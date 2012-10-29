@@ -1,0 +1,5 @@
+mutagen>=1.20
+notify2>=0.3
+psycopg2>=2.4.5
+python-debian>=0.1.21ubuntu1
+
