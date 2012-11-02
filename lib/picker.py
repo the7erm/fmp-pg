@@ -24,6 +24,7 @@ from __init__ import *
 from random import shuffle
 
 dont_pick_created = False
+populate_locked = False
 
 # CREATE TEMPORARY TABLE IF NOT EXISTS dont_pick (fid SERIAL);
 # CREATE UNIQUE INDEX fid_index ON dont_pick (fid);
@@ -51,7 +52,7 @@ def create_dont_pick():
     query("DROP TABLE dont_pick")
     query("CREATE TABLE IF NOT EXISTS dont_pick (fid SERIAL, reason text, reason_value text)")
     query("CREATE UNIQUE INDEX dont_pick_fid_index ON dont_pick (fid)")
-    query('CREATE RULE "dont_pick_on_duplicate_ignore" AS ON INSERT TO "dont_pick"  WHERE EXISTS(SELECT 1 FROM dont_pick WHERE (fid)=(NEW.fid)) DO INSTEAD NOTHING;')
+    query('CREATE RULE "dont_pick_on_duplicate_ignore" AS ON INSERT TO "dont_pick" WHERE EXISTS(SELECT 1 FROM dont_pick WHERE (fid)=(NEW.fid)) DO INSTEAD NOTHING;')
 
 def create_preload():
     # query("CREATE TABLE IF NOT EXISTS preload (fid SERIAL, uid SERIAL, reason text)")
@@ -102,16 +103,35 @@ def populate_dont_pick():
     #    print "don't pick:",r
 
 
-def populate_preload(uid=None):
-    if not uid:
+def populate_preload(uid=None, min_amount=0):
+
+    if not uid or uid is None:
         listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
         for l in listeners:
-            populate_preload(l['uid'])
+            populate_preload(l['uid'], min_amount)
+        return
 
-        return
+    try:
+        populate_preload_for_uid(uid, min_amount)
+    except:
+        global populate_locked
+        populate_locked = False
+        populate_preload_for_uid(uid, min_amount)
+
+
+def populate_preload_for_uid(uid, min_amount=0):
+
     total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s",(uid,))
-    if total['total'] != 0:
+    if total['total'] > min_amount:
+        print "uid: %s preload total: %s>%s :min_amount" % (uid, total['total'], min_amount)
         return
+
+    global populate_locked
+    if populate_locked:
+        print "populate_locked"
+        return
+    populate_locked = True
+
     associate_gernes()
     populate_dont_pick()
 
@@ -166,7 +186,7 @@ def populate_preload(uid=None):
             empty_scores.append(true_score)
             continue
         wait()
-        print get_assoc("SELECT * FROM files WHERE fid = %s",(f['fid'],))
+        print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(f['fid'],))
         query("INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)",(f['fid'], uid, "true_score >= %s" % (true_score,)))
         query("INSERT INTO dont_pick (fid, reason) SELECT DISTINCT fid, 'artist in preload' FROM file_artists WHERE aid IN (SELECT DISTINCT aid FROM file_artists fa WHERE fid IN (SELECT DISTINCT fid FROM preload))")
 
@@ -187,6 +207,8 @@ def populate_preload(uid=None):
 
     for p in preload:
         print "p:",p
+
+    populate_locked = False
 
 def get_song_from_preload():
     query("DELETE FROM preload p WHERE uid NOT IN (SELECT uid FROM users WHERE listening = true)")

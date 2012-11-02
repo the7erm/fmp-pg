@@ -233,14 +233,14 @@ def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, dur_str
 def create_dont_pick():
     populate_preload()
 
-def populate_preload():
+def populate_preload(min_amount=0):
     global listeners
     listeners = get_results_assoc("SELECT uid, uname FROM users WHERE listening = true")
     print "gc:",gc.collect()
     # picker.create_preload()
     picker.create_dont_pick()
     # picker.populate_dont_pick()
-    picker.populate_preload()
+    picker.populate_preload(min_amount=min_amount)
 
     return True
 
@@ -352,7 +352,7 @@ tray.quit.connect("activate", gtk.main_quit)
 tray.icon.connect('scroll-event',plr.on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(60000, populate_preload)
+gobject.timeout_add(60000, populate_preload, 5)
 gobject.timeout_add(5000, set_rating)
 gtk.main()
 
