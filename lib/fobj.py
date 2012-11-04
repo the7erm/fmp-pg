@@ -20,58 +20,77 @@
 
 from __init__ import *
 import os, time
-import pprint
-pp = pprint.PrettyPrinter(depth=6)
+import pprint, urllib
 
-class Listeners:
-    def __init__(self):
-        self.refresh()
-
-    def __getattr__(self, name):
-        if name == 'listeners':
-            if time.time() < self.expires():
-                self.refresh()
-            return self.listeners
-
-        return getattr(self, name)
-
-    def __str__(self):
-        return "listeners:%s\n%s" % (pp.pformat(self.listeners),pp.pformat(self.selected))
-
-    def refresh(self):
-        self.expires = time.time() + 60
-        self.listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname")
-        self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true")
-        if not self.selected and self.listeners:
-            query("UPDATE users SET selected = false")
-            query("UPDATE users SET selected = true WHERE uid = %s", (self.listeners[0]['uid']))
-            self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true")
+try:
+    import mutagen
+    from mutagen.id3 import APIC, PRIV, GEOB, MCDI, TIPL, ID3TimeStamp, UFID, TMCL, PCNT, RVA2, WCOM, COMM, Frame
+except ImportError, err:
+	print "mutagen isn't installed"
+	print "run sudo apt-get install python-mutagen"
+	exit(1)
 
 
-    def mark_fid_as_played(self, fid):
-        print "mark_fid_as_played:",fid
+def is_video(ext=None):
+    return ext.lower() in video_ext
 
-    def mark_eid_as_played(self, eid):
-        print "mark_eid_as_played:",eid
+def is_audio(ext=None):
+    return ext.lower() in audio_ext
 
+def has_tags(ext=None):
+    return ext.lower() in audio_with_tags
 
-    def pp(self):
-        pp.pprint(self.listeners)
-        pp.pprint(self.selected)
+class FObj:
+    def __init__(self, filename=None, dirname=None, basename=None):
+        self.filename = None
+        self.is_stream = False
+        self.exists = False
+        self.can_rate = False
+        self.uri = None
+        self.tags_easy = None
+        self.tags_hard = None
 
-listeners = Listeners()
+        if filename is not None and filename.startswith("file://"):
+            self.uri = filename
+            filename = urllib.url2pathname(filename).replace("file://", '', 1)
 
-class NotImpimented(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
+        if dirname is not None and basename is not None:
+            if dirname.startswith("file://"):
+                dirname = urllib.url2pathname(dirname).replace("file://", '', 1)
+                basename = urrllib.url2pathname(basename)
 
-class Fobj:
-    def __init__(self, filename=None):
-        self.filename = filename
-        self.dirname = os.path.dirname(filename)
-        self.basename = os.path.basename(filename)
+            self.filename = os.path.join(dirname, basename)
+            self.dirname = dirname
+            self.basename = basename
+        elif filename is not None:
+            self.filename = filename
+            self.dirname = os.path.dirname(filename)
+            self.basename = os.path.basename(filename)
+        else:
+            raise CreationFailed(
+                "Unabled to allocate filename:%s\n" % filename + 
+                "Unabled to allocate dirname:%s\n" % dirname + 
+                "Unabled to allocate basename:%s" % basename
+            )
+        
+        if self.filename and (
+                self.filename.startswith('http://') or 
+                self.filename.startswith('https://') or 
+                self.filename.startswith("rtsp://")
+            ):
+            self.is_stream = True
+            self.uri = self.filename
+        elif self.uri is None:
+            self.uri = "file://%s" % urllib.pathname2url(self.filename)
+
+        if not self.is_stream:
+            self.exists = os.path.exists(self.filename)
+
+        self.root, self.ext = os.path.splitext(self.basename)
+        self.has_tags = has_tags(self.ext)
+        self.is_audio = is_audio(self.ext)
+        self.is_video = is_video(self.ext)
+        
 
     def mark_as_played(self):
         raise NotImpimented("mark_as_played")
@@ -79,40 +98,69 @@ class Fobj:
     def exists(self):
         return os.path.exists(self.filename)
 
-class Local_File(Fobj):
-    def __init__(self, dirname=None, basename=None, fid=None, filename=None):
-        if filename != None:
-            dirname = os.path.dirname(filename)
-            basename = os.path.basename(filename)
+    def get_tags(self):
+        if self.exists and self.has_tags:
+            self.tags_easy = mutagen.File(self.filename, easy=True)
 
-        if fid:
-            db_info = get_assoc("SELECT * FROM files WHERE fid = %s LIMIT 1",(fid,))
+    def getmtime(self):
+        t = getmtime(self.filename)
+        self.mtime = datetime.datetime.fromtimestamp(t)
+        tz = time.strftime("%Z", time.gmtime())
+        localtz = pytz.timezone(tz)
+        self.mtime = localtz.localize(self.mtime)
+        return self.mtime
 
-        if dirname != None and basename != None:
-            db_info = get_assoc("SELECT * FROM files WHERE dir = %s AND basename = %s LIMIT 1",(dirname, basename))
-
-        if db_info:
-            filename = os.path.join(self.db_info['dir'], self.db_info['basename'])
-
-        super(Fobj, self).__init__(filename=filename)
-
-        self.db_info = db_info
-
-    def mark_as_played(self):
-        listeners.mark_fid_as_played(self.db_info['fid'])
-        
-
-class Netcast_File(Fobj):
-    def __init__(self, filename=None, dirname=None, basename=None, eid=None, episode_url=None):
-        super(Fobj, self).__init__(filename=filename)
-
-    def mark_as_played(self):
-        listeners.mark_eid_as_played(self.db_info['eid'])
+import netcast_fobj
+import local_file_fobj
+import generic_fobj
 
 
-if __name__ == "__main__":
+pp = pprint.PrettyPrinter(depth=6)
+
+audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
+audio_with_tags = ['.mp3','.ogg','.wma','.flac']
+video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv','.mp4', '.m4a', '.mov', '.m4v']
+
+class NotImpimented(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+class CreationFailed(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return str(self.value)
+
+
+
+def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, nid=None, episode_url=None, local_filename=None, register_as_new_file=False, register_as_new_netcast=False):
+    try:
+        return local_file_fobj.Local_File(dirname=dirname, basename=basename, fid=fid, filename=filename, insert=register_as_new_file)
+    except CreationFailed, e:
+        print "CreationFailed:",e
+
+    if register_as_new_file:
+        raise CreationFailed('File was unable to be registered.')
+
+    try:
+        return netcast_fobj.Netcast_file(filename=filename, dirname=dirname, basename=basename, eid=eid, episode_url=episode_url, local_filename=local_filename, nid=nid, insert=register_as_new_netcast)
+    except CreationFailed, e:
+        print "CreationFailed:", e
+
+    if register_as_new_netcast:
+        raise CreationFailed("File was not registered as a netcast.")
+
+    
+    return generic_fobj.Generic_File(dirname=None, basename=None, filename=None)
+
+
+if __name__ == '__main__':
     import sys
-    print listeners
     for arg in sys.argv:
-        print arg
+        obj = get_fobj(filename=argv)
+
+
+
 
