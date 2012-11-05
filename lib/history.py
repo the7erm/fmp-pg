@@ -40,15 +40,21 @@ class History_Tree(gtk.TreeView):
             int, # percent_played
             str, # time_played
             str, # time between
+            int, # rating
+            int, # score
+            float # true_score
         )
         self.set_model(self.store)
         self.set_headers_visible(True)
         self.append_simple_col("User",2)
+        self.append_simple_col("Rating",6)
+        self.append_simple_col("Score",7)
+        self.append_simple_col("True Score",8)
         self.append_simple_col("Percent Played",3)
         self.append_simple_col("Time Played",4)
-        self.append_simple_col("Time Between",5)
+        self.append_simple_col("Time Between",5)        
         
-        self.query = pg_cur.mogrify("SELECT * FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.fid = %s AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY time_played DESC", (fid,))
+        self.query = pg_cur.mogrify("SELECT * FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY time_played DESC", (fid,))
 
         self.populate_liststore()
 
@@ -95,16 +101,22 @@ class History_Tree(gtk.TreeView):
                 int, # percent_played
                 str, # time_played
                 str, # time between
+                int, # rating
+                int, # score
+                float # true_score
             ) """
             # uname, time_played, time_played_int, percent, time_between, int_time_between
             try:
                 self.store.append([
-                    h['fid'],
+                    h['id'],
                     h['uid'],
                     uname, # uname
                     h['percent_played'],
                     h['time_played'].strftime("%c"), # time_played
                     time_between, # time_between
+                    h['rating'],
+                    h['score'],
+                    h['true_score']
                 ])
             except AttributeError,err:
                 print "AttributeError:",err

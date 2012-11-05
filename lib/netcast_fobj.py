@@ -325,8 +325,8 @@ class Netcast_File(fobj.FObj):
             base = urllib.url2pathname(base)
         return os.path.join(cache_dir, base)
 
-    def mark_as_played(self):
-        listeners.mark_eid_as_played(self.db_info['eid'])
+    def mark_as_played(self, percent_played=0):
+        print "Necast_file::mark_as_played()"
 
     def insert(self, episode_title, episode_url):
         if self.db_info:

@@ -74,6 +74,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
         self.add_ratings_and_scores()
         self.add_history()
         self.add_tags()
+        
 
     def add_tab(self, widget, text):
         widget.show()

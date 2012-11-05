@@ -24,16 +24,8 @@ else
     echo "Database $db_name exists."
 fi
 
-sed "s/ALTER TABLE .* OWNER TO database_user\;//g" create.sql > fixed_create.sql
 
-psql "$db_name" < fixed_create.sql
-
-# psql fmp_test_bad -c '\dt' -o /dev/null &>/dev/null
-
-# createdb $db_name
-
-
-# sed "s/database_user/erm/g" ./create.sql > create_erm.sql
+psql "$db_name" < create.sql
 
 
 

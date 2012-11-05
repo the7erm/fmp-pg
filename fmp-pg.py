@@ -156,21 +156,6 @@ def is_running(pid_file, kill=False):
             return False
         return True
     return False
-    """
-    old code just checked for python, new code checks for fmp-pg.py
-    exe_path = os.path.realpath(proc_path)
-    is_python = re.search('(python)',exe_path)
-
-    print "exe_path:",exe_path
-    # print "is_python:",is_python.groups()
-    if is_python:
-        if '-kill' in sys.argv:
-            os.system("kill %s" % pid)
-            print "killing %s" % pid
-            return False
-        return True
-    return False
-    """
 
 def write_pid(pid_file):
     """
@@ -201,22 +186,49 @@ def mark_as_played(percent_played=0):
         listeners = get_results_assoc("SELECT uid, uname FROM users WHERE listening = true")
     
     if listeners and last_percent_played != math.ceil(percent_played):
-        artists = get_results_assoc("SELECT aid FROM file_artists WHERE fid = %s",(playing['fid'],))
+        updated = get_results_assoc("UPDATE user_history uh SET true_score = ufi.true_score, score = ufi.score, rating = ufi.rating, percent_played = ufi.percent_played, time_played = NOW(), date_played = current_date FROM user_song_info ufi WHERE ufi.uid IN (SELECT uid FROM users WHERE listening = true) AND uh.uid = ufi.uid AND ufi.fid = uh.id AND uh.id_type = 'f' AND uh.date_played = DATE(ufi.ultp) AND uh.id = %s RETURNING uh.*", (playing['fid'],))
+        # print "UPDATED:"
+        # pp.pprint(updated)
+        
         for l in listeners:
-            try:
-                user_history = get_assoc("INSERT INTO user_history (uid, fid, percent_played, time_played, date_played) VALUES(%s,%s,%s, NOW(), current_date) RETURNING *",(l['uid'], playing['fid'], percent_played))
-            except psycopg2.IntegrityError, err:
-                query("COMMIT;")
-                query("UPDATE user_history SET percent_played = %s, time_played = NOW(), date_played = NOW() WHERE uid = %s AND fid = %s AND date_played = current_date",(percent_played, l['uid'], playing['fid']))
+            found = False
+            for u in updated:
+                if u['uid'] == l['uid']:
+                    found = True
+            if not found:
+                try:
+                    user_history = get_assoc("INSERT INTO user_history (uid, id, id_type, percent_played, time_played, date_played) VALUES(%s, %s, %s, %s, NOW(), current_date) RETURNING *",(l['uid'], playing['fid'], 'f', percent_played))
+                    updated_user = get_assoc("UPDATE user_history uh SET true_score = ufi.true_score, score = ufi.score, rating = ufi.rating, percent_played = ufi.percent_played, time_played = NOW(), date_played = current_date FROM user_song_info ufi WHERE ufi.uid = %s AND uh.uid = ufi.uid AND ufi.fid = uh.id AND uh.id_type = 'f' AND uh.date_played = DATE(ufi.ultp) AND uh.id = %s RETURNING uh.*", (l['uid'], playing['fid']))
+                    if updated_user:
+                        updated.append(updated_user)
 
-            if artists:
+                except psycopg2.IntegrityError, err:
+                    query("COMMIT;")
+                    print "psycopg2.IntegrityError:",err
+
+        artists = get_results_assoc("UPDATE artists a SET altp = NOW() FROM file_artists fa WHERE fa.aid = a.aid AND fa.fid = %s RETURNING *;",(playing['fid'],))
+        # print "ARTISTS:"
+        # pp.pprint(artists) 
+        if artists:
+            updated_artists = get_results_assoc("UPDATE user_artist_history uah SET time_played = NOW(), date_played = NOW() FROM user_song_info usi, file_artists fa WHERE usi.uid IN (SELECT uid FROM users WHERE listening = true) AND fa.fid = usi.fid AND uah.uid = usi.uid AND uah.aid = fa.aid AND usi.fid = %s AND uah.date_played = current_date RETURNING uah.*",(playing['fid'],))
+
+            update_association = {}
+
+            for ua in updated_artists:
+                key = "%s-%s" % (ua['aid'], ua['uid'])
+                update_association[key] = ua
+
+            pp.pprint(update_association)
+            for l in listeners:
+                found = False 
                 for a in artists:
-                    try:
-                        user_artist_history = get_assoc("INSERT INTO user_artist_history (uid, aid, time_played, date_played) VALUES(%s, %s, NOW(), current_date) RETURNING *", (l['uid'], a['aid']))
-                    except psycopg2.IntegrityError, err:
-                        query("COMMIT;")
-                        query("UPDATE user_artist_history SET time_played = NOW() WHERE uid = %s AND aid = %s AND date_played = current_date",(l['uid'], a['aid']))
-                        
+                    key = "%s-%s" % (a['aid'], l['uid'])
+                    if not update_association.has_key(key):
+                        try:
+                            user_artist_history = get_assoc("INSERT INTO user_artist_history (uid, aid, time_played, date_played) VALUES(%s, %s, NOW(), current_date) RETURNING *", (l['uid'], a['aid']))
+                            update_association[key] = user_artist_history
+                        except psycopg2.IntegrityError, err:
+                            query("COMMIT;")
     
         last_percent_played = math.ceil(percent_played)
 

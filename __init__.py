@@ -19,14 +19,21 @@
 
 import psycopg2
 import psycopg2.extras
-import sys, os
+import sys, os, pprint
+pp = pprint.PrettyPrinter(depth=6)
+
 sys.path.append(sys.path[0]+'/lib/')
 import ConfigParser, gc
 home = os.path.expanduser('~')
 config_dir = home+"/.fmp"
 config_file = config_dir+"/config"
+cache_dir = config_dir+"/cache"
+
 if not os.path.isdir(config_dir):
 	os.mkdir(config_dir,0775)
+
+if not os.path.isdir(cache_dir):
+	os.mkdir(cache_dir,0775)
 
 cfg = ConfigParser.ConfigParser()
 cfg.read(config_file)

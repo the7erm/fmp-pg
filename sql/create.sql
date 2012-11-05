@@ -9,14 +9,14 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: -
 --
 
 CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 
 
 --
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: -
 --
 
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
@@ -29,7 +29,7 @@ SET default_tablespace = '';
 SET default_with_oids = true;
 
 --
--- Name: album_files; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: album_files; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE album_files (
@@ -39,10 +39,8 @@ CREATE TABLE album_files (
 );
 
 
-ALTER TABLE public.album_files OWNER TO database_user;
-
 --
--- Name: album_files_alfid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: album_files_alfid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE album_files_alfid_seq
@@ -53,17 +51,15 @@ CREATE SEQUENCE album_files_alfid_seq
     CACHE 1;
 
 
-ALTER TABLE public.album_files_alfid_seq OWNER TO database_user;
-
 --
--- Name: album_files_alfid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: album_files_alfid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE album_files_alfid_seq OWNED BY album_files.alfid;
 
 
 --
--- Name: album_files_alid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: album_files_alid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE album_files_alid_seq
@@ -74,17 +70,15 @@ CREATE SEQUENCE album_files_alid_seq
     CACHE 1;
 
 
-ALTER TABLE public.album_files_alid_seq OWNER TO database_user;
-
 --
--- Name: album_files_alid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: album_files_alid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE album_files_alid_seq OWNED BY album_files.alid;
 
 
 --
--- Name: album_files_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: album_files_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE album_files_fid_seq
@@ -95,17 +89,15 @@ CREATE SEQUENCE album_files_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.album_files_fid_seq OWNER TO database_user;
-
 --
--- Name: album_files_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: album_files_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE album_files_fid_seq OWNED BY album_files.fid;
 
 
 --
--- Name: albums; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: albums; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE albums (
@@ -116,10 +108,8 @@ CREATE TABLE albums (
 );
 
 
-ALTER TABLE public.albums OWNER TO database_user;
-
 --
--- Name: albums_aid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: albums_aid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE albums_aid_seq
@@ -130,17 +120,15 @@ CREATE SEQUENCE albums_aid_seq
     CACHE 1;
 
 
-ALTER TABLE public.albums_aid_seq OWNER TO database_user;
-
 --
--- Name: albums_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: albums_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE albums_aid_seq OWNED BY albums.aid;
 
 
 --
--- Name: albums_alid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: albums_alid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE albums_alid_seq
@@ -151,17 +139,15 @@ CREATE SEQUENCE albums_alid_seq
     CACHE 1;
 
 
-ALTER TABLE public.albums_alid_seq OWNER TO database_user;
-
 --
--- Name: albums_alid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: albums_alid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE albums_alid_seq OWNED BY albums.alid;
 
 
 --
--- Name: artists; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: artists; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE artists (
@@ -172,10 +158,8 @@ CREATE TABLE artists (
 );
 
 
-ALTER TABLE public.artists OWNER TO database_user;
-
 --
--- Name: artists_aid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: artists_aid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE artists_aid_seq
@@ -186,10 +170,8 @@ CREATE SEQUENCE artists_aid_seq
     CACHE 1;
 
 
-ALTER TABLE public.artists_aid_seq OWNER TO database_user;
-
 --
--- Name: artists_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: artists_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE artists_aid_seq OWNED BY artists.aid;
@@ -198,7 +180,7 @@ ALTER SEQUENCE artists_aid_seq OWNED BY artists.aid;
 SET default_with_oids = false;
 
 --
--- Name: dont_pick; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: dont_pick; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE dont_pick (
@@ -208,10 +190,8 @@ CREATE TABLE dont_pick (
 );
 
 
-ALTER TABLE public.dont_pick OWNER TO database_user;
-
 --
--- Name: dont_pick_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: dont_pick_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE dont_pick_fid_seq
@@ -222,10 +202,8 @@ CREATE SEQUENCE dont_pick_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.dont_pick_fid_seq OWNER TO database_user;
-
 --
--- Name: dont_pick_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: dont_pick_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE dont_pick_fid_seq OWNED BY dont_pick.fid;
@@ -234,7 +212,7 @@ ALTER SEQUENCE dont_pick_fid_seq OWNED BY dont_pick.fid;
 SET default_with_oids = true;
 
 --
--- Name: file_artists; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: file_artists; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE file_artists (
@@ -244,10 +222,8 @@ CREATE TABLE file_artists (
 );
 
 
-ALTER TABLE public.file_artists OWNER TO database_user;
-
 --
--- Name: file_artists_aid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_artists_aid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_artists_aid_seq
@@ -258,17 +234,15 @@ CREATE SEQUENCE file_artists_aid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_artists_aid_seq OWNER TO database_user;
-
 --
--- Name: file_artists_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_artists_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_artists_aid_seq OWNED BY file_artists.aid;
 
 
 --
--- Name: file_artists_faid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_artists_faid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_artists_faid_seq
@@ -279,17 +253,15 @@ CREATE SEQUENCE file_artists_faid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_artists_faid_seq OWNER TO database_user;
-
 --
--- Name: file_artists_faid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_artists_faid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_artists_faid_seq OWNED BY file_artists.faid;
 
 
 --
--- Name: file_artists_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_artists_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_artists_fid_seq
@@ -300,17 +272,15 @@ CREATE SEQUENCE file_artists_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_artists_fid_seq OWNER TO database_user;
-
 --
--- Name: file_artists_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_artists_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_artists_fid_seq OWNED BY file_artists.fid;
 
 
 --
--- Name: file_genres; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: file_genres; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE file_genres (
@@ -320,10 +290,8 @@ CREATE TABLE file_genres (
 );
 
 
-ALTER TABLE public.file_genres OWNER TO database_user;
-
 --
--- Name: file_genres_fgid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_genres_fgid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_genres_fgid_seq
@@ -334,17 +302,15 @@ CREATE SEQUENCE file_genres_fgid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_genres_fgid_seq OWNER TO database_user;
-
 --
--- Name: file_genres_fgid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_genres_fgid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_genres_fgid_seq OWNED BY file_genres.fgid;
 
 
 --
--- Name: file_genres_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_genres_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_genres_fid_seq
@@ -355,17 +321,15 @@ CREATE SEQUENCE file_genres_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_genres_fid_seq OWNER TO database_user;
-
 --
--- Name: file_genres_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_genres_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_genres_fid_seq OWNED BY file_genres.fid;
 
 
 --
--- Name: file_genres_gid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: file_genres_gid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE file_genres_gid_seq
@@ -376,17 +340,15 @@ CREATE SEQUENCE file_genres_gid_seq
     CACHE 1;
 
 
-ALTER TABLE public.file_genres_gid_seq OWNER TO database_user;
-
 --
--- Name: file_genres_gid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: file_genres_gid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE file_genres_gid_seq OWNED BY file_genres.gid;
 
 
 --
--- Name: files; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: files; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE files (
@@ -398,10 +360,8 @@ CREATE TABLE files (
 );
 
 
-ALTER TABLE public.files OWNER TO database_user;
-
 --
--- Name: files_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: files_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE files_fid_seq
@@ -412,17 +372,15 @@ CREATE SEQUENCE files_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.files_fid_seq OWNER TO database_user;
-
 --
--- Name: files_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: files_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE files_fid_seq OWNED BY files.fid;
 
 
 --
--- Name: genres; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: genres; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE genres (
@@ -433,10 +391,8 @@ CREATE TABLE genres (
 );
 
 
-ALTER TABLE public.genres OWNER TO database_user;
-
 --
--- Name: genres_gid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: genres_gid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE genres_gid_seq
@@ -447,17 +403,15 @@ CREATE SEQUENCE genres_gid_seq
     CACHE 1;
 
 
-ALTER TABLE public.genres_gid_seq OWNER TO database_user;
-
 --
--- Name: genres_gid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: genres_gid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE genres_gid_seq OWNED BY genres.gid;
 
 
 --
--- Name: netcast_episodes; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcast_episodes; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE netcast_episodes (
@@ -469,17 +423,15 @@ CREATE TABLE netcast_episodes (
 );
 
 
-ALTER TABLE public.netcast_episodes OWNER TO database_user;
-
 --
--- Name: TABLE netcast_episodes; Type: COMMENT; Schema: public; Owner: database_user
+-- Name: TABLE netcast_episodes; Type: COMMENT; Schema: public; Owner: -
 --
 
 COMMENT ON TABLE netcast_episodes IS 'eid, nid, title, local_file, remote_url';
 
 
 --
--- Name: netcast_episodes_eid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcast_episodes_eid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcast_episodes_eid_seq
@@ -490,17 +442,15 @@ CREATE SEQUENCE netcast_episodes_eid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcast_episodes_eid_seq OWNER TO database_user;
-
 --
--- Name: netcast_episodes_eid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcast_episodes_eid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcast_episodes_eid_seq OWNED BY netcast_episodes.eid;
 
 
 --
--- Name: netcast_episodes_nid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcast_episodes_nid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcast_episodes_nid_seq
@@ -511,10 +461,8 @@ CREATE SEQUENCE netcast_episodes_nid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcast_episodes_nid_seq OWNER TO database_user;
-
 --
--- Name: netcast_episodes_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcast_episodes_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcast_episodes_nid_seq OWNED BY netcast_episodes.nid;
@@ -523,7 +471,7 @@ ALTER SEQUENCE netcast_episodes_nid_seq OWNED BY netcast_episodes.nid;
 SET default_with_oids = false;
 
 --
--- Name: netcast_subscribers; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcast_subscribers; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE netcast_subscribers (
@@ -533,10 +481,8 @@ CREATE TABLE netcast_subscribers (
 );
 
 
-ALTER TABLE public.netcast_subscribers OWNER TO database_user;
-
 --
--- Name: netcast_subscribers_nid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_nid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcast_subscribers_nid_seq
@@ -547,17 +493,15 @@ CREATE SEQUENCE netcast_subscribers_nid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcast_subscribers_nid_seq OWNER TO database_user;
-
 --
--- Name: netcast_subscribers_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcast_subscribers_nid_seq OWNED BY netcast_subscribers.nid;
 
 
 --
--- Name: netcast_subscribers_nsid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_nsid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcast_subscribers_nsid_seq
@@ -568,17 +512,15 @@ CREATE SEQUENCE netcast_subscribers_nsid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcast_subscribers_nsid_seq OWNER TO database_user;
-
 --
--- Name: netcast_subscribers_nsid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_nsid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcast_subscribers_nsid_seq OWNED BY netcast_subscribers.nsid;
 
 
 --
--- Name: netcast_subscribers_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcast_subscribers_uid_seq
@@ -589,10 +531,8 @@ CREATE SEQUENCE netcast_subscribers_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcast_subscribers_uid_seq OWNER TO database_user;
-
 --
--- Name: netcast_subscribers_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcast_subscribers_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcast_subscribers_uid_seq OWNED BY netcast_subscribers.uid;
@@ -601,21 +541,20 @@ ALTER SEQUENCE netcast_subscribers_uid_seq OWNED BY netcast_subscribers.uid;
 SET default_with_oids = true;
 
 --
--- Name: netcasts; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcasts; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE netcasts (
     nid integer NOT NULL,
     netcast_name text,
     rss_url text,
-    expire_time timestamp with time zone
+    expire_time timestamp with time zone,
+    last_updated timestamp with time zone
 );
 
 
-ALTER TABLE public.netcasts OWNER TO database_user;
-
 --
--- Name: netcasts_nid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: netcasts_nid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE netcasts_nid_seq
@@ -626,10 +565,8 @@ CREATE SEQUENCE netcasts_nid_seq
     CACHE 1;
 
 
-ALTER TABLE public.netcasts_nid_seq OWNER TO database_user;
-
 --
--- Name: netcasts_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: netcasts_nid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE netcasts_nid_seq OWNED BY netcasts.nid;
@@ -638,7 +575,7 @@ ALTER SEQUENCE netcasts_nid_seq OWNED BY netcasts.nid;
 SET default_with_oids = false;
 
 --
--- Name: preload; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: preload; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE preload (
@@ -648,10 +585,8 @@ CREATE TABLE preload (
 );
 
 
-ALTER TABLE public.preload OWNER TO database_user;
-
 --
--- Name: preload_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: preload_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE preload_fid_seq
@@ -662,10 +597,8 @@ CREATE SEQUENCE preload_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.preload_fid_seq OWNER TO database_user;
-
 --
--- Name: preload_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: preload_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE preload_fid_seq OWNED BY preload.fid;
@@ -674,7 +607,7 @@ ALTER SEQUENCE preload_fid_seq OWNED BY preload.fid;
 SET default_with_oids = true;
 
 --
--- Name: tags_text; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: tags_text; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE tags_text (
@@ -685,10 +618,8 @@ CREATE TABLE tags_text (
 );
 
 
-ALTER TABLE public.tags_text OWNER TO database_user;
-
 --
--- Name: tags_tid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: tags_tid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE tags_tid_seq
@@ -699,10 +630,8 @@ CREATE SEQUENCE tags_tid_seq
     CACHE 1;
 
 
-ALTER TABLE public.tags_tid_seq OWNER TO database_user;
-
 --
--- Name: tags_tid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: tags_tid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE tags_tid_seq OWNED BY tags_text.tid;
@@ -711,7 +640,7 @@ ALTER SEQUENCE tags_tid_seq OWNED BY tags_text.tid;
 SET default_with_oids = false;
 
 --
--- Name: tags_binary; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: tags_binary; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE tags_binary (
@@ -722,10 +651,8 @@ CREATE TABLE tags_binary (
 );
 
 
-ALTER TABLE public.tags_binary OWNER TO database_user;
-
 --
--- Name: tags_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: tags_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE tags_fid_seq
@@ -736,10 +663,8 @@ CREATE SEQUENCE tags_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.tags_fid_seq OWNER TO database_user;
-
 --
--- Name: tags_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: tags_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE tags_fid_seq OWNED BY tags_text.fid;
@@ -748,7 +673,7 @@ ALTER SEQUENCE tags_fid_seq OWNED BY tags_text.fid;
 SET default_with_oids = true;
 
 --
--- Name: user_artist_history; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_artist_history; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE user_artist_history (
@@ -760,10 +685,8 @@ CREATE TABLE user_artist_history (
 );
 
 
-ALTER TABLE public.user_artist_history OWNER TO database_user;
-
 --
--- Name: user_artist_history_aid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_history_aid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_history_aid_seq
@@ -774,17 +697,15 @@ CREATE SEQUENCE user_artist_history_aid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_history_aid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_history_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_history_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_history_aid_seq OWNED BY user_artist_history.aid;
 
 
 --
--- Name: user_artist_history_uahid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_history_uahid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_history_uahid_seq
@@ -795,17 +716,15 @@ CREATE SEQUENCE user_artist_history_uahid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_history_uahid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_history_uahid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_history_uahid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_history_uahid_seq OWNED BY user_artist_history.uahid;
 
 
 --
--- Name: user_artist_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_history_uid_seq
@@ -816,17 +735,15 @@ CREATE SEQUENCE user_artist_history_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_history_uid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_history_uid_seq OWNED BY user_artist_history.uid;
 
 
 --
--- Name: user_artist_info; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_artist_info; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE user_artist_info (
@@ -837,10 +754,8 @@ CREATE TABLE user_artist_info (
 );
 
 
-ALTER TABLE public.user_artist_info OWNER TO database_user;
-
 --
--- Name: user_artist_info_aid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_info_aid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_info_aid_seq
@@ -851,17 +766,15 @@ CREATE SEQUENCE user_artist_info_aid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_info_aid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_info_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_info_aid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_info_aid_seq OWNED BY user_artist_info.aid;
 
 
 --
--- Name: user_artist_info_uaid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_info_uaid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_info_uaid_seq
@@ -872,17 +785,15 @@ CREATE SEQUENCE user_artist_info_uaid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_info_uaid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_info_uaid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_info_uaid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_info_uaid_seq OWNED BY user_artist_info.uaid;
 
 
 --
--- Name: user_artist_info_ualtp_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_info_ualtp_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_info_ualtp_seq
@@ -893,17 +804,15 @@ CREATE SEQUENCE user_artist_info_ualtp_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_info_ualtp_seq OWNER TO database_user;
-
 --
--- Name: user_artist_info_ualtp_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_info_ualtp_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_info_ualtp_seq OWNED BY user_artist_info.ualtp;
 
 
 --
--- Name: user_artist_info_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_artist_info_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_artist_info_uid_seq
@@ -914,33 +823,33 @@ CREATE SEQUENCE user_artist_info_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_artist_info_uid_seq OWNER TO database_user;
-
 --
--- Name: user_artist_info_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_artist_info_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_artist_info_uid_seq OWNED BY user_artist_info.uid;
 
 
 --
--- Name: user_history; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_history; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE user_history (
     uhid integer NOT NULL,
     uid integer NOT NULL,
-    fid integer NOT NULL,
+    id integer NOT NULL,
     percent_played integer,
     time_played timestamp with time zone,
-    date_played date
+    date_played date,
+    id_type character varying(2),
+    true_score double precision DEFAULT 0,
+    score integer DEFAULT 0,
+    rating integer DEFAULT 0
 );
 
 
-ALTER TABLE public.user_history OWNER TO database_user;
-
 --
--- Name: user_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_history_fid_seq
@@ -951,17 +860,15 @@ CREATE SEQUENCE user_history_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_history_fid_seq OWNER TO database_user;
-
 --
--- Name: user_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE user_history_fid_seq OWNED BY user_history.fid;
+ALTER SEQUENCE user_history_fid_seq OWNED BY user_history.id;
 
 
 --
--- Name: user_history_uhid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_history_uhid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_history_uhid_seq
@@ -972,17 +879,15 @@ CREATE SEQUENCE user_history_uhid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_history_uhid_seq OWNER TO database_user;
-
 --
--- Name: user_history_uhid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_history_uhid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_history_uhid_seq OWNED BY user_history.uhid;
 
 
 --
--- Name: user_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_history_uid_seq
@@ -993,17 +898,15 @@ CREATE SEQUENCE user_history_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_history_uid_seq OWNER TO database_user;
-
 --
--- Name: user_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_history_uid_seq OWNED BY user_history.uid;
 
 
 --
--- Name: user_song_info; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_song_info; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE user_song_info (
@@ -1018,10 +921,8 @@ CREATE TABLE user_song_info (
 );
 
 
-ALTER TABLE public.user_song_info OWNER TO database_user;
-
 --
--- Name: user_song_info_fid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_song_info_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_song_info_fid_seq
@@ -1032,17 +933,15 @@ CREATE SEQUENCE user_song_info_fid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_song_info_fid_seq OWNER TO database_user;
-
 --
--- Name: user_song_info_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_song_info_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_song_info_fid_seq OWNED BY user_song_info.fid;
 
 
 --
--- Name: user_song_info_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_song_info_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_song_info_uid_seq
@@ -1053,17 +952,15 @@ CREATE SEQUENCE user_song_info_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_song_info_uid_seq OWNER TO database_user;
-
 --
--- Name: user_song_info_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_song_info_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_song_info_uid_seq OWNED BY user_song_info.uid;
 
 
 --
--- Name: user_song_info_usid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: user_song_info_usid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE user_song_info_usid_seq
@@ -1074,17 +971,15 @@ CREATE SEQUENCE user_song_info_usid_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_song_info_usid_seq OWNER TO database_user;
-
 --
--- Name: user_song_info_usid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: user_song_info_usid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE user_song_info_usid_seq OWNED BY user_song_info.usid;
 
 
 --
--- Name: users; Type: TABLE; Schema: public; Owner: database_user; Tablespace: 
+-- Name: users; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE TABLE users (
@@ -1098,10 +993,8 @@ CREATE TABLE users (
 );
 
 
-ALTER TABLE public.users OWNER TO database_user;
-
 --
--- Name: users_uid_seq; Type: SEQUENCE; Schema: public; Owner: database_user
+-- Name: users_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE users_uid_seq
@@ -1112,220 +1005,211 @@ CREATE SEQUENCE users_uid_seq
     CACHE 1;
 
 
-ALTER TABLE public.users_uid_seq OWNER TO database_user;
-
 --
--- Name: users_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: database_user
+-- Name: users_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE users_uid_seq OWNED BY users.uid;
 
 
 --
--- Name: alfid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: alfid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY album_files ALTER COLUMN alfid SET DEFAULT nextval('album_files_alfid_seq'::regclass);
 
 
 --
--- Name: alid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: alid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY album_files ALTER COLUMN alid SET DEFAULT nextval('album_files_alid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY album_files ALTER COLUMN fid SET DEFAULT nextval('album_files_fid_seq'::regclass);
 
 
 --
--- Name: alid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: alid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY albums ALTER COLUMN alid SET DEFAULT nextval('albums_alid_seq'::regclass);
 
 
 --
--- Name: aid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: aid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY albums ALTER COLUMN aid SET DEFAULT nextval('albums_aid_seq'::regclass);
 
 
 --
--- Name: aid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: aid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY artists ALTER COLUMN aid SET DEFAULT nextval('artists_aid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY dont_pick ALTER COLUMN fid SET DEFAULT nextval('dont_pick_fid_seq'::regclass);
 
 
 --
--- Name: faid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: faid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_artists ALTER COLUMN faid SET DEFAULT nextval('file_artists_faid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_artists ALTER COLUMN fid SET DEFAULT nextval('file_artists_fid_seq'::regclass);
 
 
 --
--- Name: aid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: aid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_artists ALTER COLUMN aid SET DEFAULT nextval('file_artists_aid_seq'::regclass);
 
 
 --
--- Name: fgid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fgid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_genres ALTER COLUMN fgid SET DEFAULT nextval('file_genres_fgid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_genres ALTER COLUMN fid SET DEFAULT nextval('file_genres_fid_seq'::regclass);
 
 
 --
--- Name: gid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: gid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY file_genres ALTER COLUMN gid SET DEFAULT nextval('file_genres_gid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY files ALTER COLUMN fid SET DEFAULT nextval('files_fid_seq'::regclass);
 
 
 --
--- Name: gid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: gid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY genres ALTER COLUMN gid SET DEFAULT nextval('genres_gid_seq'::regclass);
 
 
 --
--- Name: eid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: eid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY netcast_episodes ALTER COLUMN eid SET DEFAULT nextval('netcast_episodes_eid_seq'::regclass);
 
 
 --
--- Name: nid; Type: DEFAULT; Schema: public; Owner: database_user
---
-
-ALTER TABLE ONLY netcast_episodes ALTER COLUMN nid SET DEFAULT nextval('netcast_episodes_nid_seq'::regclass);
-
-
---
--- Name: nsid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: nsid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY netcast_subscribers ALTER COLUMN nsid SET DEFAULT nextval('netcast_subscribers_nsid_seq'::regclass);
 
 
 --
--- Name: nid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: nid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY netcasts ALTER COLUMN nid SET DEFAULT nextval('netcasts_nid_seq'::regclass);
 
 
 --
--- Name: fid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY preload ALTER COLUMN fid SET DEFAULT nextval('preload_fid_seq'::regclass);
 
 
 --
--- Name: tid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: tid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY tags_text ALTER COLUMN tid SET DEFAULT nextval('tags_tid_seq'::regclass);
 
 
 --
--- Name: uahid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: uahid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_artist_history ALTER COLUMN uahid SET DEFAULT nextval('user_artist_history_uahid_seq'::regclass);
 
 
 --
--- Name: uaid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: uaid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_artist_info ALTER COLUMN uaid SET DEFAULT nextval('user_artist_info_uaid_seq'::regclass);
 
 
 --
--- Name: uid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: uid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_artist_info ALTER COLUMN uid SET DEFAULT nextval('user_artist_info_uid_seq'::regclass);
 
 
 --
--- Name: aid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: aid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_artist_info ALTER COLUMN aid SET DEFAULT nextval('user_artist_info_aid_seq'::regclass);
 
 
 --
--- Name: ualtp; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: ualtp; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_artist_info ALTER COLUMN ualtp SET DEFAULT nextval('user_artist_info_ualtp_seq'::regclass);
 
 
 --
--- Name: uhid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: uhid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_history ALTER COLUMN uhid SET DEFAULT nextval('user_history_uhid_seq'::regclass);
 
 
 --
--- Name: usid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: usid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_song_info ALTER COLUMN usid SET DEFAULT nextval('user_song_info_usid_seq'::regclass);
 
 
 --
--- Name: uid; Type: DEFAULT; Schema: public; Owner: database_user
+-- Name: uid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY users ALTER COLUMN uid SET DEFAULT nextval('users_uid_seq'::regclass);
 
 
 --
--- Name: album_files_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: album_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY album_files
@@ -1333,7 +1217,7 @@ ALTER TABLE ONLY album_files
 
 
 --
--- Name: albums_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: albums_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY albums
@@ -1341,7 +1225,7 @@ ALTER TABLE ONLY albums
 
 
 --
--- Name: artists_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: artists_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY artists
@@ -1349,7 +1233,7 @@ ALTER TABLE ONLY artists
 
 
 --
--- Name: file_artists_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: file_artists_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY file_artists
@@ -1357,7 +1241,7 @@ ALTER TABLE ONLY file_artists
 
 
 --
--- Name: file_genres_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: file_genres_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY file_genres
@@ -1365,7 +1249,7 @@ ALTER TABLE ONLY file_genres
 
 
 --
--- Name: genres_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: genres_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY genres
@@ -1373,7 +1257,7 @@ ALTER TABLE ONLY genres
 
 
 --
--- Name: netcast_episodes_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcast_episodes_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY netcast_episodes
@@ -1381,7 +1265,7 @@ ALTER TABLE ONLY netcast_episodes
 
 
 --
--- Name: netcast_subscribers_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcast_subscribers_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY netcast_subscribers
@@ -1389,7 +1273,7 @@ ALTER TABLE ONLY netcast_subscribers
 
 
 --
--- Name: netcasts_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: netcasts_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY netcasts
@@ -1397,7 +1281,7 @@ ALTER TABLE ONLY netcasts
 
 
 --
--- Name: tags_binary_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: tags_binary_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY tags_binary
@@ -1405,7 +1289,7 @@ ALTER TABLE ONLY tags_binary
 
 
 --
--- Name: tags_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY tags_text
@@ -1413,7 +1297,7 @@ ALTER TABLE ONLY tags_text
 
 
 --
--- Name: user_artist_history_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_artist_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY user_artist_history
@@ -1421,7 +1305,7 @@ ALTER TABLE ONLY user_artist_history
 
 
 --
--- Name: user_artist_info_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_artist_info_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY user_artist_info
@@ -1429,7 +1313,7 @@ ALTER TABLE ONLY user_artist_info
 
 
 --
--- Name: user_history_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY user_history
@@ -1437,7 +1321,7 @@ ALTER TABLE ONLY user_history
 
 
 --
--- Name: user_song_info_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: user_song_info_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY user_song_info
@@ -1445,7 +1329,7 @@ ALTER TABLE ONLY user_song_info
 
 
 --
--- Name: users_pkey; Type: CONSTRAINT; Schema: public; Owner: database_user; Tablespace: 
+-- Name: users_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
 ALTER TABLE ONLY users
@@ -1453,168 +1337,168 @@ ALTER TABLE ONLY users
 
 
 --
--- Name: album_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: album_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX album_index ON albums USING btree (album_name);
 
 
 --
--- Name: alid_fid; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: alid_fid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX alid_fid ON album_files USING btree (alid, fid);
 
 
 --
--- Name: altp_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: altp_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX altp_index ON artists USING btree (altp);
 
 
 --
--- Name: artist; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: artist; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX artist ON artists USING btree (artist);
 
 
 --
--- Name: dir_basename; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: dir_basename; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX dir_basename ON files USING btree (dir, basename);
 
 
 --
--- Name: dont_pick_fid_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: dont_pick_fid_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX dont_pick_fid_index ON dont_pick USING btree (fid);
 
 
 --
--- Name: fid; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: fid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX fid ON tags_text USING btree (fid);
 
 
 --
--- Name: fid_aid_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: fid_aid_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX fid_aid_index ON file_artists USING btree (fid, aid);
 
 
 --
--- Name: ltp_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: ltp_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX ltp_index ON files USING btree (ltp);
 
 
 --
--- Name: percent_played; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: percent_played; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX percent_played ON user_song_info USING btree (percent_played);
 
 
 --
--- Name: preload_fid_index; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: preload_fid_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX preload_fid_index ON preload USING btree (fid);
 
 
 --
--- Name: rating; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: rating; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX rating ON user_song_info USING btree (rating);
 
 
 --
--- Name: skip_count; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: skip_count; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX skip_count ON user_song_info USING btree (score);
 
 
 --
--- Name: tags_binary_fid_idx; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: tags_binary_fid_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX tags_binary_fid_idx ON tags_binary USING btree (fid);
 
 
 --
--- Name: ualtp; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: ualtp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX ualtp ON user_artist_info USING btree (ualtp);
 
 
 --
--- Name: uid_aid; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: uid_aid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX uid_aid ON user_artist_info USING btree (uid, aid);
 
 
 --
--- Name: uid_aid_date_played; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: uid_aid_date_played; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX uid_aid_date_played ON user_artist_history USING btree (uid, aid, date_played);
 
 
 --
--- Name: uid_fid; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: uid_fid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX uid_fid ON user_song_info USING btree (uid, fid);
 
 
 --
--- Name: uid_fid_date_played; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: uid_id_id_type_date_played; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
-CREATE UNIQUE INDEX uid_fid_date_played ON user_history USING btree (uid, fid, date_played);
+CREATE UNIQUE INDEX uid_id_id_type_date_played ON user_history USING btree (uid, id, id_type, date_played);
 
 
 --
--- Name: ultp; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: ultp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX ultp ON user_song_info USING btree (ultp);
 
 
 --
--- Name: uname; Type: INDEX; Schema: public; Owner: database_user; Tablespace: 
+-- Name: uname; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE UNIQUE INDEX uname ON users USING btree (uname);
 
 
 --
--- Name: dont_pick_on_duplicate_ignore; Type: RULE; Schema: public; Owner: database_user
+-- Name: dont_pick_on_duplicate_ignore; Type: RULE; Schema: public; Owner: -
 --
 
 CREATE RULE dont_pick_on_duplicate_ignore AS ON INSERT TO dont_pick WHERE (EXISTS (SELECT 1 FROM dont_pick WHERE (dont_pick.fid = new.fid))) DO INSTEAD NOTHING;
 
 
 --
--- Name: preload_on_duplicate_ignore; Type: RULE; Schema: public; Owner: database_user
+-- Name: preload_on_duplicate_ignore; Type: RULE; Schema: public; Owner: -
 --
 
 CREATE RULE preload_on_duplicate_ignore AS ON INSERT TO preload WHERE (EXISTS (SELECT 1 FROM preload WHERE (preload.fid = new.fid))) DO INSTEAD NOTHING;
 
 
 --
--- Name: public; Type: ACL; Schema: -; Owner: postgres
+-- Name: public; Type: ACL; Schema: -; Owner: -
 --
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;

@@ -86,11 +86,18 @@ class FObj:
         if not self.is_stream:
             self.exists = os.path.exists(self.filename)
 
+        if self.exists:
+            self.filename = realpath(self.filename)
+            self.dirname = os.path.dirname(self.dirname)
+            self.basename = os.path.basename(self.basename)
+            
+
         self.root, self.ext = os.path.splitext(self.basename)
         self.has_tags = has_tags(self.ext)
         self.is_audio = is_audio(self.ext)
         self.is_video = is_video(self.ext)
-        
+        self.mtime = None
+        self.getmtime()
 
     def mark_as_played(self):
         raise NotImpimented("mark_as_played")
@@ -103,12 +110,13 @@ class FObj:
             self.tags_easy = mutagen.File(self.filename, easy=True)
 
     def getmtime(self):
-        t = getmtime(self.filename)
-        self.mtime = datetime.datetime.fromtimestamp(t)
-        tz = time.strftime("%Z", time.gmtime())
-        localtz = pytz.timezone(tz)
-        self.mtime = localtz.localize(self.mtime)
-        return self.mtime
+        if self.exists:
+            t = getmtime(self.filename)
+            self.mtime = datetime.datetime.fromtimestamp(t)
+            tz = time.strftime("%Z", time.gmtime())
+            localtz = pytz.timezone(tz)
+            self.mtime = localtz.localize(self.mtime)
+            return self.mtime
 
 import netcast_fobj
 import local_file_fobj
