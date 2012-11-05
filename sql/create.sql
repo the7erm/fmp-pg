@@ -842,9 +842,9 @@ CREATE TABLE user_history (
     time_played timestamp with time zone,
     date_played date,
     id_type character varying(2),
-    true_score double precision DEFAULT 0,
-    score integer DEFAULT 0,
-    rating integer DEFAULT 0
+    true_score double precision DEFAULT 0 NOT NULL,
+    score integer DEFAULT 0 NOT NULL,
+    rating integer DEFAULT 0 NOT NULL
 );
 
 

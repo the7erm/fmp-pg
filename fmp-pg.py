@@ -218,7 +218,7 @@ def mark_as_played(percent_played=0):
                 key = "%s-%s" % (ua['aid'], ua['uid'])
                 update_association[key] = ua
 
-            pp.pprint(update_association)
+            # pp.pprint(update_association)
             for l in listeners:
                 found = False 
                 for a in artists:

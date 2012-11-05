@@ -106,6 +106,8 @@ class History_Tree(gtk.TreeView):
                 float # true_score
             ) """
             # uname, time_played, time_played_int, percent, time_between, int_time_between
+            if type(h['true_score']) != float:
+                h['true_score'] = 0
             try:
                 self.store.append([
                     h['id'],
@@ -120,6 +122,15 @@ class History_Tree(gtk.TreeView):
                 ])
             except AttributeError,err:
                 print "AttributeError:",err
+                print "value:"
+                print h
+                pp.pprint(h)
+            except TypeError, err:
+                print "TypeError:",err
+                print h
+                for k in h.keys():
+                    print "k[%s]=%s" % (k, h[k])
+                pp.pprint(h)
         return True
 
     def append_simple_col(self, text, col_id):
