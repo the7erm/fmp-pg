@@ -331,6 +331,7 @@ def on_end_of_stream(*args):
     query("UPDATE user_song_info SET ultp = NOW(), score = score + 1 WHERE fid = %s AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'],))
     query("UPDATE user_song_info SET score = 10 WHERE fid = %s AND score > 10 AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'],))
     mark_as_played(100.00)
+    update_history(100.00)
 
     inc_index()
     plr.filename = os.path.join(playing['dir'], playing['basename'])
