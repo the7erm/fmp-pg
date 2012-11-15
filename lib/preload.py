@@ -19,7 +19,7 @@
 
 from __init__ import *
 from star_cell import CellRendererStar
-import gtk, gobject, os
+import gtk, gobject, os, datetime, math
 from subprocess import Popen
 
 class Preload(gtk.ScrolledWindow):
@@ -91,7 +91,9 @@ class Preload(gtk.ScrolledWindow):
             [int, 'rating'], 
             [int, 'score'],
             [float, 'percent_played'],
-            [float, 'true_score']
+            [float, 'true_score'],
+            [str, 'ultp'],
+            [str, 'age']
         ]
 
         for u in self.listeners:
@@ -132,6 +134,12 @@ class Preload(gtk.ScrolledWindow):
         for u in self.listeners:
             self.append_simple_col('%s\'s True Score' % (u['uname'],),self.user_cols[u['uid']]['true_score'])
 
+        for u in self.listeners:
+            self.append_simple_col('%s\'s Last time played' % (u['uname'],), self.user_cols[u['uid']]['ultp'])
+
+        for u in self.listeners:
+            self.append_simple_col('%s\'s Age' % (u['uname'],), self.user_cols[u['uid']]['age'])
+
     def append_simple_col(self, text, col_id):
         col = gtk.TreeViewColumn(text, gtk.CellRendererText(), text=col_id)
         col.set_sort_column_id(col_id)
@@ -157,7 +165,8 @@ class Preload(gtk.ScrolledWindow):
     def on_key_press_event(self,w,event):
         print "on_key_press_event"
         name = gtk.gdk.keyval_name(event.keyval)
-        if name == "Delete":
+        print "keyname:",name
+        if name == "Delete" or name == 'KP_Delete':
             self.remove_selected()
             return True # stop beep
 
@@ -177,8 +186,8 @@ class Preload(gtk.ScrolledWindow):
 
 
     def refresh_data(self):
-        print "refresh_data"
-        cols = ['uid', 'rating', 'score', 'percent_played', 'true_score']
+        print "preload.refresh_data"
+        cols = ['uid', 'rating', 'score', 'percent_played', 'true_score', 'ultp', 'age']
         self.change_locked = True
         listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname ASC")
         if len(self.listeners) != len(listeners):
@@ -228,7 +237,24 @@ class Preload(gtk.ScrolledWindow):
 
     def create_row(self, f, cols):
         found = False
-        user_file_info = get_results_assoc("SELECT * FROM users u, user_song_info us WHERE us.uid = u.uid AND u.listening = true AND us.fid = %s ORDER BY admin DESC, uname", (f['fid'],))
+        q = pg_cur.mogrify("SELECT *, age(now(), ultp) AS \"age\" FROM users u, user_song_info us WHERE us.uid = u.uid AND u.listening = true AND us.fid = %s ORDER BY admin DESC, uname", (f['fid'],))
+        # print q
+        db_user_file_info = get_results_assoc(q)
+        user_file_info = []
+
+        for r in db_user_file_info:
+            r = dict(r)
+            for k, c in r.iteritems():
+                if isinstance(c, datetime.datetime):
+                    c = c.strftime("%c")
+
+                if isinstance(c, datetime.timedelta):
+                    c = convert_delta_to_str(c)
+                        
+                r[k] = c
+
+            user_file_info.append(r)
+
         for r in self.liststore:
             if r[0] == f['fid']:
                 found = True
@@ -256,6 +282,7 @@ class Preload(gtk.ScrolledWindow):
                 c_num = self.user_cols[u['uid']][c]
                 if r[c_num] != u[c]:
                     r[c_num] = u[c]
+                    print "update_row:",r[c_num], "!=", u[c]
 
     def insert_ratings(self):
         for u in self.listeners:
@@ -267,6 +294,69 @@ class Preload(gtk.ScrolledWindow):
             m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (u['uid'],))
             q = "INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) SELECT f.fid, '%s', '%s', '%s', '%s', '%s' FROM files f WHERE f.fid NOT IN (%s)" % (u['uid'], default_rating, default_score, default_percent_played, default_true_score, m)
             query(q)
+
+
+def convert_delta_to_str(delta):
+    c = ""
+    
+    days = delta.days
+    years = 0
+    months = 0
+    weeks = 0
+    parts = []
+    
+
+    try:
+        years = int(math.floor(days / 365))
+        if years > 1:
+            parts.append("%s years" % years)
+        elif years == 1:
+            parts.append("%s year" % years)
+    except ZeroDivisionError, err:
+        pass
+
+    days = days - (years * 365)
+
+    try:
+        months = int(math.floor(days / 30))
+        if months > 1:
+            parts.append("%s months" % months)
+        elif months == 1:
+            parts.append("%s month" % months)
+    except ZeroDivisionError, err:
+        pass
+
+    days = days - (months * 30)
+
+    try:
+        weeks = int(math.floor(days / 7))
+        if weeks > 1:
+            parts.append("%s weeks" % weeks)
+        elif weeks == 1:
+            parts.append("%s week" % weeks)
+    except ZeroDivisionError, err:
+        pass
+
+    days = days - (weeks * 7)
+
+    days = int(days)
+    if days > 1:
+        parts.append("%s days" % days)
+    elif days == 1:
+        parts.append("%s day" % days)
+
+    secs = delta.seconds
+    hrs = int(math.floor(secs / 3600))
+    secs = secs - (hrs * 3600)
+    mins = int(math.floor(secs / 60))
+    secs = secs - (mins * 60)
+
+    if len(parts) < 2:
+        parts.append("%s:%02d:%02d" % (hrs, mins, secs))
+
+    parts = parts[0:3]
+
+    return " ".join(parts)
 
 if __name__ == "__main__":
     

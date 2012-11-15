@@ -75,7 +75,7 @@ class User_File_Info_Tree(gtk.TreeView):
 
     def populate_liststore(self):
         self.change_locked = True
-        # print "self.query:",self.query
+        print "User_File_Info_Tree:self.query:",self.query
         self.file_info = get_results_assoc(self.query)
         if len(self.file_info) < len(self.store):
             for i, r in enumerate(self.store):
@@ -110,11 +110,23 @@ class User_File_Info_Tree(gtk.TreeView):
                         if r[6] != u['ultp'].strftime("%c"):
                             r[6] = u['ultp'].strftime("%c")
                     except AttributeError, err:
-                        r[6] = ""
+                        r[6] = "Never"
+                        u['ultp'] = "Never"
                         print "AttributeError:",err
 
                     break
             if not found:
+                if u['ultp'] is None:
+                    self.store.append([
+                        u['uid'],
+                        u['uname'],
+                        u['rating'],
+                        u['score'],
+                        u['true_score'],
+                        u['percent_played'],
+                        "Never",
+                    ])
+                    continue
                 try:
                     self.store.append([
                         u['uid'],
@@ -126,6 +138,7 @@ class User_File_Info_Tree(gtk.TreeView):
                         u['ultp'].strftime("%c"),
                     ])
                 except AttributeError, err:
+                    
                     print "AttributeError:",err
                     continue
         

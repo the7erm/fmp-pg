@@ -1,0 +1,18 @@
+#!/bin/sh
+
+if [ "$1" = "" ]
+then
+	echo "usage: pykill <script>"
+	exit
+fi
+
+for arg in "$@"
+do
+	process=`ps -Af | grep python | grep "$arg" | grep -v grep | awk '{print $2}'`
+	if [ "$process" != "" ]
+	then
+		echo "killing $process"
+		kill $process
+	fi
+done
+

@@ -19,6 +19,8 @@
 from __init__ import *
 import gtk, datetime, time, math, gobject
 
+from preload import convert_delta_to_str
+
 """
 SELECT * FROM user_history WHERE fid = 22833;
  uhid | uid |  fid  | percent_played |          time_played          | date_played 
@@ -52,9 +54,17 @@ class History_Tree(gtk.TreeView):
         self.append_simple_col("True Score",8)
         self.append_simple_col("Percent Played",3)
         self.append_simple_col("Time Played",4)
-        self.append_simple_col("Time Between",5)        
+        self.append_simple_col("Time Between",5)
+
+        # SELECT uh.*, age(uh.time_played, lag(time_played, 1, (SELECT max(time_played) FROM user_history uhl WHERE uhl.id = uh.id AND uhl.uid = uh.uid AND uhl.time_played < uh.time_played )) OVER ( PARTITION BY time_played ORDER BY time_played DESC )) AS time_between FROM user_history uh WHERE uh.id = 21067 AND uh.uid = 1 ORDER BY time_played DESC;
+
+        # SELECT u.*, uh.*, age(uh.time_played, lag(time_played, 1, (SELECT max(time_played) FROM user_history uhl WHERE uhl.id_type = uh.id_type AND uhl.id = uh.id AND uhl.uid = uh.uid AND uhl.time_played < uh.time_played )) OVER ( PARTITION BY time_played ORDER BY time_played DESC )) AS time_between FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY admin DESC, uname, time_played DESC;
         
-        self.query = pg_cur.mogrify("SELECT * FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY time_played DESC", (fid,))
+        
+        # self.query = pg_cur.mogrify("SELECT * FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY admin DESC, uname, time_played DESC", (fid,))
+
+
+        self.query = pg_cur.mogrify("SELECT u.*, uh.*, age(uh.time_played, lag(time_played, 1, (SELECT max(time_played) FROM user_history uhl WHERE uhl.id_type = uh.id_type AND uhl.id = uh.id AND uhl.uid = uh.uid AND uhl.time_played < uh.time_played )) OVER ( PARTITION BY time_played ORDER BY time_played DESC )) AS time_between FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY admin DESC, uname, time_played DESC", (fid,))
 
         self.populate_liststore()
 
@@ -67,25 +77,10 @@ class History_Tree(gtk.TreeView):
         low = datetime.datetime.now()
         high = datetime.datetime.now()
         for i, h in enumerate(history):
+            h = dict(h)
             uname = h['uname']
             if uname == None:
                 uname = ""
-
-            low = 0
-            try:
-                if history[i+1]:
-                    low = history[i+1]['time_played']
-            except IndexError:
-                low = 0
-                pass
-            high = h['time_played']
-            time_played_int = int(time.mktime(high.timetuple()))
-            int_time_between = 0
-            time_between = ""
-            try:
-                int_time_between, time_between = self.timeBetween(low, high)
-            except ValueError:
-                print  "VALUE ERROR:",self.timeBetween(low, high)
 
             perc = "%s" % h['percent_played']
             if perc == "-1":
@@ -106,16 +101,27 @@ class History_Tree(gtk.TreeView):
                 float # true_score
             ) """
             # uname, time_played, time_played_int, percent, time_between, int_time_between
-            if type(h['true_score']) != float:
+            if  not isinstance(h['true_score'], float):
                 h['true_score'] = 0
+
+            if isinstance(h['time_played'], datetime.datetime):
+                h['time_played'] = h['time_played'].strftime("%c")
+            else:
+                h['time_played'] = 'Never'
+
+            if isinstance(h['time_between'], datetime.timedelta):
+                h['time_between'] = convert_delta_to_str(h['time_between'])
+            else:
+                h['time_between'] = ""
+
             try:
                 self.store.append([
                     h['id'],
                     h['uid'],
                     uname, # uname
                     h['percent_played'],
-                    h['time_played'].strftime("%c"), # time_played
-                    time_between, # time_between
+                    h['time_played'], # time_played
+                    h['time_between'], # time_between
                     h['rating'],
                     h['score'],
                     h['true_score']

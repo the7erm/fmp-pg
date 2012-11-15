@@ -31,6 +31,7 @@ import dbus
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
+import flask_server
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):
@@ -371,7 +372,15 @@ tray.quit.connect("activate", gtk.main_quit)
 tray.icon.connect('scroll-event',plr.on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(60000, populate_preload, 5)
+gobject.timeout_add(60000, populate_preload, 1)
 gobject.timeout_add(5000, set_rating)
-gtk.main()
+
+# flask_server.playing = playing
+# flask_server.player = player
+# flask_server.start_in_thread()
+
+try:
+    gtk.main()
+except KeyboardInterrupt:
+    Popen(['pykill','fmp-pg'])
 
