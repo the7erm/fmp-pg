@@ -7,7 +7,8 @@ import os
 
 
 class Generic_File(fobj.FObj):
-    def __init__(self, dirname=None, basename=None, filename=None):
+    def __init__(self, dirname=None, basename=None, filename=None, _id=None):
+        
         if filename is not None:
             dirname = os.path.dirname(filename)
             basename = os.path.basename(filename)
@@ -20,5 +21,5 @@ class Generic_File(fobj.FObj):
         
 
     def mark_as_played(self):
-        print "Generic_File:",self.filename
+        print "TODO Generic_File.mark_as_played():",self.filename
         

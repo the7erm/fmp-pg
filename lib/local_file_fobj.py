@@ -22,10 +22,11 @@ from __init__ import *
 import fobj, math
 from listeners import listeners
 import pprint, re
+from excemptions import CreationFailed
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, insert=False):
-
+        self.can_rate = True
         self.db_info = None
         db_info = None
         self.artists = []
@@ -47,7 +48,7 @@ class Local_File(fobj.FObj):
                 basename = os.path.basename(filename)
 
             if not os.path.exists(filename):
-                raise fobj.CreationFailed("File must exist on local drive:%s" % filename)
+                raise CreationFailed("File must exist on local drive:%s" % filename)
 
             db_info = get_assoc("SELECT * FROM files WHERE dir = %s AND basename = %s",(dirname, basename))
 
@@ -59,30 +60,30 @@ class Local_File(fobj.FObj):
             self.db_info = db_info
             self.set_attribs()
         elif not insert:
-            raise fobj.CreationFailed(
+            raise CreationFailed(
                 "Unable to find file information based on:\n" +
                 "   fid:%s\n" % fid +
                 "   filename:%s\n" % filename +
-                "   basename:%s\n" % dirname +
-                "   dirname:%s\n" % basename
+                "   dirname:%s\n" % dirname +
+                "   basename:%s\n" % basename
             )
 
         fobj.FObj.__init__(self,filename=filename, dirname=dirname, basename=basename)
 
         if not self.is_audio and not self.is_video:
-            raise fobj.CreationFailed("File is not an audio or video file:%s" % self.filename)
+            raise CreationFailed("File is not an audio or video file:%s" % self.filename)
 
         if not self.exists:
-            raise fobj.CreationFailed("File must exist on local drive:%s" % self.filename)
+            raise CreationFailed("File must exist on local drive:%s" % self.filename)
 
         if self.filename and self.filename.startswith(cache_dir):
-            raise fobj.CreationFailed("File is in cache_dir:%s", (self.filename,))
+            raise CreationFailed("File is in cache_dir:%s", (self.filename,))
 
         if not self.db_info and insert:
             self.insert()
 
         elif not self.db_info:
-            raise fobj.CreationFailed("File is not in database:%s", (self.filename,))
+            raise CreationFailed("File is not in database:%s", (self.filename,))
 
         self.set_attribs()
         self.can_rate = True
@@ -402,7 +403,7 @@ if __name__ == "__main__":
             if os.path.isfile(arg):
                 obj = Local_File(filename=arg, insert=True)
                 print obj.filename
-        except fobj.CreationFailed, e:
+        except CreationFailed, e:
             print "CreationFailed:",e
 
 

@@ -22,12 +22,13 @@ from __init__ import *
 import fobj, os
 from listeners import listeners
 import gobject, feedparser, socket, urllib, pprint, datetime, pytz
+from excemptions import CreationFailed
 
 pp = pprint.PrettyPrinter(depth=6)
 
 class myURLOpener(urllib.FancyURLopener):
     """Create sub-class in order to overide error 206.  This error means a
-    partial file is being sent,
+       partial file is being sent,
        which is ok in this case.  Do nothing with this error.
     """
     def __init__(self, *args):
@@ -44,16 +45,26 @@ class myURLOpener(urllib.FancyURLopener):
         pass
 
 def update_now():
-    query("UPDATE netcasts SET expire_time = NOW() WHERE last_updated < current_timestamp - interval '30 min'")
+    query("UPDATE netcasts SET expire_time = NOW() WHERE last_updated < "+
+          "current_timestamp - interval '30 min'")
 
 class Netcast(gobject.GObject):
     __gsignals__ = {
         'updating': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-        'update-error': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        'done-updating': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        'download-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        'download-done': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        'update-entry': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+        'update-error': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                         (gobject.TYPE_PYOBJECT,)),
+
+        'done-updating': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                          (gobject.TYPE_PYOBJECT,)),
+
+        'download-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                            (gobject.TYPE_PYOBJECT,)),
+
+        'download-done': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                          (gobject.TYPE_PYOBJECT,)),
+
+        'update-entry': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                         (gobject.TYPE_PYOBJECT,)),
     }
 
     def __init__(self, nid=None, rss_url=None, insert=False):
@@ -68,18 +79,24 @@ class Netcast(gobject.GObject):
         self.expire_time = None
 
         if nid is not None:
-            self.db_info = get_assoc("SELECT * FROM netcasts WHERE nid = %s LIMIT 1", (nid,))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcasts WHERE nid = %s LIMIT 1", (nid,))
 
         if rss_url is not None and not self.db_info:
-            self.db_info = get_assoc("SELECT * FROM netcasts WHERE rss_url = %s LIMIT 1", (rss_url,))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcasts WHERE rss_url = %s LIMIT 1", (rss_url,))
 
         if not self.db_info and not insert:
-            raise fobj.CreationFailed("Unable to associate netcast: nid:%s rss_url:%s\n" % (nid, rss_url))
+            raise CreationFailed(
+                "Unable to associate netcast: nid:%s rss_url:%s\n" % 
+                    (nid, rss_url))
+
         elif not self.db_info and insert:
             if rss_url:
                 self.insert_netcast(rss_url=rss_url)
             else:
-                raise fobj.CreationFailed("Unable to insert rss feed.  No rss_url given.")
+                raise CreationFailed(
+                    "Unable to insert rss feed.  No rss_url given.")
 
         self.set_attribs()
 
@@ -93,7 +110,8 @@ class Netcast(gobject.GObject):
     def insert_netcast(self, rss_url):
         self.rss_url = rss_url
         if rss_url is not None:
-            self.db_info = get_assoc("INSERT INTO netcasts (rss_url) VALUES(%s) RETURNING *",(rss_url,))
+            self.db_info = get_assoc("INSERT INTO netcasts (rss_url) "+
+                                     "VALUES(%s) RETURNING *", (rss_url,))
             self.set_attribs()
 
         self.update()
@@ -122,11 +140,15 @@ class Netcast(gobject.GObject):
 
         if not feed.feed.has_key('title'):
             self.set_update_for_near_future()
-            self.emit('update-error', "The netcast url %s does not have a title" % (self.rss_url))
+            self.emit('update-error', "The netcast url %s " % (self.rss_url,) +
+                      "doesn't have a title")
             return
-        # select current_timestamp as "now", current_timestamp + interval '1 day' as "1 day from now";
-        query("UPDATE netcasts SET expire_time = (current_timestamp + interval '1 day') WHERE nid = %s",(self.nid,))
-        query("UPDATE netcasts SET netcast_name = %s WHERE nid = %s", ( feed['feed']['title'].encode("utf-8"), self.nid))
+        # SELECT current_timestamp AS "now", current_timestamp + interval 
+        #        '1 day' as "1 day from now";
+        query("UPDATE netcasts SET expire_time = (current_timestamp + interval"+
+              " '1 day') WHERE nid = %s", (self.nid,))
+        query("UPDATE netcasts SET netcast_name = %s WHERE nid = %s", 
+              (feed['feed']['title'].encode("utf-8"), self.nid))
 
         print self.db_info
         for i, entry in enumerate(feed['entries']):
@@ -140,24 +162,35 @@ class Netcast(gobject.GObject):
                 print "---------------------"
                 pp.pprint(enclosure)
                 try:
-                    episode = Netcast_File(netcast=self, episode_title=entry['title'], episode_url=enclosure['href'], insert=True)
+                    episode = Netcast_File(netcast=self, 
+                                           episode_title=entry['title'], 
+                                           episode_url=enclosure['href'], 
+                                           insert=True)
+
                     self.episodes.append(episode)
-                except fobj.CreationFailed, e:
-                    print "fobj.CreationFailed:",e
+                except CreationFailed, e:
+                    print "CreationFailed:",e
                 print "---------------------"
             print "==================="
 
-        query("UPDATE netcasts SET last_updated = NOW() WHERE nid = %s", (self.nid,))
+        query("UPDATE netcasts SET last_updated = NOW() WHERE nid = %s", 
+              (self.nid,))
 
     def update_episode(self, episode_url, episode_title):
-        return Netcast_File(episode_url=episode_url, episode_title=episode_title, netcast=self, insert=True)
+        return Netcast_File(episode_url=episode_url, 
+                             episode_title=episode_title, netcast=self,
+                             insert=True)
 
     def set_update_for_near_future(self):
-        query("UPDATE netcasts SET expire_time = (current_timestamp + interval '1 hour') WHERE nid = %s",(self.nid,))
+        query("UPDATE netcasts SET expire_time = (current_timestamp + "+
+              "interval '1 hour') WHERE nid = %s",(self.nid,))
 
 
 class Netcast_File(fobj.FObj):
-    def __init__(self, filename=None, dirname=None, basename=None, eid=None, episode_url=None, local_filename=None, nid=None, rss_url=None, episode_title=None, netcast=None, fuzzy=False, insert=False):
+    def __init__(self, filename=None, dirname=None, basename=None, eid=None,
+                 episode_url=None, local_filename=None, nid=None, rss_url=None,
+                 episode_title=None, netcast=None, fuzzy=False, insert=False):
+        self.can_rate = False
         self.netcast = netcast
         self.db_info = None
         self.nid = nid
@@ -188,7 +221,7 @@ class Netcast_File(fobj.FObj):
             if os.path.exists(self.local_file):
                 filename=self.local_file
             else:
-                filename=self.episode_url
+                filename=self.url
 
         if filename:
             dirname=os.path.dirname(filename)
@@ -198,72 +231,84 @@ class Netcast_File(fobj.FObj):
         elif episode_url:
             filename=episode_url
 
-        
-        fobj.FObj.__init__(self,filename=filename, dirname=dirname, basename=basename)
+        fobj.FObj.__init__(self,filename=filename, dirname=dirname, 
+                           basename=basename)
 
-        
         if not self.db_info:
             if insert:
-                self.insert(episode_title=episode_title, episode_url=episode_url)
+                self.insert(episode_title=episode_title, 
+                            episode_url=episode_url)
+
                 self.set_attribs()
             else:
                 """
-                filename=None, dirname=None, basename=None, eid=None, episode_url=None, local_filename=None, nid=None, rss_url=None, episode_title=None, netcast=None, fuzzy=False
+                filename=None, dirname=None, basename=None, eid=None, 
+                episode_url=None, local_filename=None, nid=None, rss_url=None, 
+                episode_title=None, netcast=None, fuzzy=False
                 """
-                raise fobj.CreationFailed( 
+                raise CreationFailed(
                     "Unable to find netcast episode information based on:\n"+
-                    "   eid:%s\n" % eid +
-                    "   nid:%s\n" % nid +
-                    "   filename:%s\n" % filename +
-                    "   basename:%s\n" % basename +
-                    "   dirname:%s\n" % dirname +
-                    "   episode_url:%s\n" % episode_url +
-                    "   netcast:%s\n" % netcast +
-                    "   fuzzy:%s\n" % fuzzy
+                    "    eid:%s\n" % eid +
+                    "    nid:%s\n" % nid +
+                    "    filename:%s\n" % filename +
+                    "    basename:%s\n" % basename +
+                    "    dirname:%s\n" % dirname +
+                    "    episode_url:%s\n" % episode_url +
+                    "    netcast:%s\n" % netcast +
+                    "    fuzzy:%s\n" % fuzzy
                 )
-        
 
     def set_db_info_by_nid_eid(self, eid=None):
         if self.db_info or not eid:
             return
 
         self.db_info = get_assoc("SELECT * FROM netcasts WHERE eid = %s",(eid,))
-        
 
     def set_db_info_by_episode_url(self, episode_url=None):
         if self.db_info or not episode_url:
             return
 
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND episode_url = %s LIMIT 1",(self.netcast.nid, episode_url))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND episode_url"+
+                " = %s LIMIT 1", (self.netcast.nid, episode_url))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE episode_url = %s LIMIT 1",(episode_url,))
-
-        
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE episode_url = %s LIMIT 1",
+                 (episode_url,))
 
     def set_db_info_by_local_filename(self, local_filename=None):
         if self.db_info or not local_filename:
             return
 
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND local_file = %s LIMIT 1",(self.netcast.nid, local_filename))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND local_file"+
+                " = %s LIMIT 1",(self.netcast.nid, local_filename))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE local_file = %s LIMIT 1",(local_filename,))
-
-        
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE local_file = %s LIMIT 1",
+                 (local_filename,))
 
     def set_db_info_by_filename(self, filename=None):
         if self.db_info or not filename:
             return
 
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND (local_file = %s OR episode_url = %s) LIMIT 1",(self.netcast.nid, filename, filename))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND (local_file"+
+                " = %s OR episode_url = %s) LIMIT 1", (self.netcast.nid, 
+                                                       filename, filename))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE local_file = %s OR episode_url = %s LIMIT 1", (filename, filename))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE local_file = %s OR "+
+                "episode_url = %s LIMIT 1", (filename, filename))
 
         if not self.db_info:
             filename = self.get_local_filename(filename)
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE local_file = %s OR episode_url = %s LIMIT 1", (filename, filename))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE local_file = %s OR "+
+                "episode_url = %s LIMIT 1", (filename, filename))
 
     def set_db_info_by_dirname_basename(self, dirname=None, basename=None):
         if self.db_info or not dirname or not basename:
@@ -278,9 +323,13 @@ class Netcast_File(fobj.FObj):
         basename = os.path.basename(episode_url)
         like = "%%%s" % basename
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND (episode_url LIKE %s) LIMIT 1",(self.netcast.nid, like))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND "+
+                "(episode_url LIKE %s) LIMIT 1",(self.netcast.nid, like))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE episode_url LIKE %s LIMIT 1",(like,))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE episode_url LIKE %s "+
+                "LIMIT 1",(like,))
 
     def set_db_info_by_like_local_filename(self, local_filename=None):
         if self.db_info or not local_filename:
@@ -288,9 +337,13 @@ class Netcast_File(fobj.FObj):
         basename = os.path.basename(local_filename)
         like = "%%%s" % basename
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND local_file LIKE %s LIMIT 1",(self.netcast.nid, like))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND local_file "+
+                "LIKE %s LIMIT 1", (self.netcast.nid, like))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE local_file LIKE %s LIMIT 1",(like,))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE local_file LIKE %s "+
+                "LIMIT 1",(like,))
 
     def set_db_info_by_like_filename(self, filename=None):
         if self.db_info or not filename:
@@ -298,21 +351,23 @@ class Netcast_File(fobj.FObj):
         basename = os.path.basename(filename)
         self.set_db_info_by_like_basename(basename)
 
-
     def set_db_info_by_like_basename(self, basename=None):
         if self.db_info or not basename:
             return
         like = "%%%s" % basename;
         if self.netcast:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE nid = %s AND (episode_url LIKE %s OR local_file LIKE %s) LIMIT 1",(self.netcast.nid, like, like))
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE nid = %s AND "+
+                "(episode_url LIKE %s OR local_file LIKE %s) LIMIT 1",
+                 (self.netcast.nid, like, like))
         else:
-            self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE episode_url LIKE %s OR local_file LIKE %s", (like, like))
-        
+            self.db_info = get_assoc(
+                "SELECT * FROM netcast_episodes WHERE episode_url LIKE %s OR "+
+                "local_file LIKE %s", (like, like))
 
     def set_netcast(self):
         if not self.netcast and self.db_info:
             self.netcast = Netcast(nid=self.db_info['nid'], insert=False)
-
 
     def get_local_filename(self, url=None, urldecode=False):
         if url is None:
@@ -326,7 +381,7 @@ class Netcast_File(fobj.FObj):
         return os.path.join(cache_dir, base)
 
     def mark_as_played(self, percent_played=0):
-        print "Necast_file::mark_as_played()"
+        print "TODO: Necast_file::mark_as_played()"
 
     def insert(self, episode_title, episode_url):
         if self.db_info:
@@ -338,9 +393,13 @@ class Netcast_File(fobj.FObj):
         print "url:",episode_url
         print "local_file:",local_file
 
-        self.db_info = get_assoc("INSERT INTO netcast_episodes (nid, episode_title, episode_url, local_file) VALUES(%s, %s, %s, %s) RETURNING *",(self.netcast.nid, episode_title, episode_url, local_file))
+        self.db_info = get_assoc(
+            "INSERT INTO netcast_episodes (nid, episode_title, episode_url, "+
+            "local_file) VALUES(%s, %s, %s, %s) RETURNING *", 
+            (self.netcast.nid, episode_title, episode_url, local_file))
+
         self.set_attribs()
-        pp.pprint(self.db_info)
+        pp.pprint(dict(self.db_info))
         print "====[ /Insert ]====="
 
     def set_attribs(self):
@@ -350,8 +409,7 @@ class Netcast_File(fobj.FObj):
             self.title = self.db_info['episode_title']
             self.url = self.db_info['episode_url']
             self.local = self.local_file = self.db_info['local_file']
-            
-        
+
 
 if __name__ == "__main__":
     feeds = [
@@ -368,9 +426,7 @@ if __name__ == "__main__":
         try:
             netcast = Netcast(rss_url=url, insert=True)
             netcast.update()
-        except fobj.CreationFailed, e:
+        except CreationFailed, e:
             print "CreationFailed:", e
     
     
-
-

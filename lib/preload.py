@@ -281,8 +281,9 @@ class Preload(gtk.ScrolledWindow):
             for c in cols:
                 c_num = self.user_cols[u['uid']][c]
                 if r[c_num] != u[c]:
-                    r[c_num] = u[c]
                     print "update_row:",r[c_num], "!=", u[c]
+                    r[c_num] = u[c]
+                    
 
     def insert_ratings(self):
         for u in self.listeners:

@@ -19,26 +19,41 @@
 #
 
 from __init__ import *
-import os, time
-import pprint, urllib
+import os
+import time
+import datetime
+import pprint
+import urllib
+import pytz
+from excemptions import CreationFailed, NotImpimented
 
 try:
     import mutagen
-    from mutagen.id3 import APIC, PRIV, GEOB, MCDI, TIPL, ID3TimeStamp, UFID, TMCL, PCNT, RVA2, WCOM, COMM, Frame
+    from mutagen.id3 import APIC, PRIV, GEOB, MCDI, TIPL, ID3TimeStamp, UFID, 
+                            TMCL, PCNT, RVA2, WCOM, COMM, Frame
 except ImportError, err:
 	print "mutagen isn't installed"
 	print "run sudo apt-get install python-mutagen"
 	exit(1)
 
+pp = pprint.PrettyPrinter(depth=6)
+
+audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
+audio_with_tags = ['.mp3','.ogg','.wma','.flac']
+video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
+             '.mp4', '.m4a', '.mov', '.m4v']
 
 def is_video(ext=None):
     return ext.lower() in video_ext
 
+
 def is_audio(ext=None):
     return ext.lower() in audio_ext
 
+
 def has_tags(ext=None):
     return ext.lower() in audio_with_tags
+
 
 class FObj:
     def __init__(self, filename=None, dirname=None, basename=None):
@@ -87,7 +102,7 @@ class FObj:
             self.exists = os.path.exists(self.filename)
 
         if self.exists:
-            self.filename = realpath(self.filename)
+            self.filename = os.path.realpath(self.filename)
             self.dirname = os.path.dirname(self.dirname)
             self.basename = os.path.basename(self.basename)
             
@@ -99,76 +114,86 @@ class FObj:
         self.mtime = None
         self.getmtime()
 
+
     def mark_as_played(self):
         raise NotImpimented("mark_as_played")
 
-    def exists(self):
-        return os.path.exists(self.filename)
 
     def get_tags(self):
         if self.exists and self.has_tags:
             self.tags_easy = mutagen.File(self.filename, easy=True)
 
+
     def getmtime(self):
         if self.exists:
-            t = getmtime(self.filename)
+            t = os.path.getmtime(self.filename)
             self.mtime = datetime.datetime.fromtimestamp(t)
             tz = time.strftime("%Z", time.gmtime())
             localtz = pytz.timezone(tz)
             self.mtime = localtz.localize(self.mtime)
             return self.mtime
 
+
 import netcast_fobj
 import local_file_fobj
 import generic_fobj
 
+def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, 
+             nid=None, episode_url=None, local_filename=None, 
+             register_as_new_file=False, register_as_new_netcast=False, _id=None
+             id_type=None):
 
-pp = pprint.PrettyPrinter(depth=6)
+    if id_type is not None and _id is not None:
+        if id_type = 'f':
+            try:
+                return local_file_fobj.Local_File(fid=_id)
+            except CreationFailed, e:
+                print "local_file_fobj.CreationFailed:",e
+        elif id_type == 'e':
+            try:
+                return netcast_fobj.Netcast_File(eid=_id)
+            except: CreationFailed, e:
+                print "netcast_fobj.CreationFailed:", e
+        elif id_type = 'g':
+            try:
+                return generic_fobj.Generic_File(_id=_id)
+            except: CreationFailed, e:
+                print "generic_fobj.CreationFailed:", e
 
-audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
-audio_with_tags = ['.mp3','.ogg','.wma','.flac']
-video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv','.mp4', '.m4a', '.mov', '.m4v']
-
-class NotImpimented(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
-
-class CreationFailed(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return str(self.value)
-
-
-
-def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, nid=None, episode_url=None, local_filename=None, register_as_new_file=False, register_as_new_netcast=False):
     try:
-        return local_file_fobj.Local_File(dirname=dirname, basename=basename, fid=fid, filename=filename, insert=register_as_new_file)
+        return local_file_fobj.Local_File(dirname=dirname, basename=basename, 
+                                           fid=fid, filename=filename, 
+                                           insert=register_as_new_file)
+
     except CreationFailed, e:
-        print "CreationFailed:",e
+        print "local_file_fobj.CreationFailed:",e
 
     if register_as_new_file:
         raise CreationFailed('File was unable to be registered.')
 
     try:
-        return netcast_fobj.Netcast_file(filename=filename, dirname=dirname, basename=basename, eid=eid, episode_url=episode_url, local_filename=local_filename, nid=nid, insert=register_as_new_netcast)
+        print "Attempting Netcast"
+        return netcast_fobj.Netcast_File(filename=filename, dirname=dirname, 
+                                          basename=basename, eid=eid, 
+                                          episode_url=episode_url, 
+                                          local_filename=local_filename, 
+                                          nid=nid, 
+                                          insert=register_as_new_netcast)
+
     except CreationFailed, e:
-        print "CreationFailed:", e
+        print "netcast_fobj.CreationFailed:", e
 
     if register_as_new_netcast:
         raise CreationFailed("File was not registered as a netcast.")
 
-    
-    return generic_fobj.Generic_File(dirname=None, basename=None, filename=None)
+    return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
+                                      filename=filename)
 
 
 if __name__ == '__main__':
     import sys
-    for arg in sys.argv:
-        obj = get_fobj(filename=argv)
-
-
-
+    for arg in sys.argv[1:]:
+        obj = get_fobj(filename=arg)
+        print obj
+        print "filename:",obj.filename
 

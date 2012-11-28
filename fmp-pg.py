@@ -178,11 +178,29 @@ watcher = DbusWatcher()
 
 def update_history(percent_played=0):
     global listeners
-    updated = get_results_assoc("UPDATE user_history uh SET true_score = ufi.true_score, score = ufi.score, rating = ufi.rating, percent_played = ufi.percent_played, time_played = NOW(), date_played = current_date FROM user_song_info ufi WHERE ufi.uid IN (SELECT uid FROM users WHERE listening = true) AND uh.uid = ufi.uid AND ufi.fid = uh.id AND uh.id_type = 'f' AND uh.date_played = DATE(ufi.ultp) AND uh.id = %s RETURNING uh.*", (playing['fid'],))
-        # print "UPDATED:"
-        # pp.pprint(updated)
+    updated = get_results_assoc("""UPDATE user_history uh 
+                                   SET true_score = ufi.true_score, 
+                                       score = ufi.score, 
+                                       rating = ufi.rating, 
+                                       percent_played = ufi.percent_played, 
+                                       time_played = NOW(), 
+                                       date_played = current_date 
+                                   FROM user_song_info ufi 
+                                   WHERE 
+                                        ufi.uid IN (SELECT uid 
+                                                    FROM users 
+                                                    WHERE listening = true) AND 
+                                        uh.uid = ufi.uid AND 
+                                        ufi.fid = uh.id AND 
+                                        uh.id_type = 'f' AND 
+                                        uh.date_played = DATE(ufi.ultp) AND 
+                                        uh.id = %s 
+                                   RETURNING uh.*""",
+                                   (playing['fid'],))
     if not listeners:
-        listeners = get_results_assoc("SELECT uid, uname FROM users WHERE listening = true")
+        listeners = get_results_assoc("""SELECT uid, uname 
+                                         FROM users 
+                                         WHERE listening = true""")
         
     for l in listeners:
         found = False
@@ -192,8 +210,34 @@ def update_history(percent_played=0):
 
         if not found:
             try:
-                user_history = get_assoc("INSERT INTO user_history (uid, id, id_type, percent_played, time_played, date_played) VALUES(%s, %s, %s, %s, NOW(), current_date) RETURNING *",(l['uid'], playing['fid'], 'f', percent_played))
-                updated_user = get_assoc("UPDATE user_history uh SET true_score = ufi.true_score, score = ufi.score, rating = ufi.rating, percent_played = ufi.percent_played, time_played = NOW(), date_played = current_date FROM user_song_info ufi WHERE ufi.uid = %s AND uh.uid = ufi.uid AND ufi.fid = uh.id AND uh.id_type = 'f' AND uh.date_played = DATE(ufi.ultp) AND uh.id = %s RETURNING uh.*", (l['uid'], playing['fid']))
+                user_history = get_assoc("""INSERT INTO 
+                                                user_history (uid, id, id_type,
+                                                              percent_played, 
+                                                              time_played,
+                                                              date_played) 
+                                            VALUES (%s, %s, %s, %s, NOW(), 
+                                                    current_date) 
+                                            RETURNING *""",
+                                            (l['uid'], playing['fid'], 'f', 
+                                             percent_played))
+
+                updated_user = get_assoc("""UPDATE user_history uh
+                                            SET true_score = ufi.true_score,
+                                                score = ufi.score,
+                                                rating = ufi.rating,
+                                                percent_played = ufi.percent_played, 
+                                                time_played = NOW(),
+                                                date_played = current_date 
+                                            FROM user_song_info ufi
+                                            WHERE ufi.uid = %s AND
+                                                  uh.uid = ufi.uid AND
+                                                  ufi.fid = uh.id AND
+                                                  uh.id_type = 'f' AND
+                                                  uh.date_played = 
+                                                             DATE(ufi.ultp) AND 
+                                                  uh.id = %s RETURNING uh.*""", 
+                                            (l['uid'], playing['fid']))
+
                 if updated_user:
                     updated.append(updated_user)
 
@@ -201,12 +245,32 @@ def update_history(percent_played=0):
                 query("COMMIT;")
                 print "(file) psycopg2.IntegrityError:",err
 
-    artists = get_results_assoc("UPDATE artists a SET altp = NOW() FROM file_artists fa WHERE fa.aid = a.aid AND fa.fid = %s RETURNING *;",(playing['fid'],))
+    artists = get_results_assoc("""UPDATE artists a SET altp = NOW() 
+                                   FROM file_artists fa 
+                                   WHERE fa.aid = a.aid AND 
+                                         fa.fid = %s RETURNING *;""",
+                                   (playing['fid'],))
     # print "ARTISTS:"
     # pp.pprint(artists) 
     if artists:
-        updated_artists = get_results_assoc("UPDATE user_artist_history uah SET time_played = NOW(), date_played = NOW() FROM user_song_info usi, file_artists fa WHERE usi.uid IN (SELECT uid FROM users WHERE listening = true) AND fa.fid = usi.fid AND uah.uid = usi.uid AND uah.aid = fa.aid AND usi.fid = %s AND uah.date_played = current_date RETURNING uah.*",(playing['fid'],))
+        updated_artists = get_results_assoc("""UPDATE user_artist_history uah 
+                                               SET time_played = NOW(), 
+                                                   date_played = NOW() 
+                                               FROM user_song_info usi, 
+                                                    file_artists fa 
+                                               WHERE usi.uid IN (
+                                                       SELECT uid FROM users 
+                                                       WHERE listening = true
+                                                     ) AND 
+                                                     fa.fid = usi.fid AND 
+                                                     uah.uid = usi.uid AND 
+                                                     uah.aid = fa.aid AND 
+                                                     usi.fid = %s AND 
+                                                     uah.date_played = current_date 
+                                               RETURNING uah.*""",
+                                               (playing['fid'],))
 
+        # pp.pprint(updated_artists)
         update_association = {}
 
         for ua in updated_artists:
@@ -220,16 +284,27 @@ def update_history(percent_played=0):
                 key = "%s-%s" % (a['aid'], l['uid'])
                 if not update_association.has_key(key):
                     try:
-                        user_artist_history = get_assoc("INSERT INTO user_artist_history (uid, aid, time_played, date_played) VALUES(%s, %s, NOW(), current_date) RETURNING *", (l['uid'], a['aid']))
+                        user_artist_history = get_assoc(
+                            """INSERT INTO 
+                                    user_artist_history (uid, aid, time_played, 
+                                                         date_played) 
+                               VALUES(%s, %s, NOW(), current_date) 
+                               RETURNING *""", 
+                               (l['uid'], a['aid']))
                         update_association[key] = user_artist_history
                     except psycopg2.IntegrityError, err:
                         query("COMMIT;")
                         print "(artist) psycopg2.IntegrityError:",err
 
+
 def mark_as_played(percent_played=0):
     global listeners, last_percent_played
 
-    query("UPDATE user_song_info SET ultp = NOW(), percent_played = %s WHERE fid = %s AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)",(percent_played, playing['fid'],))
+    query("""UPDATE user_song_info 
+             SET ultp = NOW(), percent_played = %s 
+             WHERE fid = %s AND uid IN (
+                SELECT DISTINCT uid FROM users WHERE listening = true)""", 
+             (percent_played, playing['fid'],))
 
     calculate_true_score()
 
@@ -239,7 +314,9 @@ def mark_as_played(percent_played=0):
         last_percent_played = math.ceil(percent_played)
 
 
-def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent):
+def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
+                   dur_str, left_str, percent):
+
     global listeners, last_percent_played, last_percent_played_decimal
     percent_played  = decimal * 100
     if percent_played == last_percent_played_decimal:
@@ -248,12 +325,16 @@ def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, dur_str
     last_percent_played_decimal = percent_played
     mark_as_played(percent_played)
 
+
 def create_dont_pick():
     populate_preload()
 
+
 def populate_preload(min_amount=0):
     global listeners
-    listeners = get_results_assoc("SELECT uid, uname FROM users WHERE listening = true")
+    listeners = get_results_assoc(
+        "SELECT uid, uname FROM users WHERE listening = true")
+
     print "gc:",gc.collect()
     # picker.create_preload()
     picker.create_dont_pick()
@@ -270,8 +351,19 @@ def on_toggle_playing(item):
 
 
 def on_next_clicked(*args, **kwargs):
-    query("UPDATE user_song_info SET ultp = NOW(), score = score - 1 WHERE fid = %s AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'], ))
-    query("UPDATE user_song_info SET score = 1  WHERE fid = %s AND score <= 0 AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'], ))
+    query("""UPDATE user_song_info 
+             SET ultp = NOW(), score = score - 1 
+             WHERE fid = %s AND uid IN (SELECT DISTINCT uid 
+                                        FROM users WHERE listening = true)""", 
+             (playing['fid'], ))
+
+    query("""UPDATE user_song_info 
+             SET score = 1 
+             WHERE fid = %s AND score <= 0 AND uid IN (SELECT DISTINCT uid 
+                                                       FROM users 
+                                                       WHERE listening = true)""", 
+             (playing['fid'], ))
+
     calculate_true_score()
     update_history(last_percent_played)
 
@@ -324,13 +416,31 @@ def set_rating():
     return True
 
 def calculate_true_score():
-    query("UPDATE user_song_info SET true_score = (((rating * 2 * 10.0) + (score * 10) + percent_played) / 3) WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true)",(playing['fid'],))
+    query("""UPDATE user_song_info 
+             SET true_score = (((rating * 2 * 10.0) + (score * 10) + 
+                                 percent_played) / 3)
+             WHERE fid = %s AND 
+                   uid IN (SELECT uid FROM users WHERE listening = true)""", 
+             (playing['fid'],))
     # print "calculate_true_score:",res
 
 def on_end_of_stream(*args):
     global playing
-    query("UPDATE user_song_info SET ultp = NOW(), score = score + 1 WHERE fid = %s AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'],))
-    query("UPDATE user_song_info SET score = 10 WHERE fid = %s AND score > 10 AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)", (playing['fid'],))
+    query("""UPDATE user_song_info
+             SET    ultp = NOW(),
+                    score = score + 1
+             WHERE  fid = %s AND 
+                    uid IN (SELECT DISTINCT uid
+                            FROM users
+                            WHERE listening = true)""", 
+             (playing['fid'],))
+
+    query("""UPDATE user_song_info SET score = 10 
+             WHERE fid = %s AND score > 10 AND 
+                   uid IN (SELECT DISTINCT uid 
+                           FROM users WHERE listening = true)""", 
+             (playing['fid'],))
+
     mark_as_played(100.00)
     update_history(100.00)
 
@@ -340,11 +450,20 @@ def on_end_of_stream(*args):
     notify.playing(playing)
 
 global history, playing, idx, listeners, last_percent_played, last_percent_played_decimal
+
 last_percent_played = 0
 last_percent_played_decimal = 0
 listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true")
 
-history = get_results_assoc("SELECT DISTINCT f.fid, dir, basename, ultp, percent_played FROM files f, user_song_info u WHERE u.uid IN (SELECT uid FROM users WHERE listening = true) AND f.fid = u.fid AND ultp IS NOT NULL ORDER BY ultp DESC LIMIT 10")
+history = get_results_assoc("""SELECT DISTINCT f.fid, dir, basename, ultp, 
+                                               percent_played 
+                               FROM files f, user_song_info u 
+                               WHERE u.uid IN (SELECT uid FROM users 
+                                               WHERE listening = true) AND 
+                                     f.fid = u.fid AND ultp IS NOT NULL 
+                               ORDER BY ultp DESC 
+                               LIMIT 10""")
+
 history.reverse()
 
 if not history:
@@ -372,7 +491,7 @@ tray.quit.connect("activate", gtk.main_quit)
 tray.icon.connect('scroll-event',plr.on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(60000, populate_preload, 1)
+gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(5000, set_rating)
 
 # flask_server.playing = playing

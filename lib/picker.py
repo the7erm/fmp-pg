@@ -114,9 +114,10 @@ def populate_preload(uid=None, min_amount=0):
     try:
         populate_preload_for_uid(uid, min_amount)
     except:
+        print "ERROR!!!!"
         global populate_locked
         populate_locked = False
-        populate_preload_for_uid(uid, min_amount)
+        # populate_preload_for_uid(uid, min_amount)
 
 
 def populate_preload_for_uid(uid, min_amount=0):
