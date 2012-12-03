@@ -303,15 +303,16 @@ last_percent_played = 0
 last_percent_played_decimal = 0
 listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true")
 
-# TODO: Convert history to user_history
-history = get_results_assoc("""SELECT DISTINCT f.fid, dir, basename, ultp, 
-                                               percent_played, dir AS dirname 
-                               FROM files f, user_song_info u 
-                               WHERE u.uid IN (SELECT uid FROM users 
-                                               WHERE listening = true) AND 
-                                     f.fid = u.fid AND ultp IS NOT NULL 
-                               ORDER BY ultp DESC 
-                               LIMIT 10""")
+history = get_results_assoc("""SELECT DISTINCT id, id_type, percent_played,
+                                               time_played
+                               FROM user_history uh, users u
+                               WHERE u.uid = uh.uid AND u.uid IN (
+                                        SELECT uid FROM users 
+                                        WHERE listening = true
+                               )
+                               ORDER BY time_played DESC
+                               LIMIT 10
+                            """)
 
 history.reverse()
 

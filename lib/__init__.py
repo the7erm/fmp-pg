@@ -19,11 +19,15 @@
 
 import psycopg2
 import psycopg2.extras
-import sys, os, pprint
-pp = pprint.PrettyPrinter(depth=6)
+import sys
+import os
+import pprint
+import ConfigParser
+import gc
 
+pp = pprint.PrettyPrinter(depth=6)
 sys.path.append(sys.path[0]+'/lib/')
-import ConfigParser, gc
+
 home = os.path.expanduser('~')
 config_dir = home+"/.fmp"
 config_file = config_dir+"/config"
@@ -38,7 +42,12 @@ if not os.path.isdir(cache_dir):
 cfg = ConfigParser.ConfigParser()
 cfg.read(config_file)
 
-pg_conn = psycopg2.connect("dbname=%s user=%s password=%s host=%s" % (cfg.get('postgres','database'), cfg.get('postgres','username'), cfg.get('postgres','password'), cfg.get('postgres','host')))
+pg_conn = psycopg2.connect("dbname=%s user=%s password=%s host=%s" % (
+                            cfg.get('postgres','database'), 
+                            cfg.get('postgres','username'), 
+                            cfg.get('postgres','password'), 
+                            cfg.get('postgres','host')))
+
 pg_cur = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 def get_results_assoc(query, args=None):
@@ -61,8 +70,4 @@ def query(query, args=None):
     cur.execute(query, args)
     pg_conn.commit()
     return cur
-
-
-
-
 

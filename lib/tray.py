@@ -21,11 +21,12 @@ from __init__ import *
 import gtk, sys, os
 from player import PLAYING
 from subprocess import Popen, PIPE
+from ConfigParser import NoSectionError
 
 def on_rating_scroll(icon, event):
     print "on_rating_scroll:",event
     print "event.direction:",event.direction
-    r = get_assoc("SELECT rating FROM user_song_info WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true AND selected = true)", (playing["fid"],))
+    r = playing.get_selected()
     rating = r['rating']
     if event.direction == gtk.gdk.SCROLL_UP:
         print "UP"
@@ -36,17 +37,18 @@ def on_rating_scroll(icon, event):
         rating = rating - 1
 
     if rating >= 0 and rating <= 5:
-        query("UPDATE user_song_info SET rating = %s, true_score = (((%s * 2 * 10) + (score * 10) + percent_played) / 3)  WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true AND selected = true)", (rating, rating, playing['fid'],))
-    
+        playing.rate(rating=rating, selected=True)
     set_rating()
 
 def set_rating():
-    # print "playing:",playing
-    r = get_assoc("SELECT rating FROM user_song_info WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true AND selected = true)", (playing["fid"],))
-    rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
-    rating_icon.set_tooltip(playing['basename'])
-    icon.set_tooltip(playing['basename'])
-
+    if playing.can_rate:
+        rating_icon.set_visible(True)
+        r = playing.get_selected()
+        rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
+        rating_icon.set_tooltip(playing['basename'])
+        icon.set_tooltip(playing['basename'])
+    else:
+        rating_icon.set_visible(False)
 
 def set_play_pause_item(state):
     if state != "PLAYING" and state != PLAYING:
@@ -71,7 +73,7 @@ def on_rate(menu_item, rating):
     print "playing:",playing
     rating = int(rating)
     if rating <= 5 and rating >= 0:
-        query("UPDATE user_song_info SET rating = %s, true_score = (((%s * 2 * 10) + (score * 10) + percent_played) / 3) WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true AND selected = true)", (rating, rating, playing['fid']))
+        playing.rate(selected=True, rating=rating)
         set_rating()
 
 def on_activate_listeners(*args):
@@ -119,6 +121,11 @@ def on_activate_preload(*args):
         Popen([sys.path[0]+"/../lib/preload.py"])
         return
 
+def on_toggle_cue_netcasts(item,*args):
+    print "on_toggle_cue_netcasts:",item.get_active()
+    with open(config_file, 'wb') as configfile:
+        cfg.set('Netcasts', 'cue', item.get_active())
+        cfg.write(configfile)
 
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
     image_path = sys.path[0]+"/images/"
@@ -188,7 +195,8 @@ img = gtk.image_new_from_stock(gtk.STOCK_PROPERTIES, gtk.ICON_SIZE_BUTTON)
 preload.set_image(img)
 menu.append(preload)
 
-
+cue_netcasts_item = gtk.CheckMenuItem("Cue Netcasts")
+menu.append(cue_netcasts_item)
 
 quit = gtk.ImageMenuItem("Quit")
 img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
@@ -201,7 +209,18 @@ song_info.connect("activate", on_activate_file_info)
 listeners.connect("activate", on_activate_listeners)
 genres.connect("activate", on_activate_genres)
 preload.connect("activate",on_activate_preload)
+cue_netcasts_item.connect("toggled",on_toggle_cue_netcasts,())
 
+try:
+    cue_netcasts = cfg.getboolean('Netcasts','cue')
+except NoSectionError:
+    cfg.add_section('Netcasts')
+    cue_netcasts = False
+    with open(config_file, 'wb') as configfile:
+        cfg.set('Netcasts', 'cue', cue_netcasts)
+        cfg.write(configfile)
+finally:
+    cue_netcasts_item.set_active(cue_netcasts)
 
 
 icon = gtk.StatusIcon()
