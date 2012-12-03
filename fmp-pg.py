@@ -21,7 +21,9 @@ import gobject, gtk, gc
 gobject.threads_init()
 
 from __init__ import *
-import os, sys, re
+import os
+import sys
+import re
 import player
 import notify
 import tray
@@ -29,46 +31,57 @@ import picker
 import math
 import dbus
 import dbus.service
+import fobj
+
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
 import flask_server
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):
-        busName = dbus.service.BusName('org.mpris.MediaPlayer2', bus = dbus.SessionBus())
+        busName = dbus.service.BusName('org.mpris.MediaPlayer2', 
+                                       bus = dbus.SessionBus())
         dbus.service.Object.__init__(self, busName, '/fmp')
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def next(self):
         on_next_clicked(None)
         return "next"
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def prev(self):
         on_prev_clicked(None)
         return "prev"
     
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def pause(self):
         on_toggle_playing(None)
         return "pause"
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def play(self):
         on_toggle_playing(None)
         return "play"
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = 's', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = 's', 
+                         out_signature = 's')
+
     def seek(self,value):
         plr.seek(value)
         return "seek:%s" % value
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def kill(self):
         gobject.timeout_add(100, gtk.main_quit)
         return "kill"
 
-    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', out_signature = 's')
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
+                         out_signature = 's')
     def quit(self):
         gobject.timeout_add(100, gtk.main_quit)
         return "quit"
@@ -77,14 +90,17 @@ class DbusWatcher(dbus.service.Object):
 usage = """
 Usage:
 fmp.py <arguments> [file] [file] ...
-For your convenience all text commands can have 2 dashes ie --next -n -next all do the same thing
+For your convenience all text commands can have 2 dashes ie --next -n -next all 
+do the same thing.
+
 -n, -next             Play next track
--b, -back, -prev      Play next track
+-b, -back, -prev      Play previous track
 -p, -play, -pause     Play/pause current track
 -s, -seek <arg>       Seek to a specific second of current track
 -k, -kill             Kill the currently running player, and replace it.
 -e, -exit             Kill the currently running player, then exit.
-<filename>            Append file to playlist (.pls, .m3u not currently supported)
+<filename>            Append file to playlist (.pls, .m3u not currently 
+                      supported)
 """
 
 DBusGMainLoop(set_as_default = True)
@@ -177,141 +193,13 @@ write_pid(pid_file)
 watcher = DbusWatcher()
 
 def update_history(percent_played=0):
-    global listeners
-    updated = get_results_assoc("""UPDATE user_history uh 
-                                   SET true_score = ufi.true_score, 
-                                       score = ufi.score, 
-                                       rating = ufi.rating, 
-                                       percent_played = ufi.percent_played, 
-                                       time_played = NOW(), 
-                                       date_played = current_date 
-                                   FROM user_song_info ufi 
-                                   WHERE 
-                                        ufi.uid IN (SELECT uid 
-                                                    FROM users 
-                                                    WHERE listening = true) AND 
-                                        uh.uid = ufi.uid AND 
-                                        ufi.fid = uh.id AND 
-                                        uh.id_type = 'f' AND 
-                                        uh.date_played = DATE(ufi.ultp) AND 
-                                        uh.id = %s 
-                                   RETURNING uh.*""",
-                                   (playing['fid'],))
-    if not listeners:
-        listeners = get_results_assoc("""SELECT uid, uname 
-                                         FROM users 
-                                         WHERE listening = true""")
-        
-    for l in listeners:
-        found = False
-        for u in updated:
-            if u['uid'] == l['uid']:
-                found = True
-
-        if not found:
-            try:
-                user_history = get_assoc("""INSERT INTO 
-                                                user_history (uid, id, id_type,
-                                                              percent_played, 
-                                                              time_played,
-                                                              date_played) 
-                                            VALUES (%s, %s, %s, %s, NOW(), 
-                                                    current_date) 
-                                            RETURNING *""",
-                                            (l['uid'], playing['fid'], 'f', 
-                                             percent_played))
-
-                updated_user = get_assoc("""UPDATE user_history uh
-                                            SET true_score = ufi.true_score,
-                                                score = ufi.score,
-                                                rating = ufi.rating,
-                                                percent_played = ufi.percent_played, 
-                                                time_played = NOW(),
-                                                date_played = current_date 
-                                            FROM user_song_info ufi
-                                            WHERE ufi.uid = %s AND
-                                                  uh.uid = ufi.uid AND
-                                                  ufi.fid = uh.id AND
-                                                  uh.id_type = 'f' AND
-                                                  uh.date_played = 
-                                                             DATE(ufi.ultp) AND 
-                                                  uh.id = %s RETURNING uh.*""", 
-                                            (l['uid'], playing['fid']))
-
-                if updated_user:
-                    updated.append(updated_user)
-
-            except psycopg2.IntegrityError, err:
-                query("COMMIT;")
-                print "(file) psycopg2.IntegrityError:",err
-
-    artists = get_results_assoc("""UPDATE artists a SET altp = NOW() 
-                                   FROM file_artists fa 
-                                   WHERE fa.aid = a.aid AND 
-                                         fa.fid = %s RETURNING *;""",
-                                   (playing['fid'],))
-    # print "ARTISTS:"
-    # pp.pprint(artists) 
-    if artists:
-        updated_artists = get_results_assoc("""UPDATE user_artist_history uah 
-                                               SET time_played = NOW(), 
-                                                   date_played = NOW() 
-                                               FROM user_song_info usi, 
-                                                    file_artists fa 
-                                               WHERE usi.uid IN (
-                                                       SELECT uid FROM users 
-                                                       WHERE listening = true
-                                                     ) AND 
-                                                     fa.fid = usi.fid AND 
-                                                     uah.uid = usi.uid AND 
-                                                     uah.aid = fa.aid AND 
-                                                     usi.fid = %s AND 
-                                                     uah.date_played = current_date 
-                                               RETURNING uah.*""",
-                                               (playing['fid'],))
-
-        # pp.pprint(updated_artists)
-        update_association = {}
-
-        for ua in updated_artists:
-            key = "%s-%s" % (ua['aid'], ua['uid'])
-            update_association[key] = ua
-
-        # pp.pprint(update_association)
-        for l in listeners:
-            found = False 
-            for a in artists:
-                key = "%s-%s" % (a['aid'], l['uid'])
-                if not update_association.has_key(key):
-                    try:
-                        user_artist_history = get_assoc(
-                            """INSERT INTO 
-                                    user_artist_history (uid, aid, time_played, 
-                                                         date_played) 
-                               VALUES(%s, %s, NOW(), current_date) 
-                               RETURNING *""", 
-                               (l['uid'], a['aid']))
-                        update_association[key] = user_artist_history
-                    except psycopg2.IntegrityError, err:
-                        query("COMMIT;")
-                        print "(artist) psycopg2.IntegrityError:",err
+    global playing
+    playing.update_history(percent_played)
 
 
 def mark_as_played(percent_played=0):
-    global listeners, last_percent_played
-
-    query("""UPDATE user_song_info 
-             SET ultp = NOW(), percent_played = %s 
-             WHERE fid = %s AND uid IN (
-                SELECT DISTINCT uid FROM users WHERE listening = true)""", 
-             (percent_played, playing['fid'],))
-
-    calculate_true_score()
-
-    if listeners and last_percent_played != math.ceil(percent_played):
-        update_history(percent_played)
-        
-        last_percent_played = math.ceil(percent_played)
+    global playing
+    playing.mark_as_played(percent_played)
 
 
 def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
@@ -348,64 +236,50 @@ def on_toggle_playing(item):
     plr.pause()
     tray.set_play_pause_item(plr.playingState)
 
-
-
 def on_next_clicked(*args, **kwargs):
-    query("""UPDATE user_song_info 
-             SET ultp = NOW(), score = score - 1 
-             WHERE fid = %s AND uid IN (SELECT DISTINCT uid 
-                                        FROM users WHERE listening = true)""", 
-             (playing['fid'], ))
-
-    query("""UPDATE user_song_info 
-             SET score = 1 
-             WHERE fid = %s AND score <= 0 AND uid IN (SELECT DISTINCT uid 
-                                                       FROM users 
-                                                       WHERE listening = true)""", 
-             (playing['fid'], ))
-
-    calculate_true_score()
-    update_history(last_percent_played)
-
+    playing.deinc_score()
     inc_index()
-    plr.filename = os.path.join(playing['dir'], playing['basename'])
+    plr.filename = playing.filename
     plr.start()
     notify.playing(playing)
+    tray.set_play_pause_item(plr.playingState)
 
 def on_prev_clicked(item):
     deinc_index()
-    plr.filename = os.path.join(playing['dir'], playing['basename'])
+    plr.filename = playing.filename
     plr.start()
     notify.playing(playing)
+    tray.set_play_pause_item(plr.playingState)
 
-def deinc_index():
-    global idx, playing
-    idx = idx - 1
+
+def set_idx(idx):
+    global playing
+
     if idx < 0:
         idx = 0
-
+    
     try:
-        tray.playing = playing = history[idx]
+        tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
     except IndexError:
         f = picker.get_song_from_preload()
         history.append(f)
-        tray.playing = playing = history[idx]
+        tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
 
     tray.set_rating()
+    populate_preload()
+
 
 def inc_index():
     global idx, playing
     idx = idx + 1
     print "IDX:",idx
-    try:
-        tray.playing = playing = history[idx]
-    except IndexError:
-        f = picker.get_song_from_preload()
-        history.append(f)
-        tray.playing = playing = history[idx]
+    set_idx(idx)
 
-    tray.set_rating()
-    populate_preload()
+
+def deinc_index():
+    global idx
+    idx = idx - 1
+    set_idx(idx)
 
 def set_rating():
     try:
@@ -415,37 +289,11 @@ def set_rating():
         pass
     return True
 
-def calculate_true_score():
-    query("""UPDATE user_song_info 
-             SET true_score = (((rating * 2 * 10.0) + (score * 10) + 
-                                 percent_played) / 3)
-             WHERE fid = %s AND 
-                   uid IN (SELECT uid FROM users WHERE listening = true)""", 
-             (playing['fid'],))
-    # print "calculate_true_score:",res
-
 def on_end_of_stream(*args):
     global playing
-    query("""UPDATE user_song_info
-             SET    ultp = NOW(),
-                    score = score + 1
-             WHERE  fid = %s AND 
-                    uid IN (SELECT DISTINCT uid
-                            FROM users
-                            WHERE listening = true)""", 
-             (playing['fid'],))
-
-    query("""UPDATE user_song_info SET score = 10 
-             WHERE fid = %s AND score > 10 AND 
-                   uid IN (SELECT DISTINCT uid 
-                           FROM users WHERE listening = true)""", 
-             (playing['fid'],))
-
-    mark_as_played(100.00)
-    update_history(100.00)
-
+    playing.inc_score()
     inc_index()
-    plr.filename = os.path.join(playing['dir'], playing['basename'])
+    plr.filename = playing.filename
     plr.start()
     notify.playing(playing)
 
@@ -455,8 +303,9 @@ last_percent_played = 0
 last_percent_played_decimal = 0
 listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true")
 
+# TODO: Convert history to user_history
 history = get_results_assoc("""SELECT DISTINCT f.fid, dir, basename, ultp, 
-                                               percent_played 
+                                               percent_played, dir AS dirname 
                                FROM files f, user_song_info u 
                                WHERE u.uid IN (SELECT uid FROM users 
                                                WHERE listening = true) AND 
@@ -471,7 +320,8 @@ if not history:
 
 
 idx = len(history) - 1
-tray.playing = playing = history[idx]
+item = dict(history[idx])
+tray.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 
 plr = player.Player(filename=os.path.join(playing['dir'], playing['basename']))

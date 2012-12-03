@@ -67,7 +67,7 @@ class Netcast(gobject.GObject):
                          (gobject.TYPE_PYOBJECT,)),
     }
 
-    def __init__(self, nid=None, rss_url=None, insert=False):
+    def __init__(self, nid=None, rss_url=None, insert=False, **kwargs):
         gobject.GObject.__init__(self)
 
         self.db_info = None
@@ -189,7 +189,8 @@ class Netcast(gobject.GObject):
 class Netcast_File(fobj.FObj):
     def __init__(self, filename=None, dirname=None, basename=None, eid=None,
                  episode_url=None, local_filename=None, nid=None, rss_url=None,
-                 episode_title=None, netcast=None, fuzzy=False, insert=False):
+                 episode_title=None, netcast=None, fuzzy=False, insert=False,
+                 **kwargs):
         self.can_rate = False
         self.netcast = netcast
         self.db_info = None
@@ -232,7 +233,7 @@ class Netcast_File(fobj.FObj):
             filename=episode_url
 
         fobj.FObj.__init__(self,filename=filename, dirname=dirname, 
-                           basename=basename)
+                           basename=basename, **kwargs)
 
         if not self.db_info:
             if insert:
@@ -382,6 +383,9 @@ class Netcast_File(fobj.FObj):
 
     def mark_as_played(self, percent_played=0):
         print "TODO: Necast_file::mark_as_played()"
+
+    def deinc_score(self, *args, **kwargs):
+        print "TODO: Netcast_File::deinc_score"
 
     def insert(self, episode_title, episode_url):
         if self.db_info:

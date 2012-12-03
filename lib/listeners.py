@@ -22,13 +22,24 @@ import time
 
 class Listeners:
     def __init__(self):
-        self.expires = 0
+        self.expires = time.time() - 1;
         self.refresh()
 
     def __getattr__(self, name):
         if name == 'listeners':
             if time.time() < self.expires:
+                print "REFRESH LISTENERS!"
                 self.refresh()
+            return self.listeners
+
+        if name == 'realtime_listeners':
+            self.refresh()
+            return self.listeners
+
+        if name == 'recheck_listeners':
+            if self.listeners:
+                return self.listeners
+            self.refresh()
             return self.listeners
 
         return getattr(self, name)
@@ -36,15 +47,14 @@ class Listeners:
     def __str__(self):
         return "listeners:%s\n%s" % (pp.pformat(self.listeners),pp.pformat(self.selected))
 
-    def refresh(self,force=False):
+    def refresh(self):
         self.expires = time.time() + 60
         self.listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname")
-        self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true")
+        self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true LIMIT 1")
         if not self.selected and self.listeners:
             query("UPDATE users SET selected = false")
             query("UPDATE users SET selected = true WHERE uid = %s", (self.listeners[0]['uid']))
-            self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true")
-
+            self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true LIMIT 1")
 
     def pp(self):
         pp.pprint(self.listeners)

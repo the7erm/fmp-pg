@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# scan.py -- Scan files, and add them to your database
+# /__init__.py -- Initialize fmp
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify

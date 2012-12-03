@@ -29,7 +29,7 @@ from excemptions import CreationFailed, NotImpimented
 
 try:
     import mutagen
-    from mutagen.id3 import APIC, PRIV, GEOB, MCDI, TIPL, ID3TimeStamp, UFID, 
+    from mutagen.id3 import APIC, PRIV, GEOB, MCDI, TIPL, ID3TimeStamp, UFID, \
                             TMCL, PCNT, RVA2, WCOM, COMM, Frame
 except ImportError, err:
 	print "mutagen isn't installed"
@@ -56,7 +56,7 @@ def has_tags(ext=None):
 
 
 class FObj:
-    def __init__(self, filename=None, dirname=None, basename=None):
+    def __init__(self, filename=None, dirname=None, basename=None, **kwargs):
         self.filename = None
         self.is_stream = False
         self.exists = False
@@ -64,6 +64,10 @@ class FObj:
         self.uri = None
         self.tags_easy = None
         self.tags_hard = None
+
+        if kwargs:
+            for k, v in kwargs.iteritems():
+                setattr(self, k, v)
 
         if filename is not None and filename.startswith("file://"):
             self.uri = filename
@@ -115,14 +119,18 @@ class FObj:
         self.getmtime()
 
 
-    def mark_as_played(self):
+    def mark_as_played(self, *args, **kwargs):
         raise NotImpimented("mark_as_played")
 
+    def update_history(self, *args, **kwargs):
+        raise NotImpimented("update_history")
+
+    def deinc_score(self, *args, **kwargs):
+        raise NotImpimented("deinc_score")
 
     def get_tags(self):
         if self.exists and self.has_tags:
             self.tags_easy = mutagen.File(self.filename, easy=True)
-
 
     def getmtime(self):
         if self.exists:
@@ -133,6 +141,12 @@ class FObj:
             self.mtime = localtz.localize(self.mtime)
             return self.mtime
 
+    def __getitem__(self, key):
+        if hasattr(self, 'db_info'):
+            if self.db_info.has_key(key):
+                return self.db_info[key]
+
+        return getattr(self, key)
 
 import netcast_fobj
 import local_file_fobj
@@ -140,30 +154,38 @@ import generic_fobj
 
 def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, 
              nid=None, episode_url=None, local_filename=None, 
-             register_as_new_file=False, register_as_new_netcast=False, _id=None
-             id_type=None):
+             register_as_new_file=False, register_as_new_netcast=False, 
+             _id=None, id_type=None, **kwargs):
+
+    print "get_fobj Unused kwargs:",kwargs
+
+    if kwargs.has_key('id') and _id is None:
+        _id = kwargs['id']
+
+    if kwargs.has_key('dir') and dirname is None:
+        dirname = kwargs['dir']
 
     if id_type is not None and _id is not None:
-        if id_type = 'f':
+        if id_type == 'f':
             try:
-                return local_file_fobj.Local_File(fid=_id)
+                return local_file_fobj.Local_File(fid=_id, **kwargs)
             except CreationFailed, e:
                 print "local_file_fobj.CreationFailed:",e
         elif id_type == 'e':
             try:
-                return netcast_fobj.Netcast_File(eid=_id)
-            except: CreationFailed, e:
+                return netcast_fobj.Netcast_File(eid=_id, **kwargs)
+            except CreationFailed, e:
                 print "netcast_fobj.CreationFailed:", e
-        elif id_type = 'g':
+        elif id_type == 'g':
             try:
-                return generic_fobj.Generic_File(_id=_id)
-            except: CreationFailed, e:
+                return generic_fobj.Generic_File(_id=_id, **kwargs)
+            except CreationFailed, e:
                 print "generic_fobj.CreationFailed:", e
 
     try:
         return local_file_fobj.Local_File(dirname=dirname, basename=basename, 
                                            fid=fid, filename=filename, 
-                                           insert=register_as_new_file)
+                                           insert=register_as_new_file, **kwargs)
 
     except CreationFailed, e:
         print "local_file_fobj.CreationFailed:",e
@@ -178,7 +200,8 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
                                           episode_url=episode_url, 
                                           local_filename=local_filename, 
                                           nid=nid, 
-                                          insert=register_as_new_netcast)
+                                          insert=register_as_new_netcast,
+                                          **kwargs)
 
     except CreationFailed, e:
         print "netcast_fobj.CreationFailed:", e
@@ -187,7 +210,7 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
         raise CreationFailed("File was not registered as a netcast.")
 
     return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
-                                      filename=filename)
+                                      filename=filename, **kwargs)
 
 
 if __name__ == '__main__':

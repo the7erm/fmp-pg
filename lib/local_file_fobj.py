@@ -25,7 +25,12 @@ import pprint, re
 from excemptions import CreationFailed
 
 class Local_File(fobj.FObj):
-    def __init__(self, dirname=None, basename=None, fid=None, filename=None, insert=False):
+    def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
+                 insert=False, **kwargs):
+
+        if kwargs.has_key('dir') and dirname is None:
+            dirname = kwargs['dir']
+
         self.can_rate = True
         self.db_info = None
         db_info = None
@@ -35,7 +40,8 @@ class Local_File(fobj.FObj):
         self.last_percent_played = 0
 
         if fid:
-            db_info = get_assoc("SELECT * FROM files WHERE fid = %s LIMIT 1",(fid,))
+            db_info = get_assoc("SELECT * FROM files WHERE fid = %s LIMIT 1",
+                                (fid,))
 
         if not db_info:
             if filename is not None:
@@ -68,7 +74,7 @@ class Local_File(fobj.FObj):
                 "   basename:%s\n" % basename
             )
 
-        fobj.FObj.__init__(self,filename=filename, dirname=dirname, basename=basename)
+        fobj.FObj.__init__(self,filename=filename, dirname=dirname, basename=basename, **kwargs)
 
         if not self.is_audio and not self.is_video:
             raise CreationFailed("File is not an audio or video file:%s" % self.filename)
@@ -88,41 +94,199 @@ class Local_File(fobj.FObj):
         self.set_attribs()
         self.can_rate = True
 
-    def calculate_true_score():
-        query("UPDATE user_song_info SET true_score = (((rating * 2 * 10.0) + (score * 10) + percent_played) / 3) WHERE fid = %s AND uid IN (SELECT uid FROM users WHERE listening = true)",(self.fid,))
+    def calculate_true_score(self):
+        global listeners
+        if not listeners.listeners:
+            return
+        query("""UPDATE user_song_info 
+                 SET true_score = (((rating * 2 * 10.0) + (score * 10) + percent_played) / 3) 
+                 WHERE fid = %s AND uid IN 
+                        (SELECT uid FROM users WHERE listening = true)""",
+                 (self.db_info['fid'],))
         
 
     def mark_as_played(self, percent_played=0):
-        fid = self.fid
-        print "mark_fid_as_played:",fid
+        fid = self.db_info['fid']
+        #  print "mark_as_played:",fid
         query("UPDATE user_song_info SET ultp = NOW(), percent_played = %s WHERE fid = %s AND uid IN (SELECT DISTINCT uid FROM users WHERE listening = true)",(percent_played, fid,))
 
         self.calculate_true_score()
-        
+        ceil_percent_played = math.ceil(percent_played)
+
+        if self.last_percent_played == ceil_percent_played:
+            self.update_artists_ltp()
+            if listeners.recheck_listeners:
+                self.update_user_artists_ltp()
+                self.update_history(percent_played)
+
+            self.last_percent_played = ceil_percent_played
+
+    def deinc_score(self):
         if not listeners.listeners:
-            listeners.reload(force=True)
+            return
+        query("""UPDATE user_song_info 
+             SET ultp = NOW(), score = score - 1 
+             WHERE fid = %s AND uid IN (SELECT DISTINCT uid 
+                                        FROM users WHERE listening = true)""", 
+             (self.db_info['fid'], ))
+
+        query("""UPDATE user_song_info 
+                 SET score = 1 
+                 WHERE fid = %s AND score <= 0 AND uid IN (SELECT DISTINCT uid 
+                                                           FROM users 
+                                                           WHERE listening = true)""", 
+             (self.db_info['fid'], ))
+
+        self.calculate_true_score()
+        self.update_history(self.last_percent_played)
+
+    def inc_score(self):
+        global listeners
+        if not listeners.listeners:
+            return
+
+        query("""UPDATE user_song_info
+             SET    ultp = NOW(),
+                    score = score + 1
+             WHERE  fid = %s AND 
+                    uid IN (SELECT DISTINCT uid
+                            FROM users
+                            WHERE listening = true)""", 
+             (self.db_info['fid'],))
+
+        query("""UPDATE user_song_info SET score = 10 
+                 WHERE fid = %s AND score > 10 AND 
+                       uid IN (SELECT DISTINCT uid 
+                               FROM users WHERE listening = true)""", 
+                 (self.db_info['fid'],))
+
+        self.mark_as_played(100.00)
+        self.update_history(100.00)
+
+
+    def update_history(self, percent_played=0):
+        global listeners
+
+        if not listeners.listeners:
+            return
         
-        if listeners.listeners and self.last_percent_played != math.ceil(percent_played):
-            artists = get_results_assoc("SELECT aid FROM file_artists WHERE fid = %s",(fid,))
-            for l in self.listeners:
+        updated = get_results_assoc("""UPDATE user_history uh 
+                                       SET true_score = ufi.true_score, 
+                                           score = ufi.score, 
+                                           rating = ufi.rating, 
+                                           percent_played = ufi.percent_played, 
+                                           time_played = NOW(), 
+                                           date_played = current_date 
+                                       FROM user_song_info ufi 
+                                       WHERE 
+                                            ufi.uid IN (SELECT uid 
+                                                        FROM users 
+                                                        WHERE listening = true) AND 
+                                            uh.uid = ufi.uid AND 
+                                            ufi.fid = uh.id AND 
+                                            uh.id_type = 'f' AND 
+                                            uh.date_played = DATE(ufi.ultp) AND 
+                                            uh.id = %s 
+                                       RETURNING uh.*""",
+                                       (self.db_info['fid'],))
+            
+        for l in listeners.listeners:
+            found = False
+            for u in updated:
+                if u['uid'] == l['uid']:
+                    found = True
+
+            if not found:
                 try:
-                    user_history = get_assoc("INSERT INTO user_history (uid, fid, percent_played, time_played, date_played) VALUES(%s,%s,%s, NOW(), current_date) RETURNING *",(l['uid'], fid, percent_played))
+                    user_history = get_assoc("""INSERT INTO 
+                                                    user_history (uid, id, id_type,
+                                                                  percent_played, 
+                                                                  time_played,
+                                                                  date_played) 
+                                                VALUES (%s, %s, %s, %s, NOW(), 
+                                                        current_date) 
+                                                RETURNING *""",
+                                                (l['uid'], self.db_info['fid'], 'f', 
+                                                 percent_played))
+
+                    updated_user = get_assoc("""UPDATE user_history uh
+                                                SET true_score = ufi.true_score,
+                                                    score = ufi.score,
+                                                    rating = ufi.rating,
+                                                    percent_played = ufi.percent_played, 
+                                                    time_played = NOW(),
+                                                    date_played = current_date 
+                                                FROM user_song_info ufi
+                                                WHERE ufi.uid = %s AND
+                                                      uh.uid = ufi.uid AND
+                                                      ufi.fid = uh.id AND
+                                                      uh.id_type = 'f' AND
+                                                      uh.date_played = 
+                                                                 DATE(ufi.ultp) AND 
+                                                      uh.id = %s RETURNING uh.*""", 
+                                                (l['uid'], self.db_info['fid']))
+
+                    if updated_user:
+                        updated.append(updated_user)
+
                 except psycopg2.IntegrityError, err:
                     query("COMMIT;")
-                    query("UPDATE user_history SET percent_played = %s, time_played = NOW(), date_played = NOW() WHERE uid = %s AND fid = %s AND date_played = current_date",(percent_played, l['uid'], fid))
+                    print "(file) psycopg2.IntegrityError:",err
 
-                if artists:
-                    for a in artists:
-                        try:
-                            user_artist_history = get_assoc("INSERT INTO user_artist_history (uid, aid, time_played, date_played) VALUES(%s, %s, NOW(), current_date) RETURNING *", (l['uid'], a['aid']))
-                        except psycopg2.IntegrityError, err:
-                            query("COMMIT;")
-                            query("UPDATE user_artist_history SET time_played = NOW() WHERE uid = %s AND aid = %s AND date_played = current_date",(l['uid'], a['aid']))
-                            
+    def update_artists_ltp(self):
+
+        artists = get_results_assoc("""UPDATE artists a SET altp = NOW() 
+                                       FROM file_artists fa 
+                                       WHERE fa.aid = a.aid AND 
+                                             fa.fid = %s RETURNING *;""",
+                                       (self.db_info['fid'],))
         
-            self.last_percent_played = math.ceil(percent_played)
+    def update_user_artists_ltp(self):
+        if not listeners.listeners:
+            return
 
-    
+        updated_artists = get_results_assoc("""UPDATE user_artist_history uah 
+                                               SET time_played = NOW(), 
+                                                   date_played = NOW() 
+                                               FROM user_song_info usi, 
+                                                    file_artists fa 
+                                               WHERE usi.uid IN (
+                                                       SELECT uid FROM users 
+                                                       WHERE listening = true
+                                                     ) AND 
+                                                     fa.fid = usi.fid AND 
+                                                     uah.uid = usi.uid AND 
+                                                     uah.aid = fa.aid AND 
+                                                     usi.fid = %s AND 
+                                                     uah.date_played = current_date 
+                                               RETURNING uah.*""",
+                                               (self.db_info['fid'],))
+
+        # pp.pprint(updated_artists)
+        update_association = {}
+
+        for ua in updated_artists:
+            key = "%s-%s" % (ua['aid'], ua['uid'])
+            update_association[key] = ua
+
+        # pp.pprint(update_association)
+        for l in listeners.listeners:
+            found = False 
+            for a in artists:
+                key = "%s-%s" % (a['aid'], l['uid'])
+                if not update_association.has_key(key):
+                    try:
+                        user_artist_history = get_assoc(
+                            """INSERT INTO 
+                                    user_artist_history (uid, aid, time_played, 
+                                                         date_played) 
+                               VALUES(%s, %s, NOW(), current_date)
+                               RETURNING *""", 
+                               (l['uid'], a['aid']))
+                        update_association[key] = user_artist_history
+                    except psycopg2.IntegrityError, err:
+                        query("COMMIT;")
+                        print "(artist) psycopg2.IntegrityError:",err
 
     def set_attribs(self, quick=True):
         if not self.db_info:
