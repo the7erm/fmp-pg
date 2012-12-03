@@ -145,8 +145,8 @@ class RatingsAndScores:
                                     LIMIT 1""", 
                                     (self.fid,))
             if selected:
-                updated = query("UPDATE users SET selected = true WHERE uid = %s",
-                       (selected['uid'],))
+                query("UPDATE users SET selected = true WHERE uid = %s",
+                      (selected['uid'],))
                 selected['selected'] = True
         self.update([selected])
 
@@ -170,6 +170,8 @@ class RatingsAndScores:
                         self.ratings_and_scores[k]['true_score'] = u['true_score']
                     if u.has_key('percent_played'):
                         self.ratings_and_scores[k]['percent_played'] = u['percent_played']
+                    if u.has_key('selected'):
+                        self.ratings_and_scores[k]['selected'] = u['selected']
                     found = True
                     break
 

@@ -49,12 +49,20 @@ class Listeners:
 
     def refresh(self):
         self.expires = time.time() + 60
-        self.listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname")
-        self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true LIMIT 1")
+        self.listeners = get_results_assoc("""SELECT * FROM users 
+                                              WHERE listening = true 
+                                              ORDER BY admin DESC, uname""")
+
+        self.selected = get_assoc("""SELECT * FROM users 
+                                     WHERE selected = true AND listening = true
+                                     LIMIT 1""")
+
         if not self.selected and self.listeners:
             query("UPDATE users SET selected = false")
             query("UPDATE users SET selected = true WHERE uid = %s", (self.listeners[0]['uid']))
-            self.selected = get_assoc("SELECT * FROM users WHERE selected = true AND listening = true LIMIT 1")
+            self.selected = get_assoc("""SELECT * FROM users 
+                                         WHERE selected = true AND listening = true
+                                         LIMIT 1""")
 
     def pp(self):
         pp.pprint(self.listeners)

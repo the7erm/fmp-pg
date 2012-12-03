@@ -230,7 +230,6 @@ icon.connect("button-press-event", on_button_press)
 
 print "sys.path[0]:",sys.path[0]
 
-
 icon.set_from_file(image_path+"angry-square.jpg")
 
 

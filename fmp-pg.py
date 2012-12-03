@@ -69,7 +69,6 @@ class DbusWatcher(dbus.service.Object):
 
     @dbus.service.method('org.mpris.MediaPlayer2', in_signature = 's', 
                          out_signature = 's')
-
     def seek(self,value):
         plr.seek(value)
         return "seek:%s" % value
@@ -103,13 +102,11 @@ do the same thing.
                       supported)
 """
 
-DBusGMainLoop(set_as_default = True)
+DBusGMainLoop(set_as_default=True)
 
 try:
-    
     bus = dbus.SessionBus()
     server = bus.get_object('org.mpris.MediaPlayer2', '/fmp')
-
     exit = True
 
     for i, arg in enumerate(sys.argv):
@@ -117,10 +114,13 @@ try:
         if arg in ('-h','-help','--help'):
             print usage
             sys.exit()
+
         if arg in ("-n","--next","-next"):
             print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
+
         if arg in ("-b","--prev","-prev", "--back","-back"):
             print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
+
         if arg in ("-p","--pause","-pause", "--play","-play"):
             print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
 
@@ -133,7 +133,6 @@ try:
 
         if arg in ("-s","--seek","-seek"):
             print server.quit(argv[i+1], dbus_interface = 'org.mpris.MediaPlayer2')
-           
 
     if exit:
         print "Dbus Instance of fmp player detected exiting..."
@@ -174,6 +173,7 @@ def is_running(pid_file, kill=False):
         return True
     return False
 
+
 def write_pid(pid_file):
     """
         Write the current pid to a file.
@@ -181,6 +181,7 @@ def write_pid(pid_file):
     fp = open(pid_file,'w')
     fp.write(str(os.getpid()))
     fp.close()
+
 
 pid_file = config_dir+"/running_pid"
 
@@ -193,19 +194,17 @@ write_pid(pid_file)
 watcher = DbusWatcher()
 
 def update_history(percent_played=0):
-    global playing
     playing.update_history(percent_played)
 
 
 def mark_as_played(percent_played=0):
-    global playing
     playing.mark_as_played(percent_played)
 
 
 def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
                    dur_str, left_str, percent):
 
-    global listeners, last_percent_played, last_percent_played_decimal
+    global last_percent_played_decimal
     percent_played  = decimal * 100
     if percent_played == last_percent_played_decimal:
         # It's paused no need to update the database
@@ -219,10 +218,6 @@ def create_dont_pick():
 
 
 def populate_preload(min_amount=0):
-    global listeners
-    listeners = get_results_assoc(
-        "SELECT uid, uname FROM users WHERE listening = true")
-
     print "gc:",gc.collect()
     # picker.create_preload()
     picker.create_dont_pick()
@@ -231,10 +226,12 @@ def populate_preload(min_amount=0):
 
     return True
 
+
 def on_toggle_playing(item):
     print "on_toggle_playing"
     plr.pause()
     tray.set_play_pause_item(plr.playingState)
+
 
 def on_next_clicked(*args, **kwargs):
     playing.deinc_score()
@@ -243,6 +240,7 @@ def on_next_clicked(*args, **kwargs):
     plr.start()
     notify.playing(playing)
     tray.set_play_pause_item(plr.playingState)
+
 
 def on_prev_clicked(item):
     deinc_index()
@@ -297,11 +295,10 @@ def on_end_of_stream(*args):
     plr.start()
     notify.playing(playing)
 
-global history, playing, idx, listeners, last_percent_played, last_percent_played_decimal
+global history, playing, idx, last_percent_played, last_percent_played_decimal
 
 last_percent_played = 0
 last_percent_played_decimal = 0
-listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true")
 
 history = get_results_assoc("""SELECT DISTINCT id, id_type, percent_played,
                                                time_played
