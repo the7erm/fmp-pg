@@ -41,7 +41,15 @@ def playing(file_info):
     print "file_info:",file_info
     
     msg = ""
-    stats = get_results_assoc("SELECT uname, rating FROM user_song_info ui, users u WHERE u.listening = true AND u.uid = ui.uid AND fid = %s ORDER BY admin DESC, uname", (file_info['fid'],))
+    stats = []
+    tags = []
+    if file_info.can_rate:
+        stats = get_results_assoc("""SELECT uname, rating 
+                                     FROM user_song_info ui, users u 
+                                     WHERE u.listening = true AND 
+                                           u.uid = ui.uid AND fid = %s 
+                                     ORDER BY admin DESC, uname""", 
+                                     (file_info['fid'],))
 
     for s in stats:
         if msg:
@@ -49,7 +57,9 @@ def playing(file_info):
         rating = "*"*s['rating']
         msg = msg + s['uname'] + ":" + rating
 
-    tags = mutagen.File(os.path.join(file_info['dir'], file_info['basename']))
+    if file_info.exists:
+        print "FILENAME:",file_info["filename"]
+        tags = mutagen.File(file_info["filename"])
     pbuf = None
     if tags and tags.has_key('APIC'):
         lower_mime = tags['APIC'].mime.lower()
@@ -80,7 +90,8 @@ def playing(file_info):
     
 
     n = notify2.Notification("Playing %s" % (file_info['basename']),msg)
-    n.add_action("file_info", "More Info", more_info, file_info['fid'])
+    if file_info.can_rate:
+        n.add_action("file_info", "More Info", more_info, file_info['fid'])
     n.set_timeout(3000)
     if pbuf:
         print "PBUFF DETECTED"

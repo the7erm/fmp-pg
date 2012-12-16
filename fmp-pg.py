@@ -36,6 +36,7 @@ import fobj
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
 import flask_server
+from ConfigParser import NoSectionError
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):
@@ -132,7 +133,8 @@ try:
             print server.quit("", dbus_interface = 'org.mpris.MediaPlayer2')
 
         if arg in ("-s","--seek","-seek"):
-            print server.quit(argv[i+1], dbus_interface = 'org.mpris.MediaPlayer2')
+            print server.quit(argv[i+1], 
+                              dbus_interface = 'org.mpris.MediaPlayer2')
 
     if exit:
         print "Dbus Instance of fmp player detected exiting..."
@@ -249,6 +251,21 @@ def on_prev_clicked(item):
     notify.playing(playing)
     tray.set_play_pause_item(plr.playingState)
 
+def get_cue_netcasts():
+    cfg = ConfigParser.ConfigParser()
+    cfg.read(config_file)
+    try:
+        cue_netcasts = cfg.getboolean('Netcasts','cue')
+        print "cue_netcasts:",cue_netcasts
+    except NoSectionError:
+        cfg.add_section('Netcasts')
+        cue_netcasts = 0
+        with open(config_file, 'wb') as configfile:
+            cfg.set('Netcasts', 'cue', "false")
+            cfg.write(configfile)
+
+    return cue_netcasts
+
 
 def set_idx(idx):
     global playing
@@ -259,7 +276,24 @@ def set_idx(idx):
     try:
         tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
     except IndexError:
-        f = picker.get_song_from_preload()
+        if get_cue_netcasts():
+            recent = history[-10:]
+            found_netcast = False
+            for r in recent:
+                print "r:",dict(r)
+                if r.has_key('id_type') and r["id_type"] == 'e':
+                    found_netcast = True
+                if r.has_key('eid') and r['eid']:
+                    found_netcast = True
+            if found_netcast:
+                f = picker.get_song_from_preload()
+            else:
+                f = fobj.netcast_fobj.get_one_unlistened_episode()
+                if not f:
+                    f = picker.get_song_from_preload()
+        else:
+            f = picker.get_song_from_preload()
+
         history.append(f)
         tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
 
@@ -300,29 +334,19 @@ global history, playing, idx, last_percent_played, last_percent_played_decimal
 last_percent_played = 0
 last_percent_played_decimal = 0
 
-history = get_results_assoc("""SELECT DISTINCT id, id_type, percent_played,
-                                               time_played
-                               FROM user_history uh, users u
-                               WHERE u.uid = uh.uid AND u.uid IN (
-                                        SELECT uid FROM users 
-                                        WHERE listening = true
-                               )
-                               ORDER BY time_played DESC
-                               LIMIT 10
-                            """)
+history = fobj.recently_played()
 
 history.reverse()
 
 if not history:
     history = []
 
-
 idx = len(history) - 1
 item = dict(history[idx])
 tray.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 
-plr = player.Player(filename=os.path.join(playing['dir'], playing['basename']))
+plr = player.Player(filename=playing.filename)
 plr.start()
 notify.playing(playing)
 if plr.dur_int:

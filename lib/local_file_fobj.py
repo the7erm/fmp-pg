@@ -29,7 +29,7 @@ from ratings_and_scores import RatingsAndScores
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
-                 insert=False, **kwargs):
+                 insert=False, silent=False, **kwargs):
 
         if kwargs.has_key('dir') and dirname is None:
             dirname = kwargs['dir']
@@ -57,7 +57,8 @@ class Local_File(fobj.FObj):
                 dirname = os.path.dirname(filename)
                 basename = os.path.basename(filename)
 
-            if not os.path.exists(filename):
+            if not filename or not os.path.exists(filename):
+                self.exists = False
                 raise CreationFailed("File must exist on local drive:%s" % filename)
 
             db_info = get_assoc("SELECT * FROM files WHERE dir = %s AND basename = %s",(dirname, basename))
@@ -78,7 +79,8 @@ class Local_File(fobj.FObj):
                 "   basename:%s\n" % basename
             )
 
-        fobj.FObj.__init__(self,filename=filename, dirname=dirname, basename=basename, **kwargs)
+        fobj.FObj.__init__(self,filename=filename, dirname=dirname, 
+                           basename=basename, **kwargs)
 
         if not self.is_audio and not self.is_video:
             raise CreationFailed("File is not an audio or video file:%s" % self.filename)
@@ -99,8 +101,8 @@ class Local_File(fobj.FObj):
         self.can_rate = True
         self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
                                                    listening=True)
-
-        print "RatingsAndScores:",self.ratings_and_scores
+        if not silent:
+            print "RatingsAndScores:",self.ratings_and_scores
 
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()

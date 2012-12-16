@@ -42,13 +42,19 @@ def on_rating_scroll(icon, event):
 
 def set_rating():
     if playing.can_rate:
-        rating_icon.set_visible(True)
+        if not rating_icon.get_visible():
+            icon.set_visible(False)
+            rating_icon.set_visible(True)
+            icon.set_visible(True)
         r = playing.get_selected()
         rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
         rating_icon.set_tooltip(playing['basename'])
         icon.set_tooltip(playing['basename'])
+        song_info.show()
     else:
+        icon.set_tooltip(playing['basename'])
         rating_icon.set_visible(False)
+        song_info.hide()
 
 def set_play_pause_item(state):
     if state != "PLAYING" and state != PLAYING:
@@ -122,9 +128,11 @@ def on_activate_preload(*args):
         return
 
 def on_toggle_cue_netcasts(item,*args):
-    print "on_toggle_cue_netcasts:",item.get_active()
+    cue_netcasts = "%s" % item.get_active()
+    cue_netcasts = cue_netcasts.lower()
+    print "on_toggle_cue_netcasts:", 
     with open(config_file, 'wb') as configfile:
-        cfg.set('Netcasts', 'cue', item.get_active())
+        cfg.set('Netcasts', 'cue', cue_netcasts)
         cfg.write(configfile)
 
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
@@ -134,10 +142,19 @@ if os.path.exists(sys.path[0]+"/../images/angry-square.jpg"):
     image_path = sys.path[0]+"/../images/"
 
 rating_icon = gtk.StatusIcon()
-rating_icon.set_name("fmp-2-player")
-rating_icon.set_title("fmp-2-player")
+rating_icon.set_name("fmp-rater")
+rating_icon.set_title("fmp-rater")
 rating_icon.connect("button-press-event", on_rating_button_press)
 rating_icon.connect("scroll-event", on_rating_scroll)
+
+icon = gtk.StatusIcon()
+icon.set_name("fmp-player")
+icon.set_title("fmp-player")
+icon.connect("button-press-event", on_button_press)
+icon.set_from_file(image_path+"angry-square.jpg")
+
+
+print "sys.path[0]:",sys.path[0]
 
 rating_images = []
 
@@ -217,20 +234,13 @@ except NoSectionError:
     cfg.add_section('Netcasts')
     cue_netcasts = False
     with open(config_file, 'wb') as configfile:
-        cfg.set('Netcasts', 'cue', cue_netcasts)
+        cfg.set('Netcasts', 'cue', "false")
         cfg.write(configfile)
 finally:
     cue_netcasts_item.set_active(cue_netcasts)
 
 
-icon = gtk.StatusIcon()
-icon.set_name("fmp-3-player")
-icon.set_title("fmp-3-player")
-icon.connect("button-press-event", on_button_press)
 
-print "sys.path[0]:",sys.path[0]
-
-icon.set_from_file(image_path+"angry-square.jpg")
 
 
 if __name__ == "__main__":

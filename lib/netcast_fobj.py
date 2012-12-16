@@ -19,9 +19,19 @@
 #
 
 from __init__ import *
-import fobj, os
 from listeners import listeners
-import gobject, feedparser, socket, urllib, pprint, datetime, pytz
+import fobj
+import os
+import gobject
+import feedparser
+import socket
+import urllib
+import pprint
+import datetime
+import pytz
+from episode_downloader import downloader
+
+
 from excemptions import CreationFailed
 
 pp = pprint.PrettyPrinter(depth=6)
@@ -44,9 +54,6 @@ class myURLOpener(urllib.FancyURLopener):
         print "data:",data
         pass
 
-def update_now():
-    query("UPDATE netcasts SET expire_time = NOW() WHERE last_updated < "+
-          "current_timestamp - interval '30 min'")
 
 class Netcast(gobject.GObject):
     __gsignals__ = {
@@ -79,24 +86,26 @@ class Netcast(gobject.GObject):
         self.expire_time = None
 
         if nid is not None:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcasts WHERE nid = %s LIMIT 1", (nid,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcasts 
+                                        WHERE nid = %s 
+                                        LIMIT 1""", (nid,))
 
         if rss_url is not None and not self.db_info:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcasts WHERE rss_url = %s LIMIT 1", (rss_url,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcasts 
+                                        WHERE rss_url = %s 
+                                        LIMIT 1""", (rss_url,))
 
         if not self.db_info and not insert:
-            raise CreationFailed(
-                "Unable to associate netcast: nid:%s rss_url:%s\n" % 
-                    (nid, rss_url))
+            raise CreationFailed("Unable to associate netcast:\n"+
+                                  "\tnid:%s rss_url:%s\n" % (nid, rss_url))
 
         elif not self.db_info and insert:
             if rss_url:
                 self.insert_netcast(rss_url=rss_url)
             else:
-                raise CreationFailed(
-                    "Unable to insert rss feed.  No rss_url given.")
+                raise CreationFailed("Unable to insert rss feed.  No rss_url given.")
 
         self.set_attribs()
 
@@ -110,8 +119,9 @@ class Netcast(gobject.GObject):
     def insert_netcast(self, rss_url):
         self.rss_url = rss_url
         if rss_url is not None:
-            self.db_info = get_assoc("INSERT INTO netcasts (rss_url) "+
-                                     "VALUES(%s) RETURNING *", (rss_url,))
+            self.db_info = get_assoc("""INSERT INTO netcasts (rss_url)
+                                        VALUES(%s) 
+                                        RETURNING *""", (rss_url,))
             self.set_attribs()
 
         self.update()
@@ -145,10 +155,14 @@ class Netcast(gobject.GObject):
             return
         # SELECT current_timestamp AS "now", current_timestamp + interval 
         #        '1 day' as "1 day from now";
-        query("UPDATE netcasts SET expire_time = (current_timestamp + interval"+
-              " '1 day') WHERE nid = %s", (self.nid,))
-        query("UPDATE netcasts SET netcast_name = %s WHERE nid = %s", 
-              (feed['feed']['title'].encode("utf-8"), self.nid))
+        query("""UPDATE netcasts 
+                 SET expire_time = (current_timestamp + interval '1 day') 
+                 WHERE nid = %s""", (self.nid,))
+
+        query("""UPDATE netcasts 
+                 SET netcast_name = %s 
+                 WHERE nid = %s""", 
+                 (feed['feed']['title'].encode("utf-8"), self.nid))
 
         print self.db_info
         for i, entry in enumerate(feed['entries']):
@@ -161,10 +175,12 @@ class Netcast(gobject.GObject):
             for enclosure in entry['enclosures']:
                 print "---------------------"
                 pp.pprint(enclosure)
+                pub_date = datetime.datetime(*entry['updated_parsed'][0:7])
                 try:
                     episode = Netcast_File(netcast=self, 
-                                           episode_title=entry['title'], 
-                                           episode_url=enclosure['href'], 
+                                           episode_title=entry['title'],
+                                           episode_url=enclosure['href'],
+                                           pub_date=pub_date,
                                            insert=True)
 
                     self.episodes.append(episode)
@@ -173,24 +189,50 @@ class Netcast(gobject.GObject):
                 print "---------------------"
             print "==================="
 
-        query("UPDATE netcasts SET last_updated = NOW() WHERE nid = %s", 
-              (self.nid,))
+        query("""UPDATE netcasts 
+                 SET last_updated = NOW() 
+                 WHERE nid = %s""", 
+                 (self.nid,))
 
     def update_episode(self, episode_url, episode_title):
         return Netcast_File(episode_url=episode_url, 
-                             episode_title=episode_title, netcast=self,
-                             insert=True)
+                            episode_title=episode_title, netcast=self,
+                            insert=True)
 
     def set_update_for_near_future(self):
-        query("UPDATE netcasts SET expire_time = (current_timestamp + "+
-              "interval '1 hour') WHERE nid = %s",(self.nid,))
+        query("""UPDATE netcasts 
+                 SET expire_time = (current_timestamp + interval '1 hour') 
+                 WHERE nid = %s""",(self.nid,))
 
+    def __str__(self):
+        return "%s" % (self.db_info,)
+
+    def __repr__(self):
+        return pp.pformat(dict(self.db_info))
+
+    def download_unlistened_netcasts(self):
+        unlistened_episodes = self.get_unlistened_episodes()
+        for e in unlistened_episodes:
+            if not os.path.exists(e['local_file']):
+                downloader.append(e['episode_url'], e['local_file'])
+
+
+    def get_unlistened_episodes(self):
+        return get_results_assoc("""SELECT n.*, ne.*, nl.*, u.* 
+                                    FROM netcasts n, netcast_episodes ne 
+                                         LEFT JOIN netcast_listend_episodes nl ON 
+                                                   nl.eid = ne.eid, users u, 
+                                                   netcast_subscribers ns 
+                                    WHERE ne.nid = n.nid AND listening = true AND 
+                                          ns.uid = u.uid AND ns.nid = n.nid AND 
+                                          nl.uid IS NULL AND ns.nid = %s 
+                                    ORDER BY pub_date""", (self.nid,))
 
 class Netcast_File(fobj.FObj):
     def __init__(self, filename=None, dirname=None, basename=None, eid=None,
                  episode_url=None, local_filename=None, nid=None, rss_url=None,
                  episode_title=None, netcast=None, fuzzy=False, insert=False,
-                 **kwargs):
+                 pub_date=None, **kwargs):
         self.can_rate = False
         self.netcast = netcast
         self.db_info = None
@@ -199,6 +241,8 @@ class Netcast_File(fobj.FObj):
         self.title = episode_title
         self.url = episode_url
         self.local_file = local_filename
+        self.pub_date = pub_date
+        
 
         if self.netcast is None and (nid is not None or rss_url is not None):
             self.netcast = Netcast(nid=nid, rss_url=rss_url, insert=False)
@@ -231,14 +275,17 @@ class Netcast_File(fobj.FObj):
             filename=os.path.join(dirname, basename)
         elif episode_url:
             filename=episode_url
+        elif local_filename:
+            filename=local_filename
+            print self.db_info
 
-        fobj.FObj.__init__(self,filename=filename, dirname=dirname, 
+        fobj.FObj.__init__(self, filename=filename, dirname=dirname, 
                            basename=basename, **kwargs)
 
         if not self.db_info:
             if insert:
                 self.insert(episode_title=episode_title, 
-                            episode_url=episode_url)
+                            episode_url=episode_url, pub_date=pub_date)
 
                 self.set_attribs()
             else:
@@ -263,53 +310,69 @@ class Netcast_File(fobj.FObj):
         if self.db_info or not eid:
             return
 
-        self.db_info = get_assoc("SELECT * FROM netcasts WHERE eid = %s",(eid,))
+        self.db_info = get_assoc("SELECT * FROM netcast_episodes WHERE eid = %s",(eid,))
+        
 
     def set_db_info_by_episode_url(self, episode_url=None):
         if self.db_info or not episode_url:
             return
 
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND episode_url"+
-                " = %s LIMIT 1", (self.netcast.nid, episode_url))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND episode_url = %s 
+                                        LIMIT 1""", 
+                                        (self.netcast.nid, episode_url))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE episode_url = %s LIMIT 1",
-                 (episode_url,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE episode_url = %s LIMIT 1""",
+                                        (episode_url,))
 
     def set_db_info_by_local_filename(self, local_filename=None):
         if self.db_info or not local_filename:
             return
 
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND local_file"+
-                " = %s LIMIT 1",(self.netcast.nid, local_filename))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND local_file = %s 
+                                        LIMIT 1""",
+                                        (self.netcast.nid, local_filename))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE local_file = %s LIMIT 1",
-                 (local_filename,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE local_file = %s 
+                                        LIMIT 1""",
+                                        (local_filename,))
 
     def set_db_info_by_filename(self, filename=None):
         if self.db_info or not filename:
             return
 
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND (local_file"+
-                " = %s OR episode_url = %s) LIMIT 1", (self.netcast.nid, 
-                                                       filename, filename))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND (local_file = %s OR
+                                                            episode_url = %s)
+                                        LIMIT 1""", 
+                                        (self.netcast.nid, filename, filename))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE local_file = %s OR "+
-                "episode_url = %s LIMIT 1", (filename, filename))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE local_file = %s OR 
+                                              episode_url = %s 
+                                        LIMIT 1""", 
+                                        (filename, filename))
 
         if not self.db_info:
             filename = self.get_local_filename(filename)
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE local_file = %s OR "+
-                "episode_url = %s LIMIT 1", (filename, filename))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE local_file = %s OR 
+                                              episode_url = %s 
+                                        LIMIT 1""", 
+                                        (filename, filename))
 
     def set_db_info_by_dirname_basename(self, dirname=None, basename=None):
         if self.db_info or not dirname or not basename:
@@ -324,13 +387,17 @@ class Netcast_File(fobj.FObj):
         basename = os.path.basename(episode_url)
         like = "%%%s" % basename
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND "+
-                "(episode_url LIKE %s) LIMIT 1",(self.netcast.nid, like))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND (episode_url LIKE %s) 
+                                        LIMIT 1""",
+                                        (self.netcast.nid, like))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE episode_url LIKE %s "+
-                "LIMIT 1",(like,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE episode_url LIKE %s 
+                                        LIMIT 1""",
+                                        (like,))
 
     def set_db_info_by_like_local_filename(self, local_filename=None):
         if self.db_info or not local_filename:
@@ -338,13 +405,17 @@ class Netcast_File(fobj.FObj):
         basename = os.path.basename(local_filename)
         like = "%%%s" % basename
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND local_file "+
-                "LIKE %s LIMIT 1", (self.netcast.nid, like))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND local_file LIKE %s 
+                                        LIMIT 1""", 
+                                        (self.netcast.nid, like))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE local_file LIKE %s "+
-                "LIMIT 1",(like,))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE local_file LIKE %s 
+                                        LIMIT 1""",
+                                        (like,))
 
     def set_db_info_by_like_filename(self, filename=None):
         if self.db_info or not filename:
@@ -357,14 +428,18 @@ class Netcast_File(fobj.FObj):
             return
         like = "%%%s" % basename;
         if self.netcast:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE nid = %s AND "+
-                "(episode_url LIKE %s OR local_file LIKE %s) LIMIT 1",
-                 (self.netcast.nid, like, like))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE nid = %s AND (episode_url LIKE %s
+                                                            OR local_file LIKE %s)
+                                        LIMIT 1""",
+                                        (self.netcast.nid, like, like))
         else:
-            self.db_info = get_assoc(
-                "SELECT * FROM netcast_episodes WHERE episode_url LIKE %s OR "+
-                "local_file LIKE %s", (like, like))
+            self.db_info = get_assoc("""SELECT * 
+                                        FROM netcast_episodes 
+                                        WHERE episode_url LIKE %s OR 
+                                              local_file LIKE %s""", 
+                                        (like, like))
 
     def set_netcast(self):
         if not self.netcast and self.db_info:
@@ -383,11 +458,98 @@ class Netcast_File(fobj.FObj):
 
     def mark_as_played(self, percent_played=0):
         print "TODO: Necast_file::mark_as_played()"
+        """nlid, uid, eid, percent_played"""
+        print "percent_played:",percent_played
+        updated = get_results_assoc("""UPDATE netcast_listend_episodes nle
+                                       SET percent_played = %s
+                                       WHERE uid IN (SELECT uid FROM users 
+                                                     WHERE listening = true)
+                                             AND eid = %s RETURNING *""",
+                                       (percent_played, self.eid))
+        print "updated:",updated
+
+        for l in listeners.listeners:
+            found = False
+            for u in updated:
+                if u['uid'] == l['uid']:
+                    found = True
+
+            if not found:
+                inserted = get_results_assoc("""INSERT INTO 
+                                                netcast_listend_episodes
+                                                    (uid, eid, percent_played)
+                                                VALUES(%s, %s, %s) RETURNING *""",
+                                                (l['uid'], self.eid, 
+                                                 percent_played))
+
+        self.update_history(percent_played)
+
+
+    def update_history(self,percent_played=0):
+        """nlid, uid, eid, percent_played"""
+        updated = get_results_assoc("""UPDATE user_history uh 
+                                       SET percent_played = nle.percent_played, 
+                                           time_played = NOW(), 
+                                           date_played = current_date 
+                                       FROM netcast_listend_episodes nle 
+                                       WHERE 
+                                            nle.uid IN (SELECT uid 
+                                                        FROM users 
+                                                        WHERE listening = true) AND 
+                                            uh.uid = nle.uid AND 
+                                            nle.eid = uh.id AND 
+                                            uh.id_type = 'e' AND 
+                                            uh.date_played = current_date AND 
+                                            uh.id = %s 
+                                       RETURNING uh.*""",
+                                       (self.eid,))
+
+        for l in listeners.listeners:
+            found = False
+            for u in updated:
+                if u['uid'] == l['uid']:
+                    found = True
+
+            if not found:
+                try:
+                    user_history = get_assoc("""INSERT INTO 
+                                                    user_history (uid, id, id_type,
+                                                                  percent_played, 
+                                                                  time_played,
+                                                                  date_played) 
+                                                VALUES (%s, %s, %s, %s, NOW(), 
+                                                        current_date) 
+                                                RETURNING *""",
+                                                (l['uid'], self.eid, 'e', 
+                                                 percent_played))
+
+                    updated_user = get_assoc("""UPDATE user_history uh
+                                                SET percent_played = nle.percent_played, 
+                                                    time_played = NOW(),
+                                                    date_played = current_date 
+                                                FROM netcast_listend_episodes nle
+                                                WHERE nle.uid = %s AND
+                                                      uh.uid = nle.uid AND
+                                                      nle.eid = uh.id AND
+                                                      uh.id_type = 'e' AND
+                                                      uh.date_played = current_date AND 
+                                                      uh.id = %s RETURNING uh.*""", 
+                                                (l['uid'], self.eid))
+
+                    if updated_user:
+                        updated.append(updated_user)
+
+                except psycopg2.IntegrityError, err:
+                    query("COMMIT;")
+                    print "(file) psycopg2.IntegrityError:",err
 
     def deinc_score(self, *args, **kwargs):
         print "TODO: Netcast_File::deinc_score"
 
-    def insert(self, episode_title, episode_url):
+    def inc_score(self,*args,**kwargs):
+        print "TODO: Netcast_File::inc_score"
+
+    def insert(self, episode_title, episode_url, pub_date):
         if self.db_info:
             return
         local_file = self.get_local_filename(episode_url, urldecode=True)
@@ -396,11 +558,14 @@ class Netcast_File(fobj.FObj):
         print "Title:",episode_title
         print "url:",episode_url
         print "local_file:",local_file
+        print "pub_date:",pub_date
 
-        self.db_info = get_assoc(
-            "INSERT INTO netcast_episodes (nid, episode_title, episode_url, "+
-            "local_file) VALUES(%s, %s, %s, %s) RETURNING *", 
-            (self.netcast.nid, episode_title, episode_url, local_file))
+        self.db_info = get_assoc("""INSERT INTO netcast_episodes 
+                                        (nid, episode_title, episode_url,
+                                         local_file, pub_date)
+                                    VALUES(%s, %s, %s, %s, %s) RETURNING *""",
+                                    (self.netcast.nid, episode_title, 
+                                     episode_url, local_file, pub_date))
 
         self.set_attribs()
         pp.pprint(dict(self.db_info))
@@ -413,6 +578,71 @@ class Netcast_File(fobj.FObj):
             self.title = self.db_info['episode_title']
             self.url = self.db_info['episode_url']
             self.local = self.local_file = self.db_info['local_file']
+            self.pub_date = self.db_info['pub_date']
+
+    def is_unlistened (self):
+        return get_results_assoc("""SELECT n.*, ne.*, nl.*, u.* 
+                                    FROM netcasts n, netcast_episodes ne 
+                                         LEFT JOIN netcast_listend_episodes nl ON 
+                                                   nl.eid = ne.eid, users u, 
+                                                   netcast_subscribers ns
+                                    WHERE ne.nid = n.nid AND listening = true AND 
+                                          ns.uid = u.uid AND ns.nid = n.nid AND 
+                                          nl.uid IS NULL AND ns.nid = %s AND
+                                          ne.eid = %s
+                                    ORDER BY pub_date""", (self.nid, self.eid))
+
+
+def get_subscribed_netcasts():
+    netcasts = get_results_assoc("""SELECT DISTINCT n.*
+                                    FROM netcasts n, netcast_subscribers ns,
+                                         users u
+                                    WHERE ns.uid = u.uid AND
+                                          u.listening = true AND
+                                          ns.nid = n.nid
+                                    ORDER BY netcast_name""")
+    netcast_list = []
+    for n in netcasts:
+        netcast = Netcast(**n)
+        netcast_list.append(netcast)
+
+    return netcast_list
+
+def get_expired_subscribed_netcasts():
+    netcasts = get_results_assoc("""SELECT DISTINCT n.*
+                                    FROM netcasts n, netcast_subscribers ns,
+                                         users u
+                                    WHERE ns.uid = u.uid AND
+                                          u.listening = true AND
+                                          ns.nid = n.nid AND 
+                                          expire_time <= current_timestamp
+                                    ORDER BY netcast_name""")
+    netcast_list = []
+    for n in netcasts:
+        netcast = Netcast(**n)
+        netcast_list.append(netcast)
+
+    return netcast_list
+
+def get_one_unlistened_episode():
+    f = get_assoc("""SELECT n.*, ne.*, nl.*, u.* 
+                     FROM netcasts n, netcast_episodes ne 
+                          LEFT JOIN netcast_listend_episodes nl ON 
+                                    nl.eid = ne.eid, users u, netcast_subscribers ns 
+                     WHERE ne.nid = n.nid AND listening = true AND 
+                           ns.uid = u.uid AND ns.nid = n.nid AND 
+                           nl.uid IS NULL 
+                     ORDER BY pub_date LIMIT 1""")
+    if not f:
+        return None
+    
+    return f
+
+
+def update_now():
+    query("""UPDATE netcasts 
+             SET expire_time = NOW() 
+             WHERE last_updated < current_timestamp - interval '30 min'""")
 
 
 if __name__ == "__main__":
@@ -423,7 +653,9 @@ if __name__ == "__main__":
         'http://feeds.feedburner.com/techsnapmp3?format=xml',
         'http://leo.am/podcasts/sn',
         'http://leo.am/podcasts/twit',
-        'http://leo.am/podcasts/tri'
+        'http://leo.am/podcasts/tri',
+        "http://www.oneplace.com/ministries/thru-the-bible-with-j-vernon-mcgee/subscribe/podcast.xml",
+        "http://revision3.com/tekzilla/feed/MP4-Large?subshow=false"
     ]
 
     for url in feeds:

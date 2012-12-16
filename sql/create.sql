@@ -419,7 +419,8 @@ CREATE TABLE netcast_episodes (
     nid integer NOT NULL,
     episode_title text,
     episode_url text,
-    local_file text
+    local_file text,
+    pub_date timestamp with time zone
 );
 
 
@@ -469,6 +470,82 @@ ALTER SEQUENCE netcast_episodes_nid_seq OWNED BY netcast_episodes.nid;
 
 
 SET default_with_oids = false;
+
+--
+-- Name: netcast_listend_episodes; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE netcast_listend_episodes (
+    nlid integer NOT NULL,
+    uid integer NOT NULL,
+    eid integer NOT NULL,
+    percent_played double precision
+);
+
+
+--
+-- Name: TABLE netcast_listend_episodes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE netcast_listend_episodes IS 'nlid, uid, eid, percent_played';
+
+
+--
+-- Name: netcast_listend_episodes_eid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE netcast_listend_episodes_eid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: netcast_listend_episodes_eid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE netcast_listend_episodes_eid_seq OWNED BY netcast_listend_episodes.eid;
+
+
+--
+-- Name: netcast_listend_episodes_nlid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE netcast_listend_episodes_nlid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: netcast_listend_episodes_nlid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE netcast_listend_episodes_nlid_seq OWNED BY netcast_listend_episodes.nlid;
+
+
+--
+-- Name: netcast_listend_episodes_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE netcast_listend_episodes_uid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: netcast_listend_episodes_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE netcast_listend_episodes_uid_seq OWNED BY netcast_listend_episodes.uid;
+
 
 --
 -- Name: netcast_subscribers; Type: TABLE; Schema: public; Owner: -; Tablespace: 
@@ -1125,6 +1202,27 @@ ALTER TABLE ONLY netcast_episodes ALTER COLUMN eid SET DEFAULT nextval('netcast_
 
 
 --
+-- Name: nlid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY netcast_listend_episodes ALTER COLUMN nlid SET DEFAULT nextval('netcast_listend_episodes_nlid_seq'::regclass);
+
+
+--
+-- Name: uid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY netcast_listend_episodes ALTER COLUMN uid SET DEFAULT nextval('netcast_listend_episodes_uid_seq'::regclass);
+
+
+--
+-- Name: eid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY netcast_listend_episodes ALTER COLUMN eid SET DEFAULT nextval('netcast_listend_episodes_eid_seq'::regclass);
+
+
+--
 -- Name: nsid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1262,6 +1360,14 @@ ALTER TABLE ONLY genres
 
 ALTER TABLE ONLY netcast_episodes
     ADD CONSTRAINT netcast_episodes_pkey PRIMARY KEY (eid);
+
+
+--
+-- Name: netcast_listend_episodes_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY netcast_listend_episodes
+    ADD CONSTRAINT netcast_listend_episodes_pkey PRIMARY KEY (nlid);
 
 
 --

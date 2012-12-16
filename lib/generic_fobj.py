@@ -16,8 +16,8 @@ class Generic_File(fobj.FObj):
         elif dirname is not None and basename is not None:
             filename = os.path.join(dirname, basename)
 
-        super(Fobj, self).__init__(filename=filename, basename=basename, 
-                                   dirname=dirname, **kwargs)
+        fobj.FObj.__init__(self, filename=filename, dirname=dirname, 
+                           basename=basename, **kwargs)
 
         self.can_rate = False
         
@@ -30,4 +30,7 @@ class Generic_File(fobj.FObj):
 
     def deinc_score(self, *args, **kwargs):
         print "TODO: Generic_File.deinc_score"
+
+    def inc_score(self, *args, **kwargs):
+        print "TODO: Generic_File.inc_score"
 

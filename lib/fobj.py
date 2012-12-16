@@ -102,7 +102,7 @@ class FObj:
         elif self.uri is None:
             self.uri = "file://%s" % urllib.pathname2url(self.filename)
 
-        if not self.is_stream:
+        if not self.is_stream and self.filename:
             self.exists = os.path.exists(self.filename)
 
         if self.exists:
@@ -122,11 +122,14 @@ class FObj:
     def mark_as_played(self, *args, **kwargs):
         raise NotImpimented("mark_as_played")
 
-    def update_history(self, *args, **kwargs):
-        raise NotImpimented("update_history")
+    def update_history(id, id_type, percent_played=0):
+        raise NotImpimented("mark_as_played")
 
     def deinc_score(self, *args, **kwargs):
         raise NotImpimented("deinc_score")
+
+    def inc_score(self,*args,**kwargs):
+        raise NotImpimented("inc_score")
 
     def get_tags(self):
         if self.exists and self.has_tags:
@@ -145,7 +148,7 @@ class FObj:
         if hasattr(self, 'db_info'):
             if self.db_info.has_key(key):
                 return self.db_info[key]
-
+        print "__getitem__",key
         return getattr(self, key)
 
 import netcast_fobj
@@ -155,9 +158,10 @@ import generic_fobj
 def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, 
              nid=None, episode_url=None, local_filename=None, 
              register_as_new_file=False, register_as_new_netcast=False, 
-             _id=None, id_type=None, **kwargs):
+             pub_date=None, _id=None, id_type=None, silent=False, **kwargs):
 
-    print "get_fobj Unused kwargs:",kwargs
+    if not silent:
+        print "get_fobj Unused kwargs:",kwargs
 
     if kwargs.has_key('id') and _id is None:
         _id = kwargs['id']
@@ -168,24 +172,26 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
     if id_type is not None and _id is not None:
         if id_type == 'f':
             try:
-                return local_file_fobj.Local_File(fid=_id, **kwargs)
+                return local_file_fobj.Local_File(fid=_id, silent=silent, **kwargs)
             except CreationFailed, e:
                 print "local_file_fobj.CreationFailed:",e
         elif id_type == 'e':
             try:
-                return netcast_fobj.Netcast_File(eid=_id, **kwargs)
+                return netcast_fobj.Netcast_File(eid=_id, silent=silent, **kwargs)
             except CreationFailed, e:
                 print "netcast_fobj.CreationFailed:", e
         elif id_type == 'g':
             try:
-                return generic_fobj.Generic_File(_id=_id, **kwargs)
+                return generic_fobj.Generic_File(_id=_id, silent=silent, 
+                                                 **kwargs)
             except CreationFailed, e:
                 print "generic_fobj.CreationFailed:", e
 
     try:
         return local_file_fobj.Local_File(dirname=dirname, basename=basename, 
                                            fid=fid, filename=filename, 
-                                           insert=register_as_new_file, **kwargs)
+                                           insert=register_as_new_file, 
+                                           silent=silent, **kwargs)
 
     except CreationFailed, e:
         print "local_file_fobj.CreationFailed:",e
@@ -199,7 +205,7 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
                                           basename=basename, eid=eid, 
                                           episode_url=episode_url, 
                                           local_filename=local_filename, 
-                                          nid=nid, 
+                                          nid=nid, pub_date=pub_date,
                                           insert=register_as_new_netcast,
                                           **kwargs)
 
@@ -212,6 +218,25 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
     return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
                                       filename=filename, **kwargs)
 
+def recently_played(limit=10):
+    return get_results_assoc("""SELECT DISTINCT id, id_type, percent_played,
+                                               time_played
+                                FROM user_history uh, users u
+                                WHERE u.uid = uh.uid AND u.uid IN (
+                                        SELECT uid FROM users 
+                                        WHERE listening = true)
+                                ORDER BY time_played DESC
+                                LIMIT %d""" % limit)
+
+def recently_played_fobjs(limit=10, silent=False):
+    recent = recently_played(limit)
+    res = []
+    for f in recent:
+        r = get_fobj(silent=silent, **f)
+        if r:
+            res.append(r)
+
+    return res
 
 if __name__ == '__main__':
     import sys
