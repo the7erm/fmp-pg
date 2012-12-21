@@ -625,10 +625,11 @@ def get_expired_subscribed_netcasts():
     return netcast_list
 
 def get_one_unlistened_episode():
-    f = get_assoc("""SELECT n.*, ne.*, nl.*, u.* 
+    f = get_assoc("""SELECT n.*, ne.*, u.uname, u.uid
                      FROM netcasts n, netcast_episodes ne 
                           LEFT JOIN netcast_listend_episodes nl ON 
-                                    nl.eid = ne.eid, users u, netcast_subscribers ns 
+                                    nl.eid = ne.eid, 
+                          users u, netcast_subscribers ns 
                      WHERE ne.nid = n.nid AND listening = true AND 
                            ns.uid = u.uid AND ns.nid = n.nid AND 
                            nl.uid IS NULL 
@@ -643,6 +644,13 @@ def update_now():
     query("""UPDATE netcasts 
              SET expire_time = NOW() 
              WHERE last_updated < current_timestamp - interval '30 min'""")
+
+
+def is_netcast(obj):
+    return isinstance(obj, Netcast_File) or \
+           (obj.has_key('id_type') and obj['id_type'] == 'e') or \
+           (obj.has_key('eid') and obj['eid']) or \
+           (obj.has_key('rss_url') and obj['rss_url']) 
 
 
 if __name__ == "__main__":

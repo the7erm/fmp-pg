@@ -70,20 +70,20 @@ class DbusWatcher(dbus.service.Object):
 
     @dbus.service.method('org.mpris.MediaPlayer2', in_signature = 's', 
                          out_signature = 's')
-    def seek(self,value):
+    def seek(self, value):
         plr.seek(value)
         return "seek:%s" % value
 
     @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
                          out_signature = 's')
     def kill(self):
-        gobject.timeout_add(100, gtk.main_quit)
+        gobject.timeout_add(100, quit)
         return "kill"
 
     @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
                          out_signature = 's')
     def quit(self):
-        gobject.timeout_add(100, gtk.main_quit)
+        gobject.timeout_add(100, quit)
         return "quit"
     
 
@@ -133,7 +133,7 @@ try:
             print server.quit("", dbus_interface = 'org.mpris.MediaPlayer2')
 
         if arg in ("-s","--seek","-seek"):
-            print server.quit(argv[i+1], 
+            print server.seek(argv[i+1], 
                               dbus_interface = 'org.mpris.MediaPlayer2')
 
     if exit:
@@ -280,11 +280,12 @@ def set_idx(idx):
             recent = history[-10:]
             found_netcast = False
             for r in recent:
+                r = dict(r)
                 print "r:",dict(r)
-                if r.has_key('id_type') and r["id_type"] == 'e':
+                if is_netcast(r):
                     found_netcast = True
-                if r.has_key('eid') and r['eid']:
-                    found_netcast = True
+                    break
+
             if found_netcast:
                 f = picker.get_song_from_preload()
             else:
@@ -292,8 +293,8 @@ def set_idx(idx):
                 if not f:
                     f = picker.get_song_from_preload()
         else:
+            recent = history[-10:]
             f = picker.get_song_from_preload()
-
         history.append(f)
         tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
 
@@ -329,6 +330,13 @@ def on_end_of_stream(*args):
     plr.start()
     notify.playing(playing)
 
+def quit(*args, **kwargs):
+    try:
+        netcast_tray.terminate()
+    except:
+        pass
+    gtk.main_quit()
+
 global history, playing, idx, last_percent_played, last_percent_played_decimal
 
 last_percent_played = 0
@@ -359,7 +367,7 @@ plr.connect("end-of-stream",on_end_of_stream)
 tray.play_pause_item.connect("activate", on_toggle_playing)
 tray.next.connect("activate", on_next_clicked)
 tray.prev.connect("activate", on_prev_clicked)
-tray.quit.connect("activate", gtk.main_quit)
+tray.quit.connect("activate", quit)
 tray.icon.connect('scroll-event',plr.on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
@@ -371,7 +379,11 @@ gobject.timeout_add(5000, set_rating)
 # flask_server.start_in_thread()
 
 try:
+    netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
+    tst = fobj.netcast_fobj.get_one_unlistened_episode()
+    print "TST:",dict(tst) 
+    print "is_netcast:",fobj.netcast_fobj.is_netcast(tst)
     gtk.main()
 except KeyboardInterrupt:
-    Popen(['pykill','fmp-pg'])
+    Popen(['pykill','netcast-tray.py', 'fmp-pg.py'])
 

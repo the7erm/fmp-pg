@@ -37,7 +37,12 @@ def on_button_press(icon, event, **kwargs):
     if event.button == 1:
         menu.popup(None, None, None, event.button, event.get_time())
 
+
 def on_update(*args, **kwargs):
+    netcast_fobj.update_now()
+    update()
+
+def update(*args, **kwargs):
     netcasts = netcast_fobj.get_expired_subscribed_netcasts()
     if not netcasts:
         f = netcast_fobj.get_one_unlistened_episode()
@@ -100,7 +105,7 @@ menu.append(update_item)
 
 quit_img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
 
-quit_item = gtk.ImageMenuItem("Quit")
+quit_item = gtk.ImageMenuItem("Quit Netcast Tray")
 quit_item.set_image(quit_img)
 quit_item.show()
 quit_item.connect("activate", lambda _: gtk.main_quit())
@@ -110,6 +115,6 @@ menu.show_all()
 downloader.connect("download-status", on_download_status)
 
 if __name__ == "__main__":
-    on_update()
-    gobject.timeout_add(60000, on_update)
+    update()
+    gobject.timeout_add(60000, update)
     gtk.main()
