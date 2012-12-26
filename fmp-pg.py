@@ -32,6 +32,7 @@ import math
 import dbus
 import dbus.service
 import fobj
+from netcast_fobj import is_netcast
 
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
@@ -382,7 +383,7 @@ try:
     netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
     tst = fobj.netcast_fobj.get_one_unlistened_episode()
     print "TST:",dict(tst) 
-    print "is_netcast:",fobj.netcast_fobj.is_netcast(tst)
+    print "is_netcast:",is_netcast(tst)
     gtk.main()
 except KeyboardInterrupt:
     Popen(['pykill','netcast-tray.py', 'fmp-pg.py'])

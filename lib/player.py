@@ -324,7 +324,11 @@ static char * invisible_xpm[] = {
         self.player.set_state(PLAYING)
         self.emit('state-changed',PLAYING)
         self.playingState = self.player.get_state()[1]
-        self.dur_int = self.player.query_duration(self.time_format, None)[0]
+        try:
+            self.dur_int = self.player.query_duration(self.time_format, None)[0]
+        except gst.QueryError, e:
+            print "gst.QueryError:",e
+            self.dur_int = 0
         # self.play_thread_id = thread.start_new_thread(self.play_thread, ())
         # gc.collect()
         

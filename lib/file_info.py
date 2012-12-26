@@ -92,8 +92,14 @@ class File_Info_Tab(gtk.ScrolledWindow):
     def add_tags(self):
         # tags = File_Tags_Tab(file_info=self.file_info)
         # print "filename:",self.filename
-        self.tags_easy = mutagen.File(self.filename, easy=True)
-        self.tags_hard = mutagen.File(self.filename)
+        try:
+            self.tags_easy = mutagen.File(self.filename, easy=True)
+            self.tags_hard = mutagen.File(self.filename)
+        except mutagen.mp3.HeaderNotFoundError,e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            self.tags_easy = {}
+            self.tags_hard = {}
+        
 
         if self.tags_easy:
             table1 = Tag_Table(self.tags_easy)

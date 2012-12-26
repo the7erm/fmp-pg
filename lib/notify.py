@@ -59,7 +59,11 @@ def playing(file_info):
 
     if file_info.exists:
         print "FILENAME:",file_info["filename"]
-        tags = mutagen.File(file_info["filename"])
+        try:
+            tags = mutagen.File(file_info["filename"])
+        except mutagen.mp3.HeaderNotFoundError,e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            tags = False
     pbuf = None
     if tags and tags.has_key('APIC'):
         lower_mime = tags['APIC'].mime.lower()
