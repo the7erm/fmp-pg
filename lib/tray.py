@@ -60,11 +60,11 @@ def set_play_pause_item(state):
     if state != "PLAYING" and state != PLAYING:
         play_pause_item.set_label("Play")
         play_pause_item.set_image(play_img)
-        icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
+        icon.set_from_stock(gtk.STOCK_MEDIA_PAUSE)
     else:
         play_pause_item.set_label("Pause")
         play_pause_item.set_image(pause_img)
-        icon.set_from_stock(gtk.STOCK_MEDIA_PAUSE)
+        icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
 
 
 def on_button_press(icon, event, **kwargs):
@@ -153,7 +153,7 @@ icon = gtk.StatusIcon()
 icon.set_name("fmp-player")
 icon.set_title("fmp-player")
 icon.connect("button-press-event", on_button_press)
-icon.set_from_stock(gtk.STOCK_MEDIA_PAUSE)
+icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
 
 
 print "sys.path[0]:",sys.path[0]
