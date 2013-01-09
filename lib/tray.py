@@ -61,10 +61,12 @@ def set_play_pause_item(state):
         play_pause_item.set_label("Play")
         play_pause_item.set_image(play_img)
         icon.set_from_stock(gtk.STOCK_MEDIA_PAUSE)
+        # icon.set_from_file(image_path+"angry-paused-square.jpg")
     else:
         play_pause_item.set_label("Pause")
         play_pause_item.set_image(pause_img)
         icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
+        # icon.set_from_file(image_path+"angry-playing-square.jpg")
 
 
 def on_button_press(icon, event, **kwargs):
@@ -154,6 +156,7 @@ icon.set_name("fmp-player")
 icon.set_title("fmp-player")
 icon.connect("button-press-event", on_button_press)
 icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
+# icon.set_from_file(image_path+"angry-playing-square.jpg")
 
 
 print "sys.path[0]:",sys.path[0]
