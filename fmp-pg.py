@@ -241,16 +241,17 @@ def on_next_clicked(*args, **kwargs):
     inc_index()
     plr.filename = playing.filename
     plr.start()
-    notify.playing(playing)
     tray.set_play_pause_item(plr.playingState)
+    notify.playing(playing)
 
 
 def on_prev_clicked(item):
     deinc_index()
     plr.filename = playing.filename
     plr.start()
-    notify.playing(playing)
     tray.set_play_pause_item(plr.playingState)
+    notify.playing(playing)
+    
 
 def get_cue_netcasts():
     cfg = ConfigParser.ConfigParser()
@@ -278,6 +279,7 @@ def set_idx(idx):
         tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
     except IndexError:
         if get_cue_netcasts():
+            # TODO: Add config option for netcast spacing.
             recent = history[-10:]
             found_netcast = False
             for r in recent:
@@ -329,6 +331,7 @@ def on_end_of_stream(*args):
     inc_index()
     plr.filename = playing.filename
     plr.start()
+    tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
 
 def quit(*args, **kwargs):

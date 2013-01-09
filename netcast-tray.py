@@ -41,6 +41,7 @@ def on_button_press(icon, event, **kwargs):
 def on_update(*args, **kwargs):
     netcast_fobj.update_now()
     update()
+    icon.set_from_file(ICON_NOTHING)
 
 def update(*args, **kwargs):
     netcasts = netcast_fobj.get_expired_subscribed_netcasts()
