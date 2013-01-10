@@ -18,8 +18,8 @@
 #
 
 
-from __init__ import *
-import clear_cache
+from lib.__init__ import *
+import lib.clear_cache as clear_cache
 
 if __name__ == "__main__":
     clear_cache.clear_cache()

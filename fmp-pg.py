@@ -20,19 +20,21 @@
 import gobject, gtk, gc
 gobject.threads_init()
 
-from __init__ import *
+from lib.__init__ import *
 import os
 import sys
 import re
-import player
-import notify
-import tray
-import picker
+import lib.player as player
+import lib.notify as notify
+import lib.tray as tray
+import lib.picker as picker
 import math
 import dbus
 import dbus.service
-import fobj
-from netcast_fobj import is_netcast
+
+import urllib
+import lib.fobj as fobj
+from lib.netcast_fobj import is_netcast
 
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
@@ -118,13 +120,16 @@ try:
             sys.exit()
 
         if arg in ("-n","--next","-next"):
-            print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
+            # print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
+            urllib.urlopen("http://localhost:5050/?cmd=next")
 
         if arg in ("-b","--prev","-prev", "--back","-back"):
-            print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
+            # print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
+            urllib.urlopen("http://localhost:5050/?cmd=prev")
 
         if arg in ("-p","--pause","-pause", "--play","-play"):
-            print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
+            # print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
+            urllib.urlopen("http://localhost:5050/?cmd=pause")
 
         if arg in ("-k","--kill","-kill"):
             print server.kill("", dbus_interface = 'org.mpris.MediaPlayer2')
@@ -276,7 +281,7 @@ def set_idx(idx):
         idx = 0
     
     try:
-        tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
+        tray.playing = flask_server.playing = playing = fobj.get_fobj(**dict(history[idx]))
     except IndexError:
         if get_cue_netcasts():
             # TODO: Add config option for netcast spacing.
@@ -299,7 +304,7 @@ def set_idx(idx):
             recent = history[-10:]
             f = picker.get_song_from_preload()
         history.append(f)
-        tray.playing = playing = fobj.get_fobj(**dict(history[idx]))
+        tray.playing = flask_server.playing = playing = fobj.get_fobj(**dict(history[idx]))
 
     tray.set_rating()
     populate_preload()
@@ -334,6 +339,9 @@ def on_end_of_stream(*args):
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
 
+def on_state_change(*args, **kwargs):
+    tray.set_play_pause_item(plr.playingState)
+
 def quit(*args, **kwargs):
     try:
         netcast_tray.terminate()
@@ -355,7 +363,7 @@ if not history:
 
 idx = len(history) - 1
 item = dict(history[idx])
-tray.playing = playing = fobj.get_fobj(**item)
+tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 
 plr = player.Player(filename=playing.filename)
@@ -367,7 +375,8 @@ if plr.dur_int:
 plr.next_button.connect('clicked', on_next_clicked)
 plr.prev_button.connect('clicked', on_prev_clicked)
 plr.connect("time-status",on_time_status)
-plr.connect("end-of-stream",on_end_of_stream)
+plr.connect("end-of-stream", on_end_of_stream)
+plr.connect("state-changed", on_state_change)
 tray.play_pause_item.connect("activate", on_toggle_playing)
 tray.next.connect("activate", on_next_clicked)
 tray.prev.connect("activate", on_prev_clicked)
@@ -378,14 +387,15 @@ gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(5000, set_rating)
 
-# flask_server.playing = playing
-# flask_server.player = player
-# flask_server.start_in_thread()
+flask_server.playing = playing
+flask_server.player = plr
+flask_server.start_in_thread()
 
 try:
     netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
     tst = fobj.netcast_fobj.get_one_unlistened_episode()
-    print "TST:",dict(tst) 
+    if tst:
+        print "TST:",dict(tst) 
     print "is_netcast:",is_netcast(tst)
     gtk.main()
 except KeyboardInterrupt:

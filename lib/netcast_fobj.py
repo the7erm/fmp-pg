@@ -647,6 +647,8 @@ def update_now():
 
 
 def is_netcast(obj):
+    if obj is None:
+        return False
     return isinstance(obj, Netcast_File) or \
            (obj.has_key('id_type') and obj['id_type'] == 'e') or \
            (obj.has_key('eid') and obj['eid']) or \

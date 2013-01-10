@@ -24,6 +24,9 @@ import os
 import pprint
 import ConfigParser
 import gc
+import time
+import random
+import hashlib
 
 pp = pprint.PrettyPrinter(depth=6)
 sys.path.append(sys.path[0]+'/lib/')
@@ -42,11 +45,33 @@ if not os.path.isdir(cache_dir):
 cfg = ConfigParser.ConfigParser()
 cfg.read(config_file)
 
+def create_salt(cfg, config_file):
+    random_string = "%s%s" % (random.random(),time.time())
+    salt = hashlib.sha256(random_string).hexdigest()
+    try:
+        cfg.add_section('password_salt')
+    except ConfigParser.DuplicateSectionError:
+        pass
+    cfg.set("password_salt","salt",salt)
+    with open(config_file, 'w') as fp:
+        cfg.write(fp)
+        fp.flush()
+    return salt
+
 pg_conn = psycopg2.connect("dbname=%s user=%s password=%s host=%s" % (
                             cfg.get('postgres','database'), 
                             cfg.get('postgres','username'), 
                             cfg.get('postgres','password'), 
                             cfg.get('postgres','host')))
+
+try:
+    salt = cfg.get('password_salt','salt')
+except ConfigParser.NoSectionError:
+    salt = create_salt(cfg, config_file)
+
+if not salt:
+    salt = create_salt(cfg, config_file)
+
 
 pg_cur = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 

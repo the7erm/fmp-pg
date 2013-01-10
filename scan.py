@@ -17,10 +17,10 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from __init__ import *
+from lib.__init__ import *
 import os, sys
-import scanner
-import file_object
+import lib.scanner as scanner
+import lib.file_object as file_object
 file_object.pg_conn = pg_conn
 file_object.pg_cur = pg_cur
 file_object.get_results_assoc = get_results_assoc

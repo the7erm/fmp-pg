@@ -151,6 +151,30 @@ class FObj:
         print "__getitem__",key
         return getattr(self, key)
 
+    def to_dict(self):
+        ratings = {}
+        if hasattr(self,"ratings_and_scores") and \
+           hasattr(self.ratings_and_scores,"ratings_and_scores"):
+            for r in self.ratings_and_scores.ratings_and_scores:
+                ultp = r["ultp"]
+                if hasattr(ultp,"isoformat"):
+                    ultp = r["ultp"].isoformat()
+                print "R:",dict(r)
+                r = dict(r)
+                ratings[r['uid']] = {}
+                for k, v in r.iteritems():
+                    if k == "pword":
+                        continue
+                    if isinstance(v,datetime.datetime):
+                        v = v.isoformat()
+                    ratings[r['uid']][k] = v
+                
+            print "RATINGS:",ratings
+        return {
+            "basename":self.basename,
+            "ratings":ratings
+        }
+
 import netcast_fobj
 import local_file_fobj
 import generic_fobj

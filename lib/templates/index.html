@@ -1,0 +1,74 @@
+<html>
+<head>
+    <title>fmp-pg - {{ playing.basename }}</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+</head>
+<body>
+    Playing:<span id="playing-file">{{ playing.basename }}</span><br>
+    <a class='action-link' href="?cmd=prev"><img src="/static/images/media-seek-backward.png"></a>
+    
+    {% if player.playingState == PLAYING %}
+        <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" border="0"></a>
+    {% else %}
+        <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" border="0"></a>
+    {% endif %}
+    
+    <a class='action-link' href="?cmd=next"><img src="/static/images/media-seek-forward.png"></a>
+    <br clear="all">
+
+    <pre id="time-status">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</pre>
+
+    <input type="text" style="display:none; position:absolute; left:-10000;" id="junk-input">
+
+    <script type="text/javascript">
+        $(document).ready(function(){
+            var time_status = $("#time-status");
+            var playing_file = $("#playing-file");
+            var play_pause_img = $("#play-pause-img");
+            var junk_input = $("#junk-input");
+            var player = null;
+            var playing = null;
+
+            $(".action-link").click(function(evt) {
+                if (evt) {
+                    evt.preventDefault();
+                }
+                junk_input.show().focus().hide(); // The extents we must go to remove the border.
+                // console.log("target:",evt.currentTarget);
+                if (window.player.playingState == "PLAYING") {
+                    play_pause_img.prop("src","/static/images/media-playback-pause.png");
+                } else {
+                    play_pause_img.prop("src","/static/images/media-playback-start.png");
+                }
+                $.ajax(evt.currentTarget.href).done(function(){
+                    get_status();
+                });
+                return false;
+            });
+            
+
+            function process_status(dta) {
+                var player = dta.player;
+                window.player = player;
+                time_status.text("-" + player.pos_data["left_str"]+ " " + 
+                                 player.pos_data["pos_str"]+"/"+player.pos_data["dur_str"]);
+                playing_file.text(dta.playing.basename);
+                if (player.playingState != "PLAYING") {
+                    play_pause_img.prop("src","/static/images/media-playback-start.png");
+                } else {
+                    play_pause_img.prop("src","/static/images/media-playback-pause.png");
+                }
+            }
+            var get_status = function () {
+                $.ajax("/status",{"cache":false}).done(function(data){
+                    process_status(data);
+                });
+                return true
+            }
+            
+            setInterval(get_status, 5000);
+        });
+
+    </script>
+</body>
+</html>

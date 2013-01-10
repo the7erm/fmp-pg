@@ -17,17 +17,17 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from __init__ import *
-import fobj
+from lib.__init__ import *
+import lib.fobj as fobj
 import os
 import sys
-import netcast_fobj
+import lib.netcast_fobj as netcast_fobj
 import pprint
 import gtk
 import gobject
 import time
-import clear_cache
-from episode_downloader import downloader
+import lib.clear_cache as clear_cache
+from lib.episode_downloader import downloader
 gobject.threads_init()
 
 pp = pprint.PrettyPrinter(depth=6, indent=4)

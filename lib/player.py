@@ -52,6 +52,7 @@ class Player(gobject.GObject):
         self.play_thread_id = None
         self.fullscreen = False
         self.seek_locked = False
+        self.pos_data = {}
         self.dur_int = 0
         self.pos_int = 0
         self.volume = 1.0
@@ -204,7 +205,21 @@ static char * invisible_xpm[] = {
         
         gobject.timeout_add(1000,self.update_time)
     
-    
+    def to_dict(self):
+        return {
+            "filename":self.filename,
+            "pos_data":self.pos_data,
+            "playingState":self.state_to_string(self.playingState)
+        }
+
+    def state_to_string(self, state):
+        if state == PLAYING:
+            return "PLAYING"
+        if state == PAUSED:
+            return "PAUSED"
+        if state == STOPPED:
+            return "STOPPED"
+        return "ERROR"
         
     def show_hide_play_pause(self,*args):    
         if self.playingState in (STOPPED, PAUSED):
@@ -301,7 +316,11 @@ static char * invisible_xpm[] = {
             self.prev_button.emit('clicked')
         
             
-            
+    def next(self, *args, **kwargs):
+        self.next_button.emit("clicked")
+
+    def prev(self, *args, **kwargs):
+        self.prev_button.emit('clicked')
         
     def start(self,*args):
         # self.play_thread_id = None
@@ -390,6 +409,16 @@ static char * invisible_xpm[] = {
             self.pos_int = pos_int
             self.left_int = left_int
             self.emit('time-status', pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent)
+            self.pos_data = {
+                "pos_str": pos_str, 
+                "dur_str": dur_str, 
+                "left_str": left_str,
+                "percent": percent,
+                "pos_int": pos_int,
+                "dur_int": dur_int,
+                "left_int": left_int,
+                "decimal": decimal
+            }
         except TypeError, e:
             print "TypeError:",e
         
@@ -548,9 +577,8 @@ static char * invisible_xpm[] = {
         # print s
         # gtk.gdk.threads_enter()
         self.timeLabel.set_text(" -%s %s/%s" % (left_str, pos_str, dur_str) )
-    
-        
-        
+
+
 
 if __name__ == '__main__':
 
