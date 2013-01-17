@@ -299,6 +299,7 @@ class HistoryDialog(gtk.Window):
         return True
 
     def create_row(self, f, cols):
+        self.wait()
         found = False
         if f['id_type'] == 'f':
             q = pg_cur.mogrify("""SELECT *, age(now(), ultp) AS \"age\",
@@ -359,16 +360,18 @@ class HistoryDialog(gtk.Window):
         return row
 
     def update_row(self, r, cols, user_file_info):
-        if gtk.events_pending():
-            while gtk.events_pending():
-                # print "pending:"
-                gtk.main_iteration(False)
         for u in user_file_info:
             for c in cols:
                 c_num = self.user_cols[u['uid']][c]
                 if r[c_num] != u[c]:
                     print "update_row:",r[c_num], "!=", u[c]
                     r[c_num] = u[c]
+
+    def wait(self):
+        if gtk.events_pending():
+            while gtk.events_pending():
+                # print "pending:"
+                gtk.main_iteration(False)
                     
 
     def insert_ratings(self):
