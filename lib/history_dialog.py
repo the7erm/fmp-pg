@@ -21,6 +21,7 @@ from __init__ import *
 from star_cell import CellRendererStar
 import gtk, gobject, os, datetime, math
 from subprocess import Popen
+from preload import convert_delta_to_str
 
 class HistoryDialog(gtk.Window):
     def __init__(self):
@@ -29,6 +30,7 @@ class HistoryDialog(gtk.Window):
         
         self.history_length = 100
         self.change_locked = False
+        self.refresh_lock = False
         self.tv = None
         self.create_treeview()
         gobject.timeout_add(10000, self.refresh_data)
@@ -84,7 +86,7 @@ class HistoryDialog(gtk.Window):
         
 
     def on_row_activate(self,treeview, path, view_column):
-        fid = str(self.liststore[path][0])
+        fid = str(self.liststore[path][1])
         print "fid:",fid
         if os.path.exists(sys.path[0]+"/file_info.py"):
             Popen([sys.path[0]+"/file_info.py", fid])
@@ -106,6 +108,7 @@ class HistoryDialog(gtk.Window):
     def setup_cols(self):
         
         self.cols = [
+            int, # uhid
             int, # id
             str, # id_type
             str, # basename
@@ -134,10 +137,11 @@ class HistoryDialog(gtk.Window):
             [int, 'score'],
             [float, 'percent_played'],
             [float, 'true_score'],
+            [float, 'ultp_epoch'],
+            [float, 'age_epoch'],
             [str, 'ultp'],
             [str, 'age'],
-            [float, 'ultp_epoch'],
-            [float, 'age_epoch']
+            
         ]
 
         for u in self.listeners:
@@ -156,7 +160,7 @@ class HistoryDialog(gtk.Window):
 
         self.refresh_data()
 
-        self.append_simple_col("Filename",1)
+        self.append_simple_col("Filename",2)
         
         for u in self.listeners:
             cell = CellRendererStar(15, self.user_cols[u['uid']]['rating'])
@@ -211,7 +215,7 @@ class HistoryDialog(gtk.Window):
         if self.change_locked:
             return
         self.change_locked = True
-        fid = liststore[path][0]
+        fid = liststore[path][1]
         print "fid:",fid
         for uid in self.user_cols:
             print "uid:",uid
@@ -238,14 +242,19 @@ class HistoryDialog(gtk.Window):
 
 
     def refresh_data(self):
+        if self.refresh_lock:
+            return True
+
+        self.refresh_lock = True
         print "history_dialog.refresh_data"
         cols = ['uid', 'rating', 'score', 'percent_played', 'true_score', 
-                'ultp', 'age', 'ultp_epoch', 'age_epoch']
+                'ultp_epoch', 'age_epoch', 'ultp', 'age']
         self.change_locked = True
         listeners = self.get_listeners()
         if len(self.listeners) != len(listeners):
             self.listeners = listeners
             self.create_treeview()
+            self.refresh_lock = False
             return True
         else:
             for l in listeners:
@@ -257,9 +266,11 @@ class HistoryDialog(gtk.Window):
                 if not found:
                     self.listeners = listeners
                     self.create_treeview()
+                    self.refresh_lock = False
                     return True
         # SELECT uh.*, u.uname FROM user_history uh, users u WHERE u.uid = uh.uid AND u.listening = true ORDER BY time_played DESC LIMIT 10
-        files = get_results_assoc("""SELECT f.fid, id, id_type, u.uname, f.basename
+        files = get_results_assoc("""SELECT f.fid, id, id_type, u.uname, f.basename,
+                                            uh.uhid
                                      FROM user_history uh 
                                           LEFT JOIN files f ON f.fid = uh.id AND
                                                     uh.id_type = 'f',
@@ -280,7 +291,8 @@ class HistoryDialog(gtk.Window):
             # print "cols:",self.cols
             try:
                 self.liststore.append(row)
-            except ValueError:
+            except ValueError, e:
+                print "ValueError:",e
                 self.insert_ratings()
                 row = self.create_row(f, cols)
                 if not row:
@@ -292,10 +304,11 @@ class HistoryDialog(gtk.Window):
         for r in self.liststore:
             found = False
             for f in files:
-                if r[0] == f['fid']:
+                if r[0] == f['uhid']:
                     found = True
             if not found:
                 self.liststore.remove(r.iter)
+        self.refresh_lock = False
         return True
 
     def create_row(self, f, cols):
@@ -340,7 +353,7 @@ class HistoryDialog(gtk.Window):
             user_file_info.append(r)
 
         for r in self.liststore:
-            if r[0] == f['id']:
+            if r[0] == f['uhid']:
                 found = True
                 self.update_row(r, cols, user_file_info)
                 break
@@ -348,6 +361,7 @@ class HistoryDialog(gtk.Window):
             return None
 
         row = [
+            f['uhid'],
             f['id'],
             f['basename'],
             f['uname'],
@@ -363,6 +377,14 @@ class HistoryDialog(gtk.Window):
         for u in user_file_info:
             for c in cols:
                 c_num = self.user_cols[u['uid']][c]
+                if c == 'age_epoch':
+                    age_cnum = self.user_cols[u['uid']]['age']
+                    if u['age'] == r[age_cnum]:
+                        # print "skipping:",u['age'],'==',r[age_cnum]
+                        continue
+                    else:
+                        #print "using:",u['age'],'!=',r[age_cnum]
+                        pass 
                 if r[c_num] != u[c]:
                     print "update_row:",r[c_num], "!=", u[c]
                     r[c_num] = u[c]
@@ -392,67 +414,6 @@ class HistoryDialog(gtk.Window):
                                                  default_true_score, m)
             query(q)
 
-
-def convert_delta_to_str(delta):
-    c = ""
-    
-    days = delta.days
-    years = 0
-    months = 0
-    weeks = 0
-    parts = []
-
-    try:
-        years = int(math.floor(days / 365))
-        if years > 1:
-            parts.append("%s years" % years)
-        elif years == 1:
-            parts.append("%s year" % years)
-    except ZeroDivisionError, err:
-        pass
-
-    days = days - (years * 365)
-
-    try:
-        months = int(math.floor(days / 30))
-        if months > 1:
-            parts.append("%s months" % months)
-        elif months == 1:
-            parts.append("%s month" % months)
-    except ZeroDivisionError, err:
-        pass
-
-    days = days - (months * 30)
-
-    try:
-        weeks = int(math.floor(days / 7))
-        if weeks > 1:
-            parts.append("%s weeks" % weeks)
-        elif weeks == 1:
-            parts.append("%s week" % weeks)
-    except ZeroDivisionError, err:
-        pass
-
-    days = days - (weeks * 7)
-
-    days = int(days)
-    if days > 1:
-        parts.append("%s days" % days)
-    elif days == 1:
-        parts.append("%s day" % days)
-
-    secs = delta.seconds
-    hrs = int(math.floor(secs / 3600))
-    secs = secs - (hrs * 3600)
-    mins = int(math.floor(secs / 60))
-    secs = secs - (mins * 60)
-
-    if len(parts) < 2:
-        parts.append("%s:%02d:%02d" % (hrs, mins, secs))
-
-    parts = parts[0:3]
-
-    return " ".join(parts)
 
 if __name__ == "__main__":
     history = HistoryDialog()

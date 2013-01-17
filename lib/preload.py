@@ -306,7 +306,6 @@ def convert_delta_to_str(delta):
     months = 0
     weeks = 0
     parts = []
-    
 
     try:
         years = int(math.floor(days / 365))
@@ -346,6 +345,10 @@ def convert_delta_to_str(delta):
         parts.append("%s days" % days)
     elif days == 1:
         parts.append("%s day" % days)
+
+    if parts:
+        parts = parts[0:3]
+        return " ".join(parts)
 
     secs = delta.seconds
     hrs = int(math.floor(secs / 3600))
