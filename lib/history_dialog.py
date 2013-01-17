@@ -22,13 +22,46 @@ from star_cell import CellRendererStar
 import gtk, gobject, os, datetime, math
 from subprocess import Popen
 
-class HistoryDialog(gtk.ScrolledWindow):
+class HistoryDialog(gtk.Window):
     def __init__(self):
-        gtk.ScrolledWindow.__init__(self)
+        gtk.Window.__init__(self)
+        self.init_containers()
+        
+        self.history_length = 100
         self.change_locked = False
         self.tv = None
         self.create_treeview()
         gobject.timeout_add(10000, self.refresh_data)
+
+    def init_containers(self):
+        self.vbox = gtk.VBox()
+        self.vbox.show()
+        self.add(self.vbox)
+
+        self.scrolled_window = gtk.ScrolledWindow()
+        self.scrolled_window.show()
+        self.vbox.pack_start(self.scrolled_window)
+        
+        self.hbox = gtk.HBox()
+        self.vbox.pack_end(self.hbox,False,False)
+
+        self.more_button = gtk.Button()
+        self.more_button.show()
+        img = gtk.Image()
+        img.show()
+        img.set_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_BUTTON)
+        self.more_button.set_image(img)
+        self.more_button.set_label("More")
+        self.more_button.connect("clicked",self.on_more)
+        
+        self.hbox.show()
+        self.hbox.pack_end(self.more_button,False, True)
+
+
+    def on_more(self, *args,**kwargs):
+        self.history_length = self.history_length + 100
+        self.refresh_data()
+
 
     def create_treeview(self):
         if self.tv:
@@ -38,7 +71,7 @@ class HistoryDialog(gtk.ScrolledWindow):
         self.tv.connect("row-activated",self.on_row_activate)
         self.tv.show()
         self.setup_cols()
-        self.add(self.tv)
+        self.scrolled_window.add(self.tv)
         self.tv.set_model(self.liststore)
 
         self.liststore.connect("row-changed", self.on_row_change)
@@ -234,8 +267,9 @@ class HistoryDialog(gtk.ScrolledWindow):
                                      WHERE u.uid = uh.uid AND u.listening = true
                                            AND id_type = 'f'
                                      ORDER BY time_played DESC LIMIT %d""" %
-                                     100) # for the time being it's just pulling files
-                                          # TODO add netcasts, and generic files.
+                                     self.history_length)
+                                     # for the time being it's just pulling files
+                                     # TODO add netcasts, and generic files.
         
         for f in files:
             row = self.create_row(f, cols)
@@ -325,6 +359,10 @@ class HistoryDialog(gtk.ScrolledWindow):
         return row
 
     def update_row(self, r, cols, user_file_info):
+        if gtk.events_pending():
+            while gtk.events_pending():
+                # print "pending:"
+                gtk.main_iteration(False)
         for u in user_file_info:
             for c in cols:
                 c_num = self.user_cols[u['uid']][c]
@@ -414,15 +452,13 @@ def convert_delta_to_str(delta):
     return " ".join(parts)
 
 if __name__ == "__main__":
-    
     history = HistoryDialog()
     w = gtk.Window()
-    w.set_title("FMP - History")
-    w.set_default_size(800,600)
-    w.set_position(gtk.WIN_POS_CENTER)
-    w.add(history)
-    w.show_all()
-    w.connect("destroy", gtk.main_quit)
+    history.set_title("FMP - History")
+    history.set_default_size(800,600)
+    history.set_position(gtk.WIN_POS_CENTER)
+    history.connect("destroy", gtk.main_quit)
+    history.show()
     # w.maximize()
     gtk.main()
 
