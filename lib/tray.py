@@ -112,6 +112,15 @@ def on_activate_file_info(*args):
         Popen([sys.path[0]+"/../lib/file_info.py", fid])
         return
 
+def on_activate_history(*args):
+    fid = str(playing['fid'])
+    if os.path.exists(sys.path[0]+"/lib/history_dialog.py"):
+        Popen([sys.path[0]+"/lib/history_dialog.py", fid])
+        return
+    if os.path.exists(sys.path[0]+"/../lib/history_dialog.py"):
+        Popen([sys.path[0]+"/../lib/history_dialog.py", fid])
+        return
+
 
 def on_activate_genres(*args):
     # WHY?! because I'm sick of running down thread locks.
@@ -202,6 +211,11 @@ img = gtk.image_new_from_stock(gtk.STOCK_INFO, gtk.ICON_SIZE_BUTTON)
 song_info.set_image(img)
 menu.append(song_info)
 
+history_info = gtk.ImageMenuItem("History")
+img = gtk.image_new_from_stock(gtk.STOCK_INFO, gtk.ICON_SIZE_BUTTON)
+history_info.set_image(img)
+menu.append(history_info)
+
 listeners = gtk.ImageMenuItem("Listeners")
 img = gtk.image_new_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_BUTTON)
 listeners.set_image(img)
@@ -228,6 +242,7 @@ menu.append(quit)
 menu.show_all()
 
 song_info.connect("activate", on_activate_file_info)
+history_info.connect("activate", on_activate_history)
 listeners.connect("activate", on_activate_listeners)
 genres.connect("activate", on_activate_genres)
 preload.connect("activate",on_activate_preload)
@@ -243,10 +258,6 @@ except NoSectionError:
         cfg.write(configfile)
 finally:
     cue_netcasts_item.set_active(cue_netcasts)
-
-
-
-
 
 if __name__ == "__main__":
     def toggle_pause(item):

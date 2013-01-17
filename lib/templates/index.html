@@ -1,6 +1,6 @@
 <html>
 <head>
-    <title>fmp-pg - {{ playing.basename }}</title>
+    <title>fmp - {{ playing.basename }}</title>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 </head>
 <body>
@@ -35,11 +35,16 @@
                 }
                 junk_input.show().focus().hide(); // The extents we must go to remove the border.
                 // console.log("target:",evt.currentTarget);
-                if (window.player.playingState == "PLAYING") {
-                    play_pause_img.prop("src","/static/images/media-playback-pause.png");
-                } else {
+                try {
+                    if (window.player.playingState == "PLAYING") {
+                        play_pause_img.prop("src","/static/images/media-playback-pause.png");
+                    } else {
+                        play_pause_img.prop("src","/static/images/media-playback-start.png");
+                    }
+                } catch(e) {
                     play_pause_img.prop("src","/static/images/media-playback-start.png");
                 }
+                
                 $.ajax(evt.currentTarget.href).done(function(){
                     get_status();
                 });
@@ -58,6 +63,7 @@
                 } else {
                     play_pause_img.prop("src","/static/images/media-playback-pause.png");
                 }
+                window.document.title = "fmp - " + dta.playing.basename;
             }
             var get_status = function () {
                 $.ajax("/status",{"cache":false}).done(function(data){

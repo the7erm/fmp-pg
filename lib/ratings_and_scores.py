@@ -319,6 +319,7 @@ class RatingsAndScores:
                     except psycopg2.IntegrityError, err:
                         query("COMMIT;")
                         print "(artist) psycopg2.IntegrityError:",err
+                        listeners.refresh()
 
     def update_history(self, percent_played=0):
         global listeners
@@ -387,6 +388,7 @@ class RatingsAndScores:
                 except psycopg2.IntegrityError, err:
                     query("COMMIT;")
                     print "(file) psycopg2.IntegrityError:",err
+                    listeners.refresh()
 
         self.update(updated)
 

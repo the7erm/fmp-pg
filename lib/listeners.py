@@ -26,9 +26,11 @@ class Listeners:
         self.refresh()
 
     def __getattr__(self, name):
+        now = time.time()
+        # print "Listeners:","__getattr__:",name
         if name == 'listeners':
-            if time.time() < self.expires:
-                print "REFRESH LISTENERS!"
+            if now > self.expires:
+                print "REFRESH LISTENERS! ",now,"<",self.expires,"drift:",(self.expires- now)
                 self.refresh()
             return self.listeners
 
@@ -38,7 +40,7 @@ class Listeners:
 
         if name == 'recheck_listeners':
             if self.listeners:
-                return self.listeners
+                return self.__getattr__("listeners")
             self.refresh()
             return self.listeners
 
@@ -48,7 +50,8 @@ class Listeners:
         return "listeners:%s\n%s" % (pp.pformat(self.listeners),pp.pformat(self.selected))
 
     def refresh(self):
-        self.expires = time.time() + 60
+        print "RERESH"
+        self.expires = time.time() + 10
         self.listeners = get_results_assoc("""SELECT * FROM users 
                                               WHERE listening = true 
                                               ORDER BY admin DESC, uname""")
@@ -69,7 +72,6 @@ class Listeners:
         pp.pprint(self.selected)
 
 listeners = Listeners()
-
 
 if __name__ == "__main__":
     print listeners
