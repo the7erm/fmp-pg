@@ -128,7 +128,6 @@ class Local_File(fobj.FObj):
         self.update_history(100.0)
 
     def get_selected(self):
-        
         return self.ratings_and_scores.get_selected()
 
 

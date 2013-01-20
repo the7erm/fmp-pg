@@ -385,7 +385,7 @@ tray.icon.connect('scroll-event',plr.on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
-gobject.timeout_add(5000, set_rating)
+gobject.timeout_add(1000, set_rating)
 
 flask_server.playing = playing
 flask_server.player = plr

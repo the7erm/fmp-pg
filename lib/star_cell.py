@@ -83,6 +83,8 @@ class CellRendererStar(gtk.GenericCellRenderer):
 		setattr(self, pspec.name, value)
 	
 	def make_stars(self):
+		if self.rating == -1:
+			return
 		rating = self.rating
 		if self.stars.has_key(rating):
 			self.image = self.stars[rating]
@@ -159,6 +161,8 @@ class CellRendererStar(gtk.GenericCellRenderer):
 		self.stars[rating] = self.image
 
 	def make_stars_hover(self, rating):
+		if self.rating == -1:
+			return
 		self.image = gtk.Image()
 		self.image.show()
 		if self.stars_hover.has_key(rating):
@@ -277,7 +281,9 @@ class CellRendererStar(gtk.GenericCellRenderer):
 		expose_area = tree.get_background_area(path, col)
 		flags = gtk.CELL_RENDERER_SELECTED
 		self.make_stars_hover(rating)
-		self.on_render(tree.get_bin_window(), tree, tree.get_background_area(path, col), tree.get_cell_area(path, col), expose_area, flags)
+		self.on_render(tree.get_bin_window(), tree, 
+					   tree.get_background_area(path, col), 
+					   tree.get_cell_area(path, col), expose_area, flags)
 
 	def on_motion_notify(self, tree, event):
 		try:

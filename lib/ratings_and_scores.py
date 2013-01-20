@@ -48,12 +48,8 @@ class RatingsAndScores:
         if time.time() < self.expires and not force:
             return self.ratings_and_scores
 
-        self.ratings_and_scores = get_results_assoc(
-            """SELECT * FROM users u, user_song_info usi
-               WHERE uid IN ("""+self.prepare_uids()+""") AND usi.uid = u.uid AND 
-                     usi.fid = %s
-               ORDER BY admin DESC, uname""", 
-               self.fid)
+        self.get_ratings_and_scores()
+        return self.ratings_and_scores
 
     def prepare_uids(self):
         self.uids_str = []
@@ -67,13 +63,17 @@ class RatingsAndScores:
         if time.time() < self.expires and not force:
             return self.ratings_and_scores
 
-        self.expires = time.time() + 60
+        self.get_ratings_and_scores()
+        return self.ratings_and_scores
+
+    def get_ratings_and_scores(self):
+        print "get_ratings_and_scores"
+        self.expires = time.time() + 10
         self.ratings_and_scores = get_results_assoc(
             """SELECT * FROM users u, user_song_info usi
                WHERE listening = true AND usi.uid = u.uid AND usi.fid = %s
                ORDER BY admin DESC, uname""", 
                (self.fid,))
-
         return self.ratings_and_scores
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
