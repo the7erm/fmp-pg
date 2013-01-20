@@ -29,6 +29,7 @@
             var player = null;
             var playing = null;
 
+
             $(".action-link").click(function(evt) {
                 if (evt) {
                     evt.preventDefault();
@@ -65,14 +66,57 @@
                 }
                 window.document.title = "fmp - " + dta.playing.basename;
             }
+
+            function format_time(milliseconds) {
+                var seconds = Math.floor(parseInt(milliseconds) / 1000000000);
+                var hrs = Math.floor(seconds / 3600);
+                if (hrs) {
+                    seconds = seconds - (hrs * 3600);
+                }
+                var minutes = Math.floor(seconds / 60);
+                if (minutes) {
+                    seconds = seconds - (minutes * 60);
+                }
+                var ret = "";
+                if (hrs) {
+                    ret = hrs+":";
+                }
+                
+                if (minutes < 10 && ret) {
+                    minutes = "0"+minutes;
+                }
+                ret += minutes+":";
+                
+                if (seconds < 10) {
+                    seconds = "0"+seconds;
+                }
+                ret += ""+seconds;
+                return ret;
+            }
+
+            function set_time() {
+                if (window.player.playingState == "PLAYING") {
+                    window.player.pos_data.left_int = parseInt(window.player.pos_data.left_int) - 1000000000;
+                    window.player.pos_data.pos_int =  parseInt(window.player.pos_data.pos_int) + 1000000000;
+                    window.player.pos_data["left_str"] = format_time(window.player.pos_data.left_int);
+                    window.player.pos_data["pos_str"] = format_time(window.player.pos_data.pos_int);
+                    time_status.text("-" + window.player.pos_data["left_str"]+ " " + 
+                                     window.player.pos_data["pos_str"]+"/"+window.player.pos_data["dur_str"]);
+                    /*
+                    {"player": {"pos_data": {"dur_int": 294581000000, "pos_str": "2:38", "left_str": "2:16", "left_int": 136094933000, "decimal": 0.5380050546369249, "pos_int": 158486067000, "percent": "53.80%", "dur_str": "4:54"}, "playingState": "PLAYING", "filename": "/home/erm/mp3/T/Toto - Africa.mp3"}, "playing": {"ratings": {"1": {"rating": 4, "uid": 1, "last_time_cued": "2013-01-20T13:20:40.710763+00:00", "usid": 189318, "admin": true, "selected": true, "true_score": 77.9335018212308, "uname": "erm", "ultp": "2013-01-20T13:23:12.417318+00:00", "listening": true, "fid": 6210, "percent_played": 53.8005054636925, "score": 10}}, "basename": "Toto - Africa.mp3"}}
+                    */
+                }
+            }
+
             var get_status = function () {
                 $.ajax("/status",{"cache":false}).done(function(data){
                     process_status(data);
                 });
                 return true
             }
-            
+            get_status();
             setInterval(get_status, 5000);
+            setInterval(set_time, 1000);
         });
 
     </script>
