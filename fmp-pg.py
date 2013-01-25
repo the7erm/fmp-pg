@@ -389,6 +389,7 @@ gobject.timeout_add(1000, set_rating)
 
 flask_server.playing = playing
 flask_server.player = plr
+flask_server.tray = tray
 flask_server.start_in_thread()
 
 try:

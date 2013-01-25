@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    global playing, player
+    global playing, player, tray
     print "FLASK PLAYING:", playing.filename
     print "REQUEST:",request
     print "request.args:",request.args
@@ -33,6 +33,15 @@ def index():
             player.next()
         if cmd == "prev":
             player.prev()
+        if cmd == "rate":
+            rating = request.args.get("value",0)
+            uid = request.args.get("uid",0)
+            print "RATE:uid:%s rating:%s" % (uid, rating)
+            if uid and hasattr(playing, "ratings_and_scores"):
+                print "RATE 2:uid:%s rating:%s" % (uid, rating)
+                playing.ratings_and_scores.rate(uid=uid, rating=rating)
+        if request.args.get("status",""):
+            return status()
         return redirect("/")
     return render_template("index.html", player=player, playing=playing, PLAYING=PLAYING)
 

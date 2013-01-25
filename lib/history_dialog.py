@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/history_dialog.py -- Display files in preload
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

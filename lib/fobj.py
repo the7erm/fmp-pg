@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # fobj.py -- File object
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -132,7 +132,7 @@ class FObj:
         raise NotImpimented("inc_score")
 
     def get_tags(self):
-        if self.exists and self.has_tags:
+        if self.exists and self.has_tags and self.tags_easy is None:
             self.tags_easy = mutagen.File(self.filename, easy=True)
 
     def getmtime(self):
@@ -150,6 +150,13 @@ class FObj:
                 return self.db_info[key]
         print "__getitem__",key
         return getattr(self, key)
+
+    def get_artist_title(self):
+        self.get_tags()
+        if self.tags_easy:
+            if self.tags_easy['artist'] and self.tags_easy['title']:
+                return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
+        return self.basename
 
     def to_dict(self):
         ratings = {}
@@ -171,6 +178,7 @@ class FObj:
                 
             print "RATINGS:",ratings
         return {
+            "artist_title":self.get_artist_title(),
             "basename":self.basename,
             "ratings":ratings
         }

@@ -2,9 +2,23 @@
 <head>
     <title>fmp - {{ playing.basename }}</title>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/js/underscore-min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.raty.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+    <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
 </head>
 <body>
-    Playing:<span id="playing-file">{{ playing.basename }}</span><br>
+    Playing:<span id="playing-file">{{ playing.basename }}</span>
+    <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
+    <br clear="all">
+    <br clear="all">
+    <table id="ratings-table" border="1" cellspacing="0">
+        <tr>
+            <td>User</td>
+            <td>Rating</td>
+            <td>True Score</td>
+        </tr>
+    </table>
     <a class='action-link' href="?cmd=prev"><img src="/static/images/media-seek-backward.png"></a>
     
     {% if player.playingState == PLAYING %}
@@ -16,19 +30,28 @@
     <a class='action-link' href="?cmd=next"><img src="/static/images/media-seek-forward.png"></a>
     <br clear="all">
 
-    <pre id="time-status">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</pre>
-
     <input type="text" style="display:none; position:absolute; left:-10000;" id="junk-input">
+
+    <script type="text/html" id="tpl-rating">
+        <tr class="user-line" data-uid="<%= uid %>">
+            <td><%= uname %></td> 
+            <td class="star-rating" data-rating="<%= rating %>" data-uid="<%= uid %>" ></td>
+            <td><% print (Math.round(true_score,2)); %></td>
+        </tr>
+    </script>
 
     <script type="text/javascript">
         $(document).ready(function(){
+            $.fn.raty.defaults.path = '/static/images/raty/';
             var time_status = $("#time-status");
             var playing_file = $("#playing-file");
             var play_pause_img = $("#play-pause-img");
             var junk_input = $("#junk-input");
             var player = null;
             var playing = null;
-
+            var ratings = null;
+            var rating_tpl = _.template($("#tpl-rating").html());
+            var ratings_table = $("#ratings-table");
 
             $(".action-link").click(function(evt) {
                 if (evt) {
@@ -36,35 +59,75 @@
                 }
                 junk_input.show().focus().hide(); // The extents we must go to remove the border.
                 // console.log("target:",evt.currentTarget);
-                try {
-                    if (window.player.playingState == "PLAYING") {
-                        play_pause_img.prop("src","/static/images/media-playback-pause.png");
-                    } else {
-                        play_pause_img.prop("src","/static/images/media-playback-start.png");
-                    }
-                } catch(e) {
-                    play_pause_img.prop("src","/static/images/media-playback-start.png");
-                }
-                
-                $.ajax(evt.currentTarget.href).done(function(){
-                    get_status();
+                $.ajax(evt.currentTarget.href+"&status=1",{"cache":false}).done(function(data){
+                    console.log("DATA:",data);
+                    process_status(data);
                 });
                 return false;
             });
             
+            function onRate(score, evt) {
+                $.ajax({
+                    "url":"/",
+                    "data":{
+                        "cmd": "rate",
+                        "uid": $(this).data("uid"),
+                        "status":1,
+                        "value":score,
+                    }
+                }).done(function(data){
+                    process_status(data);
+                });
+            }
 
             function process_status(dta) {
                 var player = dta.player;
                 window.player = player;
+                window.document.title = "fmp - " + dta.playing.basename;
+                
                 time_status.text("-" + player.pos_data["left_str"]+ " " + 
                                  player.pos_data["pos_str"]+"/"+player.pos_data["dur_str"]);
-                playing_file.text(dta.playing.basename);
+                playing_file.text(dta.playing.artist_title);
                 if (player.playingState != "PLAYING") {
                     play_pause_img.prop("src","/static/images/media-playback-start.png");
                 } else {
                     play_pause_img.prop("src","/static/images/media-playback-pause.png");
                 }
-                window.document.title = "fmp - " + dta.playing.basename;
+
+                
+                if (window.ratings != dta.playing.ratings) {
+                    window.ratings = dta.playing.ratings;
+
+                    ratings_table.find(".user-line").remove();
+                    for (var uid in dta.playing.ratings) {
+                        var r = dta.playing.ratings[uid];
+                        console.log("r:",r);
+                        ratings_table.append(rating_tpl(r));
+                    }
+                    
+                    if (_.isEmpty(dta.playing.ratings)) {
+                        ratings_table.hide();
+                    } else {
+                        ratings_table.show();
+                    }
+                    $("td.star-rating").raty({
+                        score: function () {
+                            return $(this).data("rating")
+                        },
+                        click:onRate,
+                        cancel: true,
+                        cancelOff : 'cancel-off-big.png',
+                        cancelOn  : 'cancel-on-big.png',
+                        starHalf  : 'star-half-big.png',
+                        starOff   : 'star-off-big.png',
+                        starOn    : 'star-on-big.png',
+                        size:24
+                    });
+                }
+                
+                /*
+                    {"player": {"pos_data": {"dur_int": 241413000000, "pos_str": "0:04", "left_str": "3:57", "left_int": 237392810000, "decimal": 0.016652748609229825, "pos_int": 4020190000, "percent": "1.67%", "dur_str": "4:01"}, "playingState": "PLAYING", "filename": "/home/erm/mp3/R/Raze/Power/Raze - Place in my Heart.mp3"}, "playing": {"ratings": {"1": {"rating": 4, "uid": 1, "last_time_cued": "2013-01-25T10:14:22.186400+00:00", "usid": 179199, "admin": true, "selected": true, "true_score": 47.2217582869743, "uname": "erm", "ultp": null, "listening": true, "fid": 1783, "percent_played": 1.66527486092298, "score": 6}}, "basename": "Raze - Place in my Heart.mp3"}}
+                */
             }
 
             function format_time(milliseconds) {
@@ -95,6 +158,9 @@
             }
 
             function set_time() {
+                if (!window.player) {
+                    return;
+                }
                 if (window.player.playingState == "PLAYING") {
                     window.player.pos_data.left_int = parseInt(window.player.pos_data.left_int) - 1000000000;
                     window.player.pos_data.pos_int =  parseInt(window.player.pos_data.pos_int) + 1000000000;
@@ -102,9 +168,6 @@
                     window.player.pos_data["pos_str"] = format_time(window.player.pos_data.pos_int);
                     time_status.text("-" + window.player.pos_data["left_str"]+ " " + 
                                      window.player.pos_data["pos_str"]+"/"+window.player.pos_data["dur_str"]);
-                    /*
-                    {"player": {"pos_data": {"dur_int": 294581000000, "pos_str": "2:38", "left_str": "2:16", "left_int": 136094933000, "decimal": 0.5380050546369249, "pos_int": 158486067000, "percent": "53.80%", "dur_str": "4:54"}, "playingState": "PLAYING", "filename": "/home/erm/mp3/T/Toto - Africa.mp3"}, "playing": {"ratings": {"1": {"rating": 4, "uid": 1, "last_time_cued": "2013-01-20T13:20:40.710763+00:00", "usid": 189318, "admin": true, "selected": true, "true_score": 77.9335018212308, "uname": "erm", "ultp": "2013-01-20T13:23:12.417318+00:00", "listening": true, "fid": 6210, "percent_played": 53.8005054636925, "score": 10}}, "basename": "Toto - Africa.mp3"}}
-                    */
                 }
             }
 

@@ -77,6 +77,10 @@ class RatingsAndScores:
         return self.ratings_and_scores
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
+        try:
+            rating = int(rating)
+        except:
+            return
         if rating < 0 or rating > 5:
             return
 

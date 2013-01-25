@@ -419,6 +419,13 @@ class Local_File(fobj.FObj):
             association = get_assoc("INSERT INTO file_genres (fid, gid) VALUES(%s, %s) RETURNING *", (self.fid, genre['gid']))
 
         self.genres.append(genre)
+
+    def get_artist_title(self):
+        self.get_tags()
+        if self.tags_easy:
+            if self.tags_easy['artist'] and self.tags_easy['title']:
+                return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
+        return self.basename
     
         
 if __name__ == "__main__":

@@ -228,6 +228,7 @@ class Netcast(gobject.GObject):
                                           nl.uid IS NULL AND ns.nid = %s 
                                     ORDER BY pub_date""", (self.nid,))
 
+
 class Netcast_File(fobj.FObj):
     def __init__(self, filename=None, dirname=None, basename=None, eid=None,
                  episode_url=None, local_filename=None, nid=None, rss_url=None,
@@ -591,6 +592,19 @@ class Netcast_File(fobj.FObj):
                                           nl.uid IS NULL AND ns.nid = %s AND
                                           ne.eid = %s
                                     ORDER BY pub_date""", (self.nid, self.eid))
+
+    def get_artist_title(self):
+        try:
+            return "%s - %s" % (self.netcast.db_info['netcast_name'], self.db_info['episode_title'])
+        except KeyError:
+            pass
+
+        self.get_tags()
+        if self.tags_easy:
+            if self.tags_easy['artist'] and self.tags_easy['title']:
+                return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
+
+        return self.basename
 
 
 def get_subscribed_netcasts():
