@@ -367,10 +367,6 @@ tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 
 plr = player.Player(filename=playing.filename)
-plr.start()
-notify.playing(playing)
-if plr.dur_int:
-    plr.seek_ns(int(plr.dur_int  * playing["percent_played"] * 0.01))
 
 plr.next_button.connect('clicked', on_next_clicked)
 plr.prev_button.connect('clicked', on_prev_clicked)
@@ -387,10 +383,22 @@ gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(1000, set_rating)
 
+plr.start()
+notify.playing(playing)
+if plr.dur_int:
+    try:
+        plr.seek_ns(int(plr.dur_int  * playing["percent_played"] * 0.01))
+    except AttributeError:
+        pass
+
 flask_server.playing = playing
 flask_server.player = plr
 flask_server.tray = tray
 flask_server.start_in_thread()
+
+print "START"
+picker.wait()
+
 
 try:
     netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])

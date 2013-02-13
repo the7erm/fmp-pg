@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/player.py -- main gstreamer player
-#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -173,7 +173,7 @@ class Player(gobject.GObject):
 
         self.mainVBox.pack_end(self.controls,False,True)
 
-        self.player = gst.element_factory_make("playbin", "player")
+        self.player = gst.element_factory_make("playbin2", "player")
         
         vol = self.player.get_property("volume")
         print "DEFAULT VOLUME:",vol

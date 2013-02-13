@@ -38,6 +38,12 @@ class Downloader(gobject.GObject):
             return
 
         tmp_dst = dst+".tmp"
+        if os.path.exists(tmp_dst):
+            size = os.path.getsize(tmp_dst)
+            time.sleep(1)
+            if (size != os.path.getsize(tmp_dst)):
+                return
+
         basename = os.path.basename(dst)
         file_name = tmp_dst
 

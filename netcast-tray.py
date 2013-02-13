@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/netcast-tray.py -- Download/manage netcasts
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -116,6 +116,11 @@ menu.show_all()
 downloader.connect("download-status", on_download_status)
 
 if __name__ == "__main__":
+    import lib.pid_handler as pid_handler
+    if pid_handler.is_running():
+        print "Netcast tray is already running."
+        sys.exit()
+    pid_handler.write_pid()
     update()
     gobject.timeout_add(60000, update)
     gtk.main()

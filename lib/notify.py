@@ -91,9 +91,8 @@ def playing(file_info):
 
     # helper = Gtk.Button()
     # icon = helper.render_icon(Gtk.STOCK_DIALOG_QUESTION, Gtk.IconSize.DIALOG)
-    
 
-    n = notify2.Notification("Playing %s" % (file_info['basename']),msg)
+    n = notify2.Notification("Playing %s" % (file_info.get_artist_title()),msg)
     if file_info.can_rate:
         n.add_action("file_info", "More Info", more_info, file_info['fid'])
     n.set_timeout(3000)

@@ -9,14 +9,19 @@ body {
     font-family: FreeSans;
 }
 
+.artist_title {
+    font-size:1.25em;
+    font-family: FreeSans;
+}
+
 #time-status {
-    font-size:1.1em;
     font-family:monospace;
+    font-size:1.05em;
 }
 
 .action-link img {
-    width:40px;
-    height:40px;
+    width:50px;
+    height:50px;
 }
 
 .float-left {
@@ -30,4 +35,9 @@ body {
 #ratings-table td {
     padding:3px;
 }
+
+.nowrap {
+    white-space:nowrap;
+}
+
 

@@ -8,8 +8,21 @@
     <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
 </head>
 <body>
-    Playing:<span id="playing-file">{{ playing.basename }}</span>
-    <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
+    <span class='artist_title'>
+        Playing:<span id="playing-file">{{ playing.artist_title }}</span>
+        <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
+    </span>
+    <br clear="left">
+    <div class="float-left nowrap">
+        <a class='action-link' href="?cmd=prev"><img src="/static/images/media-seek-backward.png"></a>
+        {% if player.playingState == PLAYING %}
+            <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" border="0"></a>
+        {% else %}
+            <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" border="0"></a>
+        {% endif %}
+        
+        <a class='action-link' href="?cmd=next"><img src="/static/images/media-seek-forward.png"></a>
+    </div>
     <br clear="all">
     <br clear="all">
     <table id="ratings-table" border="1" cellspacing="0">
@@ -19,23 +32,13 @@
             <td>True Score</td>
         </tr>
     </table>
-    <a class='action-link' href="?cmd=prev"><img src="/static/images/media-seek-backward.png"></a>
-    
-    {% if player.playingState == PLAYING %}
-        <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" border="0"></a>
-    {% else %}
-        <a class='action-link' href="?cmd=pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" border="0"></a>
-    {% endif %}
-    
-    <a class='action-link' href="?cmd=next"><img src="/static/images/media-seek-forward.png"></a>
-    <br clear="all">
 
     <input type="text" style="display:none; position:absolute; left:-10000;" id="junk-input">
 
     <script type="text/html" id="tpl-rating">
         <tr class="user-line" data-uid="<%= uid %>">
             <td><%= uname %></td> 
-            <td class="star-rating" data-rating="<%= rating %>" data-uid="<%= uid %>" ></td>
+            <td class="star-rating nowrap" data-rating="<%= rating %>" data-uid="<%= uid %>" ></td>
             <td><% print (Math.round(true_score,2)); %></td>
         </tr>
     </script>
