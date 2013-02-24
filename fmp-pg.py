@@ -31,6 +31,7 @@ import lib.picker as picker
 import math
 import dbus
 import dbus.service
+import alsaaudio
 
 import urllib
 import lib.fobj as fobj
@@ -77,6 +78,19 @@ class DbusWatcher(dbus.service.Object):
         plr.seek(value)
         return "seek:%s" % value
 
+    @dbus.service.method('org.mpris.MediaPlayer2', in_signature = 's', 
+                         out_signature = 's')
+    def cue(self, filename):
+        print "CUE:",filename
+        # plr.seek(value)
+        f = fobj.get_fobj(filename=filename)
+        if f.is_audio or f.is_video or f.exists or f.is_stream:
+            print "CUEING:",f.filename
+            history.append({"filename":f.filename})
+            pp.pprint(history)
+            return "CUED:%s" % filename
+        return "FAILED TO CUE:%s" % filename
+
     @dbus.service.method('org.mpris.MediaPlayer2', in_signature = '', 
                          out_signature = 's')
     def kill(self):
@@ -113,7 +127,7 @@ try:
     server = bus.get_object('org.mpris.MediaPlayer2', '/fmp')
     exit = True
 
-    for i, arg in enumerate(sys.argv):
+    for i, arg in enumerate(sys.argv[1:]):
         print "ARG:",arg
         if arg in ('-h','-help','--help'):
             print usage
@@ -122,25 +136,37 @@ try:
         if arg in ("-n","--next","-next"):
             # print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
             urllib.urlopen("http://localhost:5050/?cmd=next")
+            continue
 
         if arg in ("-b","--prev","-prev", "--back","-back"):
             # print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
             urllib.urlopen("http://localhost:5050/?cmd=prev")
+            continue
 
         if arg in ("-p","--pause","-pause", "--play","-play"):
             # print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
             urllib.urlopen("http://localhost:5050/?cmd=pause")
+            continue
 
         if arg in ("-k","--kill","-kill"):
             print server.kill("", dbus_interface = 'org.mpris.MediaPlayer2')
             exit=False
+            continue
 
         if arg in ("-e","--exit","-exit"):
             print server.quit("", dbus_interface = 'org.mpris.MediaPlayer2')
+            continue
 
         if arg in ("-s","--seek","-seek"):
             print server.seek(argv[i+1], 
                               dbus_interface = 'org.mpris.MediaPlayer2')
+            continue
+
+        if os.path.exists(arg):
+            f = fobj.get_fobj(filename=arg)
+            if f.is_audio or f.is_video or f.exists or f.is_stream:
+                print "CUE:",f.filename
+                server.cue(f.filename)
 
     if exit:
         print "Dbus Instance of fmp player detected exiting..."
@@ -242,10 +268,16 @@ def on_toggle_playing(item):
 
 
 def on_next_clicked(*args, **kwargs):
+    global playing, idx
     playing.deinc_score()
+    print "PLAYING BEFORE:",playing.filename
+    print "IDX BEFORE:",idx
     inc_index()
+    print "IDX AFTER:",idx
+    print "PLAYING AFTER:",playing.filename
     plr.filename = playing.filename
     plr.start()
+    playing.check_recently_played()
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
 
@@ -274,40 +306,62 @@ def get_cue_netcasts():
     return cue_netcasts
 
 
-def set_idx(idx):
-    global playing
+def append_file():
+    global history
+
+    if get_cue_netcasts():
+        # TODO: Add config option for netcast spacing.
+        recent = history[-10:]
+        found_netcast = False
+        for r in recent:
+            r = dict(r)
+            print "r:", dict(r)
+            if is_netcast(r):
+                found_netcast = True
+                break
+
+        if found_netcast:
+            f = picker.get_song_from_preload()
+        else:
+            f = fobj.netcast_fobj.get_one_unlistened_episode()
+            if not f:
+                f = picker.get_song_from_preload()
+    else:
+        f = picker.get_song_from_preload()
+    if f:
+        print "APPEND:",f
+        history.append(f)
+        return f
+    else:
+        print "NO FILE:"
+        return None
+
+
+def set_idx(idx, retry=2):
+    global playing, history
 
     if idx < 0:
         idx = 0
-    
+    print "set_idx: IDX:",idx
     try:
-        tray.playing = flask_server.playing = playing = fobj.get_fobj(**dict(history[idx]))
+        f = dict(history[idx])
+        print "set_idx F:",f
+        tray.playing = flask_server.playing = playing = fobj.get_fobj(**f)
+        print "/set_idx F:"
+        tray.set_rating()
+        populate_preload()
     except IndexError:
-        if get_cue_netcasts():
-            # TODO: Add config option for netcast spacing.
-            recent = history[-10:]
-            found_netcast = False
-            for r in recent:
-                r = dict(r)
-                print "r:",dict(r)
-                if is_netcast(r):
-                    found_netcast = True
-                    break
-
-            if found_netcast:
-                f = picker.get_song_from_preload()
-            else:
-                f = fobj.netcast_fobj.get_one_unlistened_episode()
-                if not f:
-                    f = picker.get_song_from_preload()
-        else:
-            recent = history[-10:]
-            f = picker.get_song_from_preload()
-        history.append(f)
-        tray.playing = flask_server.playing = playing = fobj.get_fobj(**dict(history[idx]))
-
-    tray.set_rating()
-    populate_preload()
+        history_len = len(history)
+        while idx > history_len - 1:
+            f = append_file()
+            if not f:
+                break;
+            history_len = len(history)
+        f = append_file()
+        if retry > 0:
+            print "RETRYING:",retry
+            set_idx(idx, retry-1)
+            return
 
 
 def inc_index():
@@ -368,6 +422,15 @@ tray.set_rating()
 
 plr = player.Player(filename=playing.filename)
 
+plr.start()
+playing.check_recently_played()
+notify.playing(playing)
+if plr.dur_int:
+    try:
+        plr.seek_ns(int(plr.dur_int  * playing["percent_played"] * 0.01))
+    except AttributeError:
+        pass
+
 plr.next_button.connect('clicked', on_next_clicked)
 plr.prev_button.connect('clicked', on_prev_clicked)
 plr.connect("time-status",on_time_status)
@@ -383,13 +446,6 @@ gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(1000, set_rating)
 
-plr.start()
-notify.playing(playing)
-if plr.dur_int:
-    try:
-        plr.seek_ns(int(plr.dur_int  * playing["percent_played"] * 0.01))
-    except AttributeError:
-        pass
 
 flask_server.playing = playing
 flask_server.player = plr

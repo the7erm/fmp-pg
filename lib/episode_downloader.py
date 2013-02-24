@@ -47,7 +47,12 @@ class Downloader(gobject.GObject):
         basename = os.path.basename(dst)
         file_name = tmp_dst
 
-        u = urllib2.urlopen(url)
+        try:
+            u = urllib2.urlopen(url)
+        except urllib2.HTTPError, e:
+            print "UNABLE TO DOWNLOAD:",url
+            print "urllib2.HTTPError:",e
+            return
         f = open(tmp_dst, 'wb')
         meta = u.info()
         file_size = int(meta.getheaders("Content-Length")[0])

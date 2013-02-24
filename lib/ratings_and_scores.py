@@ -22,6 +22,8 @@ from __init__ import *
 import time
 import math
 from listeners import listeners
+import fobj
+from datetime import date
 
 class RatingsAndScores:
     def __init__(self, fid=None, listening=None, uids=None):
@@ -325,11 +327,35 @@ class RatingsAndScores:
                         print "(artist) psycopg2.IntegrityError:",err
                         listeners.refresh()
 
+    def check_recently_played(self, recently_played=None):
+        print "****************************"
+        print "RatingsAndScores:check_recently_played()"
+        if not recently_played:
+            recently_played = fobj.recently_played(1)
+        if not recently_played:
+            return
+        f = dict(recently_played[0])
+        if not f.has_key('id_type') or not f.has_key('id') or \
+           f['id_type'] != 'f' or f['id'] != self.fid:
+            return
+        # print "INITAL F:",f
+        today = date.today()
+        if today.isoformat() == f['date_played'].isoformat():
+            print today.isoformat(),"==",f['date_played'].isoformat()
+            return
+        print "******* DELETEING OLD RECORD DATE CHANGED *******"
+        query("""DELETE FROM user_history 
+                 WHERE uid IN (SELECT uid FROM users WHERE listening = true) AND
+                       id_type = 'f' AND id = %s AND date_played = %s""", 
+                 (self.fid, f['date_played'].isoformat()))
+
     def update_history(self, percent_played=0):
         global listeners
         if not self.listening or not listeners.listeners:
             return
         print "UPDATE HISTORY"
+        self.check_recently_played()
+
         updated = get_results_assoc("""UPDATE user_history uh 
                                        SET true_score = ufi.true_score, 
                                            score = ufi.score, 

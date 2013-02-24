@@ -23,9 +23,11 @@ import fobj
 import math
 import time
 from listeners import listeners
-import pprint, re
+import pprint
+import re
 from excemptions import CreationFailed
 from ratings_and_scores import RatingsAndScores
+from datetime import date
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
@@ -106,6 +108,12 @@ class Local_File(fobj.FObj):
 
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
+
+    def check_recently_played(self):
+        print "****************************"
+        print "Local_File:check_recently_played()"
+        self.ratings_and_scores.check_recently_played()
+
 
     def mark_as_played(self, percent_played=0):
         ceil_percent_played = math.ceil(percent_played)

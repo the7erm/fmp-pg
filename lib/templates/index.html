@@ -1,11 +1,19 @@
 <html>
 <head>
     <title>fmp - {{ playing.basename }}</title>
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
+
+    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.0/jquery.mobile-1.3.0.min.css" />
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.10.1/themes/base/jquery-ui.css" />
+
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.9.1.js"></script>
+    
     <script type="text/javascript" src="/static/js/underscore-min.js"></script>
     <script type="text/javascript" src="/static/js/jquery.raty.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
-    <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
+    <script type="text/javascript" src="/static/js/jquery-mousewheel.js"></script>
+    <script src="http://code.jquery.com/mobile/1.3.0/jquery.mobile-1.3.0.min.js"></script>
+
 </head>
 <body>
     <span class='artist_title'>
@@ -22,9 +30,13 @@
         {% endif %}
         
         <a class='action-link' href="?cmd=next"><img src="/static/images/media-seek-forward.png"></a>
+
+        
     </div>
     <br clear="all">
     <br clear="all">
+    <input type="text" style="display:none; position:absolute; left:-10000;" id="junk-input">
+
     <table id="ratings-table" border="1" cellspacing="0">
         <tr>
             <td>User</td>
@@ -33,8 +45,18 @@
         </tr>
     </table>
 
-    <input type="text" style="display:none; position:absolute; left:-10000;" id="junk-input">
+    
+    
+    <label for="volume">Volume:</label>
+    <input name="volume-slider-1" id="volume" min="0" max="100" step="1" value="{{ volume }}" type="range">
+    
 
+    <div class="float-right">
+        <button data-inline="true" id="vol-minus">-</button>
+        <button data-inline="true" id="vol-plus">+</button>
+    </div>
+    
+    <br clear="all">
     <script type="text/html" id="tpl-rating">
         <tr class="user-line" data-uid="<%= uid %>">
             <td><%= uname %></td> 
@@ -44,30 +66,50 @@
     </script>
 
     <script type="text/javascript">
+        var change_lock = false;
+            new_vol = [];
+        
         $(document).ready(function(){
             $.fn.raty.defaults.path = '/static/images/raty/';
             var time_status = $("#time-status");
             var playing_file = $("#playing-file");
             var play_pause_img = $("#play-pause-img");
             var junk_input = $("#junk-input");
+            var junk_input_parent = junk_input.parent();
             var player = null;
             var playing = null;
             var ratings = null;
+            var volume = null;
             var rating_tpl = _.template($("#tpl-rating").html());
             var ratings_table = $("#ratings-table");
-
+            var $volume = $("#volume");
+            junk_input_parent.hide();
+            
             $(".action-link").click(function(evt) {
                 if (evt) {
                     evt.preventDefault();
                 }
+                junk_input_parent.show();
                 junk_input.show().focus().hide(); // The extents we must go to remove the border.
-                // console.log("target:",evt.currentTarget);
-                $.ajax(evt.currentTarget.href+"&status=1",{"cache":false}).done(function(data){
-                    console.log("DATA:",data);
+                // // console.log("target:",evt.currentTarget);
+                junk_input_parent.hide();
+                var href = evt.currentTarget.href;
+                // console.log("evt",evt);
+                if (href==undefined) {
+                    href = $(evt.currentTarget).find("a").prop("href");
+                }
+                if (!href) {
+                    return;
+                }
+                $.ajax(href+"&status=1",{"cache":false}).done(function(data){
+                    // console.log("DATA:",data);
                     process_status(data);
                 });
                 return false;
             });
+
+            
+            
             
             function onRate(score, evt) {
                 $.ajax({
@@ -86,6 +128,7 @@
             function process_status(dta) {
                 var player = dta.player;
                 window.player = player;
+
                 window.document.title = "fmp - " + dta.playing.basename;
                 
                 time_status.text("-" + player.pos_data["left_str"]+ " " + 
@@ -97,19 +140,31 @@
                     play_pause_img.prop("src","/static/images/media-playback-pause.png");
                 }
 
-                
+                if (window.volume != dta.volume) {
+                    window.volume = dta.volume;
+                    if (new_vol.length == 0) {
+                        $volume.val(window.volume);
+                        $volume.slider("refresh");
+                    }
+                }
+
                 if (window.ratings != dta.playing.ratings) {
                     window.ratings = dta.playing.ratings;
 
                     ratings_table.find(".user-line").remove();
+                    var found = false;
                     for (var uid in dta.playing.ratings) {
                         var r = dta.playing.ratings[uid];
-                        console.log("r:",r);
+                        // // console.log("r:",r);
                         ratings_table.append(rating_tpl(r));
+                        found = true;
                     }
                     
-                    if (_.isEmpty(dta.playing.ratings)) {
+                    if (_.isEmpty(dta.playing.ratings) || !found) {
                         ratings_table.hide();
+                        ratings_table.css("display","none");
+                        // // console.log("hide");
+                        return;
                     } else {
                         ratings_table.show();
                     }
@@ -180,9 +235,106 @@
                 });
                 return true
             }
+            var change_volume = function(volume) {
+                if (volume == undefined) {
+                    // console.log("undefined:")
+                    return;
+                }
+                if (change_lock) {
+                    if (window.volume != volume) {
+                        new_vol.push(volume);
+                        // console.log("new_vol:",volume);
+                    }
+                    return;
+                }
+                change_lock = true;
+                new_vol = [];
+                volume_val = $volume.val();
+                if (window.volume == volume && volume_val == volume) {
+                    change_lock = false;
+                    new_vol = [];
+                    return;
+                }
+                
+                // console.log("window.volume:",window.volume);
+                // console.log("volume:",volume);
+                // console.log("volume_val:",volume_val);
+                if (window.volume != volume) {
+                    $.ajax({
+                        "url":"/",
+                        "data":{
+                            "cmd": "vol",
+                            "value":volume,
+                            "status":1,
+                        }
+                    }).done(function(data){
+                        process_status(data);
+
+                    }).always(function(){
+                        change_lock = false;
+                        if (new_vol.length > 0) {
+                            change_volume(new_vol.pop());
+                        }
+                    });
+                } else {
+                    change_lock = false;
+                    if (new_vol.length > 0) {
+                        change_volume(new_vol.pop());
+                    }
+                }
+            }
             get_status();
+
+            $volume.change(function () {
+                if (window.volume == -1) {
+                    return;
+                }
+                // console.log("$volume.change");
+                if ($volume.val() != window.volume) {
+                    // console.log($volume.val(),"!=",window.volume);
+                    change_volume($volume.val());
+                }
+                return true;
+            });
+
+            $volume.parent(".ui-slider").on("mousewheel", function (evt, delta) {
+                // console.log("$volume.step:",$volume.step);
+                // console.log("$volume.val():",$volume.val());
+                // console.log("delta",delta);
+                var step = parseInt($("#volume").prop("step"));
+                if (delta == 1) {
+                    // add to the val.
+                    var new_val = parseInt($volume.val()) + step;
+                    window.volume = -1;
+                    $volume.val(new_val).slider("refresh");
+                    change_volume(new_val);
+                }
+                if (delta == -1) {
+                    // remove from the val
+                    var new_val = parseInt($volume.val()) - step;
+                    window.volume = -1;
+                    $volume.val(new_val).slider("refresh");
+                    change_volume(new_val);
+                }
+            });
+
+            $("#vol-minus").click(function(){
+                var step = parseInt($volume.prop("step"));
+                var new_val = parseInt($volume.val()) - 5;
+                window.volume = -1;
+                $volume.val(new_val).slider("refresh");
+                change_volume(new_val);
+            });
+            $("#vol-plus").click(function(){
+                var step = parseInt($volume.prop("step"));
+                var new_val = parseInt($volume.val()) + 5;
+                window.volume = -1;
+                $volume.val(new_val).slider("refresh");
+                change_volume(new_val);
+            });
             setInterval(get_status, 5000);
             setInterval(set_time, 1000);
+            
         });
 
     </script>

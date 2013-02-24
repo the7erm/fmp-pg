@@ -28,6 +28,7 @@ import socket
 import urllib
 import pprint
 import datetime
+from datetime import date
 import pytz
 from episode_downloader import downloader
 
@@ -457,10 +458,33 @@ class Netcast_File(fobj.FObj):
             base = urllib.url2pathname(base)
         return os.path.join(cache_dir, base)
 
+    def check_recently_played(self):
+        print "****************************"
+        print "Netcast_File:check_recently_played()"
+        
+        recently_played = fobj.recently_played(1)
+        if not recently_played:
+            return
+        e = dict(recently_played[0])
+        if not e.has_key('id_type') or not e.has_key('id') or \
+           e['id_type'] != 'e' or e['id'] != self.eid:
+            return
+        print "INITAL E:",e
+        today = date.today()
+        if today.isoformat() == e['date_played'].isoformat():
+            print today.isoformat(),"==",e['date_played'].isoformat()
+            return
+        print "******* DELETEING OLD RECORD DATE CHANGED *******"
+        query("""DELETE FROM user_history 
+                 WHERE uid IN (SELECT uid FROM users WHERE listening = true) AND
+                       id_type = 'e' AND id = %s AND date_played = %s""", 
+                 (self.eid, e['date_played'].isoformat()))
+
     def mark_as_played(self, percent_played=0):
         print "TODO: Necast_file::mark_as_played()"
         """nlid, uid, eid, percent_played"""
         print "percent_played:",percent_played
+
         updated = get_results_assoc("""UPDATE netcast_listend_episodes nle
                                        SET percent_played = %s
                                        WHERE uid IN (SELECT uid FROM users 
@@ -485,10 +509,8 @@ class Netcast_File(fobj.FObj):
 
         self.update_history(percent_played)
 
-
-    def update_history(self,percent_played=0):
-        """nlid, uid, eid, percent_played"""
-        updated = get_results_assoc("""UPDATE user_history uh 
+    def update_user_history(self):
+        return get_results_assoc("""UPDATE user_history uh 
                                        SET percent_played = nle.percent_played, 
                                            time_played = NOW(), 
                                            date_played = current_date 
@@ -505,44 +527,55 @@ class Netcast_File(fobj.FObj):
                                        RETURNING uh.*""",
                                        (self.eid,))
 
+    def insert_user_history(self, uid, percent_played=0):
+        try:
+            user_history = get_assoc("""INSERT INTO 
+                                            user_history (uid, id, id_type,
+                                                          percent_played, 
+                                                          time_played,
+                                                          date_played) 
+                                        VALUES (%s, %s, %s, %s, NOW(), 
+                                                current_date) 
+                                        RETURNING *""",
+                                        (uid, self.eid, 'e', 
+                                         percent_played))
+
+            updated_user = get_assoc("""UPDATE user_history uh
+                                        SET percent_played = nle.percent_played, 
+                                            time_played = NOW(),
+                                            date_played = current_date 
+                                        FROM netcast_listend_episodes nle
+                                        WHERE nle.uid = %s AND
+                                              uh.uid = nle.uid AND
+                                              nle.eid = uh.id AND
+                                              uh.id_type = 'e' AND
+                                              uh.date_played = current_date AND 
+                                              uh.id = %s RETURNING uh.*""", 
+                                        (uid, self.eid))
+
+            if updated_user:
+                return updated_user
+
+        except psycopg2.IntegrityError, err:
+            query("COMMIT;")
+            print "(file) psycopg2.IntegrityError:",err
+        return None
+
+    def update_history(self,percent_played=0):
+        """nlid, uid, eid, percent_played"""
+        self.check_recently_played()
+        updated = self.update_user_history()
         for l in listeners.listeners:
             found = False
             for u in updated:
                 if u['uid'] == l['uid']:
                     found = True
+                    break;
 
             if not found:
-                try:
-                    user_history = get_assoc("""INSERT INTO 
-                                                    user_history (uid, id, id_type,
-                                                                  percent_played, 
-                                                                  time_played,
-                                                                  date_played) 
-                                                VALUES (%s, %s, %s, %s, NOW(), 
-                                                        current_date) 
-                                                RETURNING *""",
-                                                (l['uid'], self.eid, 'e', 
-                                                 percent_played))
-
-                    updated_user = get_assoc("""UPDATE user_history uh
-                                                SET percent_played = nle.percent_played, 
-                                                    time_played = NOW(),
-                                                    date_played = current_date 
-                                                FROM netcast_listend_episodes nle
-                                                WHERE nle.uid = %s AND
-                                                      uh.uid = nle.uid AND
-                                                      nle.eid = uh.id AND
-                                                      uh.id_type = 'e' AND
-                                                      uh.date_played = current_date AND 
-                                                      uh.id = %s RETURNING uh.*""", 
-                                                (l['uid'], self.eid))
-
-                    if updated_user:
-                        updated.append(updated_user)
-
-                except psycopg2.IntegrityError, err:
-                    query("COMMIT;")
-                    print "(file) psycopg2.IntegrityError:",err
+                updated_user = self.insert_user_history(l['uid'], percent_played)
+                if updated_user:
+                    updated.append(updated_user)
 
     def deinc_score(self, *args, **kwargs):
         print "TODO: Netcast_File::deinc_score"
@@ -553,6 +586,7 @@ class Netcast_File(fobj.FObj):
     def insert(self, episode_title, episode_url, pub_date):
         if self.db_info:
             return
+        episode_url = episode_url.replace("'","%27");
         local_file = self.get_local_filename(episode_url, urldecode=True)
         print "====[ Insert ]====="
         print "netcast:",self.netcast.name
@@ -666,7 +700,8 @@ def is_netcast(obj):
     return isinstance(obj, Netcast_File) or \
            (obj.has_key('id_type') and obj['id_type'] == 'e') or \
            (obj.has_key('eid') and obj['eid']) or \
-           (obj.has_key('rss_url') and obj['rss_url']) 
+           (obj.has_key('rss_url') and obj['rss_url']) or \
+           (obj.has_key('episode_url') and obj['episode_url'])
 
 
 if __name__ == "__main__":

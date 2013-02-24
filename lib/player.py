@@ -328,20 +328,20 @@ static char * invisible_xpm[] = {
         uri = self.filename
         if os.path.isfile(self.filename):
             self.filename = os.path.realpath(self.filename)
-            uri = "file://" + urllib.quote(self.filename);
+            uri = "file://" + urllib.quote(self.filename)
             # print "QUOTED:%s" % urllib.quote(self.filename);
-        
+        uri = uri.replace("\\'","%27")
+        uri = uri.replace("'","%27")
         if uri == "":
             print "empty uri"
             return;
         print "playing uri:",uri
-        
+        self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
         self.player.set_property("volume",self.volume)
-        self.hide_window_timeout = gobject.timeout_add(1000, self.hide_window)
-        self.player.set_state(STOPPED)
         self.player.set_state(PLAYING)
-        self.emit('state-changed',PLAYING)
+        self.hide_window_timeout = gobject.timeout_add(1000, self.hide_window)
+        self.emit('state-changed', PLAYING)
         self.playingState = self.player.get_state()[1]
         try:
             self.dur_int = self.player.query_duration(self.time_format, None)[0]

@@ -122,8 +122,11 @@ class FObj:
     def mark_as_played(self, *args, **kwargs):
         raise NotImpimented("mark_as_played")
 
+    def initial_mark_as_played(self, *args, **kwargs):
+        raise NotImpimented("initial_mark_as_played")
+
     def update_history(id, id_type, percent_played=0):
-        raise NotImpimented("mark_as_played")
+        raise NotImpimented("update_history")
 
     def deinc_score(self, *args, **kwargs):
         raise NotImpimented("deinc_score")
@@ -248,11 +251,11 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
         raise CreationFailed("File was not registered as a netcast.")
 
     return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
-                                      filename=filename, **kwargs)
+                                     filename=filename, **kwargs)
 
 def recently_played(limit=10):
-    return get_results_assoc("""SELECT DISTINCT id, id_type, percent_played,
-                                               time_played
+    return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, percent_played,
+                                               time_played, date_played
                                 FROM user_history uh, users u
                                 WHERE u.uid = uh.uid AND u.uid IN (
                                         SELECT uid FROM users 

@@ -34,3 +34,6 @@ class Generic_File(fobj.FObj):
     def inc_score(self, *args, **kwargs):
         print "TODO: Generic_File.inc_score"
 
+    def check_recently_played(self,*args, **kwargs):
+        print "TODO: Generic_File.check_recently_played"
+
