@@ -135,7 +135,7 @@ class RatingsAndScores:
 
     def check_for_rating_info(self):
         print "CHECK_FOR_RATING_INFO"
-        for u in listeners['listeners']:
+        for u in listeners.listeners:
           print "U:",u
         sys.exit();
 
@@ -406,6 +406,7 @@ class RatingsAndScores:
         self.update(updated)
 
     def get_selected(self):
+        self.check_for_rating_info()
         self.get_all()
 
         for u in self.ratings_and_scores:
