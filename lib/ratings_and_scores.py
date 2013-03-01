@@ -151,6 +151,7 @@ class RatingsAndScores:
                                     LIMIT 1""", 
                                     (self.fid,))
             if selected:
+                print "selected:",selected
                 query("UPDATE users SET selected = true WHERE uid = %s",
                       (selected['uid'],))
                 selected['selected'] = True
