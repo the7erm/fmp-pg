@@ -426,7 +426,7 @@ for u in listeners.listeners:
     for i in missing_entries:
         query("""INSERT INTO user_song_info (fid, uid, rating, score)
                  VALUES(%s, %s, 6, 6)""",
-                     (i.fid, u['uid']))
+                     (i['fid'], u['uid']))
 
 
 
