@@ -427,7 +427,7 @@ except IndexError:
         item = dict(history[idx])
     except IndexError:
         item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
-        history.apppend(dict(item))
+        history.append(dict(item))
 
 tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
