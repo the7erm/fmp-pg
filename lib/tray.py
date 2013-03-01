@@ -47,7 +47,8 @@ def set_rating():
             rating_icon.set_visible(True)
             icon.set_visible(True)
         r = playing.get_selected()
-        rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
+        if r:
+            rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
         rating_icon.set_tooltip(playing.get_artist_title())
         icon.set_tooltip(playing.get_artist_title())
         song_info.show()
