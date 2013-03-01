@@ -133,10 +133,16 @@ class RatingsAndScores:
             self.update(updated)
         return updated
 
+    def check_for_rating_info(self):
+        for u in listeners:
+          pritn "U:",u
+
     def get_selected(self):
+        self.check_for_rating_info()
         self.get_all()
         if not self.ratings_and_scores:
           self.get_all(force=True)
+
         for u in self.ratings_and_scores:
             print "U:",u
             if u['selected'] == True:
@@ -160,10 +166,7 @@ class RatingsAndScores:
                 print "SELECTED:",selected
                 query("UPDATE users SET selected = true WHERE uid = %s",
                       (selected['uid'],))
-                try:
-                  selected['selected'] = True
-                except:
-                  pass
+               
         if selected:
           self.update([selected])
 
