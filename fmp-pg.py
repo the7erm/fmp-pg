@@ -418,11 +418,13 @@ if not history:
 idx = len(history) - 1
 try:
     item = dict(history[idx])
-    tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
-    tray.set_rating()
+    
 except IndexError:
+    item = {}
     pass
 
+tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
+tray.set_rating()
 plr = player.Player(filename=playing.filename)
 
 plr.start()
