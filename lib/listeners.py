@@ -19,10 +19,15 @@
 #
 from __init__ import *
 import time
+import os
 
 class Listeners:
     def __init__(self):
         self.expires = time.time() - 1;
+        total_users = get_assoc("SELECT COUNT(*) AS total FROM users");
+        if not total_users['total']:
+            query("INSERT INTO users uname, listening VALUES(%s,true)", (os.getlogin()))
+        
         self.refresh()
 
     def __getattr__(self, name):
