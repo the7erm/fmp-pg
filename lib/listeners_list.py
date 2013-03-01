@@ -110,8 +110,9 @@ class Listeners_Listview(gtk.VBox):
         self.liststore.clear()
         users = []
         
-        users = get_results_assoc("SELECT uid, uname, admin, listening FROM users ORDER BY admin DESC, listening DESC, uname")
-
+        users = get_results_assoc("""SELECT uid, uname, admin, listening 
+                                     FROM users 
+                                     ORDER BY admin DESC, listening DESC, uname""")
         
         for u in users:
             data = [
@@ -138,21 +139,22 @@ class Listeners_Listview(gtk.VBox):
         
     def on_user_add(self,*args,**kwargs):
         uname = self.usernameEntry.get_text()
-        
+        print "uname:",uname
         if uname.strip() == '':
             return
-        present = getAssoc("SELECT uid FROM users WHERE uname = %s",(uname,))
+        present = get_assoc("SELECT uid FROM users WHERE uname = %s",(uname,))
         if present:
             print "%s exists" % (uname,)
             self.populate_liststore()
             return
-        query("INSERT INTO users (uname, listening) VALUES(%s,%s)",(uname, 1))
-        newUser = getAssoc("SELECT uid, uname, admin, listening FROM users WHERE uname = %s",(uname,))
+        new_user = get_assoc("""INSERT INTO users (uname, listening) 
+                                VALUES(%s, true) RETURNING *""",(uname,))
+        
         data = [
-            newUser['uid'], 
-            newUser['uname'],
-            bool(newUser['admin']),
-            bool(newUser['listening'])
+            new_user['uid'], 
+            new_user['uname'],
+            bool(new_user['admin']),
+            bool(new_user['listening'])
         ]
         print data
         self.liststore.append(data)
