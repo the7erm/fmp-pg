@@ -423,12 +423,13 @@ try:
     tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
     tray.set_rating()
     plr = player.Player(filename=playing.filename)
+    plr.start()
 except IndexError:
     plr = player.Player()
 
 
 
-plr.start()
+
 playing.check_recently_played()
 notify.playing(playing)
 if plr.dur_int:
