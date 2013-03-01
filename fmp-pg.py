@@ -420,16 +420,20 @@ if idx < 0:
     idx = 0
 try:
     item = dict(history[idx])
-    tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
-    tray.set_rating()
-    plr = player.Player(filename=playing.filename)
-    plr.start()
 except IndexError:
-    plr = player.Player()
+    populate_preload()
+    append_file()
+    try:
+        item = dict(history[idx])
+    except IndexError:
+        item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
+        history.apppend(dict(item))
 
+tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
+tray.set_rating()
+plr = player.Player(filename=playing.filename)
 
-
-
+plr.start()
 playing.check_recently_played()
 notify.playing(playing)
 if plr.dur_int:
