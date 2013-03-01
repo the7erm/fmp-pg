@@ -486,11 +486,13 @@ picker.wait()
 
 
 try:
+    """
     netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
     tst = fobj.netcast_fobj.get_one_unlistened_episode()
     if tst:
         print "TST:",dict(tst) 
     print "is_netcast:",is_netcast(tst)
+    """
     gtk.main()
 except KeyboardInterrupt:
     Popen(['pykill','netcast-tray.py', 'fmp-pg.py'])
