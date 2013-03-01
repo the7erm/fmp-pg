@@ -68,7 +68,7 @@ class Listeners:
 
         if not self.selected and self.listeners:
             query("UPDATE users SET selected = false")
-            query("UPDATE users SET selected = true WHERE uid = %s", (self.listeners[0]['uid']))
+            query("UPDATE users SET selected = true WHERE uid = %s", (self.listeners[0]['uid'],))
             self.selected = get_assoc("""SELECT * FROM users 
                                          WHERE selected = true AND listening = true
                                          LIMIT 1""")
