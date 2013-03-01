@@ -23,6 +23,7 @@ import gtk
 from __init__ import *
 from random import shuffle
 
+global populate_locked, dont_pick_created
 dont_pick_created = False
 populate_locked = False
 
@@ -61,11 +62,20 @@ def create_preload():
     return
 
 def associate_gernes():
+    print "associate_gernes 1"
     undefined = get_assoc("SELECT * FROM genres WHERE genre = %s",('[undefined]',))
     if not undefined:
-        undefined = get_assoc("INSERT INTO genres (genre, enabled) VALUES(%s,true)",("[undefined]"))
+        print "associate_gernes 2"
+        undefined = get_assoc("""INSERT INTO genres (genre, enabled) 
+                                 VALUES(%s, true)""",("[undefined]",))
+        print "associate_gernes 2.1"
 
-    query("INSERT INTO file_genres (fid, gid)  SELECT f.fid, %s FROM files f LEFT JOIN file_genres fg ON fg.fid = f.fid WHERE fg.fid IS NULL",(undefined['gid'],))
+    print "associate_gernes 3"
+    query("""INSERT INTO file_genres (fid, gid) 
+             SELECT f.fid, %s 
+             FROM files f 
+             LEFT JOIN file_genres fg ON fg.fid = f.fid 
+             WHERE fg.fid IS NULL""",(undefined['gid'],))
 
 def populate_dont_pick():
     associate_gernes()
@@ -114,27 +124,32 @@ def populate_preload(uid=None, min_amount=0):
     try:
         populate_preload_for_uid(uid, min_amount)
     except:
-        print "ERROR!!!!"
+        print "ERROR!!!! COULD NOT POPULATE PRELOAD"
         global populate_locked
         populate_locked = False
         # populate_preload_for_uid(uid, min_amount)
 
 
 def populate_preload_for_uid(uid, min_amount=0):
-
+    print "populate_preload_for_uid 1"
     total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s",(uid,))
     if total['total'] > min_amount:
         print "uid: %s preload total: %s>%s :min_amount" % (uid, total['total'], min_amount)
         return
-
+    print "populate_preload_for_uid 2"
     global populate_locked
+    print "populate_preload_for_uid 2.1"
+
     if populate_locked:
         print "populate_locked"
+        print "populate_preload_for_uid 2.5"
         return
     populate_locked = True
-
+    print "populate_preload_for_uid 2.75"
     associate_gernes()
+    print "populate_preload_for_uid 3"
     populate_dont_pick()
+    print "populate_preload_for_uid 4"
 
     # SELECT fid, ultp FROM user_song_info ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random();
 
@@ -148,8 +163,14 @@ def populate_preload_for_uid(uid, min_amount=0):
     
 
     m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (uid,))
-    q = "INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) SELECT f.fid, '%s', '%s', '%s', '%s', '%s' FROM files f WHERE f.fid NOT IN (%s)" % (uid, default_rating, default_score, default_percent_played, default_true_score, m)
+    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
+                SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
+                FROM files f 
+                WHERE f.fid NOT IN (%s)""" % (uid, default_rating, default_score, 
+                                              default_percent_played, 
+                                              default_true_score, m)
     query(q)
+    print "populate_preload_for_uid 5"
 
     scores = [0,10,20,30,40,50,60,70,80,90,100]
 
