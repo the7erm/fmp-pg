@@ -137,8 +137,15 @@ class RatingsAndScores:
         print "CHECK_FOR_RATING_INFO"
         for u in listeners.listeners:
           print "U:",u
-        sys.exit();
-
+          present = get_assoc("""SELECT * 
+                                 FROM user_song_info usi
+                                 WHERE usi.uid = %s AND usi.fid = %s""", 
+                              (u['uid'], self.fid))
+          if not present:
+              present =  get_assoc("""INSERT INTO user_song_info 
+                                        (fid, uid, rating, score)
+                                      VALUES(%s, %s, 6, 6) RETURNING * """,
+                                      (self.fid, u['uid']))
 
 
     def update(self, updated):
