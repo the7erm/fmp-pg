@@ -41,6 +41,7 @@ class RatingsAndScores:
         self.get_all(force=True)
 
     def get_all(self, force=False):
+        print "GET_ALL"
         if self.listening:
             return self.get_all_listening(force=force)
         if self.uids:
