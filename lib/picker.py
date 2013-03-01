@@ -231,7 +231,8 @@ def get_song_from_preload():
         populate_preload()
         f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid ORDER BY random() LIMIT 1")
 
-    query("DELETE FROM preload WHERE fid = %s",(f['fid'],))
+    if f:
+        query("DELETE FROM preload WHERE fid = %s",(f['fid'],))
 
     return f
 
