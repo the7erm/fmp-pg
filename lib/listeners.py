@@ -27,7 +27,7 @@ class Listeners:
         total_users = get_assoc("SELECT COUNT(*) AS total FROM users");
         if not total_users['total']:
             query("""INSERT INTO users (uname, listening, selected) 
-                     VALUES(%s, true, true)""", (os.getlogin(),))
+                     VALUES(%s, true, true)""", (os.getenv("USER"),))
 
         self.refresh()
 
