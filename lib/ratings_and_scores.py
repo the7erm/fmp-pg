@@ -63,7 +63,9 @@ class RatingsAndScores:
         return self.uids_str
 
     def get_all_listening(self, force=False):
+        print "get_all_listening:"
         if time.time() < self.expires and not force:
+             print "get_all_listening: old"
             return self.ratings_and_scores
 
         self.get_ratings_and_scores()
