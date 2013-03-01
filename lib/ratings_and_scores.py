@@ -155,7 +155,8 @@ class RatingsAndScores:
                 query("UPDATE users SET selected = true WHERE uid = %s",
                       (selected['uid'],))
                 selected['selected'] = True
-        self.update([selected])
+        if selected:
+          self.update([selected])
 
         return selected
 
