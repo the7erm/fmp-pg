@@ -135,7 +135,7 @@ class RatingsAndScores:
 
     def check_for_rating_info(self):
         for u in listeners:
-          pritn "U:",u
+          print "U:",u
 
     def get_selected(self):
         self.check_for_rating_info()
