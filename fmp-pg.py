@@ -421,8 +421,8 @@ if idx < 0:
 try:
     item = dict(history[idx])
 except IndexError:
-    item = dict(history[idx])
     append_file()
+    item = dict(history[idx])
     pass
 
 tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
