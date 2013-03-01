@@ -135,6 +135,8 @@ class RatingsAndScores:
 
     def get_selected(self):
         self.get_all()
+        if not self.ratings_and_scores:
+          self.get_all(force=True)
         for u in self.ratings_and_scores:
             print "U:",u
             if u['selected'] == True:
