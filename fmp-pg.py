@@ -415,12 +415,28 @@ history.reverse()
 if not history:
     history = []
 
+for u in listeners.listeners:
+    missing_entries = get_results_assoc("""SELECT f.fid 
+                                           FROM files f 
+                                           LEFT JOIN user_song_info usi ON 
+                                                      usi.uid = %s AND usi.fid =f.fid 
+                                           WHERE usi.fid IS NULL;""", (u['uid'],))
+
+    for i in missing_entries:
+        query("""INSERT INTO user_song_info (fid, uid, rating, score)
+                 VALUES(%s, %s, 6, 6)""",
+                     (i.fid, u['uid']))
+
+
+
+
 idx = len(history) - 1
 if idx < 0:
     idx = 0
 try:
     item = dict(history[idx])
 except IndexError:
+
     populate_preload()
     append_file()
     try:
