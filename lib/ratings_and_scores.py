@@ -133,6 +133,7 @@ class RatingsAndScores:
     def get_selected(self):
         self.get_all()
         for u in self.ratings_and_scores:
+            print "U:",u
             if u['selected'] == True:
                 return u
 
