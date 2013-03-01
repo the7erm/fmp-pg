@@ -21,6 +21,7 @@ import gobject, gtk, gc
 gobject.threads_init()
 
 from lib.__init__ import *
+from lib.listeners import listeners
 import os
 import sys
 import re
