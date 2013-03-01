@@ -420,14 +420,13 @@ if idx < 0:
     idx = 0
 try:
     item = dict(history[idx])
+    tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
+    tray.set_rating()
+    plr = player.Player(filename=playing.filename)
 except IndexError:
-    append_file()
-    item = dict(history[idx])
-    pass
+    plr = player.Player()
 
-tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
-tray.set_rating()
-plr = player.Player(filename=playing.filename)
+
 
 plr.start()
 playing.check_recently_played()
