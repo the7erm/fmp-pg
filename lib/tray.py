@@ -48,6 +48,7 @@ def set_rating():
             icon.set_visible(True)
         r = playing.get_selected()
         if r:
+            print "R:",r
             rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
         rating_icon.set_tooltip(playing.get_artist_title())
         icon.set_tooltip(playing.get_artist_title())
