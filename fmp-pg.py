@@ -416,11 +416,13 @@ if not history:
     history = []
 
 idx = len(history) - 1
+if idx < 0:
+    idx = 0
 try:
     item = dict(history[idx])
-    
 except IndexError:
-    item = {}
+    item = dict(history[idx])
+    append_file()
     pass
 
 tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
