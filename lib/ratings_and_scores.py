@@ -134,43 +134,12 @@ class RatingsAndScores:
         return updated
 
     def check_for_rating_info(self):
-        for u in listeners.listeners:
+        print "CHECK_FOR_RATING_INFO"
+        for u in listeners['listeners']:
           print "U:",u
+        sys.exit();
 
-    def get_selected(self):
-        self.check_for_rating_info()
-        self.get_all()
-        if not self.ratings_and_scores:
-          self.get_all(force=True)
 
-        for u in self.ratings_and_scores:
-            print "U:",u
-            if u['selected'] == True:
-                return u
-
-        selected = get_assoc("""SELECT * FROM users u, user_song_info usi
-                                WHERE u.uid = usi.uid AND u.listening = true AND
-                                      u.selected = true AND usi.fid = %s 
-                                LIMIT 1""", (self.fid,))
-
-        if not selected:
-            query("UPDATE users SET selected = false")
-            selected = get_assoc("""SELECT * FROM users u, user_song_info usi
-                                    WHERE u.uid = usi.uid AND 
-                                          u.listening = true AND
-                                          usi.fid = %s
-                                    ORDER BY admin DESC, uname
-                                    LIMIT 1""", 
-                                    (self.fid,))
-            if selected:
-                print "SELECTED:",selected
-                query("UPDATE users SET selected = true WHERE uid = %s",
-                      (selected['uid'],))
-               
-        if selected:
-          self.update([selected])
-
-        return selected
 
     def update(self, updated):
         if not updated:
@@ -438,6 +407,7 @@ class RatingsAndScores:
 
     def get_selected(self):
         self.get_all()
+
         for u in self.ratings_and_scores:
             if u['selected']:
                 return u
