@@ -423,10 +423,11 @@ for u in listeners.listeners:
                                                       usi.uid = %s AND usi.fid =f.fid 
                                            WHERE usi.fid IS NULL;""", (u['uid'],))
 
-    for i in missing_entries:
+    for r in missing_entries:
+        print "inserting:", r
         query("""INSERT INTO user_song_info (fid, uid, rating, score)
                  VALUES(%s, %s, 6, 6)""",
-                     (i['fid'], u['uid']))
+                     (r['fid'], u['uid']))
 
 
 
