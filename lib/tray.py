@@ -46,6 +46,7 @@ def set_rating():
             icon.set_visible(False)
             rating_icon.set_visible(True)
             icon.set_visible(True)
+        print "PLAYING:",playing
         r = playing.get_selected()
         if r:
             print "R:",r
