@@ -33,9 +33,11 @@ import math
 import dbus
 import dbus.service
 import alsaaudio
+import datetime
 
 import urllib
 import lib.fobj as fobj
+import lib.local_file_fobj as local_file_fobj
 from lib.netcast_fobj import is_netcast
 
 from dbus.mainloop.glib import DBusGMainLoop
@@ -271,22 +273,14 @@ def on_toggle_playing(item):
 def on_next_clicked(*args, **kwargs):
     global playing, idx
     playing.deinc_score()
-    print "PLAYING BEFORE:",playing.filename
-    print "IDX BEFORE:",idx
-    inc_index()
-    print "IDX AFTER:",idx
-    print "PLAYING AFTER:",playing.filename
-    plr.filename = playing.filename
-    plr.start()
+    start_playing("inc")
     playing.check_recently_played()
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
 
 
 def on_prev_clicked(item):
-    deinc_index()
-    plr.filename = playing.filename
-    plr.start()
+    start_playing("deinc")
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
     
@@ -388,7 +382,28 @@ def set_rating():
 def on_end_of_stream(*args):
     global playing
     playing.inc_score()
-    inc_index()
+    start_playing("inc")
+
+def start_playing(direction="inc"):
+    global playing
+    if direction == "inc":
+        inc_index()
+    elif direction == "deinc":
+        deinc_index()
+    retry_cnt = 0
+    while isinstance(playing, local_file_fobj.Local_File) and not \
+          playing.exists and retry_cnt < 10:
+        retry_cnt += 1
+        fp = open(os.path.join(config_dir,"missing.log"), "a")
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+        fp.write("[%s] MISSING:%s\n" % (now, playing.filename))
+        fp.close()
+        print "MISSING:", playing.filename, "%s" % retry_cnt
+        if direction == "deinc":
+            deinc_index()
+        else:
+            inc_index()
+
     plr.filename = playing.filename
     plr.start()
     tray.set_play_pause_item(plr.playingState)
@@ -451,7 +466,7 @@ tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 plr = player.Player(filename=playing.filename)
 
-plr.start()
+start_playing("stay")
 playing.check_recently_played()
 notify.playing(playing)
 if plr.dur_int:
