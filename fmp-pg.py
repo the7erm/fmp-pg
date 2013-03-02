@@ -275,15 +275,10 @@ def on_next_clicked(*args, **kwargs):
     playing.deinc_score()
     start_playing("inc")
     playing.check_recently_played()
-    tray.set_play_pause_item(plr.playingState)
-    notify.playing(playing)
 
 
 def on_prev_clicked(item):
     start_playing("deinc")
-    tray.set_play_pause_item(plr.playingState)
-    notify.playing(playing)
-    
 
 def get_cue_netcasts():
     cfg = ConfigParser.ConfigParser()
