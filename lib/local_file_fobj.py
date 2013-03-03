@@ -66,6 +66,7 @@ class Local_File(fobj.FObj):
         if not db_info:
             if filename is not None:
                 filename = os.path.realpath(filename)
+                print "filename:",filename
                 dirname = os.path.dirname(filename)
                 basename = os.path.basename(filename)
             elif dirname is not None and basename is not None:
@@ -144,8 +145,11 @@ class Local_File(fobj.FObj):
         self.ratings_and_scores.calculate_true_score()
 
     def hash_file(self):
+        if not self.exists:
+            return
         h = hashlib.sha512()
         fsize = os.path.getsize(self.filename)
+
         fp = open(self.filename,"rb")
         while fp.tell() < (fsize - 1):
             h.update(fp.read(102400))
@@ -244,7 +248,7 @@ class Local_File(fobj.FObj):
                                         WHERE dir = %s and basename = %s""",
                                         (self.dirname, self.basename))
         self.set_attribs()
-        print "insert:", self.dirname, self.basename
+        print "insert:", os.path.join(self.dirname, self.basename)
         pp.pprint(self.db_info)
 
         if isinstance(self.tags_easy, dict) and self.tags_easy.has_key('artist') \
