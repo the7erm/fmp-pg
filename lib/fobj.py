@@ -141,7 +141,11 @@ class FObj:
     def getmtime(self):
         if self.exists:
             print "self.filename:",self.filename
-            t = os.path.getmtime(self.filename)
+            try:
+                t = os.path.getmtime(self.filename)
+            except OSError:
+                self.exists = False
+                return -1
             self.mtime = datetime.datetime.fromtimestamp(t)
             tz = time.strftime("%Z", time.gmtime())
             localtz = pytz.timezone(tz)
