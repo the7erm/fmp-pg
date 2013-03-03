@@ -140,6 +140,9 @@ class FObj:
 
     def getmtime(self):
         if self.exists:
+            if not os.path.exists(self.filename):
+                self.exists = False
+                return -1
             print "self.filename:",self.filename
             try:
                 t = os.path.getmtime(self.filename)
