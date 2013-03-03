@@ -111,7 +111,6 @@ class FObj:
             self.filename = os.path.realpath(self.filename)
             self.dirname = os.path.dirname(self.filename)
             self.basename = os.path.basename(self.filename)
-            
 
         self.root, self.ext = os.path.splitext(self.basename)
         self.has_tags = has_tags(self.ext)
@@ -138,7 +137,10 @@ class FObj:
 
     def get_tags(self):
         if self.exists and self.has_tags and self.tags_easy is None:
-            self.tags_easy = mutagen.File(self.filename, easy=True)
+            try:
+                self.tags_easy = mutagen.File(self.filename, easy=True)
+            except mutagen.mp3.HeaderNotFoundError:
+                self.tags_easy = None
 
     def getmtime(self):
         if self.exists:
