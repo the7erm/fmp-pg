@@ -41,7 +41,6 @@ class RatingsAndScores:
         self.get_all(force=True)
 
     def get_all(self, force=False):
-        print "GET_ALL"
         if self.listening:
             return self.get_all_listening(force=force)
         if self.uids:
@@ -63,16 +62,13 @@ class RatingsAndScores:
         return self.uids_str
 
     def get_all_listening(self, force=False):
-        print "get_all_listening:"
         if time.time() < self.expires and not force:
-            print "get_all_listening: old", self.ratings_and_scores
             return self.ratings_and_scores
 
         self.get_ratings_and_scores()
         return self.ratings_and_scores
 
     def get_ratings_and_scores(self):
-        print "get_ratings_and_scores"
         self.expires = time.time() + 10
         self.ratings_and_scores = get_results_assoc(
             """SELECT * FROM users u, user_song_info usi
@@ -140,12 +136,22 @@ class RatingsAndScores:
           present = get_assoc("""SELECT * 
                                  FROM user_song_info usi
                                  WHERE usi.uid = %s AND usi.fid = %s""", 
-                              (u['uid'], self.fid))
+                                 (u['uid'], self.fid))
           if not present:
+              default_rating = 6
+              default_score = 5
+              default_percent_played = 50.0
+              default_true_score = ((default_rating * 2 * 10.0) + \
+                                    (default_score * 10.0) + \
+                                    (default_percent_played) / 3)
+
               present =  get_assoc("""INSERT INTO user_song_info 
-                                        (fid, uid, rating, score)
-                                      VALUES(%s, %s, 6, 6) RETURNING * """,
-                                      (self.fid, u['uid']))
+                                        (fid, uid, rating, score, 
+                                         percent_played, true_score)
+                                      VALUES(%s, %s, %s, %s) RETURNING * """,
+                                      (self.fid, u['uid'], default_rating,
+                                       default_score, default_percent_played,
+                                       default_true_score))
 
 
     def update(self, updated):

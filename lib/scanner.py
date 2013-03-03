@@ -19,21 +19,24 @@
 
 import os
 from os.path import join, getsize
-import file_object
+from lib.local_file_fobj import Local_File, CreationFailed
 
 print "scanner.py called"
 
 already_scanned = []
 
-def scan_file(root=None, name=None, filename=None):
+def scan_file(root=None, name=None, filename=None, hash=True):
     if filename == None:
         filename = join(root, name)
 
     filename = os.path.realpath(filename)
     print 'scanning:', filename
-    f = file_object.File_Obj(filename = filename, insert=True)
+    try:
+        f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+    except CreationFailed:
+        pass
 
-def scan_dir(directory):
+def scan_dir(directory, hash=True):
     if already_scanned.count(directory) != 0:
         return
 
@@ -42,7 +45,7 @@ def scan_dir(directory):
             continue
         already_scanned.append(root)
         for f in files:
-            scan_file(root=root, name=f)
+            scan_file(root=root, name=f, hash=hash)
     already_scanned.append(directory)
 
 

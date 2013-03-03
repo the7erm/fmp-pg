@@ -151,16 +151,12 @@ def populate_preload_for_uid(uid, min_amount=0):
     populate_dont_pick()
     print "populate_preload_for_uid 4"
 
-    # SELECT fid, ultp FROM user_song_info ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random();
-
-    # SELECT f.fid FROM files f, genres g, file_genres fg WHERE g.gid = fg.gid AND g.enabled = true AND f.fid = fg.fid AND f.fid NOT IN (SELECT fid FROM user_song_info WHERE uid = 1);
-
-    # INSERT INTO user_song_info (fid, uid, rating, score, true_score, percent_played) SELECT f.fid FROM files WHERE f.fid NOT IN (SELECT fid FROM user_song_info WHERE uid = 1)
     default_rating = 6
     default_score = 5
     default_percent_played = 50.0
-    default_true_score = ((default_rating * 2 * 10.0) + (default_score * 10.0) + (default_percent_played) / 3)
-    
+    default_true_score = ((default_rating * 2 * 10.0) + \
+                                    (default_score * 10.0) + \
+                                    (default_percent_played) / 3)
 
     m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (uid,))
     q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 

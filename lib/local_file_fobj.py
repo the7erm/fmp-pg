@@ -28,10 +28,13 @@ import re
 from excemptions import CreationFailed
 from ratings_and_scores import RatingsAndScores
 from datetime import date
+import hashlib
+import os
+import sys
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
-                 insert=False, silent=False, **kwargs):
+                 insert=False, silent=False, sha512=None, **kwargs):
 
         if kwargs.has_key('dir') and dirname is None:
             dirname = kwargs['dir']
@@ -46,8 +49,17 @@ class Local_File(fobj.FObj):
         self.last_percent_played = 0
 
         if fid:
-            db_info = get_assoc("SELECT * FROM files WHERE fid = %s LIMIT 1",
-                                (fid,))
+            db_info = get_assoc("""SELECT * 
+                                   FROM files 
+                                   WHERE fid = %s LIMIT 1""",
+                                   (fid,))
+
+        if sha512 is not None:
+            db_info = get_assoc("""SELECT * 
+                                   FROM files 
+                                   WHERE sha512 = %s 
+                                   LIMIT 1""",
+                                   (sha512,))
 
         if not db_info:
             if filename is not None:
@@ -63,8 +75,10 @@ class Local_File(fobj.FObj):
                 self.exists = False
                 raise CreationFailed("File must exist on local drive:%s" % filename)
 
-            db_info = get_assoc("SELECT * FROM files WHERE dir = %s AND basename = %s",(dirname, basename))
-
+            db_info = get_assoc("""SELECT * 
+                                   FROM files 
+                                   WHERE dir = %s AND basename = %s""",
+                                   (dirname, basename))
 
         if db_info:
             filename = os.path.join(db_info['dir'], db_info['basename'])
@@ -95,7 +109,6 @@ class Local_File(fobj.FObj):
 
         if not self.db_info and insert:
             self.insert()
-
         elif not self.db_info:
             raise CreationFailed("File is not in database:%s", (self.filename,))
 
@@ -106,14 +119,43 @@ class Local_File(fobj.FObj):
         if not silent:
             print "RatingsAndScores:",self.ratings_and_scores
 
+        ok_to_hash = True
+
+        if kwargs.has_key('hash') and not kwargs['hash']:
+            ok_to_hash = False
+
+        if self.mtime_changed() and ok_to_hash:
+            self.db_info['sha512'] = self.hash_file()
+            query("""UPDATE files 
+                     SET sha512 = %s, mtime = %s 
+                     WHERE fid = %s""",
+                     (self.db_info['sha512'], self.mtime, self.db_info['fid']))
+
+        if not self.db_info['sha512'] and ok_to_hash:
+            self.db_info['sha512'] = self.hash_file()
+            query("""UPDATE files 
+                     SET sha512 = %s 
+                     WHERE fid = %s""",
+                     (self.db_info['sha512'], self.db_info['fid']))
+
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
+
+    def hash_file(self):
+        h = hashlib.sha512()
+        fsize = os.path.getsize(self.filename)
+        fp = open(self.filename,"rb")
+        while fp.tell() < (fsize - 1):
+            h.update(fp.read(102400))
+        print "SHA512:", h.hexdigest()
+        fp.close()
+        return h.hexdigest()
+        
 
     def check_recently_played(self):
         print "****************************"
         print "Local_File:check_recently_played()"
         self.ratings_and_scores.check_recently_played()
-
 
     def mark_as_played(self, percent_played=0):
         ceil_percent_played = math.ceil(percent_played)
@@ -164,29 +206,43 @@ class Local_File(fobj.FObj):
             self.get_genres()
 
     def get_artists(self):
-        self.artists = get_results_assoc("SELECT * FROM artists a, file_artists fa WHERE fa.fid = %s AND fa.aid = a.aid",(self.fid,))
+        self.artists = get_results_assoc("""SELECT * 
+                                            FROM artists a, file_artists fa 
+                                            WHERE fa.fid = %s AND fa.aid = a.aid""",
+                                            (self.fid,))
         
     def get_albums(self):
-        self.albums = get_results_assoc("SELECT * FROM albums al, album_files af WHERE af.fid = %s AND af.alid = al.alid", (self.fid,))
+        self.albums = get_results_assoc("""SELECT * 
+                                           FROM albums al, album_files af 
+                                           WHERE af.fid = %s AND af.alid = al.alid""", 
+                                           (self.fid,))
 
     def get_genres(self):
-        self.genres = get_results_assoc("SELECT * FROM genres g, file_genres fg WHERE fg.fid = %s AND g.gid = fg.gid",(self.fid,))
+        self.genres = get_results_assoc("""SELECT * 
+                                           FROM genres g, file_genres fg 
+                                           WHERE fg.fid = %s AND g.gid = fg.gid""",
+                                           (self.fid,))
 
     def insert(self):
         if self.db_info:
             return
         self.get_tags()
-        self.db_info = get_assoc("INSERT INTO files(dir, basename) VALUES(%s, %s) RETURNING *", (self.dirname, self.basename))
+        self.db_info = get_assoc("""INSERT INTO files(dir, basename) 
+                                    VALUES(%s, %s) RETURNING *""", 
+                                    (self.dirname, self.basename))
         self.set_attribs()
         print "insert:", self.dirname, self.basename
         pp.pprint(self.db_info)
 
-        if isinstance(self.tags_easy, dict) and self.tags_easy.has_key('artist') and self.tags_easy['artist']:
-            query("DELETE FROM file_artists WHERE fid = %s", self.db_info['fid'])
+        if isinstance(self.tags_easy, dict) and self.tags_easy.has_key('artist') \
+           and self.tags_easy['artist']:
+            query("""DELETE FROM file_artists WHERE fid = %s""", (self.db_info['fid'],))
             for a in self.tags_easy['artist']:
                 aids = self.get_aids_by_artist_string(a)
                 for aid in aids:
-                    query("INSERT INTO file_artists(fid, aid) VALUES(%s, %s)", (self.db_info['fid'], aid))
+                    query("""INSERT INTO file_artists(fid, aid) 
+                             VALUES(%s, %s)""", 
+                             (self.db_info['fid'], aid))
 
         self.process_filename()
         self.process_genre()
@@ -220,23 +276,28 @@ class Local_File(fobj.FObj):
         if artist_name == "":
             return
 
-
         for a in self.artists:
             if a['artist'] == artist_name:
                 # print "found:",artist_name
                 return
 
-        artist = get_assoc("SELECT * FROM artists WHERE artist = %s", (artist_name,))
+        artist = get_assoc("""SELECT * FROM artists WHERE artist = %s""", 
+                              (artist_name,))
         if not artist:
             print "inserting artist :" ,artist_name
-            artist = get_assoc("INSERT INTO artists (artist) VALUES(%s) RETURNING *", (artist_name,))
+            artist = get_assoc("""INSERT INTO artists (artist) 
+                                  VALUES(%s) RETURNING *""", (artist_name,))
 
         self.artists.append(artist)
 
-        association = get_assoc("SELECT * FROM file_artists WHERE fid = %s AND aid = %s", (self.fid, artist['aid']))
+        association = get_assoc("""SELECT * 
+                                   FROM file_artists 
+                                   WHERE fid = %s AND aid = %s""", (self.fid, artist['aid']))
         if not association:
             print "associating artist:",artist_name
-            association =  get_assoc("INSERT INTO file_artists (fid, aid) VALUES(%s, %s) RETURNING *", (self.fid, artist['aid']))
+            association =  get_assoc("""INSERT INTO file_artists (fid, aid) 
+                                        VALUES(%s, %s) RETURNING *""", 
+                                        (self.fid, artist['aid']))
 
     def parse_artist_string(self, artists):
         artists = artists.strip()
@@ -292,10 +353,12 @@ class Local_File(fobj.FObj):
         if type(value) != unicode:
             value = unicode(value, "utf8", errors='replace')
 
-        q = pg_cur.mogrify("INSERT INTO tags (fid, tag_name,tag_value) VALUES(%s,%s,%s)", (fid, key, value))
+        q = pg_cur.mogrify("""INSERT INTO tags (fid, tag_name,tag_value) 
+                              VALUES(%s,%s,%s)""", (fid, key, value))
         print "value-type:",type(value)
         print "query:",q
-        query("INSERT INTO tags (fid, tag_name,tag_value) VALUES(%s,%s,%s)", (fid, key, value))
+        query("""INSERT INTO tags (fid, tag_name,tag_value) VALUES(%s,%s,%s)""", 
+                (fid, key, value))
 
     def mtime_changed(self):
         if not self.db_info:
@@ -304,7 +367,7 @@ class Local_File(fobj.FObj):
         if self.mtime != self.db_info['mtime']:
             return True
 
-        print "self.mtime:",self.mtime,"==",self.db_info['mtime']
+        #  print "self.mtime:",self.mtime,"==",self.db_info['mtime']
         return False
 
     def update_tags(self, fid=None):
@@ -326,7 +389,7 @@ class Local_File(fobj.FObj):
             self.insert_tag_to_db(fid, k, v)
             print "tag:%s=%s" % (k,v)
 
-        query("UPDATE files SET mtime = %s WHERE fid = %s", (self.mtime, fid))
+        query("""UPDATE files SET mtime = %s WHERE fid = %s""", (self.mtime, fid))
 
     def process_filename(self):
         print "process_filename"
@@ -367,16 +430,24 @@ class Local_File(fobj.FObj):
             if al['album_name'] == album_name and al['aid'] == aid:
                 return
 
-        album = get_assoc("SELECT * FROM albums WHERE album_name = %s AND aid = %s",(album_name, aid))
+        album = get_assoc("""SELECT * FROM albums WHERE album_name = %s AND aid = %s""",
+                             (album_name, aid))
 
         if not album:
             print "associating album:", album_name
-            album = get_assoc("INSERT INTO albums (album_name, aid) VALUES(%s,%s) RETURNING *",(album_name, aid))
+            album = get_assoc("""INSERT INTO albums (album_name, aid) 
+                                 VALUES(%s,%s) RETURNING *""",
+                                 (album_name, aid))
 
-        album_file = get_assoc("SELECT * FROM album_files WHERE alid = %s AND fid = %s", (album['alid'], self.fid))
+        album_file = get_assoc("""SELECT * 
+                                  FROM album_files 
+                                  WHERE alid = %s AND fid = %s""", 
+                                  (album['alid'], self.fid))
         if not album_file:
             print "associating file to album:", album_name
-            album_file = get_assoc("INSERT INTO album_files (alid, fid) VALUES(%s,%s) RETURNING *", (album['alid'], self.fid))
+            album_file = get_assoc("""INSERT INTO album_files (alid, fid) 
+                                      VALUES(%s,%s) RETURNING *""", 
+                                      (album['alid'], self.fid))
 
         self.albums.append(album)
 
@@ -405,7 +476,7 @@ class Local_File(fobj.FObj):
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
         return self.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
-                                             selected=selected)
+                                            selected=selected)
 
     def get_ratings(self):
         return self.ratings.get_all()
@@ -415,16 +486,26 @@ class Local_File(fobj.FObj):
         for g in self.genres:
             if g['genre'] == genre_name:
                 return
-        genre = get_assoc("SELECT * FROM genres WHERE genre = %s",(genre_name,))
+        genre = get_assoc("""SELECT * 
+                             FROM genres 
+                             WHERE genre = %s""",
+                             (genre_name,))
         if not genre:
             print "inserting genre:",genre_name
-            genre = get_assoc("INSERT INTO genres (genre, enabled) VALUES(%s, %s) RETURNING *", (genre_name, True))
+            genre = get_assoc("""INSERT INTO genres (genre, enabled) 
+                                 VALUES(%s, %s) RETURNING *""", 
+                                 (genre_name, True))
 
-        association = get_assoc("SELECT * FROM file_genres WHERE fid = %s AND gid = %s", (self.fid, genre['gid']))
+        association = get_assoc("""SELECT * 
+                                   FROM file_genres 
+                                   WHERE fid = %s AND gid = %s""", 
+                                   (self.fid, genre['gid']))
 
         if not association:
             print "associating genre:", genre_name
-            association = get_assoc("INSERT INTO file_genres (fid, gid) VALUES(%s, %s) RETURNING *", (self.fid, genre['gid']))
+            association = get_assoc("""INSERT INTO file_genres (fid, gid) 
+                                       VALUES(%s, %s) RETURNING *""", 
+                                       (self.fid, genre['gid']))
 
         self.genres.append(genre)
 
@@ -445,7 +526,3 @@ if __name__ == "__main__":
                 print obj.filename
         except CreationFailed, e:
             print "CreationFailed:",e
-
-
-
-    
