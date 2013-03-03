@@ -53,25 +53,17 @@ if len(sys.argv) == 1 or "--help" in sys.argv or "-h" in sys.argv or "-help" in 
 	sys.exit()
 
 do_hash = True
-if "--no-hash" in sys.argv:
+if "--no-hash" in sys.argv[1:]:
     do_hash = False
 
-if "--folders" in sys.argv:
+if "--folders" in sys.argv[1:]:
     folders = get_results_assoc("SELECT DISTINCT dir FROM files ORDER BY dir",())
     folders_to_scan = []
     for f in folders:
         scanner.scan_dir(f['dir'], hash=do_hash)
 
-for arg in sys.argv:
+for arg in sys.argv[1:]:
     if os.path.isdir(arg):
         scanner.scan_dir(arg, hash=do_hash)
     elif os.path.isfile(arg):
         scanner.scan_file(filename=arg, hash=do_hash)
-
-
-
-
-
-
-
-
