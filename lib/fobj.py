@@ -140,12 +140,14 @@ class FObj:
 
     def getmtime(self):
         if self.exists:
+            print "self.filename:",self.filename
             t = os.path.getmtime(self.filename)
             self.mtime = datetime.datetime.fromtimestamp(t)
             tz = time.strftime("%Z", time.gmtime())
             localtz = pytz.timezone(tz)
             self.mtime = localtz.localize(self.mtime)
             return self.mtime
+        return -1
 
     def __getitem__(self, key):
         if hasattr(self, 'db_info'):
