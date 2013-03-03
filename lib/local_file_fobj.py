@@ -146,7 +146,7 @@ class Local_File(fobj.FObj):
 
     def hash_file(self):
         if not self.exists:
-            return
+            return ""
         h = hashlib.sha512()
         fsize = os.path.getsize(self.filename)
 

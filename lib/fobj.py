@@ -77,7 +77,9 @@ class FObj:
             if dirname.startswith("file://"):
                 dirname = urllib.url2pathname(dirname).replace("file://", '', 1)
                 basename = urrllib.url2pathname(basename)
-
+            print "FILENAME:",filename
+            print "DIRNAME:",dirname
+            print "BASENAME:",basename
             self.filename = os.path.join(dirname, basename)
             self.dirname = dirname
             self.basename = basename
@@ -107,8 +109,8 @@ class FObj:
 
         if self.exists:
             self.filename = os.path.realpath(self.filename)
-            self.dirname = os.path.dirname(self.dirname)
-            self.basename = os.path.basename(self.basename)
+            self.dirname = os.path.dirname(self.filename)
+            self.basename = os.path.basename(self.filename)
             
 
         self.root, self.ext = os.path.splitext(self.basename)
