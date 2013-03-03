@@ -56,7 +56,7 @@ class Local_File(fobj.FObj):
                                    WHERE fid = %s LIMIT 1""",
                                    (fid,))
 
-        if sha512 is not None:
+        if sha512 is not None and not db_info:
             db_info = get_assoc("""SELECT * 
                                    FROM files 
                                    WHERE sha512 = %s 
@@ -97,7 +97,7 @@ class Local_File(fobj.FObj):
                 "   basename:%s\n" % basename
             )
 
-        fobj.FObj.__init__(self,filename=filename, dirname=dirname, 
+        fobj.FObj.__init__(self, filename=filename, dirname=dirname, 
                            basename=basename, **kwargs)
 
         if not self.is_audio and not self.is_video:
@@ -228,6 +228,7 @@ class Local_File(fobj.FObj):
     def insert(self):
         if self.db_info:
             return
+        print "inserting:",self.filename
         self.get_tags()
         self.db_info = get_assoc("""INSERT INTO files(dir, basename) 
                                     VALUES(%s, %s) RETURNING *""", 
