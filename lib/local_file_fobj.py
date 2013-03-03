@@ -32,6 +32,8 @@ import hashlib
 import os
 import sys
 
+numeric = re.compile("^[0-9]+$")
+
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
                  insert=False, silent=False, sha512=None, **kwargs):
