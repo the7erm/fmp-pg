@@ -18,7 +18,8 @@
 #
 
 from lib.__init__ import *
-import os, sys
+import os
+import sys
 import lib.scanner as scanner
 import lib.file_object as file_object
 file_object.pg_conn = pg_conn
@@ -26,6 +27,8 @@ file_object.pg_cur = pg_cur
 file_object.get_results_assoc = get_results_assoc
 file_object.get_assoc = get_assoc
 file_object.query = query
+
+args = sys.argv[1:]
 
 # scanner.scan_dir('/home/erm/mp3/K/Keith Urban/')
 usage = """
@@ -48,21 +51,24 @@ Scan a file.
 $ scan.py /path/to/file.mp3
 
 """
-if len(sys.argv) == 1 or "--help" in sys.argv or "-h" in sys.argv or "-help" in sys.argv:
+if len(args) == 0 or "--help" in args or "-h" in args or "-help" in args:
 	print usage
 	sys.exit()
 
 do_hash = True
-if "--no-hash" in sys.argv[1:]:
+
+if "--no-hash" in args:
     do_hash = False
 
-if "--folders" in sys.argv[1:]:
+if "--folders" in args:
     folders = get_results_assoc("SELECT DISTINCT dir FROM files ORDER BY dir",())
     folders_to_scan = []
     for f in folders:
         scanner.scan_dir(f['dir'], hash=do_hash)
 
-for arg in sys.argv[1:]:
+for arg in args:
+    if arg in ("--no-hash","--folders"):
+        continue
     if os.path.isdir(arg):
         scanner.scan_dir(arg, hash=do_hash)
     elif os.path.isfile(arg):
