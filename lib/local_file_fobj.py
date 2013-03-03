@@ -228,11 +228,21 @@ class Local_File(fobj.FObj):
     def insert(self):
         if self.db_info:
             return
-        print "inserting:",self.filename
+        print "inserting:", self.filename
+        print "self.dirname:", self.dirname
+        print "self.basename:", self.basename
         self.get_tags()
-        self.db_info = get_assoc("""INSERT INTO files(dir, basename) 
-                                    VALUES(%s, %s) RETURNING *""", 
-                                    (self.dirname, self.basename))
+
+        try:
+            self.db_info = get_assoc("""INSERT INTO files(dir, basename) 
+                                        VALUES(%s, %s) RETURNING *""", 
+                                        (self.dirname, self.basename))
+        except psycopg2.IntegrityError:
+            query("COMMIT");
+            self.db_info = get_assoc("""SELECT *
+                                        FROM files
+                                        WHERE dir = %s and basename = %s""",
+                                        (self.dirname, self.basename))
         self.set_attribs()
         print "insert:", self.dirname, self.basename
         pp.pprint(self.db_info)
