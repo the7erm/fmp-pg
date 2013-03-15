@@ -61,8 +61,7 @@ if "--no-hash" in args:
     do_hash = False
 
 if "--folders" in args:
-    folders = get_results_assoc("SELECT DISTINCT dir FROM files ORDER BY dir",())
-    folders_to_scan = []
+    folders = get_results_assoc("SELECT DISTINCT dir FROM files ORDER BY dir")
     for f in folders:
         scanner.scan_dir(f['dir'], hash=do_hash)
 

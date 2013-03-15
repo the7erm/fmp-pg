@@ -35,13 +35,18 @@ def index():
             player.next()
         if cmd == "prev":
             player.prev()
+        if cmd == "seek_ns":
+            pos = request.args.get("value",0)
+            player.seek_ns(pos)
+            
         if cmd == "rate":
             rating = request.args.get("value",0)
             uid = request.args.get("uid",0)
+            print "************* RATE ****************"
             print "RATE:uid:%s rating:%s" % (uid, rating)
             if uid and hasattr(playing, "ratings_and_scores"):
                 print "RATE 2:uid:%s rating:%s" % (uid, rating)
-                playing.ratings_and_scores.rate(uid=uid, rating=rating)
+                playing.rate(uid=uid, rating=rating)
         if cmd == "vol":
             set_volume(request.args.get("value",-1))
 

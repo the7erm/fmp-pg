@@ -350,6 +350,7 @@ static char * invisible_xpm[] = {
             self.dur_int = 0
         # self.play_thread_id = thread.start_new_thread(self.play_thread, ())
         # gc.collect()
+        self.update_time()
         
         
     def set_volume(self,widget,value):
@@ -437,6 +438,7 @@ static char * invisible_xpm[] = {
             
         self.playingState = self.player.get_state()[1]
         self.emit('state-changed', self.playingState)
+        self.update_time()
 
     
     def on_message(self, bus, message):
@@ -500,6 +502,7 @@ static char * invisible_xpm[] = {
         ns = int(ns)
         print "SEEK_NS:",ns
         self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, ns)
+        self.update_time()
     
     def seek(self, string):
         if self.pos_int <= 0:

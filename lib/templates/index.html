@@ -17,7 +17,7 @@
 </head>
 <body>
     <span class='artist_title'>
-        Playing:<span id="playing-file">{{ playing.artist_title }}</span>
+        Playing:<span id="playing-file">{{ playing.get_artist_title() }}</span>
         <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
     </span>
     <br clear="left">
@@ -44,11 +44,9 @@
             <td>True Score</td>
         </tr>
     </table>
-
-    
     
     <label for="volume">Volume:</label>
-    <input name="volume-slider-1" id="volume" min="0" max="100" step="1" value="{{ volume }}" type="range">
+    <input name="volume-slider-1"  data-theme="d" data-highlight="true" id="volume" min="0" max="100" step="1" value="{{ volume }}" type="range">
     
 
     <div class="float-right">
@@ -57,6 +55,8 @@
     </div>
     
     <br clear="all">
+
+    <input name="seek-slider-1"  data-theme="d"  data-highlight="true" class="ui-hide-label" id="seek" min="0" max="{{ player.pos_data.dur_int }}" step="1" value="{{ player.pos_data.pos_int }}" type="range">
     <script type="text/html" id="tpl-rating">
         <tr class="user-line" data-uid="<%= uid %>">
             <td><%= uname %></td> 
@@ -71,18 +71,24 @@
         
         $(document).ready(function(){
             $.fn.raty.defaults.path = '/static/images/raty/';
-            var time_status = $("#time-status");
-            var playing_file = $("#playing-file");
-            var play_pause_img = $("#play-pause-img");
-            var junk_input = $("#junk-input");
-            var junk_input_parent = junk_input.parent();
-            var player = null;
-            var playing = null;
-            var ratings = null;
-            var volume = null;
-            var rating_tpl = _.template($("#tpl-rating").html());
-            var ratings_table = $("#ratings-table");
-            var $volume = $("#volume");
+            var seek_lock = false,
+                time_status = $("#time-status"),
+                playing_file = $("#playing-file"),
+                play_pause_img = $("#play-pause-img"),
+                junk_input = $("#junk-input"),
+                junk_input_parent = junk_input.parent(),
+                player = {{ player.to_dict()|tojson|safe }},
+                playing = {{ playing.to_dict()|tojson|safe }},
+                ratings = {{ playing.to_dict()['ratings']|tojson|safe }},
+                volume = {{ volume }},
+                volume_lock = false,
+                rating_tpl = _.template($("#tpl-rating").html()),
+                ratings_table = $("#ratings-table"),
+                $volume = $("#volume"),
+                $seek = $("#seek"),
+                updates_per_second = 1,
+                last_pos_str = "",
+                last_left_str = "";
             junk_input_parent.hide();
             
             $(".action-link").click(function(evt) {
@@ -109,14 +115,16 @@
             });
 
             
-            
-            
             function onRate(score, evt) {
+                var uid = $(this).data("uid");
+                if (!uid) {
+                    return;
+                }
                 $.ajax({
                     "url":"/",
                     "data":{
                         "cmd": "rate",
-                        "uid": $(this).data("uid"),
+                        "uid": uid,
                         "status":1,
                         "value":score,
                     }
@@ -127,12 +135,14 @@
 
             function process_status(dta) {
                 var player = dta.player;
+
                 window.player = player;
 
                 window.document.title = "fmp - " + dta.playing.basename;
                 
+                /* 
                 time_status.text("-" + player.pos_data["left_str"]+ " " + 
-                                 player.pos_data["pos_str"]+"/"+player.pos_data["dur_str"]);
+                                 player.pos_data["pos_str"]+"/"+player.pos_data["dur_str"]); */
                 playing_file.text(dta.playing.artist_title);
                 if (player.playingState != "PLAYING") {
                     play_pause_img.prop("src","/static/images/media-playback-start.png");
@@ -142,11 +152,19 @@
 
                 if (window.volume != dta.volume) {
                     window.volume = dta.volume;
-                    if (new_vol.length == 0) {
+                    if (!volume_lock) {
+                        volume_lock = true;
                         $volume.val(window.volume);
                         $volume.slider("refresh");
+                        volume_lock = false;
                     }
                 }
+
+                seek_lock = true;
+                $seek.val(dta.player.pos_data.pos_int);
+                $seek.prop("max", dta.player.pos_data.dur_int);
+                $seek.slider("refresh");
+                seek_lock = false;
 
                 if (window.ratings != dta.playing.ratings) {
                     window.ratings = dta.playing.ratings;
@@ -183,13 +201,10 @@
                     });
                 }
                 
-                /*
-                    {"player": {"pos_data": {"dur_int": 241413000000, "pos_str": "0:04", "left_str": "3:57", "left_int": 237392810000, "decimal": 0.016652748609229825, "pos_int": 4020190000, "percent": "1.67%", "dur_str": "4:01"}, "playingState": "PLAYING", "filename": "/home/erm/mp3/R/Raze/Power/Raze - Place in my Heart.mp3"}, "playing": {"ratings": {"1": {"rating": 4, "uid": 1, "last_time_cued": "2013-01-25T10:14:22.186400+00:00", "usid": 179199, "admin": true, "selected": true, "true_score": 47.2217582869743, "uname": "erm", "ultp": null, "listening": true, "fid": 1783, "percent_played": 1.66527486092298, "score": 6}}, "basename": "Raze - Place in my Heart.mp3"}}
-                */
             }
 
-            function format_time(milliseconds) {
-                var seconds = Math.floor(parseInt(milliseconds) / 1000000000);
+            function format_time(nanosecnods) {
+                var seconds = Math.floor(parseInt(nanosecnods) / 1000000000);
                 var hrs = Math.floor(seconds / 3600);
                 if (hrs) {
                     seconds = seconds - (hrs * 3600);
@@ -202,11 +217,21 @@
                 if (hrs) {
                     ret = hrs+":";
                 }
+
+                minutes = Math.floor(minutes);
+                if (minutes<=0) {
+                    minutes = 0;
+                }
                 
                 if (minutes < 10 && ret) {
                     minutes = "0"+minutes;
                 }
                 ret += minutes+":";
+
+                seconds = Math.floor(seconds);
+                if (seconds<=0) {
+                    seconds = 0;
+                }
                 
                 if (seconds < 10) {
                     seconds = "0"+seconds;
@@ -220,12 +245,24 @@
                     return;
                 }
                 if (window.player.playingState == "PLAYING") {
-                    window.player.pos_data.left_int = parseInt(window.player.pos_data.left_int) - 1000000000;
-                    window.player.pos_data.pos_int =  parseInt(window.player.pos_data.pos_int) + 1000000000;
+                    // 1000000000 = 1 second
+                    var inc_by = 1000000000 / updates_per_second;
+                    window.player.pos_data.left_int = parseInt(window.player.pos_data.left_int) - inc_by;
+                    window.player.pos_data.pos_int =  parseInt(window.player.pos_data.pos_int) + inc_by;
                     window.player.pos_data["left_str"] = format_time(window.player.pos_data.left_int);
                     window.player.pos_data["pos_str"] = format_time(window.player.pos_data.pos_int);
-                    time_status.text("-" + window.player.pos_data["left_str"]+ " " + 
-                                     window.player.pos_data["pos_str"]+"/"+window.player.pos_data["dur_str"]);
+                    if (last_pos_str != window.player.pos_data["pos_str"] && 
+                        last_left_str != window.player.pos_data["left_str"]) {
+                        last_pos_str = window.player.pos_data["pos_str"];
+                        last_left_str = window.player.pos_data["left_str"];
+                        time_status.text("-" + window.player.pos_data["left_str"]+ " " + 
+                                         window.player.pos_data["pos_str"] + 
+                                         "/" + window.player.pos_data["dur_str"]);
+                    }
+                    seek_lock = true;
+                    $seek.val(window.player.pos_data.pos_int);
+                    $seek.slider("refresh");
+                    seek_lock = false;
                 }
             }
 
@@ -235,30 +272,24 @@
                 });
                 return true
             }
+
+            setInterval(get_status, 5000);
+            setInterval(set_time, Math.floor(1000/updates_per_second));
+            process_status({
+                player:player,
+                playing:playing,
+                volume:volume
+            });
+            
             var change_volume = function(volume) {
                 if (volume == undefined) {
-                    // console.log("undefined:")
                     return;
                 }
-                if (change_lock) {
-                    if (window.volume != volume) {
-                        new_vol.push(volume);
-                        // console.log("new_vol:",volume);
-                    }
+                if (volume_lock) {
                     return;
                 }
-                change_lock = true;
-                new_vol = [];
+                volume_lock = true;
                 volume_val = $volume.val();
-                if (window.volume == volume && volume_val == volume) {
-                    change_lock = false;
-                    new_vol = [];
-                    return;
-                }
-                
-                // console.log("window.volume:",window.volume);
-                // console.log("volume:",volume);
-                // console.log("volume_val:",volume_val);
                 if (window.volume != volume) {
                     $.ajax({
                         "url":"/",
@@ -269,35 +300,56 @@
                         }
                     }).done(function(data){
                         process_status(data);
-
                     }).always(function(){
-                        change_lock = false;
-                        if (new_vol.length > 0) {
-                            change_volume(new_vol.pop());
-                        }
+                        volume_lock = false;
                     });
                 } else {
-                    change_lock = false;
-                    if (new_vol.length > 0) {
-                        change_volume(new_vol.pop());
-                    }
+                    volume_lock = false;
                 }
             }
-            get_status();
+
+            
 
             $volume.change(function () {
-                if (window.volume == -1) {
+                if (volume_lock) {
                     return;
                 }
-                // console.log("$volume.change");
-                if ($volume.val() != window.volume) {
-                    // console.log($volume.val(),"!=",window.volume);
-                    change_volume($volume.val());
-                }
+                change_volume($volume.val());
                 return true;
             });
 
+            $seek.bind("change", function(){
+                if (seek_lock) {
+                    return;
+                }
+                seek_lock = true;
+                var val = $(this).val();
+                console.log("val:",val);
+                window.player.pos_data.pos_int = parseInt(val);
+                $.ajax({
+                    "url":"/",
+                    "data":{
+                        "cmd": "seek_ns",
+                        "value":val,
+                        "status":1,
+                    }
+                }).done(function(data) {
+                    val = parseInt(val);
+                    window.player.pos_data.pos_int = val;
+                    data.player.pos_data.pos_int = val;
+                    process_status(data);
+                    set_time();
+                }).always(function(){
+                    seek_lock = false;
+                });
+            });
+
+            $("#seek").hide();
+
             $volume.parent(".ui-slider").on("mousewheel", function (evt, delta) {
+                if (volume_lock) {
+                    return;
+                }
                 // console.log("$volume.step:",$volume.step);
                 // console.log("$volume.val():",$volume.val());
                 // console.log("delta",delta);
@@ -318,6 +370,23 @@
                 }
             });
 
+            $seek.parent(".ui-slider").on("mousewheel", function (evt, delta) {
+                if (seek_lock) {
+                    return;
+                }
+                var step = 5000000000;
+                if (delta == 1) {
+                    // add to the val.
+                    var new_val = parseInt($seek.val()) + step;
+                    $seek.val(new_val).slider("refresh");
+                }
+                if (delta == -1) {
+                    // remove from the val
+                    var new_val = parseInt($seek.val()) - step;
+                    $seek.val(new_val).slider("refresh");
+                }
+            });
+
             $("#vol-minus").click(function(){
                 var step = parseInt($volume.prop("step"));
                 var new_val = parseInt($volume.val()) - 5;
@@ -332,9 +401,9 @@
                 $volume.val(new_val).slider("refresh");
                 change_volume(new_val);
             });
-            setInterval(get_status, 5000);
-            setInterval(set_time, 1000);
             
+            
+            // get_status();
         });
 
     </script>

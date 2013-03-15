@@ -9,6 +9,8 @@ class Downloader(gobject.GObject):
     __gsignals__ = {
         'download-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
                             (gobject.TYPE_PYOBJECT,)),
+        'download-done': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                          (gobject.TYPE_PYOBJECT,)),
     }
     def __init__(self):
         gobject.GObject.__init__(self)
@@ -92,7 +94,8 @@ class Downloader(gobject.GObject):
                                                       file_size_dl * 100.
                                                         / file_size,
                                                       sizeof_fmt(bytes_sec))
-        self.emit("download-status", "%s\n%s" % (basename, status)) 
+        self.emit("download-status", "%s\n%s" % (basename, status))
+        self.emit("download-done","Done downloading:%s\n%s" % (basename, status))
 
 
 def sizeof_fmt(num):

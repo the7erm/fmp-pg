@@ -37,13 +37,15 @@ def on_button_press(icon, event, **kwargs):
     if event.button == 1:
         menu.popup(None, None, None, event.button, event.get_time())
 
-
 def on_update(*args, **kwargs):
     netcast_fobj.update_now()
     update()
-    icon.set_from_file(ICON_NOTHING)
 
 def update(*args, **kwargs):
+    if downloader.downloading:
+        print "Not updating downloader is getting a file."
+        return True
+
     netcasts = netcast_fobj.get_expired_subscribed_netcasts()
     if not netcasts:
         f = netcast_fobj.get_one_unlistened_episode()
@@ -52,9 +54,18 @@ def update(*args, **kwargs):
             if nobj:
                 nobj.netcast.download_unlistened_netcasts()
         clear_cache.clear_cache()
+        icon.set_tooltip("Done updating")
+        icon.set_from_file(ICON_NOTHING)
+        while gtk.events_pending():
+                gtk.main_iteration(False)
         return True
 
     icon.set_from_file(ICON_UPDATING)
+    if not downloader.downloading:
+        icon.set_tooltip("Updating")
+        while gtk.events_pending():
+            gtk.main_iteration(False)
+
     for n in netcasts:
         gtk.threads_leave()
         icon.set_tooltip("Updating %s" % (n.name))
@@ -63,9 +74,9 @@ def update(*args, **kwargs):
         gtk.threads_enter()
         n.update()
         n.download_unlistened_netcasts()
+    clear_cache.clear_cache()
     icon.set_tooltip("Done updating")
     icon.set_from_file(ICON_NOTHING)
-    clear_cache.clear_cache()
     while gtk.events_pending():
             gtk.main_iteration(False)
     return True
@@ -74,6 +85,14 @@ def on_download_status(downloader, status):
     gtk.threads_leave()
     icon.set_tooltip(status)
     icon.set_from_file(ICON_DOWNLOADING)
+    while gtk.events_pending():
+        gtk.main_iteration(False)
+    gtk.threads_enter()
+
+def on_download_done(downloader, status):
+    gtk.threads_leave()
+    icon.set_tooltip(status)
+    icon.set_from_file(ICON_NOTHING)
     while gtk.events_pending():
         gtk.main_iteration(False)
     gtk.threads_enter()
@@ -114,6 +133,7 @@ menu.append(quit_item)
 
 menu.show_all()
 downloader.connect("download-status", on_download_status)
+downloader.connect("download-done", on_download_done)
 
 if __name__ == "__main__":
     import lib.pid_handler as pid_handler

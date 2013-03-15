@@ -116,12 +116,11 @@ def on_activate_file_info(*args):
         return
 
 def on_activate_history(*args):
-    fid = str(playing['fid'])
     if os.path.exists(sys.path[0]+"/lib/history_dialog.py"):
-        Popen([sys.path[0]+"/lib/history_dialog.py", fid])
+        Popen([sys.path[0]+"/lib/history_dialog.py"])
         return
     if os.path.exists(sys.path[0]+"/../lib/history_dialog.py"):
-        Popen([sys.path[0]+"/../lib/history_dialog.py", fid])
+        Popen([sys.path[0]+"/../lib/history_dialog.py"])
         return
 
 

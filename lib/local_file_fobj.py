@@ -36,7 +36,7 @@ numeric = re.compile("^[0-9]+$")
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
-                 insert=False, silent=False, sha512=None, **kwargs):
+                 insert=False, silent=False, sha512=None, get_dups=True, **kwargs):
 
         if kwargs.has_key('dir') and dirname is None:
             dirname = kwargs['dir']
@@ -47,7 +47,7 @@ class Local_File(fobj.FObj):
         self.artists = []
         self.albums = []
         self.genres = []
-        self.ratings = None
+        self.dups = []
         self.last_percent_played = 0
 
         if fid:
@@ -141,6 +141,19 @@ class Local_File(fobj.FObj):
                      WHERE fid = %s""",
                      (self.db_info['sha512'], self.db_info['fid']))
 
+        if get_dups and self.db_info["sha512"]:
+            dups = get_results_assoc("""SELECT fid
+                                        FROM files f
+                                        WHERE sha512 = %s AND fid != %s""",
+                                        (self.db_info["sha512"], 
+                                         self.db_info["fid"]))
+            for d in dups:
+                try:
+                    dup = Local_File(get_dups=False, insert=False, fid=d['fid'])
+                except CreationFailed:
+                    continue
+                self.dups.append(dup)
+
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
 
@@ -162,6 +175,8 @@ class Local_File(fobj.FObj):
         print "****************************"
         print "Local_File:check_recently_played()"
         self.ratings_and_scores.check_recently_played()
+        for d in self.dups:
+            d.ratings_and_scores.check_recently_played()
 
     def mark_as_played(self, percent_played=0):
         ceil_percent_played = math.ceil(percent_played)
@@ -171,6 +186,8 @@ class Local_File(fobj.FObj):
             self.last_percent_played = ceil_percent_played
 
         self.ratings_and_scores.mark_as_played(percent_played)
+        for d in self.dups:
+            d.mark_as_played(percent_played)
 
     def update_history(self,percent_played=0):
         self.ratings_and_scores.update_history(percent_played=percent_played)
@@ -492,12 +509,12 @@ class Local_File(fobj.FObj):
                     self.add_genre(g)
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
+        for d in self.dups:
+            d.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
+                                      selected=selected)
+
         return self.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
                                             selected=selected)
-
-    def get_ratings(self):
-        return self.ratings.get_all()
-        
 
     def add_genre(self, genre_name):
         for g in self.genres:
