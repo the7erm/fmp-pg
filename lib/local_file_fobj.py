@@ -549,6 +549,10 @@ class Local_File(fobj.FObj):
             if self.tags_easy['artist'] and self.tags_easy['title']:
                 return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
         return self.basename
+
+    def __repr__(self):
+        return '<%s\n\tpath:%s\n\tbasename:%s>' % (
+            self.__class__.__name__, self.dirname, self.basename)
     
         
 if __name__ == "__main__":

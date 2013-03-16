@@ -130,28 +130,21 @@ class RatingsAndScores:
         return updated
 
     def check_for_rating_info(self):
-        print "CHECK_FOR_RATING_INFO"
+        # print "CHECK_FOR_RATING_INFO"
         for u in listeners.listeners:
-          print "U:",u
+          # print "U:",u
           present = get_assoc("""SELECT * 
                                  FROM user_song_info usi
                                  WHERE usi.uid = %s AND usi.fid = %s""", 
                                  (u['uid'], self.fid))
           if not present:
-              default_rating = 6
-              default_score = 5
-              default_percent_played = 50.0
-              default_true_score = ((default_rating * 2 * 10.0) + \
-                                    (default_score * 10.0) + \
-                                    (default_percent_played) / 3)
-
               present =  get_assoc("""INSERT INTO user_song_info 
                                         (fid, uid, rating, score, 
                                          percent_played, true_score)
                                       VALUES(%s, %s, %s, %s) RETURNING * """,
-                                      (self.fid, u['uid'], default_rating,
-                                       default_score, default_percent_played,
-                                       default_true_score))
+                                      (self.fid, u['uid'], DEFAULT_RATING,
+                                       DEFAULT_SCORE, DEFAULT_PERCENT_PLAYED,
+                                       DEFAULT_TRUE_SCORE))
 
 
     def update(self, updated):
@@ -245,7 +238,7 @@ class RatingsAndScores:
             return
         updated = get_results_assoc(
               """UPDATE user_song_info 
-                 SET true_score = (((rating * 2 * 10.0) + (score * 10) + 
+                 SET true_score = (((rating * 2 * 10.0) + (score * 10.0) + 
                                      percent_played) / 3) 
                  WHERE fid = %s AND uid IN 
                         (SELECT uid FROM users WHERE listening = true)

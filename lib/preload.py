@@ -291,10 +291,18 @@ class Preload(gtk.ScrolledWindow):
             default_rating = 6
             default_score = 5
             default_percent_played = 50.0
-            default_true_score = ((default_rating * 2 * 10.0) + (default_score * 10.0) + (default_percent_played) / 3)
+            default_true_score = (
+                (
+                    (default_rating * 2 * 10.0) + 
+                    (default_score * 10.0) + 
+                    (default_percent_played)
+                ) / 3)
 
             m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (u['uid'],))
-            q = "INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) SELECT f.fid, '%s', '%s', '%s', '%s', '%s' FROM files f WHERE f.fid NOT IN (%s)" % (u['uid'], default_rating, default_score, default_percent_played, default_true_score, m)
+            q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
+                        SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
+                        FROM files f 
+                        WHERE f.fid NOT IN (%s)""" % (u['uid'], default_rating, default_score, default_percent_played, default_true_score, m)
             query(q)
 
 

@@ -51,9 +51,14 @@ def create_dont_pick():
 
     dont_pick_created = True
     query("DROP TABLE dont_pick")
-    query("CREATE TABLE IF NOT EXISTS dont_pick (fid SERIAL, reason text, reason_value text)")
+    query("""CREATE TABLE 
+                IF NOT EXISTS 
+                    dont_pick (fid SERIAL, reason text, reason_value text)""")
     query("CREATE UNIQUE INDEX dont_pick_fid_index ON dont_pick (fid)")
-    query('CREATE RULE "dont_pick_on_duplicate_ignore" AS ON INSERT TO "dont_pick" WHERE EXISTS(SELECT 1 FROM dont_pick WHERE (fid)=(NEW.fid)) DO INSTEAD NOTHING;')
+    query("""CREATE RULE "dont_pick_on_duplicate_ignore" AS ON 
+                INSERT TO "dont_pick" 
+                WHERE EXISTS(SELECT 1 FROM dont_pick WHERE (fid)=(NEW.fid)) 
+                DO INSTEAD NOTHING;""")
 
 def create_preload():
     # query("CREATE TABLE IF NOT EXISTS preload (fid SERIAL, uid SERIAL, reason text)")
@@ -84,9 +89,15 @@ def populate_dont_pick():
     listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
 
     if listeners:
-        total_to_remove = get_assoc("SELECT FLOOR(count(DISTINCT fid) * 0.01) AS total FROM file_genres fg, genres g WHERE g.gid = fg.gid AND g.enabled = true")
+        total_to_remove = get_assoc(
+            """SELECT FLOOR(count(DISTINCT fid) * 0.01) AS total 
+               FROM file_genres fg, genres g 
+               WHERE g.gid = fg.gid AND g.enabled = true""")
 
-        total_artists_to_remove = get_assoc("SELECT FLOOR(count(DISTINCT aid) * 0.01) AS total FROM file_artists fa, file_genres fg, genres g WHERE g.gid = fg.gid AND g.enabled = true AND fa.fid = fg.fid")
+        total_artists_to_remove = get_assoc(
+            """SELECT FLOOR(count(DISTINCT aid) * 0.01) AS total 
+               FROM file_artists fa, file_genres fg, genres g 
+               WHERE g.gid = fg.gid AND g.enabled = true AND fa.fid = fg.fid""")
 
         if total_to_remove.has_key('total'):
             total_to_remove = str(total_to_remove['total'])
@@ -99,16 +110,44 @@ def populate_dont_pick():
             total_artists_to_remove = "0"
 
         for l in listeners:
-            query("INSERT INTO dont_pick (fid, reason, reason_value) SELECT DISTINCT fid, 'rated 0', uid FROM user_song_info WHERE rating = 0 AND uid = %s",(l['uid'],))
+            query("""INSERT INTO dont_pick (fid, reason, reason_value) 
+                        SELECT DISTINCT fid, 'rated 0', uid 
+                        FROM user_song_info 
+                        WHERE rating = 0 AND uid = %s""",
+                     (l['uid'],))
 
             # Add recently played files.
-            query("INSERT INTO dont_pick (fid, reason, reason_value) SELECT DISTINCT fid, 'recently played', ultp  FROM user_song_info WHERE uid = %s AND ultp IS NOT NULL ORDER BY ultp DESC LIMIT "+total_to_remove, (l['uid'],))
+            query("""INSERT INTO dont_pick (fid, reason, reason_value) 
+                        SELECT DISTINCT fid, 'recently played', ultp 
+                        FROM user_song_info 
+                        WHERE uid = %s AND ultp IS NOT NULL 
+                        ORDER BY ultp DESC LIMIT """+total_to_remove, 
+                     (l['uid'],))
 
             # Add recently played artists
             # Don't add aid column
-            query("INSERT INTO dont_pick (fid, reason) SELECT DISTINCT fid, 'Recently played artist' FROM file_artists WHERE aid IN (SELECT aid FROM file_artists fa, user_song_info u WHERE fa.fid = u.fid AND ultp IS NOT NULL AND u.uid = %s ORDER BY ultp DESC LIMIT "+total_artists_to_remove+")",(l['uid'],))
+            query("""INSERT INTO dont_pick (fid, reason) 
+                     SELECT DISTINCT fid, 'Recently played artist' 
+                     FROM file_artists 
+                     WHERE aid IN (SELECT aid 
+                                   FROM file_artists fa, user_song_info u 
+                                   WHERE fa.fid = u.fid AND ultp IS NOT NULL AND 
+                                         u.uid = %s 
+                                   ORDER BY ultp DESC 
+                                   LIMIT """+total_artists_to_remove+")", 
+                     (l['uid'],))
 
-    query("INSERT INTO dont_pick (fid, reason) SELECT DISTINCT fid, 'artist in preload' FROM file_artists WHERE aid IN (SELECT DISTINCT aid FROM file_artists fa WHERE fid IN (SELECT DISTINCT fid FROM preload WHERE fid NOT IN (SELECT fid FROM dont_pick)))")
+    query("""INSERT INTO dont_pick (fid, reason) 
+                SELECT DISTINCT fid, 'artist in preload' 
+                FROM file_artists 
+                WHERE aid IN (SELECT DISTINCT aid 
+                              FROM file_artists fa 
+                              WHERE fid IN (SELECT DISTINCT fid 
+                                            FROM preload 
+                                            WHERE fid NOT IN (SELECT fid 
+                                                              FROM dont_pick)
+                                           )
+                             )""")
     # for r in dont_pick:
     #    print "don't pick:",r
 
@@ -128,6 +167,118 @@ def populate_preload(uid=None, min_amount=0):
         global populate_locked
         populate_locked = False
         # populate_preload_for_uid(uid, min_amount)
+
+def fix_bad_scores(uid):
+    too_high = get_results_assoc("""SELECT * 
+                                    FROM user_song_info 
+                                    WHERE true_score > %s AND uid = %s 
+                                    LIMIT 1""",(MAX_TRUE_SCORE, uid))
+
+    if too_high:
+
+        q = pg_cur.mogrify("""UPDATE user_song_info 
+                              SET true_score = %s, score = %s, rating = %s,
+                                  percent_played = %s
+                              WHERE true_score > %s AND uid = %s""",
+                              (DEFAULT_TRUE_SCORE, DEFAULT_SCORE, DEFAULT_RATING,
+                               DEFAULT_PERCENT_PLAYED, MAX_TRUE_SCORE, uid))
+
+        print "q:",q
+        query(q)
+
+    
+def insert_missing_songs(uid):
+    m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (uid,))
+    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
+                SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
+                FROM files f 
+                WHERE f.fid NOT IN (%s)""" % (uid, DEFAULT_RATING, DEFAULT_SCORE, 
+                                              DEFAULT_PERCENT_PLAYED, 
+                                              DEFAULT_TRUE_SCORE, m)
+    query(q)
+
+def get_true_score_sample(uid, true_score):
+    return get_results_assoc("""SELECT u.fid, true_score, ultp 
+                                FROM user_song_info u, genres g, file_genres fg 
+                                     LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
+                                WHERE dp.fid IS NULL AND u.uid = %s AND 
+                                      u.fid = fg.fid AND 
+                                      g.enabled = true AND 
+                                      g.gid = fg.gid AND 
+                                      true_score >= %s 
+                                ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                                       ultp, random() 
+                                LIMIT 10""", (uid, true_score))
+
+def get_single_from_true_score(uid, true_score):
+    return get_assoc("""SELECT u.fid, true_score, ultp 
+                         FROM user_song_info u, genres g, file_genres fg 
+                              LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
+                         WHERE dp.fid IS NULL AND u.uid = %s AND 
+                               u.fid = fg.fid AND g.enabled = true AND 
+                               g.gid = fg.gid AND true_score >= %s 
+                         ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                                  ultp, random() 
+                         LIMIT 1""", 
+                         (uid, true_score))
+
+def make_true_scores_list():
+    scores = [0,10,20,30,40,50,60,70,80,90,100]
+
+    shuffle(scores)
+
+    true_scores = []
+
+    for true_score in scores:
+        iter_count = int(true_score * 0.1)
+        if iter_count <= 0:
+            iter_count = 1
+        for i in range(0, iter_count):
+            true_scores.append(true_score)
+
+    shuffle(true_scores)
+
+    return true_scores
+
+def insert_fid_into_preload(fid, uid, reason):
+    query("""INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)""",
+             (fid, uid, reason))
+
+def insert_artists_in_preload_into_dont_pick():
+    query("""INSERT INTO dont_pick (fid, reason) 
+             SELECT DISTINCT fid, 'artist in preload' 
+             FROM file_artists WHERE aid IN (SELECT DISTINCT aid 
+                                             FROM file_artists fa 
+                                             WHERE fid IN (SELECT DISTINCT fid 
+                                                           FROM preload))""")
+
+
+def get_random_unplayed_sample(uid):
+    return get_results_assoc("""SELECT u.fid, true_score, ultp 
+                                FROM user_song_info u, genres g, file_genres fg 
+                                     LEFT JOIN dont_pick dp ON 
+                                               dp.fid = fg.fid 
+                                WHERE dp.fid IS NULL AND u.uid = %s AND 
+                                      u.fid = fg.fid AND 
+                                      g.enabled = true AND 
+                                      g.gid = fg.gid 
+                                ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                                         ultp, 
+                                         random() 
+                                LIMIT 10""", 
+                                (uid,))
+
+def get_single_random_unplayed(uid):
+    return get_assoc("""SELECT u.fid, true_score, ultp 
+                        FROM user_song_info u, genres g, file_genres fg 
+                             LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
+                        WHERE dp.fid IS NULL AND u.uid = %s AND 
+                              u.fid = fg.fid AND g.enabled = true AND 
+                              g.gid = fg.gid 
+                        ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                                 ultp, random() 
+                        LIMIT 1""", 
+                        (uid,))
 
 
 def populate_preload_for_uid(uid, min_amount=0):
@@ -150,36 +301,11 @@ def populate_preload_for_uid(uid, min_amount=0):
     print "populate_preload_for_uid 3"
     populate_dont_pick()
     print "populate_preload_for_uid 4"
-
-    default_rating = 6
-    default_score = 5
-    default_percent_played = 50.0
-    default_true_score = ((default_rating * 2 * 10.0) + \
-                                    (default_score * 10.0) + \
-                                    (default_percent_played) / 3)
-
-    m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (uid,))
-    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
-                SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
-                FROM files f 
-                WHERE f.fid NOT IN (%s)""" % (uid, default_rating, default_score, 
-                                              default_percent_played, 
-                                              default_true_score, m)
-    query(q)
+    fix_bad_scores(uid)
     print "populate_preload_for_uid 5"
+    insert_missing_songs(uid)
 
-    scores = [0,10,20,30,40,50,60,70,80,90,100]
-
-    shuffle(scores)
-
-    true_scores = []
-
-    for true_score in scores:
-        iter_count = int(true_score * 0.1)
-        if iter_count <= 0:
-            iter_count = 1
-        for i in range(0, iter_count):
-            true_scores.append(true_score)
+    true_scores = make_true_scores_list()
 
     empty_scores = []
 
@@ -189,7 +315,8 @@ def populate_preload_for_uid(uid, min_amount=0):
             print "skipping empty score:", true_score
             continue
 
-        sample = get_results_assoc("SELECT u.fid, true_score, ultp FROM user_song_info u, genres g, file_genres fg LEFT JOIN dont_pick dp ON dp.fid = fg.fid WHERE dp.fid IS NULL AND u.uid = %s AND u.fid = fg.fid AND g.enabled = true AND g.gid = fg.gid AND true_score >= %s ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random() LIMIT 10", (uid, true_score))
+        sample = get_true_score_sample(uid, true_score)
+        
         if not sample:
             print "nothing for:",true_score
             empty_scores.append(true_score)
@@ -198,58 +325,98 @@ def populate_preload_for_uid(uid, min_amount=0):
         for f in sample:
             print "sample :",true_score, f
 
-        f = get_assoc("SELECT u.fid, true_score, ultp FROM user_song_info u, genres g, file_genres fg LEFT JOIN dont_pick dp ON dp.fid = fg.fid WHERE dp.fid IS NULL AND u.uid = %s AND u.fid = fg.fid AND g.enabled = true AND g.gid = fg.gid AND true_score >= %s ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random() LIMIT 1", (uid, true_score))
+        f = get_single_from_true_score(uid, true_score)
+
         if not f:
             print "nothing for:",true_score
             empty_scores.append(true_score)
             continue
         wait()
         print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(f['fid'],))
-        query("INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)",(f['fid'], uid, "true_score >= %s" % (true_score,)))
-        query("INSERT INTO dont_pick (fid, reason) SELECT DISTINCT fid, 'artist in preload' FROM file_artists WHERE aid IN (SELECT DISTINCT aid FROM file_artists fa WHERE fid IN (SELECT DISTINCT fid FROM preload))")
+        insert_fid_into_preload(f['fid'], uid, "true_score >= %s" % (true_score, ))
+        insert_artists_in_preload_into_dont_pick()
 
     for i in range(0,10):
-        sample = get_results_assoc("SELECT u.fid, true_score, ultp FROM user_song_info u, genres g, file_genres fg LEFT JOIN dont_pick dp ON dp.fid = fg.fid WHERE dp.fid IS NULL AND u.uid = %s AND u.fid = fg.fid AND g.enabled = true AND g.gid = fg.gid ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random() LIMIT 10", (uid,))
+        sample = get_random_unplayed_sample(uid)
 
         if not sample:
             break;
         for f in sample:
             print "sample2:", f
 
-        f = get_assoc("SELECT u.fid, true_score, ultp FROM user_song_info u, genres g, file_genres fg LEFT JOIN dont_pick dp ON dp.fid = fg.fid WHERE dp.fid IS NULL AND u.uid = %s AND u.fid = fg.fid AND g.enabled = true AND g.gid = fg.gid ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, ultp, random() LIMIT 1", (uid,))
+        f = get_single_random_unplayed(uid)
 
-        query("INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)",(f['fid'], uid, "random unplayed"))
-        query("INSERT INTO dont_pick (fid, reason) SELECT DISTINCT fid, 'artist in preload' FROM file_artists WHERE aid IN (SELECT DISTINCT aid FROM file_artists fa WHERE fid IN (SELECT DISTINCT fid FROM preload))")
+        insert_fid_into_preload(f['fid'], uid, "random unplayed")
+        insert_artists_in_preload_into_dont_pick()
 
-    preload = get_results_assoc("SELECT uid, basename FROM preload p, files f WHERE f.fid = p.fid ORDER BY basename")
+    preload = get_preload()
 
     for p in preload:
         print "p:",p
 
     populate_locked = False
 
-def get_song_from_preload():
-    query("DELETE FROM preload p WHERE uid NOT IN (SELECT uid FROM users WHERE listening = true)")
-    cue_for = get_assoc("SELECT uid, last_time_cued FROM users WHERE listening = true ORDER BY CASE WHEN last_time_cued IS NULL THEN 0 ELSE 1 END, last_time_cued LIMIT 1")
+def get_preload():
+    return get_results_assoc("""SELECT uid, basename 
+                                FROM preload p, files f 
+                                WHERE f.fid = p.fid 
+                                ORDER BY basename""")
 
+
+def remove_songs_in_preload_for_users_who_are_not_listening():
+    query("""DELETE FROM preload p WHERE uid NOT IN (SELECT uid 
+                                                     FROM users 
+                                                     WHERE listening = true)""")
+
+def get_cue_for():
+    return get_assoc("""SELECT uid, last_time_cued 
+                        FROM users 
+                        WHERE listening = true 
+                        ORDER BY CASE WHEN last_time_cued IS NULL THEN 0 ELSE 1 END, 
+                                 last_time_cued 
+                        LIMIT 1""")
+
+def set_last_time_cued(uid):
+    query("""UPDATE users SET last_time_cued = NOW() WHERE uid = %s""",
+             (uid,))
+
+def get_single_from_preload(uid=None):
+    if uid:
+        return get_assoc("""SELECT * 
+                            FROM preload p, files f 
+                            WHERE f.fid = p.fid AND uid = %s 
+                            ORDER BY random() LIMIT 1""", 
+                            (uid,))
+
+    return get_assoc("""SELECT * 
+                        FROM preload p, files f 
+                        WHERE f.fid = p.fid 
+                        ORDER BY random() 
+                        LIMIT 1""")
+
+def remove_fid_from_preload(fid):
+    query("DELETE FROM preload WHERE fid = %s",(fid,))
+
+def get_song_from_preload():
+    remove_songs_in_preload_for_users_who_are_not_listening()
+    cue_for = get_cue_for()
     if cue_for:
-        f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid AND uid = %s ORDER BY random() LIMIT 1", (cue_for['uid'],))
-        query("UPDATE users SET last_time_cued = NOW() WHERE uid = %s",(cue_for['uid'],))
+        set_last_time_cued(cue_for['uid'])
+        f = get_single_from_preload(cue_for['uid'])
         if not f:
             populate_preload(cue_for['uid'])
-            f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid AND uid = %s ORDER BY random() LIMIT 1", (cue_for['uid'],))
+            f = get_single_from_preload(cue_for['uid'])
             if not f:
-                f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid ORDER BY random() LIMIT 1")
-
+                f = get_single_from_preload()
     else:
-        f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid ORDER BY random() LIMIT 1")
-    
+        f = get_single_from_preload()
+
     if not f:
         populate_preload()
-        f = get_assoc("SELECT * FROM preload p, files f WHERE f.fid = p.fid ORDER BY random() LIMIT 1")
+        f = get_single_from_preload()
 
     if f:
-        query("DELETE FROM preload WHERE fid = %s",(f['fid'],))
+        remove_fid_from_preload(f['fid'])
 
     return f
 

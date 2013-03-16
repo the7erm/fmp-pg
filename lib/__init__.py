@@ -96,3 +96,11 @@ def query(query, args=None):
     pg_conn.commit()
     return cur
 
+DEFAULT_RATING = 6
+DEFAULT_SCORE = 5
+DEFAULT_PERCENT_PLAYED = 50.0
+DEFAULT_TRUE_SCORE = (((DEFAULT_RATING * 2 * 10.0) + (DEFAULT_SCORE * 10.0) + 
+                        DEFAULT_PERCENT_PLAYED) / 3)
+
+MAX_TRUE_SCORE = (((6 * 2 * 10.0) + (6 * 10.0) + 
+                    100.0) / 3)
