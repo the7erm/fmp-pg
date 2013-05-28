@@ -42,7 +42,7 @@ from lib.netcast_fobj import is_netcast
 
 from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
-import flask_server
+
 from ConfigParser import NoSectionError
 
 class DbusWatcher(dbus.service.Object):
@@ -413,6 +413,11 @@ def quit(*args, **kwargs):
     except:
         pass
     gtk.main_quit()
+
+import flask_server
+flask_server.get_results_assoc = get_results_assoc
+flask_server.get_assoc = get_assoc
+flask_server.pg_cur = pg_cur
 
 global history, playing, idx, last_percent_played, last_percent_played_decimal
 

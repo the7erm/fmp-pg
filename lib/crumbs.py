@@ -17,7 +17,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-import gtk, gobject,sys, random
+import gtk, gobject, sys, random
 
 class Crumbs(gtk.VBox):
     def __init__(self, target_width = 600):

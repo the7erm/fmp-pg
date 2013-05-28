@@ -46,11 +46,11 @@ def set_rating():
             icon.set_visible(False)
             rating_icon.set_visible(True)
             icon.set_visible(True)
-        print "PLAYING:",playing
+        # print "PLAYING:",playing
         r = playing.get_selected()
         if r:
             # print "R:",r
-            rating_icon.set_from_file(image_path+"rate.%s.svg" % r['rating'])
+            rating_icon.set_from_file(image_path+"rate.%s.svg.png" % r['rating'])
         rating_icon.set_tooltip(playing.get_artist_title())
         icon.set_tooltip(playing.get_artist_title())
         song_info.show()
@@ -156,6 +156,8 @@ if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
 if os.path.exists(sys.path[0]+"/../images/angry-square.jpg"):
     image_path = sys.path[0]+"/../images/"
 
+print "image_path:",image_path
+
 rating_icon = gtk.StatusIcon()
 rating_icon.set_name("fmp-rater")
 rating_icon.set_title("fmp-rater")
@@ -180,13 +182,17 @@ rating_menu = gtk.Menu()
 for i, r in enumerate(range(5,-1,-1)):
     rating_menu_items.append(gtk.ImageMenuItem("Rate %s" % r))
     rating_menu.append(rating_menu_items[i])
-    rating_images.append(gtk.image_new_from_file(image_path+"rate.%s.svg" % r))
+    image_filename = image_path+"rate.%s.svg.png" % r
+    if not os.path.exists(image_filename):
+        print "MISSING:",image_filename
+    print "image_filename:", image_filename
+    rating_images.append(gtk.image_new_from_file(image_filename))
     rating_images[i].set_pixel_size(gtk.ICON_SIZE_MENU)
     rating_menu_items[i].set_image(rating_images[i])
-    rating_menu_items[i].connect("activate",on_rate,r)
+    rating_menu_items[i].connect("activate", on_rate, r)
 
 rating_menu.show_all()
-rating_icon.set_from_file(image_path+"rate.6.svg")
+rating_icon.set_from_file(image_path+"rate.6.svg.png")
 
 menu = gtk.Menu()
 

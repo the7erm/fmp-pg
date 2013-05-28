@@ -1,25 +1,69 @@
+#!/usr/bin/env python
+# lib/flask_server.py -- flask server
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
 from __init__ import *
 from flask import Flask
 from flask import request
 from flask import redirect
 from flask import session
 from flask import jsonify
+
+import datetime
 import random
 import time
 import hashlib
 import json
 import socket
 import alsaaudio
+import logging
+import re
 
 from player import PLAYING
 
 import threading
+import time
 
 from flask import render_template
+
+from tornado.wsgi import WSGIContainer
+from tornado.ioloop import IOLoop
+from tornado.web import FallbackHandler, RequestHandler, Application
+
+# from flasky import app
+
+class MainHandler(RequestHandler):
+  def get(self):
+    self.write("This message comes from Tornado ^_^")
 
 threads = []
 
 app = Flask(__name__)
+app.debug = True
+
+tr = WSGIContainer(app)
+
+application = Application([
+    (r"/tornado", MainHandler),
+    (r".*", FallbackHandler, dict(fallback=tr)),
+])
+
+
 
 @app.route("/")
 def index():
@@ -77,6 +121,80 @@ def get_volume():
             continue
     return -1;
 
+def prase_words(q, filter_by="all"):
+    q = "%s" % q
+    words = q.split()
+    querys = []
+
+    word_template = """
+        LOWER(a.artist) SIMILAR TO %s OR
+        LOWER(g.genre) SIMILAR TO %s OR
+        LOWER(f.basename) SIMILAR TO %s OR
+        LOWER(al.album_name) SIMILAR TO %s
+    """
+    
+    dot_template = """
+        a.artist ILIKE %s OR
+        g.genre ILIKE %s OR
+        f.basename ILIKE %s OR
+        al.album_name ILIKE %s
+    """
+
+    non_word = re.compile(r"[\W]")
+    for w in words:
+        if not w:
+            continue
+        w = w.lower()
+        template = word_template
+        if non_word.search(w):
+            template = dot_template
+            w = "%%%s%%" % w
+        else:
+            w = "%%[[:<:]]%s[[:>:]]%%" % w
+
+        querys.append(pg_cur.mogrify(template, (w,w,w,w)))
+
+    if querys:
+        if filter_by == "any":
+            query = "(%s)" % (") OR (".join(querys))
+        else:
+            query = "(%s)" % (") AND (".join(querys))
+        return query
+    return ""
+
+        
+
+def get_results(q="", start=0, filter_by="all"):
+    start = int(start)
+    query = """SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
+                               album_name
+                   FROM files f 
+                        LEFT JOIN file_artists fa ON f.fid = fa.fid 
+                        LEFT JOIN artists a ON a.aid = fa.aid 
+                        LEFT JOIN file_genres fg ON fg.fid = f.fid 
+                        LEFT JOIN genres g ON g.gid = fg.gid 
+                        LEFT JOIN preload p ON p.fid = f.fid
+                        LEFT JOIN album_files af ON af.fid = f.fid
+                        LEFT JOIN albums al ON al.alid = af.alid,
+                    %s
+                    ORDER BY artist, album_name, basename, genre
+        """
+    words = prase_words(q,filter_by=filter_by)
+    where = ""
+    if words:
+        where = "WHERE %s" % words
+
+    query = query % (where,)
+    query = "%s LIMIT 1000 OFFSET %s" % (query, start)
+    print "QUERY:%s" % query
+    results = []
+    for r in get_results_assoc(query):
+        # f = fobj.get_fobj(**r)
+        #fd = f.to_dict()
+        # fd.cued = r.cued
+        results.append(dict(r))
+    return results
+
 
 def set_volume(vol):
     cards = alsaaudio.cards()
@@ -111,6 +229,57 @@ def set_volume(vol):
         except alsaaudio.ALSAAudioError:
             continue
 
+"""
+                 List of relations
+ Schema |           Name           | Type  | Owner 
+--------+--------------------------+-------+-------
+ public | album_files              | table | erm
+ public | albums                   | table | erm
+ public | artists                  | table | erm
+ public | dont_pick                | table | erm
+ public | file_artists             | table | erm
+ public | file_genres              | table | erm
+ public | files                    | table | erm
+ public | genres                   | table | erm
+ public | netcast_episodes         | table | erm
+ public | netcast_listend_episodes | table | erm
+ public | netcast_subscribers      | table | erm
+ public | netcasts                 | table | erm
+ public | preload                  | table | erm
+ public | tags_binary              | table | erm
+ public | tags_text                | table | erm
+ public | user_artist_history      | table | erm
+ public | user_artist_info         | table | erm
+ public | user_history             | table | erm
+ public | user_song_info           | table | erm
+ public | users                    | table | erm
+(20 rows)
+"""
+
+@app.route('/search', methods=['GET', 'POST'])
+def search():
+    results = None
+    q = request.args.get("q","")
+    filter_by = "%s" % request.args.get("f","all")
+    if filter_by == "any":
+        filter_by = "any"
+    else:
+        filter_by = "all"
+    start = "%s" % request.args.get("s","0")
+    start_time = time.time()
+    print "start:",start_time
+    results = get_results(q, start=start, filter_by=filter_by)
+    print "end:", time.time() - start_time
+
+    if not request.args.get("ajax",False):
+        return render_template("search.html", playing=playing, PLAYING=PLAYING,
+                               results=results, q=request.args.get("q",""),
+                               filter_by=filter_by)
+    
+    return jsonify(player=player.to_dict(), playing=playing.to_dict(),
+                   results=results, q=request.args.get("q",""))
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -131,7 +300,10 @@ def worker(*args, **kwargs):
     print 'WORKER, args:',args, kwargs
     while True:
         try:
-            app.run(debug=False, host='0.0.0.0', port=5050)
+            # app.run(debug=False, host='0.0.0.0', port=5050)
+            app.debug = True
+            application.listen(5050)
+            IOLoop.instance().start()
         except socket.error, e:
             print "##########################################"
             print "socket.error:",e

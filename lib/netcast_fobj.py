@@ -714,7 +714,9 @@ if __name__ == "__main__":
         'http://leo.am/podcasts/twit',
         'http://leo.am/podcasts/tri',
         "http://www.oneplace.com/ministries/thru-the-bible-with-j-vernon-mcgee/subscribe/podcast.xml",
-        "http://revision3.com/tekzilla/feed/MP4-Large?subshow=false"
+        "http://revision3.com/tekzilla/feed/MP4-Large?subshow=false",
+        "http://youarenotsosmart.libsyn.com/rss",
+        "http://feeds.feedburner.com/itsathing/cCoG?format=xml"
     ]
 
     for url in feeds:

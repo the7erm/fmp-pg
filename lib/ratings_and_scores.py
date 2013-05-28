@@ -317,8 +317,8 @@ class RatingsAndScores:
                         listeners.refresh()
 
     def check_recently_played(self, recently_played=None):
-        print "****************************"
-        print "RatingsAndScores:check_recently_played()"
+        # print "****************************"
+        # print "RatingsAndScores:check_recently_played()"
         if not recently_played:
             recently_played = fobj.recently_played(1)
         if not recently_played:
@@ -330,7 +330,7 @@ class RatingsAndScores:
         # print "INITAL F:",f
         today = date.today()
         if today.isoformat() == f['date_played'].isoformat():
-            print today.isoformat(),"==",f['date_played'].isoformat()
+            # print today.isoformat(),"==",f['date_played'].isoformat()
             return
         print "******* DELETEING OLD RECORD DATE CHANGED *******"
         query("""DELETE FROM user_history 
@@ -342,7 +342,7 @@ class RatingsAndScores:
         global listeners
         if not self.listening or not listeners.listeners:
             return
-        print "UPDATE HISTORY"
+        # print "UPDATE HISTORY"
         self.check_recently_played()
 
         updated = get_results_assoc("""UPDATE user_history uh 

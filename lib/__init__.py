@@ -104,3 +104,5 @@ DEFAULT_TRUE_SCORE = (((DEFAULT_RATING * 2 * 10.0) + (DEFAULT_SCORE * 10.0) +
 
 MAX_TRUE_SCORE = (((6 * 2 * 10.0) + (6 * 10.0) + 
                     100.0) / 3)
+
+print "IMPORTED __init__"

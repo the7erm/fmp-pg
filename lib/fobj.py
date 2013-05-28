@@ -18,7 +18,6 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from __init__ import *
 import os
 import time
 import datetime
@@ -196,6 +195,7 @@ class FObj:
             "ratings":ratings
         }
 
+from __init__ import *
 import netcast_fobj
 import local_file_fobj
 import generic_fobj

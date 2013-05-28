@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# lib/history_dialog.py -- Display files in preload
+# lib/history_dialog.py -- Display files in history
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -371,3 +371,4 @@ if __name__ == '__main__':
     skel.populate_liststore()
     gobject.timeout_add(5000, skel.refresh_data, ("uhid"))
     gtk.main()
+    
