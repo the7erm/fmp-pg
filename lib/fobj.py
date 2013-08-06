@@ -143,7 +143,7 @@ class FObj:
             if not os.path.exists(self.filename):
                 self.exists = False
                 return -1
-            print "self.filename:",self.filename
+            # print "self.filename:",self.filename
             try:
                 t = os.path.getmtime(self.filename)
             except OSError:
@@ -160,7 +160,7 @@ class FObj:
         if hasattr(self, 'db_info'):
             if self.db_info.has_key(key):
                 return self.db_info[key]
-        print "__getitem__",key
+        # print "__getitem__",key
         return getattr(self, key)
 
     def get_artist_title(self):
@@ -263,15 +263,24 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
     return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
                                      filename=filename, **kwargs)
 
-def recently_played(limit=10):
-    return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, percent_played,
-                                               time_played, date_played
-                                FROM user_history uh, users u
-                                WHERE u.uid = uh.uid AND u.uid IN (
+def recently_played(limit=10, uid=None):
+    if uid is None:
+        return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, 
+                                                    percent_played, time_played, 
+                                                    date_played
+                                    FROM user_history uh, users u
+                                    WHERE u.uid = uh.uid AND u.uid IN (
                                         SELECT uid FROM users 
                                         WHERE listening = true)
+                                    ORDER BY time_played DESC
+                                    LIMIT %d""" % limit)
+    uid = int(uid)
+    return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, percent_played,
+                                                time_played, date_played
+                                FROM user_history uh, users u
+                                WHERE u.uid = uh.uid AND u.uid = %s
                                 ORDER BY time_played DESC
-                                LIMIT %d""" % limit)
+                                LIMIT %d""" % (uid, limit))
 
 def recently_played_fobjs(limit=10, silent=False):
     recent = recently_played(limit)
@@ -288,5 +297,5 @@ if __name__ == '__main__':
     for arg in sys.argv[1:]:
         obj = get_fobj(filename=arg)
         print obj
-        print "filename:",obj.filename
+        print "filename:", obj.filename
 

@@ -119,8 +119,8 @@ class Local_File(fobj.FObj):
         self.can_rate = True
         self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
                                                    listening=True)
-        if not silent:
-            print "RatingsAndScores:",self.ratings_and_scores
+        #if not silent:
+        #    print "RatingsAndScores:",self.ratings_and_scores
 
         ok_to_hash = True
 
@@ -171,12 +171,12 @@ class Local_File(fobj.FObj):
         return h.hexdigest()
         
 
-    def check_recently_played(self):
+    def check_recently_played(self, uid=None):
         print "****************************"
         print "Local_File:check_recently_played()"
-        self.ratings_and_scores.check_recently_played()
+        self.ratings_and_scores.check_recently_played(uid=None)
         for d in self.dups:
-            d.ratings_and_scores.check_recently_played()
+            d.ratings_and_scores.check_recently_played(uid=None)
 
     def mark_as_played(self, percent_played=0):
         ceil_percent_played = math.ceil(percent_played)

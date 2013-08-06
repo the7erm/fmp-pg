@@ -38,6 +38,7 @@ def more_info(n, action, fid):
 
 
 def playing(file_info):
+    return
     print "file_info:",file_info
     
     msg = ""

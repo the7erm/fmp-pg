@@ -99,6 +99,7 @@ class RatingsAndScores:
                                                        selected = true)
                                            RETURNING *""",
                                            (rating, rating, self.fid,))
+            self.calculate_true_score()
             
 
         if uid is not None:
@@ -111,6 +112,7 @@ class RatingsAndScores:
                                            WHERE fid = %s AND 
                                                  uid = %s RETURNING *""", 
                                            (rating, rating, self.fid, uid))
+            self.calculate_true_score_for_uid(uid)
 
         if uname is not None:
             updated = get_results_assoc("""UPDATE user_song_info 
@@ -176,6 +178,23 @@ class RatingsAndScores:
     def inc_score(self):
         if self.listening:
             self.inc_listeners_scores()
+
+    def inc_score_for_uid(self, uid=None, percent_played=100):
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score + 1 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
+        updated = get_results_assoc("""UPDATE user_song_info 
+                                       SET score = 10 
+                                       WHERE fid = %s AND score > 10 AND 
+                                             uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
+        self.calculate_true_score_for_uid(uid)
+        self.update_history_for_uid(uid, percent_played)
         
     def inc_listeners_scores(self):
         updated = get_results_assoc("""UPDATE user_song_info
@@ -201,7 +220,8 @@ class RatingsAndScores:
         self.update(updated)
         self.calculate_true_score()
         self.update_history(self.last_percent_played)
-        
+
+
 
     def deinc_score(self):
         if self.listening:
@@ -232,6 +252,23 @@ class RatingsAndScores:
         self.calculate_true_score()
         self.update_history(self.last_percent_played)
 
+    def deinc_score_for_uid(self, uid=None, percent_played=0):
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score - 1 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
+        updated = get_results_assoc("""UPDATE user_song_info 
+                                       SET score = 1
+                                       WHERE fid = %s AND score <= 0 AND 
+                                             uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
+        self.calculate_true_score_for_uid(uid)
+        self.update_history_for_uid(uid, percent_played)
+
     def calculate_true_score(self):
         global listeners
         if not listeners.listeners or not self.listening:
@@ -246,7 +283,17 @@ class RatingsAndScores:
                  (self.fid,))
         self.update(updated)
 
-    def mark_as_played(self,percent_played=0):
+    def calculate_true_score_for_uid(self, uid):
+        updated = get_results_assoc(
+            """UPDATE user_song_info 
+               SET true_score = (((rating * 2 * 10.0) + (score * 10.0) + 
+                                   percent_played) / 3) 
+               WHERE fid = %s AND uid = %s
+               RETURNING *""",
+               (self.fid, uid))
+        self.update(updated)
+
+    def mark_as_played(self, percent_played=0):
         updated = get_results_assoc("""UPDATE user_song_info 
                                        SET ultp = NOW(), percent_played = %s 
                                        WHERE fid = %s AND uid IN (
@@ -268,6 +315,46 @@ class RatingsAndScores:
 
             self.last_percent_played = ceil_percent_played
 
+    def mark_as_played_for_uid(self, uid=None, percent_played=0, when=None):
+        if when is None:
+          when = datetime.datetime.now()
+
+        updated = get_results_assoc("""UPDATE user_song_info 
+                                       SET ultp = %s, percent_played = %s 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""",
+                                       (when, percent_played, self.fid, uid))
+        self.update(updated)
+        self.calculate_true_score_for_uid(uid)
+        ceil_percent_played = math.ceil(percent_played)
+        if self.last_percent_played != ceil_percent_played:
+            if listeners.recheck_listeners:
+                self.update_user_artists_ltp_for_uid(uid, when)
+                self.update_history_for_uid(uid, percent_played)
+
+            self.last_percent_played = ceil_percent_played
+
+    def update_user_artists_ltp_for_uid(self, uid=None, when=None):
+        t = when.time()
+        d = when.date()
+        print "D:%s T:%s" % (d, t)
+        updated_artists = get_results_assoc("""UPDATE user_artist_history uah 
+                                               SET time_played = %s, 
+                                                   date_played = %s 
+                                               FROM user_song_info usi, 
+                                                    file_artists fa 
+                                               WHERE usi.uid = %s AND 
+                                                     fa.fid = usi.fid AND 
+                                                     uah.uid = usi.uid AND 
+                                                     uah.aid = fa.aid AND 
+                                                     usi.fid = %s AND 
+                                                     uah.date_played = current_date 
+                                               RETURNING uah.*""",
+                                               (when, 
+                                                when, 
+                                                uid, self.fid,))
+        self.process_updated_artists(updated_artists, [{"uid": uid}])
+
     def update_user_artists_ltp(self):
         if not self.listening or not listeners.listeners:
             return
@@ -288,7 +375,9 @@ class RatingsAndScores:
                                                      uah.date_played = current_date 
                                                RETURNING uah.*""",
                                                (self.fid,))
+        self.process_updated_artists(updated_artists, listeners.listeners)
 
+    def process_updated_artists(self, updated_artists, uids):
         # pp.pprint(updated_artists)
         update_association = {}
 
@@ -297,7 +386,7 @@ class RatingsAndScores:
             update_association[key] = ua
 
         # pp.pprint(update_association)
-        for l in listeners.listeners:
+        for l in uids:
             found = False 
             for a in self.artists:
                 key = "%s-%s" % (a['aid'], l['uid'])
@@ -316,15 +405,15 @@ class RatingsAndScores:
                         print "(artist) psycopg2.IntegrityError:",err
                         listeners.refresh()
 
-    def check_recently_played(self, recently_played=None):
+    def check_recently_played(self, recently_played=None, uid=None):
         # print "****************************"
         # print "RatingsAndScores:check_recently_played()"
         if not recently_played:
-            recently_played = fobj.recently_played(1)
+            recently_played = fobj.recently_played(1, uid)
         if not recently_played:
             return
         f = dict(recently_played[0])
-        if not f.has_key('id_type') or not f.has_key('id') or \
+        if not 'id_type' not in f.keys() or not 'id' not in f.keys() or \
            f['id_type'] != 'f' or f['id'] != self.fid:
             return
         # print "INITAL F:",f
@@ -333,10 +422,37 @@ class RatingsAndScores:
             # print today.isoformat(),"==",f['date_played'].isoformat()
             return
         print "******* DELETEING OLD RECORD DATE CHANGED *******"
-        query("""DELETE FROM user_history 
-                 WHERE uid IN (SELECT uid FROM users WHERE listening = true) AND
-                       id_type = 'f' AND id = %s AND date_played = %s""", 
-                 (self.fid, f['date_played'].isoformat()))
+        if uid is None:
+            query("""DELETE FROM user_history 
+                     WHERE uid IN (SELECT uid FROM users WHERE listening = true) AND
+                           id_type = 'f' AND id = %s AND date_played = %s""", 
+                     (self.fid, f['date_played'].isoformat()))
+        else:
+            query("""DELETE FROM user_history 
+                     WHERE uid = %s AND
+                           id_type = 'f' AND id = %s AND date_played = %s""", 
+                     (uid, self.fid, f['date_played'].isoformat()))
+
+    def update_history_for_uid(self, uid=None, percent_played=0):
+        self.check_recently_played(uid=uid)
+        updated = get_results_assoc("""UPDATE user_history uh 
+                                       SET true_score = ufi.true_score, 
+                                           score = ufi.score, 
+                                           rating = ufi.rating, 
+                                           percent_played = ufi.percent_played, 
+                                           time_played = NOW(), 
+                                           date_played = current_date 
+                                       FROM user_song_info ufi 
+                                       WHERE 
+                                            ufi.uid = %s AND 
+                                            uh.uid = ufi.uid AND 
+                                            ufi.fid = uh.id AND 
+                                            uh.id_type = 'f' AND 
+                                            uh.date_played = DATE(ufi.ultp) AND 
+                                            uh.id = %s 
+                                       RETURNING uh.*""",
+                                       (uid, self.fid,))
+        self.process_updated_history(updated, [{"uid": uid}], percent_played)
 
     def update_history(self, percent_played=0):
         global listeners
@@ -364,8 +480,11 @@ class RatingsAndScores:
                                             uh.id = %s 
                                        RETURNING uh.*""",
                                        (self.fid,))
+        self.process_updated_history(updated, listeners.listeners, percent_played)
+        self.update(updated)
 
-        for l in listeners.listeners:
+    def process_updated_history(self, updated, uids, percent_played):
+        for l in uids:
             found = False
             for u in updated:
                 if u['uid'] == l['uid']:
@@ -408,8 +527,6 @@ class RatingsAndScores:
                     query("COMMIT;")
                     print "(file) psycopg2.IntegrityError:",err
                     listeners.refresh()
-
-        self.update(updated)
 
     def get_selected(self):
         self.check_for_rating_info()

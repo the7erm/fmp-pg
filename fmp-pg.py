@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # fmp-pg.py -- main file.
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -34,6 +34,8 @@ import dbus
 import dbus.service
 import alsaaudio
 import datetime
+import time
+import setproctitle
 
 import urllib
 import lib.fobj as fobj
@@ -44,6 +46,8 @@ from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
 
 from ConfigParser import NoSectionError
+
+setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):
@@ -124,31 +128,44 @@ do the same thing.
 """
 
 DBusGMainLoop(set_as_default=True)
-
+print os.environ
 try:
     bus = dbus.SessionBus()
     server = bus.get_object('org.mpris.MediaPlayer2', '/fmp')
     exit = True
-
-    for i, arg in enumerate(sys.argv[1:]):
+    args = sys.argv[1:]
+    for i, arg in enumerate(args):
         print "ARG:",arg
         if arg in ('-h','-help','--help'):
             print usage
             sys.exit()
 
+        if arg in ("--rate","-r","-rate"):
+            rating = args[i+1]
+            uid = "0"
+            for i2, arg2 in enumerate(args):
+                if arg2 in ('-u','--uid'):
+                    uid = args[i2+1]
+                    break
+            urllib.urlopen("http://localhost:5050/?cmd=rate&uid=%s&value=%s" % (uid, rating), proxies={})
+            continue
+
         if arg in ("-n","--next","-next"):
             # print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
-            urllib.urlopen("http://localhost:5050/?cmd=next")
+            print "NEXT"
+            urllib.urlopen("http://localhost:5050/?cmd=next", proxies={})
+            time.sleep(1)
             continue
 
         if arg in ("-b","--prev","-prev", "--back","-back"):
             # print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
-            urllib.urlopen("http://localhost:5050/?cmd=prev")
+            urllib.urlopen("http://localhost:5050/?cmd=prev", proxies={})
             continue
 
         if arg in ("-p","--pause","-pause", "--play","-play"):
+            print "PAUSE"
             # print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
-            urllib.urlopen("http://localhost:5050/?cmd=pause")
+            urllib.urlopen("http://localhost:5050/?cmd=pause", proxies={})
             continue
 
         if arg in ("-k","--kill","-kill"):
@@ -161,7 +178,7 @@ try:
             continue
 
         if arg in ("-s","--seek","-seek"):
-            print server.seek(argv[i+1], 
+            print server.seek(args[i+1], 
                               dbus_interface = 'org.mpris.MediaPlayer2')
             continue
 
