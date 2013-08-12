@@ -146,9 +146,13 @@ def on_toggle_cue_netcasts(item,*args):
     cue_netcasts = "%s" % item.get_active()
     cue_netcasts = cue_netcasts.lower()
     print "on_toggle_cue_netcasts:", 
-    with open(config_file, 'wb') as configfile:
-        cfg.set('Netcasts', 'cue', cue_netcasts)
-        cfg.write(configfile)
+    cfg.set('Netcasts', 'cue', cue_netcasts, bool)
+
+def on_toggle_bedtime_mode(item, *args):
+    bedtime = "%s" % item.get_active()
+    bedtime = bedtime.lower()
+    print "on_toggle_bedtime:", bedtime
+    cfg.set('Misc', 'bedtime_mode', bedtime, bool)
 
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
     image_path = sys.path[0]+"/images/"
@@ -242,6 +246,9 @@ menu.append(preload)
 cue_netcasts_item = gtk.CheckMenuItem("Cue Netcasts")
 menu.append(cue_netcasts_item)
 
+bedtime_mode_item = gtk.CheckMenuItem("Bedtime Mode")
+menu.append(bedtime_mode_item)
+
 quit = gtk.ImageMenuItem("Quit")
 img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
 quit.set_image(img)
@@ -253,19 +260,15 @@ song_info.connect("activate", on_activate_file_info)
 history_info.connect("activate", on_activate_history)
 listeners.connect("activate", on_activate_listeners)
 genres.connect("activate", on_activate_genres)
-preload.connect("activate",on_activate_preload)
-cue_netcasts_item.connect("toggled",on_toggle_cue_netcasts,())
+preload.connect("activate", on_activate_preload)
+cue_netcasts_item.connect("toggled", on_toggle_cue_netcasts, ())
+bedtime_mode_item.connect("toggled", on_toggle_bedtime_mode, ())
 
-try:
-    cue_netcasts = cfg.getboolean('Netcasts','cue')
-except NoSectionError:
-    cfg.add_section('Netcasts')
-    cue_netcasts = False
-    with open(config_file, 'wb') as configfile:
-        cfg.set('Netcasts', 'cue', "false")
-        cfg.write(configfile)
-finally:
-    cue_netcasts_item.set_active(cue_netcasts)
+cue_netcasts = cfg.get('Netcasts', 'cue', False, bool)
+cue_netcasts_item.set_active(cue_netcasts)
+
+bedtime_mode = cfg.get("Misc", "bedtime_mode", False, bool)
+bedtime_mode_item.set_active(bedtime_mode)
 
 if __name__ == "__main__":
     def toggle_pause(item):

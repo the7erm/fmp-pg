@@ -27,6 +27,26 @@ import gc
 import time
 import random
 import hashlib
+import cfg_wrapper
+
+DEFAULTS = {
+    "Netcasts": {
+        "cue": False,
+    },
+    "password_salt": {
+        "salt" : "",
+    },
+    "Misc": {
+        "bedtime_mode": False
+    },
+    "postgres" : {
+        "host": "127.0.0.1",
+        "port": "5432",
+        "username": "",
+        "password": "",
+        "database": "fmp"
+    },
+}
 
 pp = pprint.PrettyPrinter(depth=6)
 sys.path.append(sys.path[0]+'/lib/')
@@ -37,41 +57,24 @@ config_file = config_dir+"/config"
 cache_dir = config_dir+"/cache"
 
 if not os.path.isdir(config_dir):
-	os.mkdir(config_dir,0775)
+	os.mkdir(config_dir, 0775)
 
 if not os.path.isdir(cache_dir):
-	os.mkdir(cache_dir,0775)
+	os.mkdir(cache_dir, 0775)
 
-cfg = ConfigParser.ConfigParser()
-cfg.read(config_file)
+cfg = cfg_wrapper.ConfigWrapper(config_file, DEFAULTS)
 
-def create_salt(cfg, config_file):
-    random_string = "%s%s" % (random.random(),time.time())
+def create_salt():
+    random_string = "%s%s" % (random.random(), time.time())
     salt = hashlib.sha256(random_string).hexdigest()
-    try:
-        cfg.add_section('password_salt')
-    except ConfigParser.DuplicateSectionError:
-        pass
-    cfg.set("password_salt","salt",salt)
-    with open(config_file, 'w') as fp:
-        cfg.write(fp)
-        fp.flush()
     return salt
 
 pg_conn = psycopg2.connect("dbname=%s user=%s password=%s host=%s" % (
-                            cfg.get('postgres','database'), 
-                            cfg.get('postgres','username'), 
-                            cfg.get('postgres','password'), 
-                            cfg.get('postgres','host')))
-
-try:
-    salt = cfg.get('password_salt','salt')
-except ConfigParser.NoSectionError:
-    salt = create_salt(cfg, config_file)
-
-if not salt:
-    salt = create_salt(cfg, config_file)
-
+                            cfg.get('postgres','database', 'fmp', str), 
+                            cfg.get('postgres','username', '', str), 
+                            cfg.get('postgres','password', '', str), 
+                            cfg.get('postgres','host', '127.0.0.1', str)))
+salt = cfg.get('password_salt', 'salt', create_salt(), str)
 
 pg_cur = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -96,9 +99,9 @@ def query(query, args=None):
     pg_conn.commit()
     return cur
 
-DEFAULT_RATING = 6
-DEFAULT_SCORE = 5
-DEFAULT_PERCENT_PLAYED = 50.0
+DEFAULT_RATING = cfg.get('Defaults', 'rating', 6, int)
+DEFAULT_SCORE = cfg.get('Defaults', 'score', 5, int)
+DEFAULT_PERCENT_PLAYED = cfg.get('Defaults', 'percent_played', 50.0, float)
 DEFAULT_TRUE_SCORE = (((DEFAULT_RATING * 2 * 10.0) + (DEFAULT_SCORE * 10.0) + 
                         DEFAULT_PERCENT_PLAYED) / 3)
 

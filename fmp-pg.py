@@ -298,19 +298,15 @@ def on_prev_clicked(item):
     start_playing("deinc")
 
 def get_cue_netcasts():
-    cfg = ConfigParser.ConfigParser()
-    cfg.read(config_file)
-    try:
-        cue_netcasts = cfg.getboolean('Netcasts','cue')
-        print "cue_netcasts:",cue_netcasts
-    except NoSectionError:
-        cfg.add_section('Netcasts')
-        cue_netcasts = 0
-        with open(config_file, 'wb') as configfile:
-            cfg.set('Netcasts', 'cue', "false")
-            cfg.write(configfile)
-
+    cue_netcasts = cfg.get('Netcasts', 'cue', False, bool)
+    print "CUE_NETCASTS:",cue_netcasts
     return cue_netcasts
+
+
+def get_bedtime_mode():
+    bedtime_mode = cfg.get('Misc', 'bedtime_mode', False, bool)
+    print "BEDTIME_MODE:", bedtime_mode
+    return bedtime_mode
 
 
 def append_file():
