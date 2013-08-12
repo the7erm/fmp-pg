@@ -99,7 +99,7 @@ class RatingsAndScores:
                                                        selected = true)
                                            RETURNING *""",
                                            (rating, rating, self.fid,))
-            self.calculate_true_score()
+            self.calculate_true_score(True)
             
 
         if uid is not None:
@@ -112,7 +112,7 @@ class RatingsAndScores:
                                            WHERE fid = %s AND 
                                                  uid = %s RETURNING *""", 
                                            (rating, rating, self.fid, uid))
-            self.calculate_true_score_for_uid(uid)
+            self.calculate_true_score_for_uid(uid, True)
 
         if uname is not None:
             updated = get_results_assoc("""UPDATE user_song_info 
@@ -180,13 +180,14 @@ class RatingsAndScores:
             self.inc_listeners_scores()
 
     def inc_score_for_uid(self, uid=None, percent_played=100):
-        if not self.get_bedtime_mode():
-            updated = get_results_assoc("""UPDATE user_song_info
-                                           SET ultp = NOW(), score = score + 1 
-                                           WHERE fid = %s AND uid = %s
-                                           RETURNING *""", 
-                                           (uid, self.fid,))
-            self.update(updated)
+        if self.get_bedtime_mode():
+            return
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score + 1 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
         updated = get_results_assoc("""UPDATE user_song_info 
                                        SET score = 10 
                                        WHERE fid = %s AND score > 10 AND 
@@ -198,17 +199,19 @@ class RatingsAndScores:
         self.update_history_for_uid(uid, percent_played)
         
     def inc_listeners_scores(self):
-        if not self.get_bedtime_mode():
-            updated = get_results_assoc("""UPDATE user_song_info
-                                           SET ultp = NOW(), score = score + 1 
-                                           WHERE fid = %s AND uid IN (
-                                                SELECT DISTINCT uid 
-                                                FROM users 
-                                                WHERE listening = true)
-                                           RETURNING *""", 
-                                           (self.fid, ))
+        if self.get_bedtime_mode():
+            return
+        
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score + 1 
+                                       WHERE fid = %s AND uid IN (
+                                            SELECT DISTINCT uid 
+                                            FROM users 
+                                            WHERE listening = true)
+                                       RETURNING *""", 
+                                       (self.fid, ))
 
-            self.update(updated)
+        self.update(updated)
 
         updated = get_results_assoc("""UPDATE user_song_info 
                                        SET score = 10 
@@ -230,17 +233,19 @@ class RatingsAndScores:
             self.deinc_listeners_scores()
 
     def deinc_listeners_scores(self):
-        if not self.get_bedtime_mode():
-            updated = get_results_assoc("""UPDATE user_song_info
-                                           SET ultp = NOW(), score = score - 1 
-                                           WHERE fid = %s AND uid IN (
-                                                SELECT DISTINCT uid 
-                                                FROM users 
-                                                WHERE listening = true)
-                                           RETURNING *""", 
-                                           (self.fid, ))
+        if self.get_bedtime_mode():
+            return
+        
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score - 1 
+                                       WHERE fid = %s AND uid IN (
+                                            SELECT DISTINCT uid 
+                                            FROM users 
+                                            WHERE listening = true)
+                                       RETURNING *""", 
+                                       (self.fid, ))
 
-            self.update(updated)
+        self.update(updated)
 
         updated = get_results_assoc("""UPDATE user_song_info 
                                        SET score = 1 
@@ -256,13 +261,14 @@ class RatingsAndScores:
         self.update_history(self.last_percent_played)
 
     def deinc_score_for_uid(self, uid=None, percent_played=0):
-        if not self.get_bedtime_mode():
-            updated = get_results_assoc("""UPDATE user_song_info
-                                           SET ultp = NOW(), score = score - 1 
-                                           WHERE fid = %s AND uid = %s
-                                           RETURNING *""", 
-                                           (uid, self.fid,))
-            self.update(updated)
+        if self.get_bedtime_mode():
+            return
+        updated = get_results_assoc("""UPDATE user_song_info
+                                       SET ultp = NOW(), score = score - 1 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""", 
+                                       (uid, self.fid,))
+        self.update(updated)
         updated = get_results_assoc("""UPDATE user_song_info 
                                        SET score = 1
                                        WHERE fid = %s AND score <= 0 AND 
@@ -273,9 +279,10 @@ class RatingsAndScores:
         self.calculate_true_score_for_uid(uid)
         self.update_history_for_uid(uid, percent_played)
 
-    def calculate_true_score(self):
+    def calculate_true_score(self, force=False):
         global listeners
-        if not listeners.listeners or not self.listening:
+        if not listeners.listeners or not self.listening or \
+           (force == False and self.get_bedtime_mode()):
             return
         updated = get_results_assoc(
               """UPDATE user_song_info 
@@ -287,7 +294,9 @@ class RatingsAndScores:
                  (self.fid,))
         self.update(updated)
 
-    def calculate_true_score_for_uid(self, uid):
+    def calculate_true_score_for_uid(self, uid, force=False):
+        if self.get_bedtime_mode() and force == False:
+            return
         updated = get_results_assoc(
             """UPDATE user_song_info 
                SET true_score = (((rating * 2 * 10.0) + (score * 10.0) + 
@@ -301,7 +310,7 @@ class RatingsAndScores:
     def get_bedtime_mode(self):
         return cfg.get('Misc', 'bedtime_mode', False, bool)
 
-    def get_marked_as_played_query_and_args(self, percent_played=0):
+    def mark_as_played(self, percent_played=0):
         query = """UPDATE user_song_info 
                    SET ultp = NOW(), percent_played = %s 
                    WHERE fid = %s AND uid IN (
@@ -309,25 +318,10 @@ class RatingsAndScores:
                         FROM users 
                         WHERE listening = true)
                    RETURNING *"""
+
         args = (percent_played, self.fid,)
-
-        if not self.get_bedtime_mode():
-            return query, args
-
-        query = """UPDATE user_song_info 
-                   SET ultp = NOW()
-                   WHERE fid = %s AND uid IN (
-                        SELECT DISTINCT uid 
-                        FROM users 
-                        WHERE listening = true)
-                   RETURNING *"""
-        args = (self.fid,)
-
-        return query, args
-
-    def mark_as_played(self, percent_played=0):
-        query, args = self.get_marked_as_played_query_and_args(percent_played)
         updated = get_results_assoc(query, args)
+
         self.update(updated)
         
         self.calculate_true_score()
@@ -344,21 +338,12 @@ class RatingsAndScores:
         if when is None:
             when = datetime.datetime.now()
 
-        if not self.get_bedtime_mode():
-            updated = get_results_assoc("""UPDATE user_song_info 
-                                           SET ultp = %s, percent_played = %s 
-                                           WHERE fid = %s AND uid = %s
-                                           RETURNING *""",
-                                           (when, percent_played, self.fid, uid))
-            self.update(updated)
-        else:
-            updated = get_results_assoc("""UPDATE user_song_info 
-                                           SET ultp = %s,
-                                           WHERE fid = %s AND uid = %s
-                                           RETURNING *""",
-                                           (when, self.fid, uid))
-            self.update(updated)
-
+        updated = get_results_assoc("""UPDATE user_song_info 
+                                       SET ultp = %s, percent_played = %s 
+                                       WHERE fid = %s AND uid = %s
+                                       RETURNING *""",
+                                       (when, percent_played, self.fid, uid))
+        self.update(updated)
         self.calculate_true_score_for_uid(uid)
         ceil_percent_played = math.ceil(percent_played)
         if self.last_percent_played != ceil_percent_played:
