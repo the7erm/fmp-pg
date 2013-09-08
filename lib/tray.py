@@ -154,6 +154,15 @@ def on_toggle_bedtime_mode(item, *args):
     print "on_toggle_bedtime:", bedtime
     cfg.set('Misc', 'bedtime_mode', bedtime, bool)
 
+def on_activate_favorites(item, *args):
+    print "on_activate_favorites"
+    q = """INSERT INTO preload (fid, uid, reason) 
+                SELECT fid, usi.uid, 'My Favorites' 
+                FROM user_song_info usi, users u
+                WHERE usi.uid = u.uid AND u.listening = true AND 
+                      true_score >= 85 AND ultp <= now() - INTERVAL '1 day'"""
+    query(q)
+
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
     image_path = sys.path[0]+"/images/"
 
@@ -249,6 +258,11 @@ menu.append(cue_netcasts_item)
 bedtime_mode_item = gtk.CheckMenuItem("Bedtime Mode")
 menu.append(bedtime_mode_item)
 
+my_favorites_item = gtk.ImageMenuItem("My Favorites")
+img = gtk.image_new_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_BUTTON)
+my_favorites_item.set_image(img)
+menu.append(my_favorites_item)
+
 quit = gtk.ImageMenuItem("Quit")
 img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
 quit.set_image(img)
@@ -263,6 +277,7 @@ genres.connect("activate", on_activate_genres)
 preload.connect("activate", on_activate_preload)
 cue_netcasts_item.connect("toggled", on_toggle_cue_netcasts, ())
 bedtime_mode_item.connect("toggled", on_toggle_bedtime_mode, ())
+my_favorites_item.connect("activate", on_activate_favorites, ())
 
 cue_netcasts = cfg.get('Netcasts', 'cue', False, bool)
 cue_netcasts_item.set_active(cue_netcasts)

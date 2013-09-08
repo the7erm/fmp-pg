@@ -179,15 +179,17 @@ class Preload(gtk.ScrolledWindow):
         model, selected = selection.get_selected_rows()
         selected.sort(reverse=True)
         rows = []
+        cnt = 0
         for path in selected:
+            cnt += 1
             print "SELECTED:",path
             selection.unselect_path(path)
             itr = self.liststore.get_iter(path)
             fid = self.liststore[path][0]
             query("DELETE FROM preload WHERE fid = %s",(fid,))
             self.liststore.remove(itr)
-
-
+            if cnt % 10 == 0:
+                wait()
 
     def refresh_data(self):
         if self.reload_lock:
