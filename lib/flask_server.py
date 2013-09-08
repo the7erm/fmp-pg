@@ -34,6 +34,9 @@ import alsaaudio
 import logging
 import re
 
+from bson import json_util
+import json
+
 from player import PLAYING
 
 import threading
@@ -162,7 +165,25 @@ def prase_words(q, filter_by="all"):
         return query
     return ""
 
-        
+def listeners_info_for_fid(fid):
+    query = """SELECT uname, usi.*
+               FROM user_song_info usi, users u
+               WHERE usi.fid = %s AND u.uid = usi.uid AND u.listening = true
+               ORDER BY admin DESC, uname ASC
+    """
+    print "query:%s" % query
+    results = []
+    try:
+        for r in get_results_assoc(query, (fid,)):
+            # f = fobj.get_fobj(**r)
+            #fd = f.to_dict()
+            # fd.cued = r.cued
+            results.append(dict(r))
+        print "results:",results
+    except psycopg2.IntegrityError, err:
+        query("COMMIT;")
+        print "(flask_server) psycopg2.IntegrityError:",err
+    return results
 
 def get_results(q="", start=0, filter_by="all"):
     start = int(start)
@@ -175,7 +196,7 @@ def get_results(q="", start=0, filter_by="all"):
                         LEFT JOIN genres g ON g.gid = fg.gid 
                         LEFT JOIN preload p ON p.fid = f.fid
                         LEFT JOIN album_files af ON af.fid = f.fid
-                        LEFT JOIN albums al ON al.alid = af.alid,
+                        LEFT JOIN albums al ON al.alid = af.alid
                     %s
                     ORDER BY artist, album_name, basename, genre
         """
@@ -183,16 +204,27 @@ def get_results(q="", start=0, filter_by="all"):
     where = ""
     if words:
         where = "WHERE %s" % words
+    else:
+        where = "WHERE true"
 
     query = query % (where,)
     query = "%s LIMIT 1000 OFFSET %s" % (query, start)
     print "QUERY:%s" % query
     results = []
-    for r in get_results_assoc(query):
-        # f = fobj.get_fobj(**r)
-        #fd = f.to_dict()
-        # fd.cued = r.cued
-        results.append(dict(r))
+    try:
+        for r in get_results_assoc(query):
+            # f = fobj.get_fobj(**r)
+            #fd = f.to_dict()
+            # fd.cued = r.cued
+            rdict = dict(r)
+            rdict['usi'] = listeners_info_for_fid(r['fid'])
+            results.append(rdict)
+    except psycopg2.IntegrityError, err:
+        query("COMMIT;")
+        print "(flask_server) psycopg2.IntegrityError:",err
+    except psycopg2.InternalError, err:
+        query("COMMIT;")
+        print "(flask_server) psycopg2.InternalError:",err
     return results
 
 
@@ -256,7 +288,25 @@ def set_volume(vol):
 (20 rows)
 """
 
-@app.route('/search', methods=['GET', 'POST'])
+def json_obj_handler(obj):
+    if obj is None:
+        return 'null';
+    """Default JSON serializer."""
+    import calendar, datetime
+
+    if isinstance(obj, datetime.datetime):
+        if obj.utcoffset() is not None:
+            obj = obj - obj.utcoffset()
+    millis = int(
+        calendar.timegm(obj.timetuple()) * 1000 +
+        obj.microsecond / 1000
+    )
+    return millis
+
+def json_dump(obj):
+    return json.dumps(obj, default=json_obj_handler) or "{};"
+
+@app.route('/search/', methods=['GET', 'POST'])
 def search():
     results = None
     q = request.args.get("q","")
@@ -270,14 +320,21 @@ def search():
     print "start:",start_time
     results = get_results(q, start=start, filter_by=filter_by)
     print "end:", time.time() - start_time
+    json_results = json_dump(results)
 
-    if not request.args.get("ajax",False):
+    if not request.args.get("ajax", False):
         return render_template("search.html", playing=playing, PLAYING=PLAYING,
-                               results=results, q=request.args.get("q",""),
+                               results=json_results, q=request.args.get("q",""),
                                filter_by=filter_by)
-    
-    return jsonify(player=player.to_dict(), playing=playing.to_dict(),
-                   results=results, q=request.args.get("q",""))
+    resp = {
+        "player": player.to_dict(), 
+        "playing": playing.to_dict(),
+        "results": results, 
+        "q": request.args.get("q","")
+    }
+    print "RESP:"
+    return json_results
+    # return jsonify()
 
 
 @app.route('/login', methods=['GET', 'POST'])
