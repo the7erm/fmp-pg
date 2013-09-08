@@ -18,6 +18,7 @@
 #
 
 from __init__ import *
+from picker import wait
 from star_cell import CellRendererStar
 import gtk, gobject, os, datetime, math
 from subprocess import Popen
@@ -25,10 +26,12 @@ from subprocess import Popen
 class Preload(gtk.ScrolledWindow):
     def __init__(self):
         gtk.ScrolledWindow.__init__(self)
+        self.reload_lock = False
         self.change_locked = False
         self.tv = None
         self.create_treeview()
         gobject.timeout_add(10000, self.refresh_data)
+
 
     def create_treeview(self):
         if self.tv:
@@ -110,7 +113,7 @@ class Preload(gtk.ScrolledWindow):
         self.liststore = gtk.ListStore(*self.cols)
         
 
-        self.refresh_data()
+        # self.refresh_data()
 
         self.append_simple_col("Filename",1)
         self.append_simple_col("Cued For",2)
@@ -187,6 +190,11 @@ class Preload(gtk.ScrolledWindow):
 
 
     def refresh_data(self):
+        if self.reload_lock:
+            print "reload_lock"
+            return True
+        self.reload_lock = True
+        wait()
         print "preload.refresh_data"
         cols = ['uid', 'rating', 'score', 'percent_played', 'true_score', 'ultp', 'age']
         self.change_locked = True
@@ -194,6 +202,7 @@ class Preload(gtk.ScrolledWindow):
         if len(self.listeners) != len(listeners):
             self.listeners = listeners
             self.create_treeview()
+            self.reload_lock = False 
             return True
         else:
             for l in listeners:
@@ -206,14 +215,20 @@ class Preload(gtk.ScrolledWindow):
                     self.listeners = listeners
                     self.create_treeview()
                     return True
-
-        files = get_results_assoc("SELECT p.fid, basename, p.uid, u.uname, reason FROM preload p, files f, users u WHERE f.fid = p.fid AND u.uid = p.uid ORDER BY basename")
-        
-        for f in files:
+        wait()
+        print "fetching files"
+        files = get_results_assoc("""SELECT p.fid, basename, p.uid, u.uname, reason 
+                                     FROM preload p, files f, users u 
+                                     WHERE f.fid = p.fid AND u.uid = p.uid 
+                                     ORDER BY basename""")
+        print "done fetching files"
+        wait()
+        for i, f in enumerate(files):
+            if i % 15 == 0:
+                wait()
             row = self.create_row(f, cols)
             if not row:
                 continue
-
             # print "row:",row
             # print "cols:",self.cols
             try:
@@ -231,9 +246,13 @@ class Preload(gtk.ScrolledWindow):
             found = False
             for f in files:
                 if r[0] == f['fid']:
+                    wait()
                     found = True
+                    break
             if not found:
                 self.liststore.remove(r.iter)
+                wait()
+        self.reload_lock = False 
         return True
 
     def create_row(self, f, cols):
@@ -284,7 +303,7 @@ class Preload(gtk.ScrolledWindow):
                 if r[c_num] != u[c]:
                     print "update_row:",r[c_num], "!=", u[c]
                     r[c_num] = u[c]
-                    
+                    wait()
 
     def insert_ratings(self):
         for u in self.listeners:
@@ -381,6 +400,7 @@ if __name__ == "__main__":
     w.add(preload)
     w.show_all()
     w.connect("destroy", gtk.main_quit)
+    preload.refresh_data()
     # w.maximize()
     gtk.main()
 
