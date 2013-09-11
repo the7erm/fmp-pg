@@ -163,6 +163,15 @@ def on_activate_favorites(item, *args):
                       true_score >= 85 AND ultp <= now() - INTERVAL '1 day'"""
     query(q)
 
+def on_activate_webplayer(item, *args):
+    print "on_activate_webplayer"
+    if os.path.exists(sys.path[0]+"/lib/player_window.py"):
+        Popen([sys.path[0]+"/lib/player_window.py"])
+        return
+    if os.path.exists(sys.path[0]+"/../lib/player_window.py"):
+        Popen([sys.path[0]+"/../lib/player_window.py"])
+        return
+
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
     image_path = sys.path[0]+"/images/"
 
@@ -227,6 +236,11 @@ img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON)
 prev.set_image(img)
 menu.append(prev)
 
+player_window_item = gtk.ImageMenuItem("Player")
+img = gtk.image_new_from_stock(gtk.STOCK_INFO, gtk.ICON_SIZE_BUTTON)
+player_window_item.set_image(img)
+menu.append(player_window_item)
+
 song_info = gtk.ImageMenuItem("File Info")
 img = gtk.image_new_from_stock(gtk.STOCK_INFO, gtk.ICON_SIZE_BUTTON)
 song_info.set_image(img)
@@ -270,6 +284,7 @@ menu.append(quit)
 
 menu.show_all()
 
+player_window_item.connect("activate", on_activate_webplayer)
 song_info.connect("activate", on_activate_file_info)
 history_info.connect("activate", on_activate_history)
 listeners.connect("activate", on_activate_listeners)
