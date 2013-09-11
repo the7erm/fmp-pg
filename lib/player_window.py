@@ -15,7 +15,7 @@ class PlayerWindow(gtk.Window):
     def __init__(self):
         gtk.Window.__init__(self)
         self.set_default_size(600, 400)
-        self.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+        self.set_position(gtk.WIN_POS_CENTER)
         self.vbox_container = gtk.VBox()
         self.add(self.vbox_container)
         view = webkit.WebView()
