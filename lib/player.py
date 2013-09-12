@@ -464,11 +464,11 @@ static char * invisible_xpm[] = {
         elif t == gst.MESSAGE_TAG:
             for key in message.parse_tag().keys():
                 msg = message.structure[key]
-                if isinstance(msg, gst.Date):
+                if isinstance(msg, (gst.Date, gst.DateTime)):
                     self.tags[key] = "%s" % msg
                 elif key not in ('image','private-id3v2-frame'):
                     print "tags[%s]=%s" % (key, msg )
-                    self.tags[key] = msg
+                    self.tags[key] = "%s" % msg
                 else:
                     print "tags[%s]=%s" % (key,"[Binary]")
                     data = {}
