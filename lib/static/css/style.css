@@ -57,3 +57,9 @@ body {
 }
 
 
+#album-art {
+    width:auto;
+    height: auto; 
+    float:right; 
+    max-width:100px;
+}
