@@ -21,6 +21,7 @@
 
 import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
+import base64
 gobject.threads_init()
 pygst.require("0.10")
 import gst
@@ -207,9 +208,10 @@ static char * invisible_xpm[] = {
     
     def to_dict(self):
         return {
-            "filename":self.filename,
-            "pos_data":self.pos_data,
-            "playingState":self.state_to_string(self.playingState)
+            "filename": self.filename,
+            "pos_data": self.pos_data,
+            "playingState": self.state_to_string(self.playingState),
+            "tags": self.tags
         }
 
     def state_to_string(self, state):
@@ -324,6 +326,7 @@ static char * invisible_xpm[] = {
         
     def start(self,*args):
         # self.play_thread_id = None
+        self.tags = {}
         gc.collect()
         uri = self.filename
         if os.path.isfile(self.filename):
@@ -460,10 +463,27 @@ static char * invisible_xpm[] = {
             self.emit('error', err, debug)
         elif t == gst.MESSAGE_TAG:
             for key in message.parse_tag().keys():
-                if key not in ('image','private-id3v2-frame'):
-                    print "tags[%s]=%s" % (key,message.structure[key])
+                msg = message.structure[key]
+                if isinstance(msg, gst.Date):
+                    self.tags[key] = "%s" % msg
+                elif key not in ('image','private-id3v2-frame'):
+                    print "tags[%s]=%s" % (key, msg )
+                    self.tags[key] = msg
                 else:
                     print "tags[%s]=%s" % (key,"[Binary]")
+                    data = {}
+                    if isinstance(msg, list):
+                        for i, v in enumerate(msg):
+                            data[i] = base64.b64encode(msg[i])
+                    elif isinstance(msg, dict):
+                        for k, v in enumerate(msg):
+                            data[k] = base64.b64encode(msg[k])
+                    else:
+                        print "%s" % msg[0:10]
+                        data = base64.b64encode(msg)
+                    self.tags[key] = data
+                    print self.tags[key]
+
                 self.emit('tag-received', key, message.structure[key])
     
     def on_sync_message(self, bus, message):
