@@ -150,11 +150,9 @@
                         $album_art.prop('src', 'data:image/png;base64,'+dta.player.tags.image)
                                   .show();
                     }
-                    console.log("SHOW!")
                     window.last_img = dta.player.tags.image;
                 } else {
                     $album_art.hide();
-                    console.log("HIDE!");
                     window.last_img = '';
                 }
                 
