@@ -43,6 +43,7 @@ import threading
 import time
 
 from flask import render_template
+import lib.fobj as fobj
 
 from tornado.wsgi import WSGIContainer
 from tornado.ioloop import IOLoop
@@ -91,9 +92,16 @@ def index():
             uid = request.args.get("uid",0)
             print "************* RATE ****************"
             print "RATE:uid:%s rating:%s" % (uid, rating)
-            if uid and hasattr(playing, "ratings_and_scores"):
+            fid = request.args.get("fid","")
+            if not fid and uid and hasattr(playing, "ratings_and_scores"):
                 print "RATE 2:uid:%s rating:%s" % (uid, rating)
                 playing.rate(uid=uid, rating=rating)
+            elif fid and uid:
+                print "RATE 3: fid:%s, uid:%s rating:%s" % (fid, uid, rating)
+                f = fobj.get_fobj(fid=fid)
+                f.rate(uid=uid, rating=rating)
+                return json_dump(f.to_dict())
+
         if cmd == "vol":
             set_volume(request.args.get("value",-1))
 
@@ -334,7 +342,32 @@ def search():
     }
     print "RESP:"
     return json_results
-    # return jsonify()
+
+@app.route('/cue/', methods=['GET', 'POST'])
+def cue():
+    user = get_assoc("""SELECT uid
+                        FROM users WHERE listening = true
+                        LIMIT 1""")
+    fid = request.args.get('fid')
+    finfo = get_assoc("""SELECT * 
+                         FROM files 
+                         WHERE fid = %s 
+                         LIMIT 1""", (fid,))
+    if finfo and fid:
+        cue = request.args.get('cue', 'false')
+        print "CUE:",cue
+        if cue == 'true':
+            cue = True
+        else:
+            cue = False
+        if cue:
+            query("""INSERT INTO preload (fid, uid, reason)
+                     VALUES (%s, %s, %s)""", (fid, user['uid'], "From search"))
+            return "{cued:true}"
+        else:
+            query("""DELETE FROM preload WHERE fid = %s""", (fid,))
+            return "{cued:false}"
+
 
 
 @app.route('/login', methods=['GET', 'POST'])

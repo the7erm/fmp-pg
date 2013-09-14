@@ -19,13 +19,12 @@
     <div style='min-height:50px;'>
         <span class='artist_title'>
             Playing:<span id="playing-file">{{ playing.get_artist_title() }}</span>
-            <div class="float-right" style="display:in-line;">
-                <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
-                
-            </div>
+            <div id="time-status" class="float-right">-{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}</div>
             <br clear="right">
-            <img id="album-art" src="">
         </span>
+        
+        <img id="album-art" src="">
+        <br clear="left">
         <div class="float-left nowrap">
             <a class='action-link' href="?cmd=prev"><img src="/static/images/media-seek-backward.png"></a>
             {% if player.playingState == PLAYING %}

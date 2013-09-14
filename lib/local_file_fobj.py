@@ -497,7 +497,7 @@ class Local_File(fobj.FObj):
                     self.add_album(al, a['aid'])
 
     def process_genre(self):
-        if self.tags_easy and self.tags_easy.has_key('genre') and self.tags_easy['genre']:
+        if self.tags_easy and 'genre' in self.tags_easy and self.tags_easy['genre']:
             if isinstance(self.tags_easy['genre'],list):
                 for g in self.tags_easy['genre']:
                     self.add_genre(g)
@@ -546,7 +546,8 @@ class Local_File(fobj.FObj):
     def get_artist_title(self):
         self.get_tags()
         if self.tags_easy:
-            if self.tags_easy['artist'] and self.tags_easy['title']:
+            if 'artist' in self.tags_easy and self.tags_easy['artist'] and \
+               'title' in self.tags_easy and self.tags_easy['title']:
                 return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
         return self.basename
 
