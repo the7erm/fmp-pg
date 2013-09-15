@@ -65,7 +65,7 @@ body {
 }
 
 #loading {
-    position: fixed;
+    position: absolute;
     right:0px;
     z-index: 1000;
     bottom:0px;

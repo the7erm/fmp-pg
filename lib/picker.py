@@ -153,7 +153,7 @@ def populate_dont_pick():
 
 
 def populate_preload(uid=None, min_amount=0):
-
+    remove_duplicates_from_preload()
     if not uid or uid is None:
         listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
         for l in listeners:
@@ -367,6 +367,21 @@ def remove_songs_in_preload_for_users_who_are_not_listening():
     query("""DELETE FROM preload p WHERE uid NOT IN (SELECT uid 
                                                      FROM users 
                                                      WHERE listening = true)""")
+
+def remove_duplicates_from_preload():
+    duplicates = get_results_assoc("""SELECT count(f.sha512) AS total, f.sha512 
+                                      FROM files f, preload p 
+                                      WHERE f.fid = p.fid AND f.sha512 != ''
+                                      GROUP BY f.sha512 
+                                      HAVING count(f.sha512) > 1""")
+    for d in duplicates:
+      files = get_results_assoc("""SELECT p.fid, p.uid
+                                   FROM files f, preload p
+                                   WHERE f.fid = p.fid AND sha512 = %s""",
+                                   (d['sha512'],))
+      for f in files[1:]:
+        query("""DELETE FROM preload WHERE fid = %s AND uid = %s""",
+              (f['fid'], f['uid']))
 
 def get_cue_for():
     return get_assoc("""SELECT uid, last_time_cued 
