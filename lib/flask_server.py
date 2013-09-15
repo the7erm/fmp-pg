@@ -193,8 +193,9 @@ def listeners_info_for_fid(fid):
         print "(flask_server) psycopg2.IntegrityError:",err
     return results
 
-def get_results(q="", start=0, filter_by="all"):
+def get_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
+    limit = int(limit)
     query = """SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
                                album_name
                    FROM files f 
@@ -216,7 +217,7 @@ def get_results(q="", start=0, filter_by="all"):
         where = "WHERE true"
 
     query = query % (where,)
-    query = "%s LIMIT 1000 OFFSET %s" % (query, start)
+    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
     try:
@@ -323,10 +324,11 @@ def search():
         filter_by = "any"
     else:
         filter_by = "all"
-    start = "%s" % request.args.get("s","0")
+    start = "%s" % request.args.get("s", "0")
+    limit = "%s" % request.args.get("s", "20")
     start_time = time.time()
     print "start:",start_time
-    results = get_results(q, start=start, filter_by=filter_by)
+    results = get_results(q, start=start, limit=20, filter_by=filter_by)
     print "end:", time.time() - start_time
     json_results = json_dump(results)
 

@@ -58,6 +58,7 @@
     <br clear="all">
 
     <input name="seek-slider-1"  data-theme="d"  data-highlight="true" class="ui-hide-label" id="seek" min="0" max="{{ player.pos_data.dur_int }}" step="1" value="{{ player.pos_data.pos_int }}" type="range">
+    {% include "search-form.html" ignore missing %}
     <script type="text/html" id="tpl-rating">
         <tr class="user-line" data-uid="<%= uid %>">
             <td><%= uname %></td> 
