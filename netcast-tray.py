@@ -18,6 +18,7 @@
 #
 
 from lib.__init__ import *
+from lib.picker import wait, enter, leave
 import lib.fobj as fobj
 import os
 import sys
@@ -28,7 +29,6 @@ import gobject
 import time
 import lib.clear_cache as clear_cache
 from lib.episode_downloader import downloader
-gobject.threads_init()
 
 pp = pprint.PrettyPrinter(depth=6, indent=4)
 
@@ -36,66 +36,64 @@ def on_button_press(icon, event, **kwargs):
     print "on_button_press:",icon, event
     if event.button == 1:
         menu.popup(None, None, None, event.button, event.get_time())
+        wait()
 
 def on_update(*args, **kwargs):
+    leave("on_update")
     netcast_fobj.update_now()
     update()
 
+def set_tooltip(msg):
+    enter("set_tooltip:%s" % msg)
+    icon.set_tooltip(msg)
+    leave("set_tooltip:%s" % msg)
+    wait()
+
+def set_icon(img, msg=None):
+    enter("set_icon:%s %s" % (img, msg))
+    if msg is not None:
+        icon.set_tooltip(msg)
+    icon.set_from_file(img)
+    leave("set_icon:%s %s" % (img, msg))
+    wait()
+
 def update(*args, **kwargs):
+    leave("def update")
     if downloader.downloading:
         print "Not updating downloader is getting a file."
         return True
 
     netcasts = netcast_fobj.get_expired_subscribed_netcasts()
+    wait()
     if not netcasts:
         f = netcast_fobj.get_one_unlistened_episode()
+        wait()
         if f:
             nobj = netcast_fobj.Netcast_File(**f)
             if nobj:
+                wait()
                 nobj.netcast.download_unlistened_netcasts()
         clear_cache.clear_cache()
-        icon.set_tooltip("Done updating")
-        icon.set_from_file(ICON_NOTHING)
-        while gtk.events_pending():
-                gtk.main_iteration(False)
+        set_icon(ICON_NOTHING, "Done updating")
         return True
 
-    icon.set_from_file(ICON_UPDATING)
+    
     if not downloader.downloading:
-        icon.set_tooltip("Updating")
-        while gtk.events_pending():
-            gtk.main_iteration(False)
+        set_icon(ICON_UPDATING, "Updating")
 
     for n in netcasts:
-        gtk.threads_leave()
-        icon.set_tooltip("Updating %s" % (n.name))
-        while gtk.events_pending():
-            gtk.main_iteration(False)
-        gtk.threads_enter()
+        set_tooltip("Updating %s" % (n.name,))
         n.update()
         n.download_unlistened_netcasts()
     clear_cache.clear_cache()
-    icon.set_tooltip("Done updating")
-    icon.set_from_file(ICON_NOTHING)
-    while gtk.events_pending():
-            gtk.main_iteration(False)
+    set_icon(ICON_NOTHING, "Done updating")
     return True
 
 def on_download_status(downloader, status):
-    gtk.threads_leave()
-    icon.set_tooltip(status)
-    icon.set_from_file(ICON_DOWNLOADING)
-    while gtk.events_pending():
-        gtk.main_iteration(False)
-    gtk.threads_enter()
+    set_icon(ICON_DOWNLOADING, status)
 
 def on_download_done(downloader, status):
-    gtk.threads_leave()
-    icon.set_tooltip(status)
-    icon.set_from_file(ICON_NOTHING)
-    while gtk.events_pending():
-        gtk.main_iteration(False)
-    gtk.threads_enter()
+    set_icon(ICON_NOTHING, status)
 
 
 image_path = sys.path[0]+"/images/rss/"
@@ -128,7 +126,7 @@ quit_img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
 quit_item = gtk.ImageMenuItem("Quit Netcast Tray")
 quit_item.set_image(quit_img)
 quit_item.show()
-quit_item.connect("activate", lambda _: gtk.main_quit())
+quit_item.connect("activate", gtk_main_quit)
 menu.append(quit_item)
 
 menu.show_all()
@@ -141,6 +139,7 @@ if __name__ == "__main__":
         print "Netcast tray is already running."
         sys.exit()
     pid_handler.write_pid()
+    wait()
     update()
     gobject.timeout_add(60000, update)
     gtk.main()

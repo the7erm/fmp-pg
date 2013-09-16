@@ -37,9 +37,9 @@ populate_locked = False
 # DROP RULE "my_table_on_duplicate_ignore" ON "my_table";
 
 def wait():
-    print "1leave"
+    print "leave1"
     gtk.gdk.threads_leave()
-    print "/1leave"
+    print "/leave1"
     print "enter"
     gtk.gdk.threads_enter()
     print "/enter"
@@ -50,6 +50,16 @@ def wait():
     print "leave"
     gtk.gdk.threads_leave()
     print "/leave"
+
+def enter(msg=None):
+    print "enter:",msg
+    gtk.gdk.threads_enter()
+    print "/enter:",msg
+
+def leave(msg=None):
+    print "leave:",msg
+    gtk.gdk.threads_leave()
+    print "/leave:",msg
 
 def create_dont_pick():
     global dont_pick_created

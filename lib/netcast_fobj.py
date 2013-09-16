@@ -19,6 +19,7 @@
 #
 
 from __init__ import *
+from picker import wait, enter, leave
 from listeners import listeners
 import fobj
 import os
@@ -128,6 +129,7 @@ class Netcast(gobject.GObject):
         self.update()
 
     def update(self, force=False):
+        leave("update")
         if self.expire_time:
             now = datetime.datetime.now(self.expire_time.tzinfo)
             if not force:
@@ -142,6 +144,7 @@ class Netcast(gobject.GObject):
 
         socket.setdefaulttimeout(30)
         self.emit('updating')
+        wait()
         try:
             feed = feedparser.parse(self.rss_url)
         except socket.error, msg:
@@ -149,6 +152,7 @@ class Netcast(gobject.GObject):
             self.emit('update-error', msg)
             return
 
+        wait()
         if not feed.feed.has_key('title'):
             self.set_update_for_near_future()
             self.emit('update-error', "The netcast url %s " % (self.rss_url,) +
@@ -167,6 +171,7 @@ class Netcast(gobject.GObject):
 
         print self.db_info
         for i, entry in enumerate(feed['entries']):
+            wait()
             if not entry.has_key('enclosures'):
                 continue
             if len(entry['enclosures']) == 0:
@@ -174,6 +179,7 @@ class Netcast(gobject.GObject):
             print "==================="
             pp.pprint(entry)
             for enclosure in entry['enclosures']:
+                wait()
                 print "---------------------"
                 pp.pprint(enclosure)
                 pub_date = datetime.datetime(*entry['updated_parsed'][0:7])
