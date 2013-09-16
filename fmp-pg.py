@@ -426,10 +426,17 @@ def on_state_change(*args, **kwargs):
     tray.set_play_pause_item(plr.playingState)
 
 def quit(*args, **kwargs):
+    print "QUIT!!!!"
     try:
         netcast_tray.terminate()
     except:
         pass
+    for t in flask_server.threads:
+        try:
+            t._Thread__stop()
+        except:
+            print "COULDN'T KILL"
+    gtk.threads_leave()
     gtk.main_quit()
 
 import flask_server
@@ -507,7 +514,6 @@ tray.icon.connect('scroll-event',plr.on_scroll)
 gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(1000, set_rating)
-
 
 flask_server.playing = playing
 flask_server.player = plr
