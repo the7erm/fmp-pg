@@ -225,8 +225,8 @@ if __name__ == '__main__':
     l = Listeners_Listview()
     w.add(l)
     w.show_all()
-    w.connect("destroy", gtk.main_quit)
-    l.connect("close", gtk.main_quit)
+    w.connect("destroy", gtk_main_quit)
+    l.connect("close", gtk_main_quit)
     gtk.main()
 
 

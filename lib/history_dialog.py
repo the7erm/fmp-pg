@@ -364,7 +364,7 @@ if __name__ == '__main__':
     window.set_title("FMP - History")
     window.set_default_size(800,600)
     window.set_position(gtk.WIN_POS_CENTER)
-    window.connect("destroy", gtk.main_quit)
+    window.connect("destroy", gtk_main_quit)
     window.show()
     skel.wait()
     skel.liststore.connect("row-changed", on_row_change)

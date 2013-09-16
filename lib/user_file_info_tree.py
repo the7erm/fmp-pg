@@ -173,7 +173,7 @@ def on_change(*args):
 if __name__ == "__main__":
     w = gtk.Window()
     w.set_position(gtk.WIN_POS_CENTER)
-    w.connect('delete-event', gtk.main_quit)
+    w.connect('delete-event', gtk_main_quit)
     t = User_File_Info_Tree(fid=13254)
     m = t.get_model()
     m.connect("row-changed", on_change)

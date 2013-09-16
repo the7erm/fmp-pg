@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/file_info.py -- Display dialog about file
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -410,7 +410,7 @@ if __name__ == "__main__":
 
     w.add(tab)
     w.show_all()
-    w.connect("destroy", gtk.main_quit)
+    w.connect("destroy", gtk_main_quit)
     # w.maximize()
     gtk.main()
 

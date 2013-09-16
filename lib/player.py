@@ -19,10 +19,11 @@
 
 ## TODO: add appindicator in __main__ section
 
+from __init__ import gtk_main_quit
 import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
 import base64
-gobject.threads_init()
+# gobject.threads_init()
 pygst.require("0.10")
 import gst
 
@@ -73,7 +74,7 @@ class Player(gobject.GObject):
         
         self.window.set_icon_from_file(img_path+'images/tv.png');
             
-        self.window.connect("destroy", gtk.main_quit)
+        self.window.connect("destroy", gtk_main_quit)
         self.window.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK |
                                gtk.gdk.POINTER_MOTION_MASK |
@@ -88,7 +89,7 @@ class Player(gobject.GObject):
         
         self.window.set_title("Video-Player")
         self.window.set_default_size(600, 400)
-        self.window.connect("destroy", gtk.main_quit, "WM destroy")
+        self.window.connect("destroy", gtk_main_quit, "WM destroy")
         
 
         #main Event Box
@@ -654,7 +655,7 @@ if __name__ == '__main__':
         elif label == 'Prev':
             prev()
         elif label == 'Quit':
-            gtk.main_quit()
+            gtk_main_quit()
         
         print "CLICKED:%s " % (item.get_label())
 
@@ -738,11 +739,10 @@ if __name__ == '__main__':
     ind.connect('scroll-event', player.ind_on_scroll)
     player.connect('state-changed', on_playing_state_changed)
 
-    player.next_button.connect('clicked',next)
+    player.next_button.conne_+ct('clicked',next)
     player.prev_button.connect('clicked',prev)
     gobject.idle_add(next)
     while gtk.events_pending(): gtk.main_iteration(False)
-    gtk.gdk.threads_init()
     gtk.main()
 
 

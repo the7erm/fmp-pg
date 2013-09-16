@@ -18,7 +18,7 @@
 #
 
 import gobject, gtk, gc
-gobject.threads_init()
+# gobject.threads_init()
 
 from lib.__init__ import *
 from lib.listeners import listeners
@@ -272,11 +272,13 @@ def create_dont_pick():
 
 
 def populate_preload(min_amount=0):
+    gtk.gdk.threads_leave()
     print "gc:",gc.collect()
     # picker.create_preload()
     picker.create_dont_pick()
     # picker.populate_dont_pick()
     picker.populate_preload(min_amount=min_amount)
+
 
     return True
 
@@ -381,10 +383,13 @@ def deinc_index():
 
 def set_rating():
     try:
+        gtk.gdk.threads_enter()
         tray.set_rating()
         picker.wait()
     except:
         pass
+    finally:
+        gtk.gdk.threads_leave()
     return True
 
 def on_end_of_stream(*args):
@@ -521,6 +526,7 @@ try:
         print "TST:",dict(tst) 
     print "is_netcast:",is_netcast(tst)
     """
+    gtk.gdk.threads_leave()
     gtk.main()
 except KeyboardInterrupt:
     Popen(['pykill','netcast-tray.py', 'fmp-pg.py'])

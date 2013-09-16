@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # /lib/__init__.py -- Initialize fmp
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -28,6 +28,10 @@ import time
 import random
 import hashlib
 import cfg_wrapper
+import gtk
+import gobject
+gobject.threads_init()
+gtk.gdk.threads_init()
 
 DEFAULTS = {
     "Netcasts": {
@@ -109,3 +113,6 @@ MAX_TRUE_SCORE = (((6 * 2 * 10.0) + (6 * 10.0) +
                     100.0) / 3)
 
 print "IMPORTED __init__"
+
+def gtk_main_quit(*args, **kwargs):
+    gtk.main_quit()

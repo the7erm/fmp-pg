@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/crumbs.py -- Create crumb type list
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #
 
 import gtk, gobject, sys, random
+from __init__ import gtk_main_quit
 
 class Crumbs(gtk.VBox):
     def __init__(self, target_width = 600):
@@ -248,7 +249,7 @@ if __name__ == '__main__':
 
     container.show()
     w.add(container)
-    w.connect("destroy", gtk.main_quit)
+    w.connect("destroy", gtk_main_quit)
     w.show()
     gtk.main()
 

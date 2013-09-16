@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/history_dialog.py -- Dialog that shows history for a song.
-#    Copyright (C) 2008 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     # SELECT * FROM user_history WHERE fid = 22833;
     w = gtk.Window()
     w.set_position(gtk.WIN_POS_CENTER)
-    w.connect('delete-event', gtk.main_quit)
+    w.connect('delete-event', gtk_main_quit)
     t = History_Tree(fid=22833)
     w.add(t)
 

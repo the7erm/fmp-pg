@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/preload.py -- Display files in preload
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -401,7 +401,7 @@ if __name__ == "__main__":
     w.set_position(gtk.WIN_POS_CENTER)
     w.add(preload)
     w.show_all()
-    w.connect("destroy", gtk.main_quit)
+    w.connect("destroy", gtk_main_quit)
     preload.refresh_data()
     # w.maximize()
     gtk.main()

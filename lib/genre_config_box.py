@@ -134,6 +134,6 @@ if __name__ == '__main__':
 	w.add(genre_config_box)
 	w.show_all()
 	gtk.gdk.threads_init()
-	w.connect("destroy", gtk.main_quit)
+	w.connect("destroy", gtk_main_quit)
 	gtk.main()
 

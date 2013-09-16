@@ -4,6 +4,7 @@ import webkit
 import gtk
 import gobject
 import thread
+from __init__ import gtk_main_quit
 
 # win = gtk.Window(gtk.WINDOW_TOPLEVEL) 
 # win.add(sw) 
@@ -28,12 +29,12 @@ class PlayerWindow(gtk.Window):
     def on_button_press_event(self, *args, **kwargs):
         # logger.info("on_button_press_event:%s, %s", args, kwargs)
         self.destroy()
-        gtk.main_quit()
+        gtk_main_quit()
 
     def destroy_window(self, *args, **kwargs):
         # logger.info("destroy_window:%s %s", args, kwargs)
         self.destroy()
-        gtk.main_quit()
+        gtk_main_quit()
         return False
 
 
@@ -45,6 +46,6 @@ class PlayerWindow(gtk.Window):
 
 if __name__ == '__main__':
     w = PlayerWindow()
-    w.connect("destroy", gtk.main_quit)
+    w.connect("destroy", gtk_main_quit)
     gtk.gdk.threads_init()
     gtk.main()

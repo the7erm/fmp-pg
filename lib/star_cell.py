@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2009 Zuza Software Foundation
-# Copyright 2012 Eugene R. Miller
+# Copyright 2013 Eugene R. Miller
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ import gtk, random
 import pango, os, sys
 import gtk, pygtk, gobject
 from gobject import idle_add, PARAM_READWRITE, SIGNAL_RUN_FIRST, TYPE_PYOBJECT
+from __init__ import gtk_main_quit
 
 img_path = ""
 # print sys.path[0]
@@ -436,7 +437,7 @@ if __name__ == "__main__":
 
 	w = gtk.Window()
 	w.set_position(gtk.WIN_POS_CENTER)
-	w.connect('delete-event', gtk.main_quit)
+	w.connect('delete-event', gtk_main_quit)
 	t = Tree()
 	m = t.get_model()
 	m.connect("row-changed", on_change)
