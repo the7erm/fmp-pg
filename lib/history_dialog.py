@@ -18,6 +18,7 @@
 #
 
 from __init__ import *
+from picker import wait
 from star_cell import CellRendererStar
 import gtk
 import gobject
@@ -30,6 +31,8 @@ from preload import convert_delta_to_str
 from listeners import listeners
 import pprint
 pp = pprint.PrettyPrinter(depth=6)
+
+print "WAIT:",wait
 
 class TableSkel:
     def __init__(self,query=""):
@@ -184,11 +187,15 @@ class TableSkel:
         rows = self.get_rows()
 
     def wait(self):
+        wait()
+        return
+        gtk.gdk.threads_leave()
         if gtk.events_pending():
             while gtk.events_pending():
                 gtk.main_iteration(False)
 
     def refresh_data(self, based_on=""):
+        gtk.gdk.threads_leave()
         if not based_on or not self.liststore:
             return True
         global change_lock
@@ -204,13 +211,17 @@ class TableSkel:
                     if "%s" % liststore_row[i2] != "%s" % fresh_row[i2]:
                         change_lock = True
                         print liststore_row[i2],"!=",fresh_row[i2]
+                        gtk.gdk.threads_enter()
                         liststore_row[i2] = fresh_row[i2]
+                        gtk.gdk.threads_leave()
                         change_lock = False
                 break
                 
             if not found:
                 change_lock = True
+                gtk.gdk.threads_enter()
                 self.liststore.append(fresh_row)
+                gtk.gdk.threads_leave()
                 change_lock = False
 
         return True
