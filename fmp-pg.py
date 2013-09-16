@@ -395,6 +395,7 @@ def set_rating():
     return True
 
 def on_end_of_stream(*args):
+    gtk.gdk.threads_leave()
     global playing
     playing.inc_score()
     start_playing("inc")

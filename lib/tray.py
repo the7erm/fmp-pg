@@ -149,24 +149,30 @@ def on_activate_preload(*args):
         return
 
 def on_toggle_cue_netcasts(item,*args):
+    gtk.gdk.threads_leave()
     cue_netcasts = "%s" % item.get_active()
     cue_netcasts = cue_netcasts.lower()
     print "on_toggle_cue_netcasts:", 
     cfg.set('Netcasts', 'cue', cue_netcasts, bool)
 
 def on_toggle_bedtime_mode(item, *args):
+    gtk.gdk.threads_leave()
     bedtime = "%s" % item.get_active()
     bedtime = bedtime.lower()
     print "on_toggle_bedtime:", bedtime
     cfg.set('Misc', 'bedtime_mode', bedtime, bool)
 
 def on_activate_favorites(item, *args):
+    gtk.gdk.threads_leave()
     print "on_activate_favorites"
     q = """INSERT INTO preload (fid, uid, reason) 
-                SELECT fid, usi.uid, 'My Favorites' 
-                FROM user_song_info usi, users u
+                SELECT usi.fid, usi.uid, 'My Favorites' 
+                FROM user_song_info usi, users u, files f, genres g, 
+                     file_genres fg
                 WHERE usi.uid = u.uid AND u.listening = true AND 
-                      true_score >= 85 AND ultp <= now() - INTERVAL '1 day'"""
+                      true_score >= 85 AND ultp <= now() - INTERVAL '1 day' AND
+                      fg.fid = f.fid AND fg.gid = g.gid AND f.fid = usi.fid AND
+                      g.enabled = true"""
     query(q)
 
 def on_activate_webplayer(item, *args):
