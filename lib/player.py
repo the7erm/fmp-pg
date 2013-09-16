@@ -355,6 +355,10 @@ static char * invisible_xpm[] = {
         # self.play_thread_id = thread.start_new_thread(self.play_thread, ())
         # gc.collect()
         self.update_time()
+
+
+    def stop(self):
+        self.player.set_state(STOPPED)
         
         
     def set_volume(self,widget,value):
@@ -363,7 +367,9 @@ static char * invisible_xpm[] = {
         self.player.set_property("volume",self.volume)
 
     def hide_window(self):
+        gtk.gdk.threads_enter()
         self.window.hide()
+        gtk.gdk.threads_leave()
         print "HIDE WINDOW"
 
         

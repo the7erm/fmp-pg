@@ -55,8 +55,6 @@ class MainHandler(RequestHandler):
   def get(self):
     self.write("This message comes from Tornado ^_^")
 
-threads = []
-
 app = Flask(__name__)
 app.debug = True
 
@@ -66,8 +64,6 @@ application = Application([
     (r"/tornado", MainHandler),
     (r".*", FallbackHandler, dict(fallback=tr)),
 ])
-
-
 
 @app.route("/")
 def index():
@@ -417,6 +413,9 @@ def start():
 
 def call_test():
     print "CALL TEST COMPLETED"
+
+def quit():
+    kill_threads()
 
 
 if __name__ == "__main__":

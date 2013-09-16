@@ -426,20 +426,16 @@ def on_state_change(*args, **kwargs):
     tray.set_play_pause_item(plr.playingState)
 
 def quit(*args, **kwargs):
-    print "QUIT!!!!"
     try:
         netcast_tray.terminate()
     except:
         pass
-    for t in flask_server.threads:
-        try:
-            t._Thread__stop()
-        except:
-            print "COULDN'T KILL"
+    plr.stop()
     gtk.threads_leave()
-    gtk.main_quit()
+    gtk_main_quit()
 
 import flask_server
+flask_server.threads = threads
 flask_server.get_results_assoc = get_results_assoc
 flask_server.get_assoc = get_assoc
 flask_server.pg_cur = pg_cur
