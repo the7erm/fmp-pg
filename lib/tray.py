@@ -63,6 +63,7 @@ def set_rating():
     gtk.gdk.threads_leave()
 
 def set_play_pause_item(state):
+    gtk.gdk.threads_enter()
     if state != "PLAYING" and state != PLAYING:
         play_pause_item.set_label("Play")
         play_pause_item.set_image(play_img)
@@ -73,6 +74,7 @@ def set_play_pause_item(state):
         play_pause_item.set_image(pause_img)
         icon.set_from_stock(gtk.STOCK_MEDIA_PLAY)
         # icon.set_from_file(image_path+"angry-playing-square.jpg")
+    gtk.gdk.threads_leave()
 
 
 def on_button_press(icon, event, **kwargs):

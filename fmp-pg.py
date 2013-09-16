@@ -257,7 +257,7 @@ def mark_as_played(percent_played=0):
 
 def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
                    dur_str, left_str, percent):
-
+    gtk.gdk.threads_leave()
     global last_percent_played_decimal
     percent_played  = decimal * 100
     if percent_played == last_percent_played_decimal:
@@ -284,12 +284,14 @@ def populate_preload(min_amount=0):
 
 
 def on_toggle_playing(item):
+    gtk.gdk.threads_leave()
     print "on_toggle_playing"
     plr.pause()
     tray.set_play_pause_item(plr.playingState)
 
 
 def on_next_clicked(*args, **kwargs):
+    gtk.gdk.threads_leave()
     global playing, idx
     playing.deinc_score()
     start_playing("inc")
@@ -297,6 +299,7 @@ def on_next_clicked(*args, **kwargs):
 
 
 def on_prev_clicked(item):
+    gtk.gdk.threads_leave()
     start_playing("deinc")
 
 def get_cue_netcasts():
@@ -382,7 +385,6 @@ def deinc_index():
     set_idx(idx)
 
 def set_rating():
-    print "set_rating()"
     try:
         tray.set_rating()
         picker.wait()
@@ -423,6 +425,7 @@ def start_playing(direction="inc"):
     notify.playing(playing)
 
 def on_state_change(*args, **kwargs):
+    gtk.gdk.threads_leave()
     tray.set_play_pause_item(plr.playingState)
 
 def quit(*args, **kwargs):
