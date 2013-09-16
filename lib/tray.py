@@ -24,6 +24,7 @@ from subprocess import Popen, PIPE
 from ConfigParser import NoSectionError
 
 def on_rating_scroll(icon, event):
+    gtk.gdk.threads_leave()
     print "on_rating_scroll:",event
     print "event.direction:",event.direction
     r = playing.get_selected()
@@ -41,6 +42,7 @@ def on_rating_scroll(icon, event):
     set_rating()
 
 def set_rating():
+    gtk.gdk.threads_enter()
     if playing.can_rate:
         if not rating_icon.get_visible():
             icon.set_visible(False)
@@ -58,6 +60,7 @@ def set_rating():
         icon.set_tooltip(playing.get_artist_title())
         rating_icon.set_visible(False)
         song_info.hide()
+    gtk.gdk.threads_leave()
 
 def set_play_pause_item(state):
     if state != "PLAYING" and state != PLAYING:
@@ -82,6 +85,7 @@ def on_rating_button_press(icon, event, **kwargs):
         rating_menu.popup(None, None, None, event.button, event.get_time())
 
 def on_rate(menu_item, rating):
+    gtk.gdk.threads_leave()
     print "on_rate:",menu_item, rating
     print "playing:",playing
     rating = int(rating)

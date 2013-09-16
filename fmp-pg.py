@@ -382,8 +382,8 @@ def deinc_index():
     set_idx(idx)
 
 def set_rating():
+    print "set_rating()"
     try:
-        gtk.gdk.threads_enter()
         tray.set_rating()
         picker.wait()
     except:

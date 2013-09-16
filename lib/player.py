@@ -255,10 +255,13 @@ static char * invisible_xpm[] = {
         
     
     def on_scroll(self, widget, event):
+        print "on_scroll:"
+        gtk.gdk.threads_leave()
         if event.direction == gtk.gdk.SCROLL_UP:
             self.seek("+5")
         if event.direction == gtk.gdk.SCROLL_DOWN:
             self.seek("-5")
+        print "/on_scroll"
 
     def ind_on_scroll(self, widget, steps, direction):
         if direction == 0:

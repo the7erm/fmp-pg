@@ -37,10 +37,16 @@ populate_locked = False
 # DROP RULE "my_table_on_duplicate_ignore" ON "my_table";
 
 def wait():
+    print "enter"
+    gtk.gdk.threads_enter()
+    print "/enter"
     if gtk.events_pending():
         while gtk.events_pending():
             # print "pending:"
             gtk.main_iteration(False)
+    print "leave"
+    gtk.gdk.threads_leave()
+    print "/leave"
 
 def create_dont_pick():
     global dont_pick_created
@@ -282,6 +288,7 @@ def get_single_random_unplayed(uid):
 
 
 def populate_preload_for_uid(uid, min_amount=0):
+    gtk.gdk.threads_leave()
     print "populate_preload_for_uid 1"
     total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s",(uid,))
     if total['total'] > min_amount:

@@ -1,0 +1,300 @@
+<html>
+<head>
+    <title>fmp - {{ playing.basename|safe }}</title>
+    <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
+
+    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.0/jquery.mobile-1.3.0.min.css" />
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.10.1/themes/base/jquery-ui.css" />
+
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.9.1.js"></script>
+    
+    <script type="text/javascript" src="/static/js/underscore-min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery.raty.min.js"></script>
+    <script type="text/javascript" src="/static/js/jquery-mousewheel.js"></script>
+    <script src="http://code.jquery.com/mobile/1.3.0/jquery.mobile-1.3.0.min.js"></script>
+
+
+</head>
+<body>
+    <a href="/" data-role="button" data-icon="home" data-inline="true" data-ajax="false">Back To Player</a>
+    {% include "search-form.html" ignore missing %}
+    <div id="loading">
+        Loading ...
+    </div>
+    {% if results: %}
+        <div id="search_results" >
+            
+        </div>
+    {% endif %}
+    <div class="loading">Loading ...</div>
+
+    <style>
+    .file {
+        border: 1px dotted #000;
+        background: #DDD;
+        margin:5px;
+        padding:5px;
+        color:#000;
+    }
+    
+    .file:hover {
+        background: #CCC;
+        border: 1px solid #000;
+    }
+    .float-right {
+        float:right;
+    }
+    </style>
+
+    <script type="text/html" id="tpl-item">
+        <div class="float-left"><%- label %></div>
+        <div class="float-left"><%- text %></div><br clear="left">
+    </script>
+
+    <script type="text/html" id="tpl-row">
+       <div class="bordered file<% if (cued) { %> cued<% } %>">
+            <div class="float-left">
+                <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% if (cued) { 
+                    %>minus<% 
+                } else { 
+                    %>plus<% 
+                } %>">&nbsp;</button>
+            </div>
+            <div class="float-left" style="padding-left:3px; word-wrap:break-word;">
+                <% 
+                    if (artist) {
+                        print(item_template({"label": 'Artist:', 'text': artist}));
+                    } 
+                    print(item_template({"label": 'Filename:', 'text': basename}));
+                    if (album_name) {
+                        print(item_template({"label": 'Album:', 'text': album_name}));
+                    }
+                %>
+            </div>
+            <div class="float-right">
+                <table class='ratings-table bordered' cellspacing="0">
+                    <thead class="ui-slider-bg ui-btn-active ui-btn-corner-all">
+                        <tr>
+                            <th>User</th>
+                            <th>Rating</th>
+                            <th>True Score</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+            <br clear="all">
+       </div>
+    </script>
+    <script type="text/html" id="tpl-rating">
+        <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>">
+            <td><%= uname %></td> 
+            <td class="star-rating nowrap"  data-fid="<%= fid %>" data-rating="<%- rating %>" data-uid="<%- uid %>" ></td>
+            <td><% print (Math.round(true_score,2)); %></td>
+        </tr>
+    </script>
+
+    <script type="text/javascript">
+        if (!window.console) {
+            window.console = {
+                'log':function(){}
+            };
+        }
+        var row_template = _.template($("#tpl-row").text()),
+            rating_template = _.template($("#tpl-rating").text()),
+            item_template = _.template($("#tpl-item").text()),
+            $window = $(window),
+            $document = $(document),
+            $loading = $("#loading"),
+            $_loading = $(".loading");
+
+        $(document).bind('pageinit', function(){
+            function showLoading() {
+                $loading.show();
+
+                //        .css("bottom", document.documentElement.scrollTop);
+                // $_loading.show();
+                /*
+                .style.left=String(e.clientX+document.documentElement.scrollLeft)+"px";
+document.getElementById('imgbox').style.top=String(e.clientY+document.documentElement.scrollTop)+"px";  */
+            }
+            function hideLoading() {
+                $loading.hide();
+                $_loading.hide();
+            }
+            function onRate(score, evt) {
+                var _this = $(this),
+                    uid = _this.data("uid"), 
+                    fid = _this.data("fid");
+                if (!uid || !fid) {
+                    return;
+                }
+                $.ajax({
+                    "url":"/",
+                    "data":{
+                        "fid": fid,
+                        "cmd": "rate",
+                        "uid": uid,
+                        "status": 1,
+                        "value": score,
+                    }
+                }).done(function(data){
+                    // process_status(data);
+                });
+            }
+            
+            var load_lock = false,
+                end_of_list = false,
+                start = 0,
+                limit = 20,
+                None = null,
+                $search_results = $("#search_results"),
+                files = {{ results|safe }},
+                addFile = function() {
+                    var file = files.shift();
+                    if (!file) {
+                        load_lock = false;
+                        hideLoading();
+                        loadDataWhenAtBottom();
+                        return;
+                    }
+                    if (_.isUndefined(file, 'cued')) {
+                        file.cued = false;
+                    }
+                    file.cued = file.cued == null ? false : true;
+                    file.item_template = item_template;
+                    var file_html = row_template(file);
+                        el = $("<span></span>");
+                        
+                    el.append(file_html);
+                    // console.log(file_html);
+
+                    var rt = el.find('.ratings-table');
+                    _.each(file.usi, function(u){
+                        var dta = u;
+                            dta['fid']  = file.fid;
+                        rt.append(rating_template(dta));
+                    });
+
+                    el.find(".star-rating").raty({
+                        score: function () {
+                            return $(this).data("rating")
+                        },
+                        click: onRate,
+                        path: '/static/images/raty/',
+                        cancel: true,
+                        cancelOff : 'cancel-off-big.png',
+                        cancelOn  : 'cancel-on-big.png',
+                        starHalf  : 'star-half-big.png',
+                        starOff   : 'star-off-big.png',
+                        starOn    : 'star-on-big.png',
+                        size:24
+                    });
+
+                    el.find('.add-to-preload')
+                      .click(function(){
+                        console.log("arguments",arguments)
+                        var _this = $(this),
+                            cued = _this.data('cued') ? false : true,
+                            sign = cued ? "minus" : "plus",
+                            fid = _this.data('fid'),
+                            $parent = _this.parent(),
+                            $ui_icon = $parent.find('.ui-icon');
+                        console.log("_this.data(\"cued\"):", _this.data("cued"));
+                        console.log("cued:",cued)
+                        el.toggleClass('cued', cued);
+                        // $parent.find(".ui-btn-text").text();
+                        if (sign == "plus") {
+                            $ui_icon.removeClass("ui-icon-minus").addClass("ui-icon-plus");
+                        } else {
+                            $ui_icon.removeClass("ui-icon-plus").addClass("ui-icon-minus");
+                        }
+                        
+                        _this.data('cued', cued);
+                        _this.data("icon", sign)
+                        _this.trigger("refresh");
+                        console.log("clicked");
+                        $.ajax("/cue/", {
+                           data: {
+                                'fid': fid,
+                                'cue': cued
+                           }
+                        });
+                      })
+                      .data(file);
+                    
+                    $search_results.append(el);
+                    el.trigger("create");
+                    addFile();
+                };
+
+            function processResponse(response) {
+                start = parseInt(start);
+                response = jQuery.parseJSON(response);
+                if (response.length == 0) {
+                    load_lock = true;
+                    end_of_list = true;
+                    console.log("END OF LIST!!!");
+                    $loading.text("End of results for "+{{ q|tojson|safe }});
+                    setTimeout(hideLoading, 5000);
+                    return;
+                }
+                _.each(response, function(f,k){
+                    files.push(f);
+                }, this);
+                if (response.length > 0 || files.length > 0) {
+                    addFile();
+                }
+                // img.show().lazyload();
+            }
+            
+            function loadData() {
+                if (load_lock) {
+                    console.log("loadData load_lock:",load_lock);
+                    return;
+                }
+                showLoading();
+                console.log("load_lock:",load_lock);
+                load_lock = true;
+                start = parseInt(start)+limit;
+
+                console.log("load_lock:",load_lock);
+                $.ajax({
+                    type: "get",
+                    url: "/search",
+                    cache: false,
+                    data:{
+                            "l": parseInt(limit),
+                            "s": parseInt(start), 
+                            "ajax": 1, 
+                            "q": {{ q|tojson|safe }},
+                            "f": {{ filter_by|tojson|safe }}
+                         },
+                    success: processResponse,
+                    error: function(){
+                        load_lock = false;
+                        hideLoading();
+                    }
+                });
+                
+            }
+            function loadDataWhenAtBottom() {
+                if ($window.scrollTop() + ($window.height() * 1) >= ($document.height() - $window.height())) {
+                    loadData();
+                }
+            }
+            load_lock = true;
+            window.setTimeout(addFile, 1000);
+            // addFile();
+            
+            $window.scroll(function () {
+                /*
+                console.log("top:", $window.scrollTop());
+                console.log("$document.height() - $window.height()",$document.height() - $window.height()) */
+                loadDataWhenAtBottom();
+            });
+            // loadDataWhenAtBottom();
+        });
+    </script>
+</body>
+</html>
