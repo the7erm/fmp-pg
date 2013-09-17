@@ -97,7 +97,7 @@
                 junk_input = $("#junk-input"),
                 junk_input_parent = junk_input.parent(),
                 player = {{ player.to_dict()|tojson|safe }},
-                playing = {{ playing_json|safe }},
+                playing = {{ playing.to_dict()|tojson|safe }},
                 ratings = {{ playing.to_dict()['ratings']|tojson|safe }},
                 volume = {{ volume }},
                 volume_lock = false,
