@@ -190,9 +190,10 @@ class FObj:
                 
             print "RATINGS:",ratings
         return {
-            "artist_title":self.get_artist_title(),
-            "basename":self.basename,
-            "ratings":ratings
+            "artist_title": self.get_artist_title(),
+            "basename": self.basename,
+            "ratings": ratings,
+            # "tags": self.tags_hard or self.tags_easy or {}
         }
 
 from __init__ import *
