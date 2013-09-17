@@ -4,8 +4,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
 
     <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.0/jquery.mobile-1.3.0.min.css" />
-    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
     <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.10.1/themes/base/jquery-ui.css" />
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+    
 
     <script type="text/javascript" src="http://code.jquery.com/jquery-1.9.1.js"></script>
     <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
@@ -69,17 +70,33 @@
         </tr>
     </script>
 
+    <script type="text/html" id="tpl-search">
+        <div class="ui-input-search ui-btn-corner-all ui-btn-shadow ui-icon-searchfield ui-body-c">
+            <%- text %>
+        </div>
+    </script>
+
     <script type="text/javascript">
         var change_lock = false;
-            new_vol = [];
+            new_vol = [],
+            tooltip_tpl = _.template($("#tpl-search").html());
         
         $(document).ready(function(){
-            $(document).tooltip({
+            $("#playing-file").click(function(evt){
+                var _this = $(this);
+                document.location = "/search/?q="+encodeURIComponent(_this.text())+"&f=all&s=0"
+            });
+            $(document).tooltip();
+            $(".artist_title").tooltip({
                 track: true,
+                tooltipClass: "search-tooltip",
                 content: function() {
                     var element = $(this);
                     if ( element.is( "[data-search]" ) ) {
-                      return "<img src='/static/images/tv.png'>";
+                      var _this = $(this),
+                          args = {"text": _this.text() };
+                          html = tooltip_tpl(args);
+                      return html;
                     }
                     if ( element.is( "[title]" ) ) {
                       return element.attr( "title" );
@@ -87,6 +104,10 @@
                     if ( element.is( "img" ) ) {
                       return element.attr( "alt" );
                     }
+                },
+                position: {
+                    my: "right-5 bottom-5",
+                    at: "center top"
                 }
             });
             $.fn.raty.defaults.path = '/static/images/raty/';

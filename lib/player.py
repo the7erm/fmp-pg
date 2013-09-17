@@ -476,7 +476,8 @@ static char * invisible_xpm[] = {
                 msg = message.structure[key]
                 if isinstance(msg, (gst.Date, gst.DateTime)):
                     self.tags[key] = "%s" % msg
-                elif key not in ('image','private-id3v2-frame', 'preview-image'):
+                elif key not in ('image','private-id3v2-frame', 'preview-image',
+                                 'private-qt-tag'):
                     print "tags[%s]=%s" % (key, msg )
                     self.tags[key] = "%s" % msg
                 else:

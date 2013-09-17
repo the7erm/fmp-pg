@@ -39,6 +39,28 @@ body {
     background: #DDD !important;
 }
 
+#playing-file {
+    cursor: pointer;
+    color:blue;
+}
+
+#playing-file:hover {
+    text-decoration: underline;
+}
+
+.search-tooltip {
+    padding:0px;
+    margin: 0px;
+    border: 0px solid transparent !important;
+    -moz-border-radius: 0px;
+    -webkit-border-radius: 0px;
+    border-radius: 0px;
+    -webkit-box-shadow: none; 
+    -moz-box-shadow: none;
+    box-shadow: none;
+    background: transparent;
+}
+
 .volume {
     width:50px;
     height:50px;
