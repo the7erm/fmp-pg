@@ -119,6 +119,18 @@
                 return false;
             });
 
+            function set_image(img) {
+                if (!img) {
+                    $album_art.hide();
+                    window.last_img = '';
+                    return;
+                }
+                if (window.last_img != img) {
+                    $album_art.prop('src', 'data:image/png;base64,'+img)
+                              .show();
+                }
+                window.last_img = img;
+            }
             
             function onRate(score, evt) {
                 var uid = $(this).data("uid");
@@ -144,20 +156,8 @@
                 window.player = player;
 
                 window.document.title = "fmp - " + dta.playing.basename;
-                if (!_.isUndefined(dta.player.tags.image)) {
-                    if (window.last_img != dta.player.tags.image) {
-                        $album_art.prop('src', 'data:image/png;base64,'+dta.player.tags.image)
-                                  .show();
-                        /*
-                        background: url(background.png);
-                        opacity: 0.5;
-                        */
-                    }
-                    window.last_img = dta.player.tags.image;
-                } else {
-                    $album_art.hide();
-                    window.last_img = '';
-                }
+                var img = dta.player.tags.image || dta.player.tags["preview-image"] || "";
+                set_image(img);
                 
                 
                 /* 

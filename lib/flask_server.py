@@ -111,7 +111,7 @@ def index():
 def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
     global player, playing
-    # print "PLAYING",playing.to_dict()
+    print "PLAYING",player.to_dict()
 
     return jsonify(player=player.to_dict(), playing=playing.to_dict(),
                    volume=get_volume())
