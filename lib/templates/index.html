@@ -62,12 +62,7 @@
 
     <input name="seek-slider-1"  data-theme="d"  data-highlight="true" class="ui-hide-label" id="seek" min="0" max="{{ player.pos_data.dur_int }}" step="1" value="{{ player.pos_data.pos_int }}" type="range">
     {% include "search-form.html" ignore missing %}
-    <script type="text/html" id="tpl-rating">
-        <tr class="user-line" data-uid="<%= uid %>">
-            <td><%= uname %></td> 
-            <td class="star-rating nowrap" data-rating="<%= rating %>" data-uid="<%= uid %>" ></td>
-            <td><% print (Math.round(true_score,2)); %></td>
-        </tr>
+    {% include "rating-tpl.html" ignore missing %}
     </script>
 
     <script type="text/html" id="tpl-search">
@@ -82,33 +77,61 @@
             tooltip_tpl = _.template($("#tpl-search").html());
         
         $(document).ready(function(){
-            $("#playing-file").click(function(evt){
-                var _this = $(this);
-                document.location = "/search/?q="+encodeURIComponent(_this.text())+"&f=all&s=0"
-            });
             $(document).tooltip();
-            $(".artist_title").tooltip({
-                track: true,
-                tooltipClass: "search-tooltip",
-                content: function() {
-                    var element = $(this);
-                    if ( element.is( "[data-search]" ) ) {
-                      var _this = $(this),
-                          args = {"text": _this.text() };
-                          html = tooltip_tpl(args);
-                      return html;
-                    }
-                    if ( element.is( "[title]" ) ) {
-                      return element.attr( "title" );
-                    }
-                    if ( element.is( "img" ) ) {
-                      return element.attr( "alt" );
-                    }
-                },
-                position: {
-                    my: "right-5 bottom-5",
-                    at: "center top"
+            
+
+            $("#playing-file").bind("mouseover",function(){
+                var _this = $(this),
+                    fullText = "",
+                    spanCnt = _this.find("span").length;
+                    words = _this.text().split(" ");
+                if (spanCnt) {
+                    return;
                 }
+                console.log("words:",words);
+                
+                if (words == null) {
+                    return;
+                }
+
+                for(i=0;i<words.length;i++){
+                    if (words[i]) {
+                        words[i] = "<span title='"+words[i]+"'>"+words[i]+"</span> ";
+                        fullText += words[i];
+                    }
+                }
+
+                _this.empty().append(fullText);
+
+                _this.children("span").tooltip({
+                    track: true,
+                    tooltipClass: "search-tooltip",
+                    content: function() {
+                        var element = $(this),
+                            html = "";
+                        if ( element.is( "[data-search]" ) ) {
+                          var element = element,
+                              args = {"text": element.text() };
+                              html = tooltip_tpl(args);
+                        }
+                        if ( element.is( "[title]" ) ) {
+                           args = {"text": element.text() };
+                           html = tooltip_tpl(args);
+                        }
+                        if ( element.is( "img" ) ) {
+                          return element.attr( "alt" );
+                        }
+                        return html;
+                    },
+                    position: {
+                        my: "right-5 bottom-5",
+                        at: "center top"
+                    }
+                }).click(function(){
+                    var _this = $(this);
+                    document.location = "/search/?q="+encodeURIComponent(_this.text())+"&f=all&s=0";
+                });
+
             });
             $.fn.raty.defaults.path = '/static/images/raty/';
             var seek_lock = false,
@@ -246,14 +269,14 @@
                         score: function () {
                             return $(this).data("rating")
                         },
-                        click:onRate,
+                        click: onRate,
                         cancel: true,
                         cancelOff : 'cancel-off-big.png',
                         cancelOn  : 'cancel-on-big.png',
                         starHalf  : 'star-half-big.png',
                         starOff   : 'star-off-big.png',
                         starOn    : 'star-on-big.png',
-                        size:24
+                        size: 24
                     });
                 }
                 

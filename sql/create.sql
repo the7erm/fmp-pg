@@ -356,7 +356,9 @@ CREATE TABLE files (
     dir character varying(255),
     basename character varying(255),
     ltp timestamp with time zone,
-    mtime timestamp with time zone
+    mtime timestamp with time zone,
+    sha512 character varying(132),
+    title text
 );
 
 
@@ -658,7 +660,8 @@ SET default_with_oids = false;
 CREATE TABLE preload (
     fid integer NOT NULL,
     uid integer NOT NULL,
-    reason text
+    reason text,
+    plid integer NOT NULL
 );
 
 
@@ -679,6 +682,25 @@ CREATE SEQUENCE preload_fid_seq
 --
 
 ALTER SEQUENCE preload_fid_seq OWNED BY preload.fid;
+
+
+--
+-- Name: preload_plid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_plid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_plid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_plid_seq OWNED BY preload.plid;
 
 
 SET default_with_oids = true;
@@ -1244,6 +1266,13 @@ ALTER TABLE ONLY preload ALTER COLUMN fid SET DEFAULT nextval('preload_fid_seq':
 
 
 --
+-- Name: plid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload ALTER COLUMN plid SET DEFAULT nextval('preload_plid_seq'::regclass);
+
+
+--
 -- Name: tid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1527,6 +1556,13 @@ CREATE INDEX rating ON user_song_info USING btree (rating);
 
 
 --
+-- Name: sha512_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX sha512_index ON files USING btree (sha512);
+
+
+--
 -- Name: skip_count; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1538,6 +1574,13 @@ CREATE INDEX skip_count ON user_song_info USING btree (score);
 --
 
 CREATE INDEX tags_binary_fid_idx ON tags_binary USING btree (fid);
+
+
+--
+-- Name: title_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX title_idx ON files USING btree (title);
 
 
 --

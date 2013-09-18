@@ -417,11 +417,27 @@ def set_last_time_cued(uid):
 
 def get_single_from_preload(uid=None):
     if uid:
+        f = get_assoc("""SELECT * 
+                            FROM preload p, files f 
+                            WHERE f.fid = p.fid AND uid = %s AND 
+                                  reason = 'From search'
+                            ORDER BY plid LIMIT 1""", 
+                            (uid,))
+        if f:
+          return f
         return get_assoc("""SELECT * 
                             FROM preload p, files f 
                             WHERE f.fid = p.fid AND uid = %s 
                             ORDER BY random() LIMIT 1""", 
                             (uid,))
+
+    f = get_assoc("""SELECT * 
+                     FROM preload p, files f 
+                     WHERE f.fid = p.fid AND reason = 'From search'
+                     ORDER BY plid
+                     LIMIT 1""")
+    if f:
+      return f
 
     return get_assoc("""SELECT * 
                         FROM preload p, files f 

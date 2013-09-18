@@ -86,13 +86,7 @@
             <br clear="all">
        </div>
     </script>
-    <script type="text/html" id="tpl-rating">
-        <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>">
-            <td><%= uname %></td> 
-            <td class="star-rating nowrap"  data-fid="<%= fid %>" data-rating="<%- rating %>" data-uid="<%- uid %>" ></td>
-            <td><% print (Math.round(true_score,2)); %></td>
-        </tr>
-    </script>
+    {% include "rating-tpl.html" ignore missing %}
 
     <script type="text/javascript">
         if (!window.console) {

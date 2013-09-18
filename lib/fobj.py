@@ -135,6 +135,8 @@ class FObj:
         if self.exists and self.has_tags and self.tags_easy is None:
             try:
                 self.tags_easy = mutagen.File(self.filename, easy=True)
+                print "GET_TAGS"
+                pp.pprint(self.tags_easy)
             except mutagen.mp3.HeaderNotFoundError:
                 self.tags_easy = None
 

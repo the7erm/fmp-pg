@@ -137,6 +137,7 @@ def prase_words(q, filter_by="all"):
         LOWER(a.artist) SIMILAR TO %s OR
         LOWER(g.genre) SIMILAR TO %s OR
         LOWER(f.basename) SIMILAR TO %s OR
+        LOWER(f.title) SIMILAR TO %s OR
         LOWER(al.album_name) SIMILAR TO %s
     """
     
@@ -144,6 +145,7 @@ def prase_words(q, filter_by="all"):
         a.artist ILIKE %s OR
         g.genre ILIKE %s OR
         f.basename ILIKE %s OR
+        f.title ILIKE %s OR
         al.album_name ILIKE %s
     """
 
@@ -159,7 +161,7 @@ def prase_words(q, filter_by="all"):
         else:
             w = "%%[[:<:]]%s[[:>:]]%%" % w
 
-        querys.append(pg_cur.mogrify(template, (w,w,w,w)))
+        querys.append(pg_cur.mogrify(template, (w,w,w,w,w)))
 
     if querys:
         if filter_by == "any":

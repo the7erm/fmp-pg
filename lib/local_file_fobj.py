@@ -154,6 +154,21 @@ class Local_File(fobj.FObj):
                     continue
                 self.dups.append(dup)
 
+        if self.db_info and not self.db_info['title']:
+            self.get_title()
+
+    def get_title(self):
+        if not self.tags_easy:
+            self.get_tags()
+
+        if self.tags_easy:
+            if 'title' in self.tags_easy and self.tags_easy['title']:
+                self.db_info = get_assoc("""UPDATE files SET title = %s
+                                            WHERE fid = %s 
+                                            RETURNING *;""",
+                                            (self.tags_easy['title'][0], 
+                                             self.db_info['fid'],))
+                print "SET TITLE:%s" % self.tags_easy['title'][0]
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
 
