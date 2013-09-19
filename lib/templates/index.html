@@ -74,17 +74,39 @@
     <script type="text/javascript">
         var change_lock = false;
             new_vol = [],
-            tooltip_tpl = _.template($("#tpl-search").html());
+            tooltip_tpl = _.template($("#tpl-search").html()),
+            hide_ext = ['.mp3', '.wma', '.mp4', '.avi']
         
         $(document).ready(function(){
-            $(document).tooltip();
+            $(document).tooltip({
+                content: function() {
+                    var element = $(this),
+                        html = "",
+                        txt = element.text();
+                    if (txt == '-') {
+                        return "";
+                    }
+                    if ( element.is( "[data-search]" ) ) {
+                      var element = element,
+                          args = {"text": txt };
+                          html = tooltip_tpl(args);
+                    }
+                    if ( element.is( "[title]" ) ) {
+                       return element.attr("title");
+                    }
+                    if ( element.is( "img" ) ) {
+                      return element.attr("alt");
+                    }
+                    return html;
+                }
+            });
             
 
             $("#playing-file").bind("mouseover",function(){
                 var _this = $(this),
                     fullText = "",
                     spanCnt = _this.find("span").length;
-                    words = _this.text().split(" ");
+                    words = _this.text().split(/\ /);
                 if (spanCnt) {
                     return;
                 }
@@ -96,8 +118,15 @@
 
                 for(i=0;i<words.length;i++){
                     if (words[i]) {
-                        words[i] = "<span title='"+words[i]+"'>"+words[i]+"</span> ";
-                        fullText += words[i];
+                        var word = words[i];
+                        if (word == '-') {
+                            word = "<span>"+word+"</span> ";
+                            fullText += word;
+                            continue;
+                        }
+                        word = word.replace(".mp3","")
+                        word = "<span title='"+word+"'>"+word+"</span> ";
+                        fullText += word;
                     }
                 }
 
@@ -108,14 +137,20 @@
                     tooltipClass: "search-tooltip",
                     content: function() {
                         var element = $(this),
-                            html = "";
+                            html = "",
+                            txt = element.text();
+                        console.log("txt:'"+txt+"'");
+                        if (txt == '-') {
+                            console.log("is-")
+                            return "";
+                        }
                         if ( element.is( "[data-search]" ) ) {
                           var element = element,
-                              args = {"text": element.text() };
+                              args = {"text": txt };
                               html = tooltip_tpl(args);
                         }
                         if ( element.is( "[title]" ) ) {
-                           args = {"text": element.text() };
+                           args = {"text": txt };
                            html = tooltip_tpl(args);
                         }
                         if ( element.is( "img" ) ) {
@@ -128,8 +163,14 @@
                         at: "center top"
                     }
                 }).click(function(){
-                    var _this = $(this);
-                    document.location = "/search/?q="+encodeURIComponent(_this.text())+"&f=all&s=0";
+                    var _this = $(this),
+                        txt = _this.text();
+                    txt = txt == '-' ? 
+                                 _this.parent().text()
+                                 .replace(' - ',' ')
+                                 .replace('.mp3','') : 
+                                 txt;
+                    document.location = "/search/?q="+encodeURIComponent(txt)+"&f=all&s=0";
                 });
 
             });
@@ -276,7 +317,13 @@
                         starHalf  : 'star-half-big.png',
                         starOff   : 'star-off-big.png',
                         starOn    : 'star-on-big.png',
-                        size: 24
+                        size: 24,
+                        hints: ['Not the greatest', 
+                                'Meh',
+                                'Good', 
+                                'Really good', 
+                                'Love it!'],
+                        cancelHint: 'Please don\' play this ever again for me',
                     });
                 }
                 
@@ -403,7 +450,6 @@
                 }
                 seek_lock = true;
                 var val = $(this).val();
-                console.log("val:",val);
                 window.player.pos_data.pos_int = parseInt(val);
                 $.ajax({
                     "url":"/",
