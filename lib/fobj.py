@@ -180,7 +180,7 @@ class FObj:
                 ultp = r["ultp"]
                 if hasattr(ultp,"isoformat"):
                     ultp = r["ultp"].isoformat()
-                print "R:",dict(r)
+                # print "R:",dict(r)
                 r = dict(r)
                 ratings[r['uid']] = {}
                 for k, v in r.iteritems():
@@ -190,7 +190,7 @@ class FObj:
                         v = v.isoformat()
                     ratings[r['uid']][k] = v
                 
-            print "RATINGS:",ratings
+            # print "RATINGS:",ratings
         return {
             "artist_title": self.get_artist_title(),
             "basename": self.basename,

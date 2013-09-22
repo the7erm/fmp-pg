@@ -387,7 +387,7 @@ def deinc_index():
 def set_rating():
     try:
         tray.set_rating()
-        picker.wait()
+        # picker.wait()
     except:
         pass
     finally:

@@ -42,6 +42,7 @@ class Player(gobject.GObject):
         'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,)),
         'SIGUSR1-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         'SIGUSR2-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+        'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
     }
     
     def __init__(self, filename=None):
@@ -519,8 +520,8 @@ static char * invisible_xpm[] = {
         elif message_name == 'missing-plugin':
             print "MISSING PLUGGIN"
             # self.play_thread_id = None
-            self.player.set_state(STOPPED)
-            self.emit('end-of-stream')
+            # self.player.set_state(STOPPED)
+            self.emit('missing-plugin')
 
             
     def control_seek(self,w,seek):
@@ -749,7 +750,7 @@ if __name__ == '__main__':
     ind.connect('scroll-event', player.ind_on_scroll)
     player.connect('state-changed', on_playing_state_changed)
 
-    player.next_button.conne_+ct('clicked',next)
+    player.next_button.connect('clicked',next)
     player.prev_button.connect('clicked',prev)
     gobject.idle_add(next)
     while gtk.events_pending(): gtk.main_iteration(False)

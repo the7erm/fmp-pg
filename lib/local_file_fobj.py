@@ -28,6 +28,8 @@ import re
 from excemptions import CreationFailed
 from ratings_and_scores import RatingsAndScores
 from datetime import date
+from datetime import datetime
+from datetime import timedelta
 import hashlib
 import os
 import sys
@@ -48,7 +50,10 @@ class Local_File(fobj.FObj):
         self.albums = []
         self.genres = []
         self.dups = []
+        self.mark_as_played_when_time = datetime.now()
+        self.mark_as_played_when_percent = 0
         self.last_percent_played = 0
+        self.last_time_marked_as_played = datetime.now()
 
         if fid:
             db_info = get_assoc("""SELECT * 
@@ -194,15 +199,31 @@ class Local_File(fobj.FObj):
             d.ratings_and_scores.check_recently_played(uid=None)
 
     def mark_as_played(self, percent_played=0):
-        ceil_percent_played = math.ceil(percent_played)
+        now = datetime.now()
 
-        if self.last_percent_played != ceil_percent_played:
-            self.update_artists_ltp()
-            self.last_percent_played = ceil_percent_played
+        if self.mark_as_played_when_percent > percent_played and \
+           self.mark_as_played_when_time > now:
+            return
 
+        print "mark as played:", self.mark_as_played_when_percent, "<="
+        print "               ",percent_played
+        print "            or ",self.last_time_marked_as_played, "<="
+        print "               ",now
+        print "self.last_time_marked_as_played:",self.last_time_marked_as_played, \
+              'drift:', now - self.last_time_marked_as_played
+        print "self.last_percent_played:", self.last_percent_played
+        self.update_artists_ltp()
+        
         self.ratings_and_scores.mark_as_played(percent_played)
         for d in self.dups:
             d.mark_as_played(percent_played)
+        self.mark_as_played_when_percent = percent_played + 10
+        if self.mark_as_played_when_percent > 100:
+            self.mark_as_played_when_percent = 100
+        now = datetime.now()
+        self.mark_as_played_when_time = now + timedelta(seconds=5)
+        self.last_time_marked_as_played = now
+        self.last_percent_played = percent_played
 
     def update_history(self,percent_played=0):
         self.ratings_and_scores.update_history(percent_played=percent_played)

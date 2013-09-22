@@ -18,10 +18,15 @@
 #
 
 from __init__ import *
-import gtk, sys, os
+import gtk
+import sys
+import os
 from player import PLAYING
 from subprocess import Popen, PIPE
 from ConfigParser import NoSectionError
+
+global rating_image_path
+rating_image_path = ""
 
 def on_rating_scroll(icon, event):
     gtk.gdk.threads_leave()
@@ -41,25 +46,43 @@ def on_rating_scroll(icon, event):
         playing.rate(rating=rating, selected=True)
     set_rating()
 
+def set_tooltip():
+    tooltip = rating_icon.get_tooltip_text()
+    playing_artist_title = playing.get_artist_title()
+    if tooltip == playing_artist_title:
+        return False
+    print "tooltip != playing_artist_title", tooltip,'!=',playing_artist_title
+    icon.set_tooltip(playing_artist_title)
+    rating_icon.set_tooltip(playing_artist_title)
+    return True
+
 def set_rating():
     gtk.gdk.threads_enter()
     if playing.can_rate:
+        set_tooltip()
         if not rating_icon.get_visible():
             icon.set_visible(False)
             rating_icon.set_visible(True)
             icon.set_visible(True)
+        if not song_info.get_visible():
+            song_info.show()
+
         # print "PLAYING:",playing
         r = playing.get_selected()
         if r:
             # print "R:",r
-            rating_icon.set_from_file(image_path+"rate.%s.svg.png" % r['rating'])
-        rating_icon.set_tooltip(playing.get_artist_title())
-        icon.set_tooltip(playing.get_artist_title())
-        song_info.show()
+            global rating_image_path
+            path_to_image = os.path.join(image_path, "rate.%s.svg.png" % r['rating'])
+            if rating_image_path != path_to_image:
+                rating_icon.set_from_file(path_to_image)
+                rating_image_path = path_to_image
+        
     else:
-        icon.set_tooltip(playing.get_artist_title())
-        rating_icon.set_visible(False)
-        song_info.hide()
+        if rating_icon.get_visible():
+            rating_icon.set_visible(False)
+        if song_info.get_visible():
+            song_info.hide()
+        set_tooltip()
     gtk.gdk.threads_leave()
 
 def set_play_pause_item(state):

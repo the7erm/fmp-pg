@@ -84,12 +84,13 @@
                         html = "",
                         txt = element.text();
                     if (txt == '-') {
-                        return "";
+                        args = {"text": txt };
+                        return tooltip_tpl(args);
                     }
                     if ( element.is( "[data-search]" ) ) {
                       var element = element,
                           args = {"text": txt };
-                          html = tooltip_tpl(args);
+                          return tooltip_tpl(args);
                     }
                     if ( element.is( "[title]" ) ) {
                        return element.attr("title");
