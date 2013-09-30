@@ -75,8 +75,7 @@
     <script type="text/javascript">
         var change_lock = false;
             new_vol = [],
-            tooltip_tpl = _.template($("#tpl-search").html()),
-            hide_ext = ['.mp3', '.wma', '.mp4', '.avi']
+            tooltip_tpl = _.template($("#tpl-search").html());
         
         $(document).ready(function(){
             $(document).tooltip({
@@ -126,7 +125,6 @@
                             fullText += word;
                             continue;
                         }
-                        word = word.replace(".mp3","")
                         word = "<span title='"+word+"'>"+word+"</span> ";
                         fullText += word;
                     }
@@ -169,13 +167,51 @@
                         txt = _this.text();
                     txt = txt == '-' ? 
                                  _this.parent().text()
-                                 .replace(' - ',' ')
-                                 .replace('.mp3','') : 
+                                 .replace(' - ',' ') : 
                                  txt;
+                    $("#search-field").val(txt);
                     document.location = "/search/?q="+encodeURIComponent(txt)+"&f=all&s=0";
                 });
 
             });
+
+            function format_time(nanosecnods) {
+                var seconds = Math.floor(parseInt(nanosecnods) / 1000000000);
+                var hrs = Math.floor(seconds / 3600);
+                if (hrs) {
+                    seconds = seconds - (hrs * 3600);
+                }
+                var minutes = Math.floor(seconds / 60);
+                if (minutes) {
+                    seconds = seconds - (minutes * 60);
+                }
+                var ret = "";
+                if (hrs) {
+                    ret = hrs+":";
+                }
+
+                minutes = Math.floor(minutes);
+                if (minutes<=0) {
+                    minutes = 0;
+                }
+                
+                if (minutes < 10 && ret) {
+                    minutes = "0"+minutes;
+                }
+                ret += minutes+":";
+
+                seconds = Math.floor(seconds);
+                if (seconds<=0) {
+                    seconds = 0;
+                }
+                
+                if (seconds < 10) {
+                    seconds = "0"+seconds;
+                }
+                ret += ""+seconds;
+                return ret;
+            }
+
             $.fn.raty.defaults.path = '/static/images/raty/';
             var seek_lock = false,
                 time_status = $("#time-status"),
@@ -192,11 +228,23 @@
                 ratings_table = $("#ratings-table"),
                 $volume = $("#volume"),
                 $seek = $("#seek"),
+                $seek_sibling = $seek.siblings('.ui-slider-track')
+                                     .find('a.ui-slider-handle'),
                 $album_art = $("#album-art"),
                 updates_per_second = 1,
                 last_pos_str = "",
-                last_left_str = "";
+                last_left_str = "",
+                set_seek_val = function(val, mx) {
+                    $seek.val(val);
+                    if (!_.isUndefined(mx)) {
+                        $seek.prop("max", mx);
+                    }
+                    $seek.slider("refresh");
+                    $seek_sibling.prop('title', format_time(val));
+                };
             junk_input_parent.hide();
+
+
             
             $(".action-link").click(function(evt) {
                 if (evt) {
@@ -282,11 +330,12 @@
                     }
                 }
 
-                seek_lock = true;
-                $seek.val(dta.player.pos_data.pos_int);
-                $seek.prop("max", dta.player.pos_data.dur_int);
-                $seek.slider("refresh");
-                seek_lock = false;
+                if (dta.player.pos_data.pos_int > 0 && dta.player.pos_data.dur_int > 0) {
+                    seek_lock = true;
+                    set_seek_val(dta.player.pos_data.pos_int, 
+                                 dta.player.pos_data.dur_int);
+                    seek_lock = false;
+                }
 
                 if (window.ratings != dta.playing.ratings) {
                     window.ratings = dta.playing.ratings;
@@ -331,43 +380,6 @@
                 
             }
 
-            function format_time(nanosecnods) {
-                var seconds = Math.floor(parseInt(nanosecnods) / 1000000000);
-                var hrs = Math.floor(seconds / 3600);
-                if (hrs) {
-                    seconds = seconds - (hrs * 3600);
-                }
-                var minutes = Math.floor(seconds / 60);
-                if (minutes) {
-                    seconds = seconds - (minutes * 60);
-                }
-                var ret = "";
-                if (hrs) {
-                    ret = hrs+":";
-                }
-
-                minutes = Math.floor(minutes);
-                if (minutes<=0) {
-                    minutes = 0;
-                }
-                
-                if (minutes < 10 && ret) {
-                    minutes = "0"+minutes;
-                }
-                ret += minutes+":";
-
-                seconds = Math.floor(seconds);
-                if (seconds<=0) {
-                    seconds = 0;
-                }
-                
-                if (seconds < 10) {
-                    seconds = "0"+seconds;
-                }
-                ret += ""+seconds;
-                return ret;
-            }
-
             function set_time() {
                 if (!window.player) {
                     return;
@@ -388,8 +400,9 @@
                                          "/" + window.player.pos_data["dur_str"]);
                     }
                     seek_lock = true;
-                    $seek.val(window.player.pos_data.pos_int);
-                    $seek.slider("refresh");
+                    if (window.player.pos_data.pos_int != 0) {
+                        set_seek_val(window.player.pos_data.pos_int);
+                    }
                     seek_lock = false;
                 }
             }
@@ -473,7 +486,9 @@
 
             $("#seek").hide();
 
+
             $volume.parent(".ui-slider").on("mousewheel", function (evt, delta) {
+                evt.preventDefault();
                 if (volume_lock) {
                     return;
                 }
@@ -498,6 +513,7 @@
             });
 
             $seek.parent(".ui-slider").on("mousewheel", function (evt, delta) {
+                evt.preventDefault();
                 if (seek_lock) {
                     return;
                 }
@@ -505,12 +521,12 @@
                 if (delta == 1) {
                     // add to the val.
                     var new_val = parseInt($seek.val()) + step;
-                    $seek.val(new_val).slider("refresh");
+                    set_seek_val(new_val);
                 }
                 if (delta == -1) {
                     // remove from the val
                     var new_val = parseInt($seek.val()) - step;
-                    $seek.val(new_val).slider("refresh");
+                    set_seek_val(new_val);
                 }
             });
 

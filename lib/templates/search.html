@@ -134,9 +134,11 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
                         "uid": uid,
                         "status": 1,
                         "value": score,
-                    }
+                    },
+                    'dataType':'json'
                 }).done(function(data){
-                    // process_status(data);
+                    _this.siblings(".true_score_td").text(
+                        Math.round(data["ratings"][uid]['true_score'], 2));
                 });
             }
             
