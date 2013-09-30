@@ -211,7 +211,7 @@ FROM files f
 WHERE kw.fid = f.fid AND tsv @@ query
 ORDER BY ts_rank DESC;"""
 
-    query = """SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
+    query = """SELECT DISTINCT f.fid, basename, title, genre, artist, p.fid AS cued,
                                album_name,
                                ts_rank(tsv, query)
                    FROM files f 

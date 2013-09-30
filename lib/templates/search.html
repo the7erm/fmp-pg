@@ -65,7 +65,10 @@
                 <% 
                     if (artist) {
                         print(item_template({"label": 'Artist:', 'text': artist}));
-                    } 
+                    }
+                    if (title) {
+                        print(item_template({"label": 'Title:', 'text': title}));
+                    }
                     print(item_template({"label": 'Filename:', 'text': basename}));
                     if (album_name) {
                         print(item_template({"label": 'Album:', 'text': album_name}));
