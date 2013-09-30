@@ -131,14 +131,33 @@ class FObj:
     def inc_score(self,*args,**kwargs):
         raise NotImpimented("inc_score")
 
-    def get_tags(self):
-        if self.exists and self.has_tags and self.tags_easy is None:
-            try:
-                self.tags_easy = mutagen.File(self.filename, easy=True)
-                print "GET_TAGS"
-                pp.pprint(self.tags_easy)
-            except mutagen.mp3.HeaderNotFoundError:
-                self.tags_easy = None
+    def get_easy_tags(self):
+        if not self.exists or not self.has_tags or self.tags_easy is not None:
+            return
+        try:
+            self.tags_easy = mutagen.File(self.filename, easy=True)
+            print "GET_TAGS"
+            pp.pprint(self.tags_easy)
+        except mutagen.mp3.HeaderNotFoundError, e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            self.tags_easy = None
+
+    def get_hard_tags(self):
+        if not self.exists or not self.has_tags or self.tags_hard is not None:
+            return
+        try:
+            self.tags_hard = mutagen.File(self.filename, easy=True)
+            print "GET_TAGS"
+            pp.pprint(self.tags_hard)
+        except mutagen.mp3.HeaderNotFoundError, e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            self.tags_hard = None
+
+    def get_tags(self, easy=True, hard=False):
+        if easy:
+            self.get_easy_tags()
+        if hard:
+            self.get_hard_tags()
 
     def getmtime(self):
         if self.exists:

@@ -412,6 +412,60 @@ CREATE SEQUENCE genres_gid_seq
 ALTER SEQUENCE genres_gid_seq OWNED BY genres.gid;
 
 
+SET default_with_oids = false;
+
+--
+-- Name: keywords; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE keywords (
+    kwid integer NOT NULL,
+    fid integer NOT NULL,
+    txt text,
+    tsv tsvector
+);
+
+
+--
+-- Name: keywords_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE keywords_fid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: keywords_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE keywords_fid_seq OWNED BY keywords.fid;
+
+
+--
+-- Name: keywords_kwid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE keywords_kwid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: keywords_kwid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE keywords_kwid_seq OWNED BY keywords.kwid;
+
+
+SET default_with_oids = true;
+
 --
 -- Name: netcast_episodes; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
@@ -1217,6 +1271,20 @@ ALTER TABLE ONLY genres ALTER COLUMN gid SET DEFAULT nextval('genres_gid_seq'::r
 
 
 --
+-- Name: kwid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY keywords ALTER COLUMN kwid SET DEFAULT nextval('keywords_kwid_seq'::regclass);
+
+
+--
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY keywords ALTER COLUMN fid SET DEFAULT nextval('keywords_fid_seq'::regclass);
+
+
+--
 -- Name: eid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1584,6 +1652,13 @@ CREATE INDEX title_idx ON files USING btree (title);
 
 
 --
+-- Name: txt_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX txt_idx ON keywords USING gin (to_tsvector('english'::regconfig, txt));
+
+
+--
 -- Name: ualtp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1644,6 +1719,13 @@ CREATE RULE dont_pick_on_duplicate_ignore AS ON INSERT TO dont_pick WHERE (EXIST
 --
 
 CREATE RULE preload_on_duplicate_ignore AS ON INSERT TO preload WHERE (EXISTS (SELECT 1 FROM preload WHERE (preload.fid = new.fid))) DO INSTEAD NOTHING;
+
+
+--
+-- Name: tsvectorupdate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE ON keywords FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger('tsv', 'pg_catalog.english', 'txt');
 
 
 --

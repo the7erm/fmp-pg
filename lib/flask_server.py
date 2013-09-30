@@ -194,8 +194,26 @@ def listeners_info_for_fid(fid):
 def get_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
+    """
+    SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
+           album_name, 
+           ts_rank(tsv, query)
+FROM files f
+    LEFT JOIN file_artists fa ON f.fid = fa.fid 
+    LEFT JOIN artists a ON a.aid = fa.aid 
+    LEFT JOIN file_genres fg ON fg.fid = f.fid 
+    LEFT JOIN genres g ON g.gid = fg.gid 
+    LEFT JOIN preload p ON p.fid = f.fid
+    LEFT JOIN album_files af ON af.fid = f.fid
+    LEFT JOIN albums al ON al.alid = af.alid,
+    keywords kw,
+    plainto_tsquery('the erm fears') query
+WHERE kw.fid = f.fid AND tsv @@ query
+ORDER BY ts_rank DESC;"""
+
     query = """SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
-                               album_name
+                               album_name,
+                               ts_rank(tsv, query)
                    FROM files f 
                         LEFT JOIN file_artists fa ON f.fid = fa.fid 
                         LEFT JOIN artists a ON a.aid = fa.aid 
@@ -203,23 +221,23 @@ def get_results(q="", start=0, limit=20, filter_by="all"):
                         LEFT JOIN genres g ON g.gid = fg.gid 
                         LEFT JOIN preload p ON p.fid = f.fid
                         LEFT JOIN album_files af ON af.fid = f.fid
-                        LEFT JOIN albums al ON al.alid = af.alid
-                    %s
-                    ORDER BY artist, album_name, basename, genre
-        """
-    words = prase_words(q,filter_by=filter_by)
-    where = ""
-    if words:
-        where = "WHERE %s" % words
-    else:
-        where = "WHERE true"
+                        LEFT JOIN albums al ON al.alid = af.alid,
+                        keywords kw,
+                        to_tsquery(%s) query
+                    WHERE kw.fid = f.fid AND tsv @@ query
+                    ORDER BY ts_rank DESC
+            """
 
-    query = query % (where,)
     query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
+    _q = q.split()
+    if filter_by == "all":
+        q = " & ".join(_q)
+    else:
+        q = " | ".join(_q)
     try:
-        for r in get_results_assoc(query):
+        for r in get_results_assoc(query, (q,)):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
             # fd.cued = r.cued

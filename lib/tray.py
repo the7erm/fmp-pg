@@ -189,14 +189,32 @@ def on_activate_favorites(item, *args):
     gtk.gdk.threads_leave()
     print "on_activate_favorites"
     q = """INSERT INTO preload (fid, uid, reason) 
-                SELECT usi.fid, usi.uid, 'My Favorites' 
-                FROM user_song_info usi, users u, files f, genres g, 
-                     file_genres fg
-                WHERE usi.uid = u.uid AND u.listening = true AND 
+                SELECT DISTINCT usi.fid, usi.uid, 'My Favorites' 
+                FROM files f LEFT JOIN preload p ON p.fid = f.fid,  
+                     user_song_info usi, users u, genres g, file_genres fg 
+                WHERE p.fid IS NULL AND usi.uid = u.uid AND u.listening = true AND 
                       true_score >= 85 AND ultp <= now() - INTERVAL '1 day' AND
                       fg.fid = f.fid AND fg.gid = g.gid AND f.fid = usi.fid AND
                       g.enabled = true"""
     query(q)
+
+def on_activate_clear_preload(item, *args):
+    gtk.gdk.threads_leave()
+    query("""DELETE FROM preload""")
+
+
+def on_activate_never_played(item, *args):
+    gtk.gdk.threads_leave()
+    q = """INSERT INTO preload (fid, uid, reason) 
+                SELECT DISTINCT usi.fid, usi.uid, 'Never Played' 
+                FROM files f LEFT JOIN preload p ON p.fid = f.fid,  
+                     user_song_info usi, users u, genres g, file_genres fg 
+                WHERE p.fid IS NULL AND usi.uid = u.uid AND u.listening = true AND 
+                      ultp IS NULL AND 
+                      fg.fid = f.fid AND fg.gid = g.gid AND f.fid = usi.fid AND
+                      g.enabled = true"""
+    query(q)
+
 
 def on_activate_webplayer(item, *args):
     print "on_activate_webplayer"
@@ -307,10 +325,21 @@ menu.append(cue_netcasts_item)
 bedtime_mode_item = gtk.CheckMenuItem("Bedtime Mode")
 menu.append(bedtime_mode_item)
 
-my_favorites_item = gtk.ImageMenuItem("My Favorites")
+my_favorites_item = gtk.ImageMenuItem("Preload My Favorites")
 img = gtk.image_new_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_BUTTON)
 my_favorites_item.set_image(img)
 menu.append(my_favorites_item)
+
+never_played_item = gtk.ImageMenuItem("Preload Never Played")
+img = gtk.image_new_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_BUTTON)
+never_played_item.set_image(img)
+menu.append(never_played_item)
+
+clear_preload_item = gtk.ImageMenuItem("Clear Preload")
+img = gtk.image_new_from_stock(gtk.STOCK_REMOVE, gtk.ICON_SIZE_BUTTON)
+clear_preload_item.set_image(img)
+menu.append(clear_preload_item)
+
 
 quit = gtk.ImageMenuItem("Quit")
 img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
@@ -328,6 +357,9 @@ preload.connect("activate", on_activate_preload)
 cue_netcasts_item.connect("toggled", on_toggle_cue_netcasts, ())
 bedtime_mode_item.connect("toggled", on_toggle_bedtime_mode, ())
 my_favorites_item.connect("activate", on_activate_favorites, ())
+never_played_item.connect("activate", on_activate_never_played, ())
+clear_preload_item.connect("activate", on_activate_clear_preload, ())
+
 
 cue_netcasts = cfg.get('Netcasts', 'cue', False, bool)
 cue_netcasts_item.set_active(cue_netcasts)

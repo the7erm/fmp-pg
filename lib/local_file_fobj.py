@@ -25,6 +25,7 @@ import time
 from listeners import listeners
 import pprint
 import re
+import os
 from excemptions import CreationFailed
 from ratings_and_scores import RatingsAndScores
 from datetime import date
@@ -33,6 +34,8 @@ from datetime import timedelta
 import hashlib
 import os
 import sys
+import genres_v1
+import copy
 
 numeric = re.compile("^[0-9]+$")
 
@@ -50,6 +53,8 @@ class Local_File(fobj.FObj):
         self.albums = []
         self.genres = []
         self.dups = []
+        self.tags_easy = None
+        self.tags_hard = None
         self.mark_as_played_when_time = datetime.now()
         self.mark_as_played_when_percent = 0
         self.last_percent_played = 0
@@ -93,7 +98,6 @@ class Local_File(fobj.FObj):
             dirname = db_info['dir']
             basename = db_info['basename']
             self.db_info = db_info
-            self.set_attribs()
         elif not insert:
             raise CreationFailed(
                 "Unable to find file information based on:\n" +
@@ -110,7 +114,9 @@ class Local_File(fobj.FObj):
             raise CreationFailed("File is not an audio or video file:%s" % self.filename)
 
         if not self.exists:
-            raise CreationFailed("File must exist on local drive:%s" % self.filename)
+            print "MISSING:", self.filename
+            if not get_dups or not self.use_dup():
+                raise CreationFailed("File must exist on local drive:%s" % self.filename)
 
         if self.filename and self.filename.startswith(cache_dir):
             raise CreationFailed("File is in cache_dir:%s", (self.filename,))
@@ -132,39 +138,118 @@ class Local_File(fobj.FObj):
         if kwargs.has_key('hash') and not kwargs['hash']:
             ok_to_hash = False
 
-        if self.mtime_changed() and ok_to_hash:
-            self.db_info['sha512'] = self.hash_file()
-            query("""UPDATE files 
-                     SET sha512 = %s, mtime = %s 
-                     WHERE fid = %s""",
-                     (self.db_info['sha512'], self.mtime, self.db_info['fid']))
-
-        if not self.db_info['sha512'] and ok_to_hash:
-            self.db_info['sha512'] = self.hash_file()
-            query("""UPDATE files 
-                     SET sha512 = %s 
-                     WHERE fid = %s""",
-                     (self.db_info['sha512'], self.db_info['fid']))
+        if ok_to_hash and (not self.db_info['sha512'] or self.mtime_changed()):
+            self.update_hash()
 
         if get_dups and self.db_info["sha512"]:
-            dups = get_results_assoc("""SELECT fid
-                                        FROM files f
-                                        WHERE sha512 = %s AND fid != %s""",
-                                        (self.db_info["sha512"], 
-                                         self.db_info["fid"]))
-            for d in dups:
-                try:
-                    dup = Local_File(get_dups=False, insert=False, fid=d['fid'])
-                except CreationFailed:
-                    continue
-                self.dups.append(dup)
+            self.prepare_dups()
 
-        if self.db_info and not self.db_info['title']:
-            self.get_title()
+    def set_db_keywords(self):
+
+        root, ext = os.path.splitext(self.basename)
+        keywords = self.get_words_from_string(root)
+        keywords += self.get_words_from_string(ext)
+        
+        for a in self.artists:
+            keywords += self.get_words_from_string(a['artist'])
+
+        for a in self.albums:
+            keywords += self.get_words_from_string(a['album_name'])
+
+        for g in self.genres:
+            keywords += self.get_words_from_string(g['genre'])
+
+        keywords += self.get_words_from_string(self.db_info['title'])
+
+        keywords = list(set(keywords))
+        for i, k in enumerate(keywords):
+            keywords[i] = k.strip()
+        print "BEFORE:",keywords
+        keywords = sorted(keywords, key=str.lower)
+        print "AFTER:",keywords
+
+        present = get_assoc("""SELECT * FROM keywords WHERE fid = %s""",
+                            (self.fid,))
+
+        txt = " ".join(keywords)
+
+        if not present:
+            query("""INSERT INTO keywords (fid, txt) VALUES(%s, %s)""",
+                  (self.fid, txt))
+        elif present['txt'] != txt:
+            print "update:",txt
+            query("""UPDATE keywords SET txt = %s WHERE fid = %s""",
+                  (txt, self.fid))
+
+    def get_words_from_string(self, string):
+        if not string or not isinstance(string, str):
+            return []
+
+        words = string.replace("_"," ").strip().split()
+        words = list(set(words))
+        words += string.split("-")
+
+        final_words = []
+        final_words.append(string)
+        for w in words:
+            w = w.strip()
+            if not w or w == '-':
+                continue
+            final_words.append(w)
+            _w = re.sub(r"[\W]", " ", w).strip()
+            if _w and w != _w:
+                final_words.append(_w)
+
+        return final_words
+
+
+    def update_hash(self):
+        self.db_info['sha512'] = self.hash_file()
+        query("""UPDATE files 
+                 SET sha512 = %s, mtime = %s 
+                 WHERE fid = %s""",
+                 (self.db_info['sha512'], self.mtime, self.db_info['fid']))
+
+    def prepare_dups(self):
+        dups = self.get_dups()
+        for d in dups:
+            try:
+                dup = Local_File(get_dups=False, insert=False, fid=d['fid'])
+            except CreationFailed:
+                continue
+            self.dups.append(dup)
+
+    def use_dup(self, *args, **kwargs):
+        if not self.db_info or self.is_stream:
+            return False
+
+        dups = self.get_dups()
+        found = False
+
+        for dup in dups:
+            filename = os.path.join(dup['dir'], dup['basename'])
+            if os.path.exists(filename):
+                self.db_info = dup
+                self.set_attribs()
+                fobj.FObj.__init__(self, filename=filename, **kwargs)
+                found = True
+                break
+
+        return found
+
+    def get_dups(self):
+        return get_results_assoc("""SELECT fid
+                                    FROM files f
+                                    WHERE sha512 = %s AND fid != %s""",
+                                    (self.db_info["sha512"], 
+                                     self.db_info["fid"]))
 
     def get_title(self):
         if not self.tags_easy:
-            self.get_tags()
+            try:
+                self.get_tags()
+            except KeyError, e:
+                print "KeyError:",e
 
         if self.tags_easy:
             if 'title' in self.tags_easy and self.tags_easy['title']:
@@ -259,28 +344,36 @@ class Local_File(fobj.FObj):
         self.dirname = self.db_info['dir']
         self.basename = self.db_info['basename']
         self.filename = os.path.join(self.db_info['dir'], self.db_info['basename'])
-        if not quick:
-            self.get_artists()
-            self.get_albums()
-            self.get_genres()
+        self.get_artists()
+        self.get_albums()
+        self.get_genres()
+
+        if not self.db_info['title']:
+            self.get_title()
+
+        self.set_db_keywords()
+
 
     def get_artists(self):
         self.artists = get_results_assoc("""SELECT * 
                                             FROM artists a, file_artists fa 
                                             WHERE fa.fid = %s AND fa.aid = a.aid""",
                                             (self.fid,))
+        return self.artists
         
     def get_albums(self):
         self.albums = get_results_assoc("""SELECT * 
                                            FROM albums al, album_files af 
                                            WHERE af.fid = %s AND af.alid = al.alid""", 
                                            (self.fid,))
+        return self.albums
 
     def get_genres(self):
         self.genres = get_results_assoc("""SELECT * 
                                            FROM genres g, file_genres fg 
                                            WHERE fg.fid = %s AND g.gid = fg.gid""",
                                            (self.fid,))
+        return self.genres
 
     def insert(self):
         if self.db_info:
@@ -368,6 +461,40 @@ class Local_File(fobj.FObj):
             association =  get_assoc("""INSERT INTO file_artists (fid, aid) 
                                         VALUES(%s, %s) RETURNING *""", 
                                         (self.fid, artist['aid']))
+        return artist
+
+    def remove_artist(self, aid=None):
+        for i, a in enumerate(self.artists):
+            if a['aid'] == aid:
+                print "del:",a
+                del self.artists[i]
+        query("""DELETE FROM file_artists 
+                 WHERE fid = %s AND aid = %s""",
+                 (self.fid, aid))
+        present = get_assoc("""SELECT count(*) AS total 
+                               FROM file_artists fa, files f
+                               WHERE f.fid = fa.fid AND fa.aid = %s""",
+                               (aid,))
+        if not present or present['total'] == 0:
+            query("""DELETE FROM artists WHERE aid = %s""", (aid,))
+
+    def remove_genre(self, gid=None):
+        genre = None
+        for i, g in enumerate(self.genres):
+            if g['gid'] == gid:
+                print "del:",g
+                genre = copy.deepcopy(self.genres[i])
+                del self.genres[i]
+        query("""DELETE FROM file_genres 
+                 WHERE fid = %s AND gid = %s""",
+                 (self.fid, gid))
+        present = get_assoc("""SELECT count(*) AS total 
+                               FROM file_genres fg, files f
+                               WHERE f.fid = fg.fid AND fg.gid = %s""",
+                               (gid,))
+        if not present or present['total'] == 0:
+            if genre is not None and genre['genre'] not in genres_v1.genres_v1:
+                query("""DELETE FROM genres WHERE gid = %s""", (gid,))
 
     def parse_artist_string(self, artists):
         artists = artists.strip()
@@ -520,10 +647,11 @@ class Local_File(fobj.FObj):
                                       (album['alid'], self.fid))
 
         self.albums.append(album)
+        return album
 
     def process_album(self):
         if self.tags_easy and self.tags_easy.has_key('album') and self.tags_easy['album']:
-            if isinstance(self.tags_easy['album'],list):
+            if isinstance(self.tags_easy['album'], list):
                 for al in self.tags_easy['album']:
                     for a in self.artists:
                         self.add_album(al, a['aid'])
@@ -534,13 +662,13 @@ class Local_File(fobj.FObj):
 
     def process_genre(self):
         if self.tags_easy and 'genre' in self.tags_easy and self.tags_easy['genre']:
-            if isinstance(self.tags_easy['genre'],list):
+            if isinstance(self.tags_easy['genre'], list):
                 for g in self.tags_easy['genre']:
                     self.add_genre(g)
 
             # print self.tags_hard
         if self.tags_hard and self.tags_hard.has_key('TCON') and self.tags_hard['TCON']:
-            if isinstance(self.tags_hard['TCON'].text,list):
+            if isinstance(self.tags_hard['TCON'].text, list):
                 for g in self.tags_hard['TCON'].text:
                     self.add_genre(g)
 
@@ -578,14 +706,16 @@ class Local_File(fobj.FObj):
                                        (self.fid, genre['gid']))
 
         self.genres.append(genre)
+        return genre
 
     def get_artist_title(self):
-        self.get_tags()
+        self.get_tags(easy=True)
         if self.tags_easy:
             if 'artist' in self.tags_easy and self.tags_easy['artist'] and \
                'title' in self.tags_easy and self.tags_easy['title']:
                 return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
-        return self.basename
+
+        return self.db_info['title'] or self.basename
 
     def __repr__(self):
         return '<%s\n\tpath:%s\n\tbasename:%s>' % (

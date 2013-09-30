@@ -250,6 +250,10 @@ class Netcast_File(fobj.FObj):
         self.url = episode_url
         self.local_file = local_filename
         self.pub_date = pub_date
+        self.mark_as_played_when_time = datetime.datetime.now()
+        self.mark_as_played_when_percent = 0
+        self.last_percent_played = 0
+        self.last_time_marked_as_played = datetime.datetime.now()
         
 
         if self.netcast is None and (nid is not None or rss_url is not None):
@@ -487,6 +491,13 @@ class Netcast_File(fobj.FObj):
                  (self.eid, e['date_played'].isoformat()))
 
     def mark_as_played(self, percent_played=0):
+        
+        now = datetime.datetime.now()
+
+        if self.mark_as_played_when_percent > percent_played and \
+           self.mark_as_played_when_time > now:
+            return
+
         print "TODO: Necast_file::mark_as_played()"
         """nlid, uid, eid, percent_played"""
         print "percent_played:",percent_played
@@ -514,6 +525,13 @@ class Netcast_File(fobj.FObj):
                                                  percent_played))
 
         self.update_history(percent_played)
+        self.mark_as_played_when_percent = percent_played + 10
+        if self.mark_as_played_when_percent > 100:
+            self.mark_as_played_when_percent = 100
+        now = datetime.datetime.now()
+        self.mark_as_played_when_time = now + datetime.timedelta(seconds=5)
+        self.last_time_marked_as_played = now
+        self.last_percent_played = percent_played
 
     def update_user_history(self):
         return get_results_assoc("""UPDATE user_history uh 
