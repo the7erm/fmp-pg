@@ -44,6 +44,8 @@ import time
 
 from flask import render_template
 import lib.fobj as fobj
+from lib.ratings_and_scores import rate as simple_rate
+from lib.local_file_fobj import get_words_from_string
 
 from tornado.wsgi import WSGIContainer
 from tornado.ioloop import IOLoop
@@ -107,13 +109,55 @@ def index():
     return render_template("index.html", player=player, playing=playing, 
                            PLAYING=PLAYING, volume=get_volume())
 
+@app.route("/index2/")
+def index2():
+    global playing, player, tray
+    print "FLASK PLAYING:", playing.filename
+    print "REQUEST:",request
+    print "request.args:",request.args
+    cmd = request.args.get("cmd","")
+    if cmd:
+        if cmd == "pause":
+            player.pause()
+        if cmd == "next":
+            player.next()
+        if cmd == "prev":
+            player.prev()
+        if cmd == "seek_ns":
+            pos = request.args.get("value",0)
+            player.seek_ns(pos)
+            
+        if cmd == "rate":
+            rating = request.args.get("value",0)
+            uid = request.args.get("uid",0)
+            print "************* RATE ****************"
+            print "RATE:uid:%s rating:%s" % (uid, rating)
+            fid = request.args.get("fid","")
+            if not fid and uid and hasattr(playing, "ratings_and_scores"):
+                print "RATE 2:uid:%s rating:%s" % (uid, rating)
+                playing.rate(uid=uid, rating=rating)
+            elif fid and uid:
+                print "RATE 3: fid:%s, uid:%s rating:%s" % (fid, uid, rating)
+                f = fobj.get_fobj(fid=fid)
+                f.rate(uid=uid, rating=rating)
+                return json_dump(f.to_dict())
+
+        if cmd == "vol":
+            set_volume(request.args.get("value",-1))
+
+        if request.args.get("status",""):
+            return status()
+        return redirect("/")
+    return render_template("index2.html", player=player, playing=playing, 
+                           PLAYING=PLAYING, volume=get_volume())
+
 @app.route("/status/")
 def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
-    global player, playing
+    global playing, player, tray
     # print "PLAYING",playing.to_dict()
 
-    return jsonify(player=player.to_dict(), playing=playing.to_dict(),
+    return jsonify(player=player.to_dict(), playing=playing.to_full_dict(),
                    volume=get_volume())
 
 def get_volume():
@@ -178,71 +222,80 @@ def listeners_info_for_fid(fid):
                ORDER BY admin DESC, uname ASC
     """
     print "query:%s" % query
+    return convert_to_dict(get_results_assoc(query, (fid,)))
+
+def convert_to_dict(res):
+    if not res:
+        return []
     results = []
-    try:
-        for r in get_results_assoc(query, (fid,)):
-            # f = fobj.get_fobj(**r)
-            #fd = f.to_dict()
-            # fd.cued = r.cued
-            results.append(dict(r))
-        print "results:",results
-    except psycopg2.IntegrityError, err:
-        query("COMMIT;")
-        print "(flask_server) psycopg2.IntegrityError:",err
+    for r in res:
+        results.append(dict(r))
     return results
 
-def get_results(q="", start=0, limit=20, filter_by="all"):
+def artists_for_fid(fid):
+    res = get_results_assoc("""SELECT a.*
+                               FROM files f, artists a, file_artists fa
+                               WHERE f.fid = %s AND
+                                     fa.fid = f.fid AND
+                                     a.aid = fa.aid""", (fid,))
+    return convert_to_dict(res)
+
+def albums_for_fid(fid):
+    res = get_results_assoc("""SELECT al.* 
+                                FROM files f, albums al, album_files af
+                                WHERE f.fid = %s AND
+                                      af.fid = f.fid AND
+                                      al.alid = af.alid""", (fid,))
+    return convert_to_dict(res)
+
+def genres_for_fid(fid):
+    res = get_results_assoc("""SELECT g.* 
+                               FROM files f, genres g, file_genres fg
+                               WHERE f.fid = %s AND
+                                     fg.fid = f.fid AND
+                                     fg.gid = g.gid""", (fid,))
+    return convert_to_dict(res)
+
+def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
-    """
-    SELECT DISTINCT f.fid, basename, genre, artist, p.fid AS cued,
-           album_name, 
-           ts_rank(tsv, query)
-FROM files f
-    LEFT JOIN file_artists fa ON f.fid = fa.fid 
-    LEFT JOIN artists a ON a.aid = fa.aid 
-    LEFT JOIN file_genres fg ON fg.fid = f.fid 
-    LEFT JOIN genres g ON g.gid = fg.gid 
-    LEFT JOIN preload p ON p.fid = f.fid
-    LEFT JOIN album_files af ON af.fid = f.fid
-    LEFT JOIN albums al ON al.alid = af.alid,
-    keywords kw,
-    plainto_tsquery('the erm fears') query
-WHERE kw.fid = f.fid AND tsv @@ query
-ORDER BY ts_rank DESC;"""
 
-    query = """SELECT DISTINCT f.fid, basename, title, genre, artist, p.fid AS cued,
-                               album_name,
-                               ts_rank(tsv, query)
+    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                               p.fid AS cued, ts_rank(tsv, query)
                    FROM files f 
-                        LEFT JOIN file_artists fa ON f.fid = fa.fid 
-                        LEFT JOIN artists a ON a.aid = fa.aid 
-                        LEFT JOIN file_genres fg ON fg.fid = f.fid 
-                        LEFT JOIN genres g ON g.gid = fg.gid 
-                        LEFT JOIN preload p ON p.fid = f.fid
-                        LEFT JOIN album_files af ON af.fid = f.fid
-                        LEFT JOIN albums al ON al.alid = af.alid,
+                        LEFT JOIN preload p ON p.fid = f.fid,
                         keywords kw,
                         to_tsquery(%s) query
                     WHERE kw.fid = f.fid AND tsv @@ query
                     ORDER BY ts_rank DESC
-            """
-
+                    """
     query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
-    _q = q.split()
+    print "Q:",q
+    _q = get_words_from_string(q)
+    print "_Q:",_q
+    words = []
+    for w in _q:
+        _w = w.split()
+        if _w:
+            words += _w
+
     if filter_by == "all":
-        q = " & ".join(_q)
+        q = " & ".join(words)
     else:
-        q = " | ".join(_q)
+        q = " | ".join(words)
     try:
         for r in get_results_assoc(query, (q,)):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
             # fd.cued = r.cued
             rdict = dict(r)
-            rdict['usi'] = listeners_info_for_fid(r['fid'])
+            fid = r['fid']
+            rdict['usi'] = listeners_info_for_fid(fid)
+            rdict['artists'] = artists_for_fid(fid)
+            rdict['albums'] = albums_for_fid(fid)
+            rdict['genres'] = genres_for_fid(fid)
             results.append(rdict)
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
@@ -333,6 +386,7 @@ def json_dump(obj):
 
 @app.route('/search/', methods=['GET', 'POST'])
 def search():
+    global player, playing
     results = None
     q = request.args.get("q","")
     filter_by = "%s" % request.args.get("f","all")
@@ -344,14 +398,14 @@ def search():
     limit = "%s" % request.args.get("s", "20")
     start_time = time.time()
     print "start:",start_time
-    results = get_results(q, start=start, limit=20, filter_by=filter_by)
+    results = get_search_results(q, start=start, limit=20, filter_by=filter_by)
     print "end:", time.time() - start_time
     json_results = json_dump(results)
 
     if not request.args.get("ajax", False):
         return render_template("search.html", playing=playing, PLAYING=PLAYING,
                                results=json_results, q=request.args.get("q",""),
-                               filter_by=filter_by)
+                               filter_by=filter_by, player=player)
     resp = {
         "player": player.to_dict(), 
         "playing": playing.to_dict(),
@@ -387,6 +441,51 @@ def cue():
             return "{cued:false}"
 
 
+@app.route("/rate/<usid>/<fid>/<uid>/<rating>", methods=['GET', 'POST', 'PUT'])
+def rate(usid, fid, uid, rating):
+    global playing
+    print "RATE:", usid, fid, uid, rating
+    # playing.rate(uid=uid, rating=rating)
+    if hasattr(playing, 'fid') and playing.fid == fid:
+        return json_dump(playing.rate(uid=uid, rating=rating))
+
+    return json_dump(simple_rate(usid=usid, fid=fid, uid=uid, rating=rating))
+
+@app.route('/player/<cmd>', methods=['GET', 'POST', 'PUT'])
+def player_command(cmd):
+    global player
+    cmd = cmd.lower();
+    valid_commands = ['play', 'pause', 'next', 'prev', 'status']
+    if cmd not in valid_commands:
+        return playing_file()
+    if cmd in ('play', 'pause'):
+        player.pause()
+    if cmd == "next":
+        player.next()
+    if cmd == "prev":
+        player.prev()
+    return status()
+
+
+@app.route("/seek/<typ>/<val>", methods=["GET", "POST", "PUT"])
+def seek(typ, val):
+    global player
+    if typ == 'nano':
+        nano = int(val)
+        if nano >= 0:
+            player.seek_ns(nano)
+    return json_dump({"value": player.pos_data["value"]})
+
+
+@app.route("/playing/", methods=['GET', 'POST', 'PUT'])
+def playing_file():
+    global playing
+    return json_dump(playing.to_full_dict())
+
+@app.route("/volume/<new_val>", methods=['POST', 'PUT', 'GET'])
+def volume(new_val):
+    set_volume(new_val);
+    return json_dump({"value": new_val})
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

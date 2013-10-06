@@ -523,8 +523,8 @@ flask_server.start_in_thread()
 print "START"
 picker.wait()
 
-
 try:
+    netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
     """
     netcast_tray = Popen([sys.path[0]+'/netcast-tray.py'])
     tst = fobj.netcast_fobj.get_one_unlistened_episode()
@@ -536,4 +536,3 @@ try:
     gtk.main()
 except KeyboardInterrupt:
     Popen(['pykill','netcast-tray.py', 'fmp-pg.py'])
-

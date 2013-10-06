@@ -291,7 +291,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
         print "resp:",resp
         if resp == gtk.RESPONSE_OK and text:
             print "Saving:",text
-            artist = self.fobj.add_artist(self, text)
+            artist = self.fobj.add_artist(text)
             if artist:
                 self.artists.append(artist)
                 crumb = self.create_crumb('aid', artist['aid'], artist['artist'])

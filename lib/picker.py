@@ -419,10 +419,9 @@ def get_single_from_preload(uid=None):
     if uid:
         f = get_assoc("""SELECT * 
                             FROM preload p, files f 
-                            WHERE f.fid = p.fid AND uid = %s AND 
+                            WHERE f.fid = p.fid AND 
                                   reason = 'From search'
-                            ORDER BY plid LIMIT 1""", 
-                            (uid,))
+                            ORDER BY plid LIMIT 1""")
         if f:
           return f
         return get_assoc("""SELECT * 

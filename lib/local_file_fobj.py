@@ -147,19 +147,19 @@ class Local_File(fobj.FObj):
     def set_db_keywords(self):
 
         root, ext = os.path.splitext(self.basename)
-        keywords = self.get_words_from_string(root)
-        keywords += self.get_words_from_string(ext)
+        keywords = get_words_from_string(root)
+        keywords += get_words_from_string(ext)
         
         for a in self.artists:
-            keywords += self.get_words_from_string(a['artist'])
+            keywords += get_words_from_string(a['artist'])
 
         for a in self.albums:
-            keywords += self.get_words_from_string(a['album_name'])
+            keywords += get_words_from_string(a['album_name'])
 
         for g in self.genres:
-            keywords += self.get_words_from_string(g['genre'])
+            keywords += get_words_from_string(g['genre'])
 
-        keywords += self.get_words_from_string(self.db_info['title'])
+        keywords += get_words_from_string(self.db_info['title'])
 
         keywords = list(set(keywords))
         for i, k in enumerate(keywords):
@@ -180,28 +180,6 @@ class Local_File(fobj.FObj):
             print "update:",txt
             query("""UPDATE keywords SET txt = %s WHERE fid = %s""",
                   (txt, self.fid))
-
-    def get_words_from_string(self, string):
-        if not string or not isinstance(string, str):
-            return []
-
-        words = string.replace("_"," ").strip().split()
-        words = list(set(words))
-        words += string.split("-")
-
-        final_words = []
-        final_words.append(string)
-        for w in words:
-            w = w.strip()
-            if not w or w == '-':
-                continue
-            final_words.append(w)
-            _w = re.sub(r"[\W]", " ", w).strip()
-            if _w and w != _w:
-                final_words.append(_w)
-
-        return final_words
-
 
     def update_hash(self):
         self.db_info['sha512'] = self.hash_file()
@@ -721,6 +699,28 @@ class Local_File(fobj.FObj):
         return '<%s\n\tpath:%s\n\tbasename:%s>' % (
             self.__class__.__name__, self.dirname, self.basename)
     
+def get_words_from_string(string):
+    if not string or not isinstance(string,(str, unicode)):
+        print "NOT VALID:",string
+        print "TYPE:",type(string)
+        return []
+
+    words = string.replace("_"," ").strip().split()
+    words = list(set(words))
+    words += string.split("-")
+
+    final_words = []
+    final_words.append(string)
+    for w in words:
+        w = w.strip()
+        if not w or w == '-':
+            continue
+        final_words.append(w)
+        _w = re.sub(r"[\W]", " ", w).strip()
+        if _w and w != _w:
+            final_words.append(_w)
+
+    return final_words
         
 if __name__ == "__main__":
     import sys
@@ -731,3 +731,5 @@ if __name__ == "__main__":
                 print obj.filename
         except CreationFailed, e:
             print "CreationFailed:",e
+
+

@@ -78,56 +78,12 @@ class RatingsAndScores:
         return self.ratings_and_scores
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
-        try:
-            rating = int(rating)
-        except:
-            return
-        if rating < 0 or rating > 5:
-            return
-
-        updated = None
-        if selected is not None and selected:
-            updated = get_results_assoc("""UPDATE user_song_info 
-                                           SET rating = %s, 
-                                               true_score = (((%s * 2 * 10) + 
-                                                              (score * 10) + 
-                                                              percent_played)
-                                                             / 3)
-                                           WHERE fid = %s AND uid IN 
-                                                (SELECT uid FROM users 
-                                                 WHERE listening = true AND
-                                                       selected = true)
-                                           RETURNING *""",
-                                           (rating, rating, self.fid,))
-            self.calculate_true_score(True)
-            
-
-        if uid is not None:
-            updated = get_results_assoc("""UPDATE user_song_info 
-                                           SET rating = %s,
-                                               true_score = (((%s * 2 * 10) +
-                                                              (score * 10) +
-                                                              percent_played)
-                                                             / 3)
-                                           WHERE fid = %s AND 
-                                                 uid = %s RETURNING *""", 
-                                           (rating, rating, self.fid, uid))
-            self.calculate_true_score_for_uid(uid, True)
-
-        if uname is not None:
-            updated = get_results_assoc("""UPDATE user_song_info 
-                                           SET rating = %s, 
-                                               true_score = (((%s * 2 * 10) +
-                                                              (score * 10) +
-                                                              percent_played)
-                                                             / 3)
-                                           WHERE fid = %s AND uid IN
-                                                 (SELECT uid FROM users
-                                                  WHERE uname=%s)
-                                           RETURNING *""",
-                                           (rating, rating, self.fid, uname))
+        updated = rate(fid=self.fid, uid=uid, rating=rating, uname=uname, 
+                       selected=selected)
 
         if updated:
+            self.update(updated)
+            updated = self.calculate_true_score(True)
             self.update(updated)
         return updated
 
@@ -284,26 +240,13 @@ class RatingsAndScores:
         if not listeners.listeners or not self.listening or \
            (force == False and self.get_bedtime_mode()):
             return
-        updated = get_results_assoc(
-              """UPDATE user_song_info 
-                 SET true_score = (((rating * 2 * 10.0) + (score * 10.0) + 
-                                     percent_played) / 3) 
-                 WHERE fid = %s AND uid IN 
-                        (SELECT uid FROM users WHERE listening = true)
-                 RETURNING *""",
-                 (self.fid,))
+        updated = calculate_true_score(self.fid)
         self.update(updated)
 
     def calculate_true_score_for_uid(self, uid, force=False):
         if self.get_bedtime_mode() and force == False:
             return
-        updated = get_results_assoc(
-            """UPDATE user_song_info 
-               SET true_score = (((rating * 2 * 10.0) + (score * 10.0) + 
-                                   percent_played) / 3) 
-               WHERE fid = %s AND uid = %s
-               RETURNING *""",
-               (self.fid, uid))
+        updated = calculate_true_score_for_uid(self.fid, uid)
         self.update(updated)
 
 
@@ -581,11 +524,128 @@ class RatingsAndScores:
 
         return None
 
+CALCULATE_TRUESCORE_FORMULA = """(
+    (
+      (rating * 2 * 10.0) + 
+      (score * 10.0) + 
+      percent_played
+    ) / 3
+)"""
+RATE_TRUESCORE_FORMULA = """(
+  (
+      (%s * 2 * 10.0) +
+      (score * 10.0) + 
+      percent_played
+  ) / 3
+)"""
+
+def calculate_true_score(fid):
+  return get_results_assoc(
+      """UPDATE user_song_info 
+         SET true_score =  """+CALCULATE_TRUESCORE_FORMULA+"""
+         WHERE fid = %s AND uid IN 
+                (SELECT uid FROM users WHERE listening = true)
+         RETURNING *""",
+         (fid,))
+
+def calculate_true_score_for_selected(fid):
+  return get_results_assoc(
+      """UPDATE user_song_info 
+         SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
+         WHERE fid = %s AND uid IN 
+                (SELECT uid FROM users WHERE listening = true AND
+                                             selected = true)
+         RETURNING *""",
+         (fid,))
 
 
+def calculate_true_score_for_uid(fid, uid):
+    return get_results_assoc(
+        """UPDATE user_song_info 
+           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+""" 
+           WHERE fid = %s AND uid = %s
+           RETURNING *""",
+           (fid, uid))
+
+def caclulate_true_score_for_usid(usid):
+    return get_results_assoc(
+        """UPDATE user_song_info 
+           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
+           WHERE usid = %s
+           RETURNING *""",
+           (usid,))
+
+def caclulate_true_score_for_uname(uname, fid):
+    uinfo = get_assoc("""""");
+    return get_results_assoc(
+        """UPDATE user_song_info 
+           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
+           WHERE fid = %s AND uid = %s
+           RETURNING *""",
+           (fid, uid))
+
+def rate_selected(fid, rating):
+    updated = get_results_assoc("""UPDATE user_song_info 
+                                 SET rating = %s, 
+                                     true_score = """+RATE_TRUESCORE_FORMULA+"""
+                                 WHERE fid = %s AND uid IN 
+                                      (SELECT uid FROM users 
+                                       WHERE listening = true AND
+                                             selected = true)
+                                 RETURNING *""",
+                                 (rating, rating, fid,))
+    updated_again = calculate_true_score_for_selected(fid)
+    return updated_again or updated or []
+
+def rate_for_uid(fid, uid, rating):
+    updated = get_results_assoc("""UPDATE user_song_info 
+                                   SET rating = %s,
+                                       true_score = """+RATE_TRUESCORE_FORMULA+"""
+                                   WHERE fid = %s AND 
+                                         uid = %s RETURNING *""", 
+                                   (rating, rating, fid, uid))
+    updated_again = calculate_true_score_for_uid(fid, uid)
+    return updated_again or updated or []
+
+def rate_for_usid(usid, rating):
+    updated = get_results_assoc("""UPDATE user_song_info 
+                                   SET rating = %s,
+                                       true_score = """+RATE_TRUESCORE_FORMULA+"""
+                                   WHERE usid = %s RETURNING *""", 
+                                   (rating, rating, usid))
+    updated_again = caclulate_true_score_for_usid(usid)
+    return updated_again or updated or []
 
 
+def rate_for_uname(fid, uname, rating):
+    uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname, ))
+    if not uinfo:
+        return []
+
+    return rate_for_uid(fid, uinfo['uid'], rating)
 
 
+def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
+    try:
+        rating = int(rating)
+    except:
+        return
+    if rating < 0 or rating > 5:
+        return 
+    updated = None
+
+    if selected is not None and selected:
+        return rate_selected(fid, rating)
+
+    if usid is not None:
+        return rate_for_usid(usid, rating)
+
+    if uid is not None and fid is not None:
+        return rate_for_uid(fid, uid, rating)
+
+    if uname is not None and fid is not None:
+        return rate_for_uname(fid, uname, rating)
+
+    return []
 
 

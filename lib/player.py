@@ -23,6 +23,7 @@ from __init__ import gtk_main_quit
 import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
 import base64
+from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
 import gst
@@ -396,7 +397,7 @@ static char * invisible_xpm[] = {
 
         
 
-    def update_time(self):
+    def update_time(self, retry=True):
         #if self.playingState != PLAYING :
         #    print "update_time:NOT PLAYING"
         #    return True
@@ -413,6 +414,11 @@ static char * invisible_xpm[] = {
             pos_int = self.player.query_position(self.time_format, None)[0]
         except:
             pos_int = 0
+
+        if pos_int == 0 and retry:
+            sleep(0.1)
+            self.update_time(retry=False)
+            return True
             
         pos_str = self.convert_ns(pos_int)
         left_int = (dur_int - pos_int)
@@ -432,7 +438,11 @@ static char * invisible_xpm[] = {
                 "pos_int": pos_int,
                 "dur_int": dur_int,
                 "left_int": left_int,
-                "decimal": decimal
+                "decimal": decimal,
+                "min": 0,
+                "max": dur_int,
+                "value": pos_int,
+                "playingState": self.state_to_string(self.playingState)
             }
         except TypeError, e:
             print "TypeError:",e

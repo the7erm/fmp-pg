@@ -1,0 +1,23 @@
+    <form method="get" action="/search" data-ajax="false">
+        <table border="0" width="100%">
+            <tr>
+                <td style="width:75%;"><input type="search" name="q" value="{{q}}" placeholder="Search by artist, filename, genre and album name (Leave blank for everything)" id="search-field" style="width:100%;"></td>
+                <td>
+                    <select name="f">
+                        <option value="all"
+                            {% if filter_by != "any": %}
+                                selected="selected"
+                            {% endif %}
+                        >All&nbsp;</option>
+                        <option value="any" 
+                            {% if filter_by == "any": %}
+                                selected="selected"
+                            {% endif %}
+                        >Any&nbsp;</option>
+                    </select>
+                </td>
+                <td><input type="submit" value="Search"></td>
+                <input type="hidden" name="s" value="0">
+            </tr>
+        </table>
+    </form>

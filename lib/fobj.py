@@ -211,11 +211,41 @@ class FObj:
                 
             # print "RATINGS:",ratings
         return {
+            "fid": self.fid,
             "artist_title": self.get_artist_title(),
             "basename": self.basename,
+            "dirname": self.dirname,
             "ratings": ratings,
             # "tags": self.tags_hard or self.tags_easy or {}
         }
+
+    def to_full_dict(self):
+        _dict = self.to_dict()
+        _dict['artists'] = []
+        _dict['genres'] = []
+        _dict['albums'] = []
+        if hasattr(self, 'fid'):
+            _dict['id'] = self.fid
+            _dict['id_type'] = 'f'
+        else:
+            _dict['id'] = ""
+            _dict['id_type'] = ""
+        
+
+        keys = ['artists', 'genres', 'albums']
+        for k in keys:
+            if hasattr(self, k):
+                 values = getattr(self, k)
+                 if values:
+                    for v in values:
+                        k2 = k
+                        vd = dict(v)
+                        for k2, v2 in vd.iteritems():
+                            if isinstance(v2, datetime.datetime):
+                                vd[k2] = v2.isoformat()
+                        _dict[k].append(vd)
+
+        return _dict
 
 from __init__ import *
 import netcast_fobj

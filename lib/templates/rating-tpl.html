@@ -1,7 +1,95 @@
-<script type="text/html" id="tpl-rating">
-<tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>">
-    <td><%= uname %></td> 
-    <td class="star-rating nowrap" data-fid="<%= fid %>" data-rating="<%= rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ></td>
-    <td class="true_score_td"><% print (Math.round(true_score, 2)); %><% if (rating == 6) { %><br><b style='color:red;'><small>RATE ME</small></b><% } %></td>
-</tr>
+
+<script type="text/html" id="tpl-ratings-table">
+    <table class="ratings-table bordered" cellspacing="0">
+        <thead class="ui-slider-bg ui-btn-active ui-btn-corner-all">
+            <tr>
+                <th>User</th>
+                <th>Rating</th>
+                <th>True Score</th>
+            </tr>
+        </thead>
+    </table>
 </script>
+
+<script type="text/html" id="tpl-rating">
+    <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>">
+        <td><%= uname %></td> 
+        <td class="star-rating nowrap" data-usid="<%= usid %>" data-fid="<%= fid %>" data-rating="<%= rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ></td>
+        <td class="true_score_td"><% print (true_score.toFixed(1)); %><% if (rating == 6) { %><br><b style='color:red;'><small>RATE ME</small></b><% } %></td>
+    </tr>
+</script>
+
+
+<script type="text/html" id="tpl-item">
+    <div class="float-left"><%- label %></div>
+    <div class="float-left"><%- text %></div><br clear="left">
+</script>
+
+<script type="text/html" id="tpl-file-info">
+    <% 
+        print(itemTemplate({"label": 'Folder:', 'text': dirname}));
+        print(itemTemplate({"label": 'Filename:', 'text': basename}));
+        if (artists) {
+            var renderedArtists = [];
+            _.each(artists, function(a){
+                if (!_.contains(renderedArtists, a['artist'])) {
+                    renderedArtists.push(a['artist']);
+                    print(itemTemplate({"label": 'Artist:', 
+                                     "text": a['artist'] }));
+                }
+            });
+        }
+        if (typeof(title) != 'undefined' && title) {
+            print(itemTemplate({"label": 'Title:', 
+                                 "text": title}));
+        }
+        if (albums) {
+            var last_album = "";
+            _.each(albums, function(al){
+                if (last_album != al['album_name']) {
+                    print(itemTemplate({"label": 'Album:', 
+                                     "text": al['album_name']}));
+                    last_album = al['album_name'];
+                }
+            });
+        }
+        if (genres) {
+            var renderedGenres = [];
+            _.each(genres, function(g){
+                if (!_.contains(renderedGenres, g['artist'])) {
+                    print(itemTemplate({"label": 'Genre:', 
+                                         "text": g['genre']}));
+                    renderedGenres.push(g['genre']);
+                }
+            });
+        }
+    %>
+</script>
+
+<script type="text/html" id="tpl-row">
+    <% var isCued = typeof(cued) != 'undefined' && cued; %>
+    <div class="bordered file<% if (isCued) { %> cued<% } %>">
+        <div class="float-left add-to-preload-div">
+            <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% if (isCued) { 
+                %>minus<% 
+            } else { 
+                %>plus<% 
+            } %>">&nbsp;</button>
+        </div>
+        <div class="float-left file-info" style="padding-left:3px; word-wrap:break-word;"></div>
+        <div class="float-right ratings-table"></div>
+        <br clear="all">
+    </div>
+</script>
+
+<script type="text/html" id="tpl-media-control">
+    <a class='action-link' href="/player/prev" data-cmd="prev"><img src="/static/images/media-seek-backward.png" data-cmd="prev"></a>
+    {% if player.playingState == PLAYING %}
+        <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" data-cmd="pause"></a>
+    {% else %}
+        <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" data-cmd="pause"></a>
+    {% endif %}
+    <a class='action-link' href="/player/next" data-cmd="next"><img src="/static/images/media-seek-forward.png" data-cmd="next"></a>
+</script>
+
+
