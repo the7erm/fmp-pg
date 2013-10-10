@@ -40,9 +40,10 @@
                 'log': function(){}
             };
         }
-        var row_template = _.template($("#tpl-row").text()),
-            rating_template = _.template($("#tpl-rating").text()),
-            item_template = _.template($("#tpl-item").text()),
+        var row_template = _.template($("#tpl-row").html()),
+            rating_template = _.template($("#tpl-rating").html()),
+            item_template = _.template($("#tpl-item").html()),
+            file_info_template = _.template($("#tpl-file-info").html()),
             $window = $(window),
             $document = $(document),
             $loading = $("#loading"),
@@ -105,10 +106,16 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
                     }
                     file.cued = file.cued == null ? false : true;
                     file.itemTemplate = item_template;
-                    var file_html = row_template(file);
-                        el = $("<span></span>");
+                    file.model = new Backbone.Model(file);
+                    file.model.getArtistTitle = function() { 
+                        return this.get('artist_title'); 
+                    };
+                    var file_html = row_template(file),
+                        el = $("<span></span>"),
+                        file_info_html = file_info_template(file);
                         
                     el.append(file_html);
+                    el.find(".file-info").html(file_info_html);
                     // console.log(file_html);
 
                     var rt = el.find('.ratings-table');

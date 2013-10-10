@@ -297,8 +297,11 @@
                 window.player = player;
 
                 window.document.title = "fmp - " + dta.playing.basename;
-                var img = dta.player.tags.image || dta.player.tags["preview-image"] || "";
-                set_image(img);
+                if (!_.isUndefined(dta.player.tags)) {
+                    var img = dta.player.tags.image || dta.player.tags["preview-image"] || "";
+                    set_image(img);
+                }
+                
                 
                 
                 /* 

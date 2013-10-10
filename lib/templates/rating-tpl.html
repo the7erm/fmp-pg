@@ -12,10 +12,11 @@
 </script>
 
 <script type="text/html" id="tpl-rating">
-    <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>">
+    <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>" id="usid-<%- usid %>">
         <td><%= uname %></td> 
-        <td class="star-rating nowrap" data-usid="<%= usid %>" data-fid="<%= fid %>" data-rating="<%= rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ></td>
-        <td class="true_score_td"><% print (true_score.toFixed(1)); %><% if (rating == 6) { %><br><b style='color:red;'><small>RATE ME</small></b><% } %></td>
+        <td class="star-rating nowrap" data-usid="<%= usid %>" data-fid="<%= fid %>" data-rating="<%- rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ><%- rating %></td>
+        <td class="true_score_td"><span class="true_score"><% print (true_score.toFixed(1)); %></span>
+              <div class='rate-me<%= rating == 6 ? "" : " hidden" %>'>RATE ME</div></td>
     </tr>
 </script>
 
@@ -26,23 +27,27 @@
 </script>
 
 <script type="text/html" id="tpl-file-info">
-    <% 
-        print(itemTemplate({"label": 'Folder:', 'text': dirname}));
-        print(itemTemplate({"label": 'Filename:', 'text': basename}));
+    <%  
+        var itemTemplate = _.template($("#tpl-item").html()),
+            albums = model.get('albums'),
+            artists = model.get('artists'),
+            genres = model.get('genres'),
+            artist_title = model.getArtistTitle();
+
+        print(itemTemplate({"label": 'Folder:', 'text': model.get('dirname')}));
+        print(itemTemplate({"label": 'Filename:', 'text': model.get('basename')}));
         if (artists) {
             var renderedArtists = [];
             _.each(artists, function(a){
                 if (!_.contains(renderedArtists, a['artist'])) {
                     renderedArtists.push(a['artist']);
                     print(itemTemplate({"label": 'Artist:', 
-                                     "text": a['artist'] }));
+                                        "text": a['artist'] }));
                 }
             });
         }
-        if (typeof(title) != 'undefined' && title) {
-            print(itemTemplate({"label": 'Title:', 
-                                 "text": title}));
-        }
+        print(itemTemplate({"label": 'Title:', "text": model.get('artist_title')}));
+        
         if (albums) {
             var last_album = "";
             _.each(albums, function(al){
@@ -70,21 +75,24 @@
     <% var isCued = typeof(cued) != 'undefined' && cued; %>
     <div class="bordered file<% if (isCued) { %> cued<% } %>">
         <div class="float-left add-to-preload-div">
-            <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% if (isCued) { 
+            <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% 
+            if (isCued) { 
                 %>minus<% 
             } else { 
                 %>plus<% 
             } %>">&nbsp;</button>
         </div>
         <div class="float-left file-info" style="padding-left:3px; word-wrap:break-word;"></div>
+        <img class="float-right album-art" src="">
         <div class="float-right ratings-table"></div>
+
         <br clear="all">
     </div>
 </script>
 
 <script type="text/html" id="tpl-media-control">
     <a class='action-link' href="/player/prev" data-cmd="prev"><img src="/static/images/media-seek-backward.png" data-cmd="prev"></a>
-    {% if player.playingState == PLAYING %}
+    {% if playingState == "PLAYING" %}
         <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" data-cmd="pause"></a>
     {% else %}
         <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" data-cmd="pause"></a>

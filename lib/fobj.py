@@ -186,7 +186,7 @@ class FObj:
 
     def get_artist_title(self):
         self.get_tags()
-        if self.tags_easy:
+        if self.tags_easy and 'artist' in self.tags_easy and 'title' in self.tags_easy:
             if self.tags_easy['artist'] and self.tags_easy['title']:
                 return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
         return self.basename
@@ -197,7 +197,7 @@ class FObj:
            hasattr(self.ratings_and_scores,"ratings_and_scores"):
             for r in self.ratings_and_scores.ratings_and_scores:
                 ultp = r["ultp"]
-                if hasattr(ultp,"isoformat"):
+                if hasattr(ultp, "isoformat"):
                     ultp = r["ultp"].isoformat()
                 # print "R:",dict(r)
                 r = dict(r)
@@ -210,12 +210,36 @@ class FObj:
                     ratings[r['uid']][k] = v
                 
             # print "RATINGS:",ratings
+        fid = "-1"
+        eid = "-1"
+        _id = "-1"
+        id_type = ""
+        if hasattr(self, 'fid'):
+            fid = self.fid
+            _id = fid
+            id_type = "f"
+        
+        if hasattr(self, 'eid'):
+            eid = self.eid
+            _id = eid
+            id_type = "e"
+
+        artist_title = self.get_artist_title()
+
+        title = ""
+        if self.tags_easy and 'title' in self.tags_easy and self.tags_easy['title']:
+            title = self.tags_easy['title'][0]
+
         return {
-            "fid": self.fid,
-            "artist_title": self.get_artist_title(),
+            "fid": fid,
+            "eid": eid,
+            "id": _id,
+            "id_type": id_type,
+            "artist_title": artist_title,
             "basename": self.basename,
             "dirname": self.dirname,
             "ratings": ratings,
+            "title": title
             # "tags": self.tags_hard or self.tags_easy or {}
         }
 
@@ -224,13 +248,6 @@ class FObj:
         _dict['artists'] = []
         _dict['genres'] = []
         _dict['albums'] = []
-        if hasattr(self, 'fid'):
-            _dict['id'] = self.fid
-            _dict['id_type'] = 'f'
-        else:
-            _dict['id'] = ""
-            _dict['id_type'] = ""
-        
 
         keys = ['artists', 'genres', 'albums']
         for k in keys:

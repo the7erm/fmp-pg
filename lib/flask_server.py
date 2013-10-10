@@ -23,6 +23,7 @@ from flask import request
 from flask import redirect
 from flask import session
 from flask import jsonify
+from flask import send_file
 
 import datetime
 import random
@@ -33,6 +34,8 @@ import socket
 import alsaaudio
 import logging
 import re
+import base64
+import StringIO
 
 from bson import json_util
 import json
@@ -106,8 +109,11 @@ def index():
         if request.args.get("status",""):
             return status()
         return redirect("/")
+    extended = player.to_dict()
+    extended.update(playing.to_full_dict())
     return render_template("index.html", player=player, playing=playing, 
-                           PLAYING=PLAYING, volume=get_volume())
+                           PLAYING=PLAYING, volume=get_volume(),
+                           extended=extended)
 
 @app.route("/index2/")
 def index2():
@@ -148,17 +154,22 @@ def index2():
         if request.args.get("status",""):
             return status()
         return redirect("/")
+    extended = player.to_dict()
+    extended.update(playing.to_full_dict())
     return render_template("index2.html", player=player, playing=playing, 
-                           PLAYING=PLAYING, volume=get_volume())
+                           PLAYING=PLAYING, volume=get_volume(), 
+                           extended=extended)
 
 @app.route("/status/")
 def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
     global playing, player, tray
     # print "PLAYING",playing.to_dict()
+    extended = player.to_dict()
+    extended.update(playing.to_full_dict())
 
     return jsonify(player=player.to_dict(), playing=playing.to_full_dict(),
-                   volume=get_volume())
+                   volume=get_volume(), extended=extended)
 
 def get_volume():
     cards = alsaaudio.cards()
@@ -440,16 +451,27 @@ def cue():
             query("""DELETE FROM preload WHERE fid = %s""", (fid,))
             return "{cued:false}"
 
+def json_first(dta):
+    if not dta:
+        return json_dump(None)
+
+    dta = convert_to_dict(dta)
+    print "dta:",dta
+    return json_dump(dta[0])
+
 
 @app.route("/rate/<usid>/<fid>/<uid>/<rating>", methods=['GET', 'POST', 'PUT'])
 def rate(usid, fid, uid, rating):
     global playing
     print "RATE:", usid, fid, uid, rating
-    # playing.rate(uid=uid, rating=rating)
-    if hasattr(playing, 'fid') and playing.fid == fid:
-        return json_dump(playing.rate(uid=uid, rating=rating))
-
-    return json_dump(simple_rate(usid=usid, fid=fid, uid=uid, rating=rating))
+    # playing.rate(uid=uid, rating=rafidting)
+    if hasattr(playing, 'fid') and int(playing.fid) == int(fid):
+        print "**************** RATING PLAYING FILE **************"
+        dta = playing.rate(uid=uid, rating=rating)
+        return json_first(dta)
+        
+    dta = simple_rate(usid=usid, fid=fid, uid=uid, rating=rating)
+    return json_first(dta)
 
 @app.route('/player/<cmd>', methods=['GET', 'POST', 'PUT'])
 def player_command(cmd):
@@ -481,6 +503,15 @@ def seek(typ, val):
 def playing_file():
     global playing
     return json_dump(playing.to_full_dict())
+
+@app.route("/playing/image.png", methods=["GET"])
+def playing_image():
+    global player
+    output = StringIO.StringIO()
+    img_data = player.tags["image-raw"]
+    output.write(img_data)
+    output.seek(0)
+    return send_file(output, mimetype='image/png')
 
 @app.route("/volume/<new_val>", methods=['POST', 'PUT', 'GET'])
 def volume(new_val):

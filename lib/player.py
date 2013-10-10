@@ -23,6 +23,7 @@ from __init__ import gtk_main_quit
 import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
 import base64
+import hashlib
 from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
@@ -210,11 +211,17 @@ static char * invisible_xpm[] = {
         gobject.timeout_add(1000,self.update_time)
     
     def to_dict(self):
+        # "tags": self.tags
+        imgHash = ""
+        if 'image' in self.tags:
+            m = hashlib.md5()
+            m.update(self.tags['image'])
+            imgHash = m.hexdigest()
         return {
             "filename": self.filename,
             "pos_data": self.pos_data,
             "playingState": self.state_to_string(self.playingState),
-            "tags": self.tags
+            "imgHash": imgHash
         }
 
     def state_to_string(self, state):
@@ -492,18 +499,23 @@ static char * invisible_xpm[] = {
                     print "tags[%s]=%s" % (key, msg )
                     self.tags[key] = "%s" % msg
                 else:
+                    if key == 'image':
+                        self.tags["image-raw"] = msg
                     print "tags[%s]=%s" % (key,"[Binary]")
                     data = {}
                     if isinstance(msg, list):
                         for i, v in enumerate(msg):
                             data[i] = base64.b64encode(msg[i])
+                            data["%s-raw" % i] = msg[i]
                     elif isinstance(msg, dict):
                         for k, v in enumerate(msg):
                             data[k] = base64.b64encode(msg[k])
+                            data[k+"-raw"] = msg[k]
                     else:
                         print "%s" % msg[0:10]
                         data = base64.b64encode(msg)
                     self.tags[key] = data
+
                     print self.tags[key]
 
                 self.emit('tag-received', key, message.structure[key])

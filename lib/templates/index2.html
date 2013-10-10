@@ -6,7 +6,6 @@
 <body>
     {% include "search-form.html" ignore missing %}
     {% include "rating-tpl.html" ignore missing %}
-    
 
     <script type="text/html" id="tpl-search">
         <div class="ui-input-search ui-btn-corner-all ui-btn-shadow ui-icon-searchfield ui-body-c">
@@ -18,37 +17,37 @@
     <input type="range" name="volume-slider" data-theme="d" data-highlight="true" id="volume-slider" value="60" min="0" max="100" step="1" />
 
     <input type="range" name="seek-slider" data-theme="d" data-highlight="true" id="seek-slider" value="0" min="0" max="100" step="1000000000" />
+    
 
     <script type="text/javascript">
         $(document).ready(function(){
-            var mediaPlayerModel = new MediaPlayerModel({
-                    player: {{ player.to_dict()|tojson|safe }}, 
-                    playing: {{ playing.to_full_dict()|tojson|safe }},
-                    volume: {{ volume|tojson|safe }}
-                }),
-                fileView = new FileView({
+            
+            var playerData = {
+                    "player": {{ player.to_dict()|tojson|safe }}, 
+                    "playing": {{ playing.to_full_dict()|tojson|safe }},
+                    "volume": {{ volume|tojson|safe }},
+                    "extended": {{ extended|tojson|safe }}
+                };
+            var testModel = new TestModel(playerData);
+            var conductor = new ConductorModel(playerData);
+            
+            var fileview = new PlayingFileView({
                     "el": "#file-box",
-                    "model": mediaPlayerModel.playingModel,
-                    "showAddToPreload": false
-                }), 
-                mediaControlView = new MediaControlView({
-                    "el": "#player-control",
-                    "playerModel": mediaPlayerModel.playerModel
-                });
-            fileView.render();
-            mediaControlView.render();
-            mediaPlayerModel.playerModel.on('change:artist_title', function(){
-                window.document.title = "fmp - " + mediaPlayerModel.playerModel.get('artist_title');
-            });
+                    "conductor": conductor
+                }).render();
+            $("#check").hide(); 
             var volumeView = new SliderView({
                 "el": "#volume-slider",
-                "model": mediaPlayerModel.volumeModel
+                "model": conductor.volume
             }).render();
-            var posView = new SliderView({
+            var posView = new TimeSlider({
                 "el": "#seek-slider",
-                "model": mediaPlayerModel.posModel
+                "model": conductor.pos
+            }).render(); 
+            var controlView = new ControlView({
+                "el": "#player-control",
+                "conductor": conductor
             }).render();
-
         });
     </script>
 </body>

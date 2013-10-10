@@ -80,12 +80,13 @@ class RatingsAndScores:
     def rate(self, uid=None, rating=None, uname=None, selected=None):
         updated = rate(fid=self.fid, uid=uid, rating=rating, uname=uname, 
                        selected=selected)
-
+        print "UPDATED:",updated
         if updated:
             self.update(updated)
-            updated = self.calculate_true_score(True)
-            self.update(updated)
-        return updated
+            more_updates = self.calculate_true_score(True)
+            print "MORE UPDATES:", more_updates
+            self.update(more_updates)
+        return more_updates or updated
 
     def check_for_rating_info(self):
         # print "CHECK_FOR_RATING_INFO"
@@ -576,13 +577,13 @@ def caclulate_true_score_for_usid(usid):
            (usid,))
 
 def caclulate_true_score_for_uname(uname, fid):
-    uinfo = get_assoc("""""");
+    uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname,));
     return get_results_assoc(
         """UPDATE user_song_info 
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
            WHERE fid = %s AND uid = %s
            RETURNING *""",
-           (fid, uid))
+           (fid, uinfo['uid']))
 
 def rate_selected(fid, rating):
     updated = get_results_assoc("""UPDATE user_song_info 
@@ -626,13 +627,14 @@ def rate_for_uname(fid, uname, rating):
 
 
 def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
+    print "rate: usid:", usid, "uid:", uid, "fid:", fid, "rating:", rating, \
+          "selected:", selected, "uname:", uname
     try:
         rating = int(rating)
     except:
         return
     if rating < 0 or rating > 5:
         return 
-    updated = None
 
     if selected is not None and selected:
         return rate_selected(fid, rating)
