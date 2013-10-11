@@ -215,3 +215,8 @@ input.ui-input-text.ui-slider-input {
 #player-control {
     display:block;
 }
+
+
+.ratings-table {
+    font-size: 0.85em;
+}
