@@ -85,10 +85,27 @@
         <div class="float-left file-info" style="padding-left:3px; word-wrap:break-word;"></div>
         <img class="float-right album-art" src="">
         <div class="float-right ratings-table"></div>
-
         <br clear="all">
     </div>
 </script>
+
+<script type="text/html" id="tpl-mini-playing">
+    <div class="float-left file-info" style="padding-left:3px; word-wrap:break-word;"></div>
+    <div id="time-status" class="float-right">-<span class='left_str'></span> <span class='pos_str'></span>/<span class='dur_str'></span>
+    </div>
+    <br clear="both">
+    <img class="float-right album-art" src="">
+    <div class="float-right ratings-table"></div>
+    <br clear="left">
+    <div id="player-control" class="nowrap float-left"></div>
+    <br clear="all">
+</script>
+
+<script type="text/html" id="tpl-mini-file-info">
+    <%- model.get("artist_title") %>
+</script>
+
+
 
 <script type="text/html" id="tpl-media-control">
     <a class='action-link' href="/player/prev" data-cmd="prev"><img src="/static/images/media-seek-backward.png" data-cmd="prev"></a>

@@ -190,3 +190,28 @@ body {
 .hidden {
     display: none;
 }
+
+input.ui-input-text.ui-slider-input {
+    display: block;
+    float: left;
+    margin: 0;
+    padding: 4px;
+    width: 50px;
+    height: 22px;
+    line-height: 22px;
+    font-size: 14px;
+    border-width: 0;
+    background-image: none;
+    font-weight: bold;
+    text-align: center;
+    vertical-align: text-bottom;
+    outline: 0;
+    -webkit-box-sizing: content-box;
+    -moz-box-sizing: content-box;
+    -ms-box-sizing: content-box;
+    box-sizing: content-box;
+}
+
+#player-control {
+    display:block;
+}

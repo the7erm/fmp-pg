@@ -508,10 +508,18 @@ def playing_file():
 def playing_image():
     global player
     output = StringIO.StringIO()
-    img_data = player.tags["image-raw"]
+    img_data = ""
+    if "image-raw" in player.tags:
+        img_data = player.tags["image-raw"]
+    elif "preview-image-raw" in player.tags:
+        img_data = player.tags["preview-image-raw"]
     output.write(img_data)
     output.seek(0)
     return send_file(output, mimetype='image/png')
+
+@app.route("/favicon.ico", methods=["GET"])
+def favicon():
+    return send_file("favicon.ico", mimetype='image/png')
 
 @app.route("/volume/<new_val>", methods=['POST', 'PUT', 'GET'])
 def volume(new_val):

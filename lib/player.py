@@ -217,6 +217,10 @@ static char * invisible_xpm[] = {
             m = hashlib.md5()
             m.update(self.tags['image'])
             imgHash = m.hexdigest()
+        if 'preview-image' in self.tags:
+            m = hashlib.md5()
+            m.update(self.tags['preview-image'])
+            imgHash = m.hexdigest()
         return {
             "filename": self.filename,
             "pos_data": self.pos_data,
@@ -501,6 +505,8 @@ static char * invisible_xpm[] = {
                 else:
                     if key == 'image':
                         self.tags["image-raw"] = msg
+                    elif key == "preview-image":
+                        self.tags["preview-image-raw"] = msg
                     print "tags[%s]=%s" % (key,"[Binary]")
                     data = {}
                     if isinstance(msg, list):
