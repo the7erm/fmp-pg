@@ -41,18 +41,14 @@
                 alert("Conductor error:"+e);
                 return;
             }
-            
             var fileview = new PlayingFileView({
                     "el": "#file-box",
                     "conductor": conductor
                 }).render();
-
-
             var volumeView = new SliderView({
                 "el": "#volume-slider",
                 "model": conductor.volume
             }).render();
-            
             var posView = new TimeSlider({
                 "el": "#seek-slider",
                 "model": conductor.pos
@@ -65,6 +61,7 @@
                 "el": "#time-status",
                 "conductor": conductor
             }).render();
+
         });
     </script>
     <pre id="logger"></pre>

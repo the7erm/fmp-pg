@@ -23,7 +23,7 @@
 
 <script type="text/html" id="tpl-item">
     <div class="float-left"><%- label %></div>
-    <div class="float-left"><%- text %></div><br clear="left">
+    <div class="float-left item-text"><%- text %></div><br clear="left">
 </script>
 
 <script type="text/html" id="tpl-file-info">
@@ -46,7 +46,7 @@
                 }
             });
         }
-        print(itemTemplate({"label": 'Title:', "text": model.get('artist_title')}));
+        print(itemTemplate({"label": 'Title:', "text": model.get('title')}));
         
         if (albums) {
             var last_album = "";
@@ -73,18 +73,27 @@
 
 <script type="text/html" id="tpl-row">
     <% var isCued = typeof(cued) != 'undefined' && cued; %>
-    <div class="bordered file<% if (isCued) { %> cued<% } %>">
-        <div class="float-left add-to-preload-div">
+    <div class="file<% if (isCued) { %> cued<% } %>">
+        <div class="float-right add-to-preload-div">
             <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% 
             if (isCued) { 
                 %>minus<% 
             } else { 
                 %>plus<% 
-            } %>">&nbsp;</button>
+            } %>"></button>
         </div>
-        <div class="float-left file-info" style="padding-left:3px; word-wrap:break-word;"></div>
-        <img class="float-right album-art" src="">
-        <div class="float-right ratings-table"></div>
+        <div class="float-left loading_data_for"><%
+            if (typeof(artist) != 'undefined') {
+                %><%- artist %><%
+            }
+        %> - <%
+            if (typeof(title) != 'undefined') {
+                %><%- title %><%
+            }
+        %></div>
+        <div class="float-left file-info" style=""></div>
+        <img class="float-right album-art" src="/static/images/ajax-loader.gif">
+        <div class="float-right ratings-table-div"></div>
         <br clear="all">
     </div>
 </script>
@@ -96,16 +105,14 @@
     <br clear="both">
     <div id="player-control" class="nowrap float-left"></div>
     
-    <div class="float-right ratings-table"></div><br clear="right">
+    <div class="float-right ratings-table-div"></div><br clear="right">
     <img class="float-right album-art" src="">
     <br clear="left">
     
     <br clear="all">
 </script>
 
-<script type="text/html" id="tpl-mini-file-info">
-    <%- model.get("artist_title") %>
-</script>
+<script type="text/html" id="tpl-mini-file-info"><%= model.getArtistTitleLink() %></script>
 
 
 
@@ -118,5 +125,4 @@
     {% endif %}
     <a class='action-link' href="/player/next" data-cmd="next"><img src="/static/images/media-seek-forward.png" data-cmd="next"></a>
 </script>
-
 

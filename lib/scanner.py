@@ -29,6 +29,9 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     if filename == None:
         filename = join(root, name)
 
+    if "/.minecraft/" in filename:
+        return
+
     filename = os.path.realpath(filename)
     print 'scanning:', filename
     try:
@@ -37,6 +40,8 @@ def scan_file(root=None, name=None, filename=None, hash=True):
         pass
 
 def scan_dir(directory, hash=True):
+    if "./.minecraft/" in directory:
+        return
     if already_scanned.count(directory) != 0:
         return
 

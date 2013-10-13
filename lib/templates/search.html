@@ -4,7 +4,7 @@
     {% include "head.html"  ignore missing %}
 </head>
 <body>
-    <a href="/" data-role="button" data-icon="home" data-inline="true" data-ajax="false">Back To Player</a>
+    
     {% include "search-form.html" ignore missing %}
     <div id="loading">
         Loading ...
@@ -33,8 +33,28 @@
     </style>
 
     {% include "rating-tpl.html" ignore missing %}
-
+    <div id="tmp-div" style='display:none;'></div>
     <script type="text/javascript">
+        jQuery.fn.animateAuto = function(prop, speed, callback){
+            var elem, height, width;
+            return this.each(function(i, el){
+                el = jQuery(el), 
+                elem = el.clone()
+                         .css({"height":"auto","width":"auto"})
+                         .appendTo(el.parent());
+                height = elem.outerHeight(),
+                width = elem.outerWidth(),
+                elem.remove();
+                
+                if(prop === "height")
+                    el.animate({"height":height}, speed, callback);
+                else if(prop === "width")
+                    el.animate({"width":width}, speed, callback);  
+                else if(prop === "both")
+                    el.animate({"width":width,"height":height}, speed, callback);
+
+            });  
+        }
         if (!window.console) {
             window.console = {
                 'log': function(){}
@@ -44,20 +64,36 @@
             rating_template = _.template($("#tpl-rating").html()),
             item_template = _.template($("#tpl-item").html()),
             file_info_template = _.template($("#tpl-file-info").html()),
+            ratings_table_template = _.template($("#tpl-ratings-table").html()),
             $window = $(window),
             $document = $(document),
             $loading = $("#loading"),
             $_loading = $(".loading");
 
+
+        $(document).ready(function(){
+            var playerData = {
+                    "player": {{ player.to_dict()|tojson|safe }}, 
+                    "playing": {{ playing.to_full_dict()|tojson|safe }},
+                    "volume": {{ volume|tojson|safe }},
+                    "extended": {{ extended|tojson|safe }}
+                },
+                conductor = new ConductorModel(playerData),
+                controlView = new ControlView({
+                    "el": "#player-control",
+                    "conductor": conductor
+                });
+            controlView.render();
+            conductor.playing.on("change:basename", function(){
+                $("#artist_title").html(conductor.getArtistTitleLink());
+            });
+            $("#artist_title").html(conductor.getArtistTitleLink());
+        });
+
         $(document).bind('pageinit', function(){
+
             function showLoading() {
                 $loading.show();
-
-                //        .css("bottom", document.documentElement.scrollTop);
-                // $_loading.show();
-                /*
-                .style.left=String(e.clientX+document.documentElement.scrollLeft)+"px";
-document.getElementById('imgbox').style.top=String(e.clientY+document.documentElement.scrollTop)+"px";  */
             }
             function hideLoading() {
                 $loading.hide();
@@ -85,11 +121,13 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
                         Math.round(data["ratings"][uid]['true_score'], 2));
                 });
             }
+
+            var preload_img = new Image("");
             
             var load_lock = false,
                 end_of_list = false,
                 start = 0,
-                limit = 20,
+                limit = 10,
                 None = null,
                 $search_results = $("#search_results"),
                 files = {{ results|safe }},
@@ -98,83 +136,115 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
                     if (!file) {
                         load_lock = false;
                         hideLoading();
-                        loadDataWhenAtBottom();
+                        $window.scroll();
                         return;
                     }
+                    file.itemTemplate = item_template;
                     if (_.isUndefined(file, 'cued')) {
                         file.cued = false;
                     }
                     file.cued = file.cued == null ? false : true;
-                    file.itemTemplate = item_template;
-                    file.model = new Backbone.Model(file);
-                    file.model.getArtistTitle = function() { 
-                        return this.get('artist_title'); 
-                    };
                     var file_html = row_template(file),
-                        el = $("<span></span>"),
-                        file_info_html = file_info_template(file);
-                        
+                        el = $("<div clear='both'></div>");
+
                     el.append(file_html);
-                    el.find(".file-info").html(file_info_html);
-                    // console.log(file_html);
 
-                    var rt = el.find('.ratings-table');
-                    _.each(file.usi, function(u){
-                        var dta = u;
-                            dta['fid']  = file.fid;
-                        rt.append(rating_template(dta));
-                    });
-
-                    el.find(".star-rating").raty({
-                        score: function () {
-                            return $(this).data("rating")
-                        },
-                        click: onRate,
-                        path: '/static/images/raty/',
-                        cancel: true,
-                        cancelOff : 'cancel-off-big.png',
-                        cancelOn  : 'cancel-on-big.png',
-                        starHalf  : 'star-half-big.png',
-                        starOff   : 'star-off-big.png',
-                        starOn    : 'star-on-big.png',
-                        size:24
-                    });
-
-                    el.find('.add-to-preload')
-                      .click(function(){
-                        console.log("arguments",arguments)
-                        var _this = $(this),
-                            cued = _this.data('cued') ? false : true,
-                            sign = cued ? "minus" : "plus",
-                            fid = _this.data('fid'),
-                            $parent = _this.parent(),
-                            $ui_icon = $parent.find('.ui-icon');
-                        console.log("_this.data(\"cued\"):", _this.data("cued"));
-                        console.log("cued:",cued)
-                        el.toggleClass('cued', cued);
-                        // $parent.find(".ui-btn-text").text();
-                        if (sign == "plus") {
-                            $ui_icon.removeClass("ui-icon-minus").addClass("ui-icon-plus");
-                        } else {
-                            $ui_icon.removeClass("ui-icon-plus").addClass("ui-icon-minus");
-                        }
-                        
-                        _this.data('cued', cued);
-                        _this.data("icon", sign)
-                        _this.trigger("refresh");
-                        console.log("clicked");
-                        $.ajax("/cue/", {
-                           data: {
-                                'fid': fid,
-                                'cue': cued
-                           }
-                        });
-                      })
-                      .data(file);
-                    
+                    var rt_div = el.find(".ratings-table-div");
+                    rt_div.html(this.ratings_table_template({})).hide();
                     $search_results.append(el);
                     el.trigger("create");
+                    var album_art = el.find(".album-art"),
+                        loading_data_for = el.find(".loading_data_for");
+                    album_art.hide();
+                    // el.find(".album-art").prop("src", "/static/images/ajax-loader.gif");
+                    el.find(".loading_data_for").show();
+                    el.one("inview",function(){
+                        var el = $(this);
+
+                        album_art.show();
+                        $.ajax({
+                            cache: false,
+                            url: "/file-info/"+file.fid + "/",
+                            'dataType':'json'
+                        }).done(function (file) {
+                            album_art.hide();
+                            // console.log("FILE:",file);
+                            rt_div.show();
+
+                            file.model = new Backbone.Model(file);
+                            file.model.getArtistTitle = function() { 
+                                return this.get('artist_title'); 
+                            };
+                            var file_info_html = file_info_template(file);
+                            loading_data_for.hide();
+                            var file_info = el.find(".file-info"),
+                                rt = rt_div.find('.ratings-table');
+                            
+                            file_info.html(file_info_html);
+
+                            _.each(file.usi, function(u){
+                                var dta = u;
+                                    dta['fid']  = file.fid;
+                                var row_html = rating_template(dta);
+                                rt.append(row_html);
+                                
+                            });
+
+                            rt.find(".star-rating").raty({
+                                score: function () {
+                                    return $(this).data("rating")
+                                },
+                                click: onRate,
+                                path: '/static/images/raty/',
+                                cancel: true,
+                                cancelOff : 'cancel-off-big.png',
+                                cancelOn  : 'cancel-on-big.png',
+                                starHalf  : 'star-half-big.png',
+                                starOff   : 'star-off-big.png',
+                                starOn    : 'star-on-big.png',
+                                size:24
+                            });
+
+                            el.find('.add-to-preload')
+                              .click(function(){
+                                console.log("arguments",arguments)
+                                var _this = $(this),
+                                    cued = _this.data('cued') ? false : true,
+                                    sign = cued ? "minus" : "plus",
+                                    fid = _this.data('fid'),
+                                    $parent = _this.parent(),
+                                    $ui_icon = $parent.find('.ui-icon');
+                                console.log("_this.data(\"cued\"):", _this.data("cued"));
+                                console.log("cued:",cued)
+                                el.toggleClass('cued', cued);
+                                // $parent.find(".ui-btn-text").text();
+                                if (sign == "plus") {
+                                    $ui_icon.removeClass("ui-icon-minus").addClass("ui-icon-plus");
+                                } else {
+                                    $ui_icon.removeClass("ui-icon-plus").addClass("ui-icon-minus");
+                                }
+                                
+                                _this.data('cued', cued);
+                                _this.data("icon", sign)
+                                _this.trigger("refresh");
+                                console.log("clicked");
+                                $.ajax("/cue/", {
+                                   data: {
+                                        'fid': fid,
+                                        'cue': cued
+                                   }
+                                });
+                              }).data(file);
+                            
+                            // console.log(file_html);
+                            // el.animate({height:"auto"}, 200);
+                            // el.animateAuto("height", 2000);
+                            
+                        });
+                        
+                    });
                     addFile();
+                    
                 };
 
             function processResponse(response) {
@@ -199,15 +269,15 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
             
             function loadData() {
                 if (load_lock) {
-                    console.log("loadData load_lock:",load_lock);
+                    // console.log("loadData load_lock:",load_lock);
                     return;
                 }
                 showLoading();
-                console.log("load_lock:",load_lock);
+                // console.log("load_lock:",load_lock);
                 load_lock = true;
                 start = parseInt(start)+limit;
 
-                console.log("load_lock:",load_lock);
+                // console.log("load_lock:",load_lock);
                 $.ajax({
                     type: "get",
                     url: "/search",
@@ -228,21 +298,21 @@ document.getElementById('imgbox').style.top=String(e.clientY+document.documentEl
                 
             }
             function loadDataWhenAtBottom() {
-                if ($window.scrollTop() + ($window.height() * 1) >= ($document.height() - $window.height())) {
+                if ($window.scrollTop() + ($window.height() * 10) >= ($document.height() - $window.height())) {
                     loadData();
                 }
             }
             load_lock = true;
             window.setTimeout(addFile, 1000);
-            // addFile();
-            
-            $window.scroll(function () {
-                /*
-                console.log("top:", $window.scrollTop());
-                console.log("$document.height() - $window.height()",$document.height() - $window.height()) */
-                loadDataWhenAtBottom();
-            });
+            $window.scroll(loadDataWhenAtBottom);
+
+           
         });
     </script>
+
+    <div data-role="footer" data-position="fixed" data-theme="d">
+        <div id="artist_title" class="float-left footer-artist-title"></div>
+        <div id="player-control" class="float-right"></div>
+    </div>
 </body>
 </html>

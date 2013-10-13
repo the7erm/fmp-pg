@@ -70,6 +70,12 @@ application = Application([
     (r".*", FallbackHandler, dict(fallback=tr)),
 ])
 
+def get_extended():
+    global player, playing
+    extended = player.to_dict()
+    extended.update(playing.to_full_dict())
+    return extended;
+
 @app.route("/")
 def index():
     global playing, player, tray
@@ -109,11 +115,10 @@ def index():
         if request.args.get("status",""):
             return status()
         return redirect("/")
-    extended = player.to_dict()
-    extended.update(playing.to_full_dict())
+    
     return render_template("index.html", player=player, playing=playing, 
                            PLAYING=PLAYING, volume=get_volume(),
-                           extended=extended)
+                           extended=get_extended())
 
 @app.route("/index2/")
 def index2():
@@ -154,11 +159,9 @@ def index2():
         if request.args.get("status",""):
             return status()
         return redirect("/")
-    extended = player.to_dict()
-    extended.update(playing.to_full_dict())
     return render_template("index2.html", player=player, playing=playing, 
                            PLAYING=PLAYING, volume=get_volume(), 
-                           extended=extended)
+                           extended=get_extended())
 
 @app.route("/status/")
 def status():
@@ -270,19 +273,6 @@ def genres_for_fid(fid):
 def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
-
-    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
-                               p.fid AS cued, ts_rank(tsv, query)
-                   FROM files f 
-                        LEFT JOIN preload p ON p.fid = f.fid,
-                        keywords kw,
-                        to_tsquery(%s) query
-                    WHERE kw.fid = f.fid AND tsv @@ query
-                    ORDER BY ts_rank DESC
-                    """
-    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
-    print "QUERY:%s" % query
-    results = []
     print "Q:",q
     _q = get_words_from_string(q)
     print "_Q:",_q
@@ -296,17 +286,46 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
         q = " & ".join(words)
     else:
         q = " | ".join(words)
+    
+
+    no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, 
+                                        artist, f.fid, p.fid AS cued
+                   FROM files f 
+                        LEFT JOIN preload p ON p.fid = f.fid
+                        LEFT JOIN file_artists fa ON fa.fid = f.fid
+                        LEFT JOIN artists a ON a.aid = fa.aid
+                    ORDER BY artist, title"""
+
+    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                               p.fid AS cued, ts_rank(tsv, query)
+                   FROM files f 
+                        LEFT JOIN preload p ON p.fid = f.fid,
+                        keywords kw,
+                        to_tsquery(%s) query
+                    WHERE kw.fid = f.fid AND tsv @@ query
+                    ORDER BY ts_rank DESC
+                    """
+
+    if not q:
+        query = no_words_query
+
+    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
+    print "QUERY:%s" % query
+    results = []
+    
     try:
+
         for r in get_results_assoc(query, (q,)):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
             # fd.cued = r.cued
             rdict = dict(r)
+            """
             fid = r['fid']
             rdict['usi'] = listeners_info_for_fid(fid)
             rdict['artists'] = artists_for_fid(fid)
             rdict['albums'] = albums_for_fid(fid)
-            rdict['genres'] = genres_for_fid(fid)
+            rdict['genres'] = genres_for_fid(fid) """
             results.append(rdict)
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
@@ -316,6 +335,31 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
         print "(flask_server) psycopg2.InternalError:",err
     return results
 
+
+@app.route("/file-info/<fid>/")
+def file_info(fid, methods=["GET"]):
+
+    r = get_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                                     p.fid AS cued
+                     FROM files f 
+                        LEFT JOIN preload p ON p.fid = f.fid
+                     WHERE f.fid = %s""", (fid, ))
+    rdict = dict(r)
+    try:
+        fid = r['fid']
+        rdict['usi'] = listeners_info_for_fid(fid)
+        rdict['artists'] = artists_for_fid(fid)
+        rdict['albums'] = albums_for_fid(fid)
+        rdict['genres'] = genres_for_fid(fid)
+    except psycopg2.IntegrityError, err:
+        query("COMMIT;")
+        print "(flask_server) psycopg2.IntegrityError:",err
+    except psycopg2.InternalError, err:
+        query("COMMIT;")
+        print "(flask_server) psycopg2.InternalError:",err
+
+   
+    return json_dump(rdict)
 
 def set_volume(vol):
     cards = alsaaudio.cards()
@@ -406,24 +450,27 @@ def search():
     else:
         filter_by = "all"
     start = "%s" % request.args.get("s", "0")
-    limit = "%s" % request.args.get("s", "20")
+    limit = "%s" % request.args.get("l", "10")
+    start = int(start)
+    limit = int(limit)
+    if not start:
+        start = 0
+    if not limit:
+        limit = 10
+
+    print "LIMIT:%s" % limit
     start_time = time.time()
     print "start:",start_time
-    results = get_search_results(q, start=start, limit=20, filter_by=filter_by)
+    results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
     print "end:", time.time() - start_time
     json_results = json_dump(results)
-
+    extended = get_extended();
     if not request.args.get("ajax", False):
         return render_template("search.html", playing=playing, PLAYING=PLAYING,
                                results=json_results, q=request.args.get("q",""),
-                               filter_by=filter_by, player=player)
-    resp = {
-        "player": player.to_dict(), 
-        "playing": playing.to_dict(),
-        "results": results, 
-        "q": request.args.get("q","")
-    }
-    print "RESP:"
+                               filter_by=filter_by, player=player,
+                               extended=extended, volume=get_volume())
+    
     return json_results
 
 @app.route('/cue/', methods=['GET', 'POST'])

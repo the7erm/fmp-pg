@@ -1708,6 +1708,13 @@ CREATE UNIQUE INDEX uname ON users USING btree (uname);
 
 
 --
+-- Name: unique_fid_gid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE UNIQUE INDEX unique_fid_gid ON file_genres USING btree (fid, gid);
+
+
+--
 -- Name: dont_pick_on_duplicate_ignore; Type: RULE; Schema: public; Owner: -
 --
 

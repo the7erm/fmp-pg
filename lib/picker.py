@@ -207,13 +207,18 @@ def fix_bad_scores(uid):
 
     
 def insert_missing_songs(uid):
-    m = pg_cur.mogrify("SELECT fid FROM user_song_info WHERE uid = %s", (uid,))
+    print "inserting missing songs"
+    m = pg_cur.mogrify("""SELECT f.fid FROM files f 
+                              LEFT JOIN user_song_info usi ON usi.fid = f.fid AND 
+                                        usi.uid = %s 
+                          WHERE usi.fid IS NULL""", (uid,))
+
     q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
                 SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
                 FROM files f 
-                WHERE f.fid NOT IN (%s)""" % (uid, DEFAULT_RATING, DEFAULT_SCORE, 
-                                              DEFAULT_PERCENT_PLAYED, 
-                                              DEFAULT_TRUE_SCORE, m)
+                WHERE f.fid IN (%s)""" % (uid, DEFAULT_RATING, DEFAULT_SCORE, 
+                                          DEFAULT_PERCENT_PLAYED, 
+                                          DEFAULT_TRUE_SCORE, m)
     query(q)
 
 def get_true_score_sample(uid, true_score):

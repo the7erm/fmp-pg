@@ -366,7 +366,7 @@ class Local_File(fobj.FObj):
                                         VALUES(%s, %s) RETURNING *""", 
                                         (self.dirname, self.basename))
         except psycopg2.IntegrityError:
-            query("COMMIT");
+            query("COMMIT")
             self.db_info = get_assoc("""SELECT *
                                         FROM files
                                         WHERE dir = %s and basename = %s""",
@@ -705,6 +705,10 @@ def get_words_from_string(string):
         print "TYPE:",type(string)
         return []
 
+    string = string.replace("!"," ")
+    string = string.replace("?"," ")
+    string = string.replace("&"," ")
+    string = string.replace("|"," ")
     words = string.replace("_"," ").strip().split()
     words = list(set(words))
     words += string.split("-")

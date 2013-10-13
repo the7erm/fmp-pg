@@ -35,9 +35,6 @@ body {
 }
 
 
-.action-link img:hover {
-    background: #DDD !important;
-}
 
 #playing-file {
     cursor: pointer;
@@ -219,4 +216,30 @@ input.ui-input-text.ui-slider-input {
 
 .ratings-table {
     font-size: 0.85em;
+}
+
+.file-info {
+    max-width: 80%;
+    min-width: 50%;
+    word-wrap:break-word;
+}
+
+.loading_data_for {
+    max-width: 80%;
+}
+
+.footer-artist-title {
+    word-wrap:break-word; 
+    max-width:50%; 
+    max-height:50px; 
+    overflow:hidden; 
+    text-overflow: ellipsis;
+}
+
+.item-text {
+    max-width:70%;
+    overflow:hidden; 
+    text-overflow: ellipsis;
+    word-wrap:break-word;
+    max-height: 20px;
 }
