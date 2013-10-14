@@ -308,8 +308,8 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
 
     if not q:
         query = no_words_query
-
-    query = "%s +" % (query, limit, start)
+    # """+limit+""" OFFSET """+offset
+    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
     

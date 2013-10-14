@@ -35,6 +35,22 @@
                 el: "#history",
                 collection: new HistoryCollection({{ results|safe }})
             }).render();
+            var playerData = {
+                    "player": {{ player.to_dict()|tojson|safe }}, 
+                    "playing": {{ playing.to_full_dict()|tojson|safe }},
+                    "volume": {{ volume|tojson|safe }},
+                    "extended": {{ extended|tojson|safe }}
+                },
+                conductor = new ConductorModel(playerData),
+                controlView = new ControlView({
+                    "el": "#player-control",
+                    "conductor": conductor
+                });
+            controlView.render();
+            conductor.playing.on("change:basename", function(){
+                $("#artist_title").html(conductor.getArtistTitleLink());
+            });
+            $("#artist_title").html(conductor.getArtistTitleLink());
         });
     </script>
 
