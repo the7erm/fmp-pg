@@ -201,7 +201,7 @@ class Local_File(fobj.FObj):
         if not self.db_info or self.is_stream:
             return False
 
-        dups = self.get_dups()
+        dups = self.get_dups(must_match=True)
         found = False
 
         for dup in dups:
@@ -215,12 +215,79 @@ class Local_File(fobj.FObj):
 
         return found
 
-    def get_dups(self):
-        return get_results_assoc("""SELECT fid
+    def get_possible_dups(self):
+        if self.db_info['title']:
+            # SELECT * FROM sometable WHERE UPPER(textfield) LIKE (UPPER('value') || '%')
+            return get_results_assoc("""SELECT f.fid
+                                        FROM files f 
+                                        WHERE fid != %s AND 
+                                              sha512 != %s AND
+                                              (
+                                                UPPER(title) LIKE UPPER(%s) OR 
+                                                UPPER(basename) LIKE UPPER(%s)
+                                              )""",
+                                        (self.db_info["fid"], 
+                                         self.db_info["sha512"], 
+                                         self.db_info['title'], 
+                                         self.db_info['basename']))
+        
+        return get_results_assoc("""SELECT f.fid
+                                    FROM files f 
+                                    WHERE fid != %s AND 
+                                          sha512 != %s AND
+                                          UPPER(basename) LIKE UPPER(%s)""",
+                                        (self.db_info["fid"], 
+                                         self.db_info["sha512"],
+                                         self.db_info['basename']))
+
+
+    def get_dups(self, must_match=False):
+        results = []
+        fids = []
+        
+        dups = get_results_assoc("""SELECT fid
                                     FROM files f
                                     WHERE sha512 = %s AND fid != %s""",
                                     (self.db_info["sha512"], 
                                      self.db_info["fid"]))
+        for d in dups:
+            fids.append(d['fid'])
+            results.append(d)
+        print "SHA DUPS:",
+        pp.pprint(results)
+        if must_match:
+            return results
+
+        possible_dups = self.get_possible_dups()
+
+        for d in possible_dups:
+            if d['fid'] in fids:
+                continue
+            dup = Local_File(get_dups=False, insert=False, fid=d['fid'])
+            if not self.artists:
+                # In this case the basename or title match, and since the
+                # current file has no artists consider it a match
+                fids.append(d['fid'])
+                results.append(dup)
+                continue
+            
+            for a1 in self.artists:
+                is_dup = False
+                for a2 in dup.artists:
+                    if a1['artist'].lower() == a2['artist'].lower():
+                        # At least 1 of the artists match, and 
+                        # the basename or title matches so call it a dup.
+                        is_dup = True
+                        break
+                if not is_dup:
+                    continue
+                fids.append(d['fid'])
+                results.append(dup)
+
+        print "POSSIBLE DUPES:",
+        pp.pprint(results)
+
+        return results
 
     def get_title(self):
         if not self.tags_easy:

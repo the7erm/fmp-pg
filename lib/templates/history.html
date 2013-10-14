@@ -1,0 +1,46 @@
+<html>
+<head>
+    <title>fmp - history</title>
+    {% include "head.html"  ignore missing %}
+</head>
+<body>
+    
+    {% include "search-form.html" ignore missing %}
+    <div id="history-results" ></div>
+
+    <style>
+    .file {
+        border: 1px dotted #000;
+        background: #DDD;
+        margin:5px;
+        padding:5px;
+        color:#000;
+    }
+    
+    .file:hover {
+        background: #CCC;
+        border: 1px solid #000;
+    }
+    .float-right {
+        float:right;
+    }
+    </style>
+
+    {% include "rating-tpl.html" ignore missing %}
+    <div id="history"></div>
+    <div id="tmp-div" style='display:none;'></div>
+    <script type="text/javascript">
+        $(document).bind('pageinit', function(){
+            var historyView = new HistoryView({
+                el: "#history",
+                collection: new HistoryCollection({{ results|safe }})
+            }).render();
+        });
+    </script>
+
+    <div data-role="footer" data-position="fixed" data-theme="d">
+        <div id="artist_title" class="float-left footer-artist-title"></div>
+        <div id="player-control" class="float-right"></div>
+    </div>
+</body>
+</html>

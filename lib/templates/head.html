@@ -18,7 +18,11 @@
     <script type="text/javascript" src="/static/js/lib/backbone-min.js"></script>
     <script type="text/javascript" src="/static/js/fmp2.js"></script>
 
-
+    <script type="text/javascript">
+        $(document).bind('pageinit', function(){
+            $.mobile.ajaxEnabled = false;
+        });
+    </script>
 
 
 

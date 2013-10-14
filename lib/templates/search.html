@@ -71,7 +71,7 @@
             $_loading = $(".loading");
 
 
-        $(document).ready(function(){
+        $(document).bind('pageinit', function(){
             var playerData = {
                     "player": {{ player.to_dict()|tojson|safe }}, 
                     "playing": {{ playing.to_full_dict()|tojson|safe }},
@@ -88,10 +88,6 @@
                 $("#artist_title").html(conductor.getArtistTitleLink());
             });
             $("#artist_title").html(conductor.getArtistTitleLink());
-        });
-
-        $(document).bind('pageinit', function(){
-
             function showLoading() {
                 $loading.show();
             }

@@ -29,11 +29,11 @@
 <script type="text/html" id="tpl-file-info">
     <%  
         var itemTemplate = _.template($("#tpl-item").html()),
-            albums = model.get('albums'),
-            artists = model.get('artists'),
-            genres = model.get('genres'),
+            albums = model.get('albums') || [],
+            artists = model.get('artists') || [],
+            genres = model.get('genres') || [],
             artist_title = model.getArtistTitle();
-
+        
         print(itemTemplate({"label": 'Folder:', 'text': model.get('dirname')}));
         print(itemTemplate({"label": 'Filename:', 'text': model.get('basename')}));
         if (artists) {
@@ -74,7 +74,7 @@
 <script type="text/html" id="tpl-row">
     <% var isCued = typeof(cued) != 'undefined' && cued; %>
     <div class="file<% if (isCued) { %> cued<% } %>">
-        <div class="float-right add-to-preload-div">
+        <div class="float-right add-to-reload-div">
             <button class="add-to-preload" data-iconpos="notext" data-inline="true" data-icon="<% 
             if (isCued) { 
                 %>minus<% 

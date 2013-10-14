@@ -76,7 +76,7 @@ def get_extended():
     extended.update(playing.to_full_dict())
     return extended;
 
-@app.route("/")
+@app.route("/index-old/")
 def index():
     global playing, player, tray
     print "FLASK PLAYING:", playing.filename
@@ -120,7 +120,7 @@ def index():
                            PLAYING=PLAYING, volume=get_volume(),
                            extended=get_extended())
 
-@app.route("/index2/")
+@app.route("/")
 def index2():
     global playing, player, tray
     print "FLASK PLAYING:", playing.filename
@@ -159,7 +159,7 @@ def index2():
         if request.args.get("status",""):
             return status()
         return redirect("/")
-    return render_template("index2.html", player=player, playing=playing, 
+    return render_template("index.html", player=player, playing=playing, 
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
@@ -309,7 +309,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     if not q:
         query = no_words_query
 
-    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
+    query = "%s +" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
     
@@ -347,7 +347,7 @@ def file_info(fid, methods=["GET"]):
     rdict = dict(r)
     try:
         fid = r['fid']
-        rdict['usi'] = listeners_info_for_fid(fid)
+        rdict['usi'] = rdict['ratings'] = listeners_info_for_fid(fid)
         rdict['artists'] = artists_for_fid(fid)
         rdict['albums'] = albums_for_fid(fid)
         rdict['genres'] = genres_for_fid(fid)
@@ -359,6 +359,24 @@ def file_info(fid, methods=["GET"]):
         print "(flask_server) psycopg2.InternalError:",err
 
    
+    return json_dump(rdict)
+
+@app.route("/episode-info/<eid>")
+def episode_info(eid, methods=["GET"]):
+    r = get_assoc("""SELECT * 
+                     FROM netcast_episodes ne, netcasts n
+                     WHERE ne.eid = %s AND n.nid = ne.nid""", (eid, ))
+    rdict = dict(r)
+    rdict['id'] = eid
+    rdict['id_type'] = 'e'
+    rdict['artist_title'] = "%s - %s" % (rdict['netcast_name'], rdict['episode_title'])
+    rdict['artists'] = [{
+        "aid": "-1",    
+        "artist": rdict['netcast_name']
+    }]
+    rdict['title'] = rdict['episode_title']
+    rdict['dirname'], rdict['basename'] = os.path.split(rdict['local_file'])
+
     return json_dump(rdict)
 
 def set_volume(vol):
@@ -427,6 +445,9 @@ def json_obj_handler(obj):
     """Default JSON serializer."""
     import calendar, datetime
 
+    if isinstance(obj, datetime.date):
+        obj = datetime.datetime(*obj.timetuple()[:3])
+
     if isinstance(obj, datetime.datetime):
         if obj.utcoffset() is not None:
             obj = obj - obj.utcoffset()
@@ -435,6 +456,7 @@ def json_obj_handler(obj):
         obj.microsecond / 1000
     )
     return millis
+    
 
 def json_dump(obj):
     return json.dumps(obj, default=json_obj_handler) or "{};"
@@ -449,14 +471,8 @@ def search():
         filter_by = "any"
     else:
         filter_by = "all"
-    start = "%s" % request.args.get("s", "0")
-    limit = "%s" % request.args.get("l", "10")
-    start = int(start)
-    limit = int(limit)
-    if not start:
-        start = 0
-    if not limit:
-        limit = 10
+    
+    start, limit = get_start_limit()
 
     print "LIMIT:%s" % limit
     start_time = time.time()
@@ -472,6 +488,17 @@ def search():
                                extended=extended, volume=get_volume())
     
     return json_results
+
+def get_start_limit():
+    start = "%s" % request.args.get("s", "0")
+    limit = "%s" % request.args.get("l", "10")
+    start = int(start)
+    limit = int(limit)
+    if not start:
+        start = 0
+    if not limit:
+        limit = 10
+    return start, limit
 
 @app.route('/cue/', methods=['GET', 'POST'])
 def cue():
@@ -572,6 +599,33 @@ def favicon():
 def volume(new_val):
     set_volume(new_val);
     return json_dump({"value": new_val})
+
+@app.route("/history/", methods=['get'])
+def history():
+    json_results=history_data()
+    extended=get_extended()
+    return render_template("history.html", playing=playing, PLAYING=PLAYING,
+                           results=json_results, player=player,
+                           extended=extended, volume=get_volume())
+
+@app.route('/history-data/', methods=['GET'])
+def history_data():
+    start, limit = get_start_limit()
+    offset = "%d" % start
+    limit = "%d" % limit
+    # LIMIT %d OFFSET %d
+    history = get_results_assoc("""SELECT uh.*, uname
+                                   FROM user_history uh, users u
+                                   WHERE uh.uid = u.uid AND 
+                                         u.listening = true AND
+                                         time_played IS NOT NULL 
+                                   ORDER BY time_played DESC, admin DESC, uname
+                                   LIMIT """+limit+""" OFFSET """+offset)
+    results = []
+    for h in history:
+        h = dict(h)
+        results.append(h)
+    return json_dump(results)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
