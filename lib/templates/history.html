@@ -26,7 +26,6 @@
     }
     </style>
 
-    {% include "rating-tpl.html" ignore missing %}
     <div id="history"></div>
     <div id="tmp-div" style='display:none;'></div>
     <script type="text/javascript">
@@ -48,15 +47,16 @@
                 });
             controlView.render();
             conductor.playing.on("change:basename", function(){
-                $("#artist_title").html(conductor.getArtistTitleLink());
+                $("#footer_artist_title").html(conductor.getArtistTitleLink());
             });
-            $("#artist_title").html(conductor.getArtistTitleLink());
+            $("#footer_artist_title").html(conductor.getArtistTitleLink());
         });
     </script>
 
     <div data-role="footer" data-position="fixed" data-theme="d">
-        <div id="artist_title" class="float-left footer-artist-title"></div>
+        <div id="footer_artist_title" class="float-left footer-artist-title"></div>
         <div id="player-control" class="float-right"></div>
     </div>
+    {% include "js-templates.html" ignore missing %}
 </body>
 </html>

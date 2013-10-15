@@ -525,6 +525,7 @@ class RatingsAndScores:
 
         return None
 
+# OLD, but keeping it around because what I'm doing is an experiment.
 CALCULATE_TRUESCORE_FORMULA = """(
     (
       (rating * 2 * 10.0) + 
@@ -532,6 +533,32 @@ CALCULATE_TRUESCORE_FORMULA = """(
       percent_played
     ) / 3
 )"""
+
+CALCULATE_TRUESCORE_FORMULA = """
+(((usi.rating * 2 * 10.0) + 
+               (usi.score * 10.0) + 
+               (usi.percent_played) + 
+(SELECT CASE WHEN avg(percent_played) IS NOT NULL THEN
+           avg(percent_played)
+        ELSE
+          50
+        END
+ FROM user_history uh 
+ WHERE uhid IN (
+     SELECT uhid 
+     FROM user_history uh2
+     WHERE uh2.uid = usi.uid AND 
+          uh2.id = usi.fid AND 
+          uh2.id_type = 'f' AND
+          usi.uid = 1
+     ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
+              time_played DESC
+     LIMIT 5
+ )) 
+) / 4)
+"""
+
+# OLD, but keeping it around because what I'm doing is an experiment.
 RATE_TRUESCORE_FORMULA = """(
   (
       (%s * 2 * 10.0) +
@@ -540,18 +567,44 @@ RATE_TRUESCORE_FORMULA = """(
   ) / 3
 )"""
 
+RATE_TRUESCORE_FORMULA = """
+(((%s * 2 * 10.0) + 
+               (usi.score * 10.0) + 
+               (usi.percent_played) + 
+(SELECT CASE WHEN avg(percent_played) IS NOT NULL THEN
+           avg(percent_played)
+        ELSE
+          50
+        END
+ FROM user_history uh 
+ WHERE uhid IN (
+     SELECT uhid 
+     FROM user_history uh2
+     WHERE uh2.uid = usi.uid AND 
+          uh2.id = usi.fid AND 
+          uh2.id_type = 'f' AND
+          usi.uid = 1
+     ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
+              time_played DESC
+     LIMIT 5
+ )) 
+) / 4)
+"""
+
 def calculate_true_score(fid):
-  return get_results_assoc(
-      """UPDATE user_song_info 
+  res = get_results_assoc(
+      """UPDATE user_song_info usi
          SET true_score =  """+CALCULATE_TRUESCORE_FORMULA+"""
          WHERE fid = %s AND uid IN 
                 (SELECT uid FROM users WHERE listening = true)
          RETURNING *""",
          (fid,))
+  print res
+  return res
 
 def calculate_true_score_for_selected(fid):
   return get_results_assoc(
-      """UPDATE user_song_info 
+      """UPDATE user_song_info usi
          SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
          WHERE fid = %s AND uid IN 
                 (SELECT uid FROM users WHERE listening = true AND
@@ -561,16 +614,17 @@ def calculate_true_score_for_selected(fid):
 
 
 def calculate_true_score_for_uid(fid, uid):
-    return get_results_assoc(
-        """UPDATE user_song_info 
+    res = get_results_assoc(
+        """UPDATE user_song_info usi
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+""" 
            WHERE fid = %s AND uid = %s
            RETURNING *""",
            (fid, uid))
+    return res
 
 def caclulate_true_score_for_usid(usid):
     return get_results_assoc(
-        """UPDATE user_song_info 
+        """UPDATE user_song_info usi
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
            WHERE usid = %s
            RETURNING *""",
@@ -579,14 +633,14 @@ def caclulate_true_score_for_usid(usid):
 def caclulate_true_score_for_uname(uname, fid):
     uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname,));
     return get_results_assoc(
-        """UPDATE user_song_info 
+        """UPDATE user_song_info usi
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
            WHERE fid = %s AND uid = %s
            RETURNING *""",
            (fid, uinfo['uid']))
 
 def rate_selected(fid, rating):
-    updated = get_results_assoc("""UPDATE user_song_info 
+    updated = get_results_assoc("""UPDATE user_song_info usi
                                  SET rating = %s, 
                                      true_score = """+RATE_TRUESCORE_FORMULA+"""
                                  WHERE fid = %s AND uid IN 
@@ -599,7 +653,7 @@ def rate_selected(fid, rating):
     return updated_again or updated or []
 
 def rate_for_uid(fid, uid, rating):
-    updated = get_results_assoc("""UPDATE user_song_info 
+    updated = get_results_assoc("""UPDATE user_song_info usi
                                    SET rating = %s,
                                        true_score = """+RATE_TRUESCORE_FORMULA+"""
                                    WHERE fid = %s AND 
@@ -609,7 +663,7 @@ def rate_for_uid(fid, uid, rating):
     return updated_again or updated or []
 
 def rate_for_usid(usid, rating):
-    updated = get_results_assoc("""UPDATE user_song_info 
+    updated = get_results_assoc("""UPDATE user_song_info usi
                                    SET rating = %s,
                                        true_score = """+RATE_TRUESCORE_FORMULA+"""
                                    WHERE usid = %s RETURNING *""", 

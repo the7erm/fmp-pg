@@ -1,11 +1,11 @@
 <html>
 <head>
-    <title>fmp - {{ playing.basename }}</title>
+    <title>fmp - {{ playing.get_artist_title() }}</title>
     {% include "head.html"  ignore missing %}
 </head>
 <body>
     {% include "search-form.html" ignore missing %}
-    {% include "rating-tpl.html" ignore missing %}
+    
 
     <script type="text/html" id="tpl-search">
         <div class="ui-input-search ui-btn-corner-all ui-btn-shadow ui-icon-searchfield ui-body-c">
@@ -72,6 +72,8 @@
             }).render(); */
         });
     </script>
+
     <pre id="logger"></pre>
+    {% include "js-templates.html" ignore missing %}
 </body>
 </html>

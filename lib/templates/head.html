@@ -19,14 +19,14 @@
     <script type="text/javascript" src="/static/js/fmp.js"></script>
 
     <script type="text/javascript">
+        jQuery.fx.off = true;
         $(document).bind('pageinit', function(){
+            
             $.mobile.ajaxEnabled = false;
+            
+            $("[data-role=header]").fixedtoolbar({ disablePageZoom: false });
+            $("[data-role=footer]").fixedtoolbar({ disablePageZoom: false });
+            $("[data-role=header]").fixedtoolbar({ tapToggleBlacklist: ".star-rating, img, a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed" });
+            $("[data-role=footer]").fixedtoolbar({ tapToggleBlacklist: ".star-rating, img, a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed" });
         });
     </script>
-
-
-
-
-    
-    
-    

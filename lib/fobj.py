@@ -186,6 +186,7 @@ class FObj:
 
     def get_artist_title(self):
         self.get_tags()
+
         if self.tags_easy and 'artist' in self.tags_easy and 'title' in self.tags_easy:
             if self.tags_easy['artist'] and self.tags_easy['title']:
                 return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
