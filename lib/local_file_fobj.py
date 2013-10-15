@@ -145,9 +145,12 @@ class Local_File(fobj.FObj):
             self.prepare_dups()
 
     def set_db_keywords(self):
+        keywords = []
 
         root, ext = os.path.splitext(self.basename)
-        keywords = get_words_from_string(root)
+        keywords += get_words_from_string(self.basename)
+        keywords += get_words_from_string(root)
+        
         keywords += get_words_from_string(ext)
         
         for a in self.artists:
@@ -163,8 +166,13 @@ class Local_File(fobj.FObj):
 
         keywords = list(set(keywords))
         for i, k in enumerate(keywords):
-            keywords[i] = k.strip()
+            keywords[i] = k.strip().lower()
+        keywords = list(set(keywords))
         print "BEFORE:",keywords
+        txt = " ".join(keywords) 
+        keywords = list(set(txt.split()))
+        if keywords.count("-"):
+            keywords.remove("-")
         keywords = sorted(keywords, key=str.lower)
         print "AFTER:",keywords
 
@@ -772,15 +780,23 @@ def get_words_from_string(string):
         print "TYPE:",type(string)
         return []
 
-    string = string.replace("!"," ")
-    string = string.replace("?"," ")
-    string = string.replace("&"," ")
-    string = string.replace("|"," ")
-    words = string.replace("_"," ").strip().split()
-    words = list(set(words))
-    words += string.split("-")
+    string = string.strip()
 
     final_words = []
+    final_words.append(string)
+    dash_splitted = string.split("-")
+    for p in dash_splitted:
+        p = p.strip()
+        final_words.append(p)
+
+    string = re.sub("[\!\?\&\|\_\.]", " ", string)
+    words = string.strip().split()
+    words = list(set(words))
+    words += [string.strip()]
+
+    words += string.split("-")
+
+    
     final_words.append(string)
     for w in words:
         w = w.strip()

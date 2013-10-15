@@ -274,20 +274,6 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
     print "Q:",q
-    _q = get_words_from_string(q)
-    print "_Q:",_q
-    words = []
-    for w in _q:
-        _w = w.split()
-        if _w:
-            words += _w
-
-    if filter_by == "all":
-        q = " & ".join(words)
-    else:
-        q = " | ".join(words)
-    
-
     no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, 
                                         artist, f.fid, p.fid AS cued
                    FROM files f 
@@ -301,7 +287,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                    FROM files f 
                         LEFT JOIN preload p ON p.fid = f.fid,
                         keywords kw,
-                        to_tsquery(%s) query
+                        plainto_tsquery('english', %s) query
                     WHERE kw.fid = f.fid AND tsv @@ query
                     ORDER BY ts_rank DESC
                     """
@@ -314,7 +300,6 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     results = []
     
     try:
-
         for r in get_results_assoc(query, (q,)):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
