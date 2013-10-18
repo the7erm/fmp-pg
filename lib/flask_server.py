@@ -166,7 +166,7 @@ def index2():
 @app.route("/status/")
 def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
-    global playing, player, tray
+    global playing, player
     # print "PLAYING",playing.to_dict()
     extended = player.to_dict()
     extended.update(playing.to_full_dict())
@@ -230,9 +230,10 @@ def prase_words(q, filter_by="all"):
     return ""
 
 def listeners_info_for_fid(fid):
-    query = """SELECT uname, usi.*
-               FROM user_song_info usi, users u
-               WHERE usi.fid = %s AND u.uid = usi.uid AND u.listening = true
+    query = """SELECT uname, usi.*, f.sha512
+               FROM user_song_info usi, users u, files f
+               WHERE usi.fid = %s AND u.uid = usi.uid AND u.listening = true AND
+                     f.fid = usi.fid
                ORDER BY admin DESC, uname ASC
     """
     print "query:%s" % query
@@ -274,16 +275,18 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
     print "Q:",q
-    no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, 
-                                        artist, f.fid, p.fid AS cued
+    no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                                        sha512, artist, f.fid, p.fid AS cued,
+                                        f.fid AS id, 'f' AS id_type
                    FROM files f 
                         LEFT JOIN preload p ON p.fid = f.fid
                         LEFT JOIN file_artists fa ON fa.fid = f.fid
                         LEFT JOIN artists a ON a.aid = fa.aid
                     ORDER BY artist, title"""
 
-    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
-                               p.fid AS cued, ts_rank(tsv, query)
+    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, sha512,
+                               p.fid AS cued, ts_rank(tsv, query),
+                               f.fid AS id, 'f' AS id_type
                    FROM files f 
                         LEFT JOIN preload p ON p.fid = f.fid,
                         keywords kw,
@@ -305,12 +308,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
             #fd = f.to_dict()
             # fd.cued = r.cued
             rdict = dict(r)
-            """
-            fid = r['fid']
-            rdict['usi'] = listeners_info_for_fid(fid)
-            rdict['artists'] = artists_for_fid(fid)
-            rdict['albums'] = albums_for_fid(fid)
-            rdict['genres'] = genres_for_fid(fid) """
+            
             results.append(rdict)
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
@@ -321,15 +319,13 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     return results
 
 
-@app.route("/file-info/<fid>/")
-def file_info(fid, methods=["GET"]):
-
-    r = get_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
-                                     p.fid AS cued
-                     FROM files f 
-                        LEFT JOIN preload p ON p.fid = f.fid
-                     WHERE f.fid = %s""", (fid, ))
+def convert_res_to_dict(r):
+    print "R:",r
     rdict = dict(r)
+    sha512 = ""
+    if r['sha512']:
+        sha512 = r['sha512']
+    print "DICT:",rdict
     try:
         fid = r['fid']
         rdict['usi'] = rdict['ratings'] = listeners_info_for_fid(fid)
@@ -342,8 +338,29 @@ def file_info(fid, methods=["GET"]):
     except psycopg2.InternalError, err:
         query("COMMIT;")
         print "(flask_server) psycopg2.InternalError:",err
+    return rdict
 
-   
+@app.route("/file-info/<fid>/")
+def file_info(fid, methods=["GET"]):
+
+    r = get_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                                     sha512, p.fid AS cued
+                     FROM files f 
+                        LEFT JOIN preload p ON p.fid = f.fid
+                     WHERE f.fid = %s""", 
+                     (fid, ))
+    rdict = convert_res_to_dict(r)
+    rdict['dups'] = []
+    if r['sha512']:
+        dups = get_results_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
+                                     sha512, p.fid AS cued
+                                    FROM files f 
+                                         LEFT JOIN preload p ON p.fid = f.fid
+                                    WHERE f.sha512 = %s AND f.fid != %s""", 
+                                    (r['sha512'], fid))
+        for d in dups:
+            rdict['dups'].append(convert_res_to_dict(d))
+
     return json_dump(rdict)
 
 @app.route("/episode-info/<eid>")
@@ -448,31 +465,57 @@ def json_dump(obj):
 
 @app.route('/search/', methods=['GET', 'POST'])
 def search():
-    global player, playing
-    results = None
-    q = request.args.get("q","")
-    filter_by = "%s" % request.args.get("f","all")
+    global player, playing, PLAYING
+    json_results = search_data()
+    filter_by = get_filter_by()
+    extended = get_extended();
+    return render_template("search.html", playing=playing, PLAYING=PLAYING,
+                           results=json_results, q=request.args.get("q",""),
+                           filter_by=filter_by, player=player,
+                           extended=extended, volume=get_volume())
+    
+    
+def get_filter_by():
+    filter_by = "%s" % request.args.get("f", "all")
     if filter_by == "any":
         filter_by = "any"
     else:
         filter_by = "all"
-    
+    return filter_by
+
+@app.route('/search-data/', methods=['GET', 'POST'])
+def search_data():
+    global player, playing
+    results = None
+    q = request.args.get("q","")
     start, limit = get_start_limit()
+    filter_by=get_filter_by()
 
     print "LIMIT:%s" % limit
     start_time = time.time()
     print "start:",start_time
     results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
     print "end:", time.time() - start_time
-    json_results = json_dump(results)
-    extended = get_extended();
-    if not request.args.get("ajax", False):
-        return render_template("search.html", playing=playing, PLAYING=PLAYING,
-                               results=json_results, q=request.args.get("q",""),
-                               filter_by=filter_by, player=player,
-                               extended=extended, volume=get_volume())
-    
-    return json_results
+    return json_dump(results)
+
+@app.route('/history-data/', methods=['GET'])
+def history_data():
+    start, limit = get_start_limit()
+    offset = "%d" % start
+    limit = "%d" % limit
+    # LIMIT %d OFFSET %d
+    history = get_results_assoc("""SELECT uh.*, uname
+                                   FROM user_history uh, users u
+                                   WHERE uh.uid = u.uid AND 
+                                         u.listening = true AND
+                                         time_played IS NOT NULL 
+                                   ORDER BY time_played DESC, admin DESC, uname
+                                   LIMIT """+limit+""" OFFSET """+offset)
+    results = []
+    for h in history:
+        h = dict(h)
+        results.append(h)
+    return json_dump(results)
 
 def get_start_limit():
     start = "%s" % request.args.get("s", "0")

@@ -41,7 +41,7 @@ numeric = re.compile("^[0-9]+$")
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
-                 insert=False, silent=False, sha512=None, get_dups=True, **kwargs):
+                 insert=False, silent=False, sha512=None, must_match=False, get_dups=True, **kwargs):
 
         if kwargs.has_key('dir') and dirname is None:
             dirname = kwargs['dir']
@@ -53,6 +53,7 @@ class Local_File(fobj.FObj):
         self.albums = []
         self.genres = []
         self.dups = []
+        self.sha_dups = []
         self.tags_easy = None
         self.tags_hard = None
         self.mark_as_played_when_time = datetime.now()
@@ -142,12 +143,14 @@ class Local_File(fobj.FObj):
             self.update_hash()
 
         if get_dups and self.db_info["sha512"]:
-            self.prepare_dups()
+            self.prepare_dups(must_match=must_match)
 
     def set_db_keywords(self):
         keywords = []
 
         root, ext = os.path.splitext(self.basename)
+        if self.db_info['sha512']:
+            keywords += [self.db_info['sha512']]
         keywords += get_words_from_string(self.basename)
         keywords += get_words_from_string(root)
         
@@ -166,7 +169,7 @@ class Local_File(fobj.FObj):
 
         keywords = list(set(keywords))
         for i, k in enumerate(keywords):
-            keywords[i] = k.strip().lower()
+            keywords[i] = k.strip()
         keywords = list(set(keywords))
         print "BEFORE:",keywords
         txt = " ".join(keywords) 
@@ -196,14 +199,16 @@ class Local_File(fobj.FObj):
                  WHERE fid = %s""",
                  (self.db_info['sha512'], self.mtime, self.db_info['fid']))
 
-    def prepare_dups(self):
-        dups = self.get_dups()
+    def prepare_dups(self, must_match=False):
+        dups = self.get_dups(must_match=must_match)
         for d in dups:
             try:
                 dup = Local_File(get_dups=False, insert=False, fid=d['fid'])
             except CreationFailed:
                 continue
             self.dups.append(dup)
+            if dup.db_info["sha512"] == self.db_info["sha512"]:
+                self.sha_dups.append(dup)
 
     def use_dup(self, *args, **kwargs):
         if not self.db_info or self.is_stream:
@@ -780,32 +785,24 @@ def get_words_from_string(string):
         print "TYPE:",type(string)
         return []
 
-    string = string.strip()
-
-    final_words = []
-    final_words.append(string)
+    string = string.strip().lower()
+    final_words = string.split()
     dash_splitted = string.split("-")
     for p in dash_splitted:
         p = p.strip()
         final_words.append(p)
 
-    string = re.sub("[\!\?\&\|\_\.]", " ", string)
-    words = string.strip().split()
-    words = list(set(words))
-    words += [string.strip()]
-
-    words += string.split("-")
-
-    
-    final_words.append(string)
-    for w in words:
-        w = w.strip()
-        if not w or w == '-':
-            continue
-        final_words.append(w)
-        _w = re.sub(r"[\W]", " ", w).strip()
-        if _w and w != _w:
-            final_words.append(_w)
+    # replace any non-word characters
+    # This would replace "don't say a word" with "don t say a word"
+    replaced_string = re.sub("[\W]", " ", string)
+    final_words += replaced_string.split()
+    # replace any non words characters and leave spaces.
+    # To change phrases like "don't say a word" to "dont say a word"
+    # so I'm will become "im"
+    # P.O.D. will become pod
+    removed_string = re.sub("[^\w\s]", "", string)
+    final_words += removed_string.split()
+    final_words = list(set(final_words))
 
     return final_words
         

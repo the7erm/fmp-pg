@@ -1,0 +1,81 @@
+    <div id="log"></div>
+    <br clear="all">
+    <br clear="all">
+    <br clear="all">
+    <br clear="all">
+    <br clear="all">
+
+    <div data-role="popup" id="ratePopup" data-overlay-theme="a" data-theme="c" style="max-width:400px;" class="ui-corner-all">
+        <div data-role="header" data-theme="a" class="ui-corner-top">
+            <h1 class="popup-rate-artist-title"></h1>
+        </div>
+        <div data-role="content" data-theme="d" class="ui-corner-bottom ui-content">
+            <h3 class="ui-title">What do you think?</h3>
+            <p></p>
+            <div class="footer-rating-table"></div>
+        </div>
+    </div>
+
+    <!--
+    <div data-role="footer" data-position="fixed" data-theme="d" id="footer">
+        <div class="artist_title footer-artist-title"></div>
+        <div style="text-align:right; float:right;" id="player-control"></div>
+        <div class="center-wrapper">
+            <a href="#ratePopup" data-position-to="window" data-icon="star" data-inline="true" data-rel="popup" data-role="button" class="footer-rating">-</a>
+        </div>
+    </div>
+    -->
+    <style> 
+
+        #control-prev .ui-icon {
+            background: url(/static/images/media-seek-backward.png) 50% 50% no-repeat;  
+            background-size: 20px 24px;
+        }
+        .control-pause .ui-icon {
+            background: url(/static/images/media-playback-pause.png) 50% 50% no-repeat;  
+            background-size: 20px 24px;
+        }
+       .control-play .ui-icon {
+            background: url(/static/images/media-playback-start.png) 50% 50% no-repeat;  
+            background-size: 20px 24px;
+        }
+        #control-next .ui-icon {
+            background: url(/static/images/media-seek-forward.png) 50% 50% no-repeat;  
+            background-size: 20px 24px;
+        }
+    </style>
+
+    <p id="ua"></p>
+
+    <div data-role="footer" data-position="fixed" data-theme="d" id="footer">
+        <div data-role="navbar" data-theme="d">
+            <ul>
+                <li class="artist_title footer-artist-title" data-theme="d"></li>
+                <li data-theme="d"><a 
+                    href="#prev" 
+                    id="control-prev" 
+                    class="action-link" 
+                    data-cmd="prev" 
+                    data-icon="custom">Prev</a></li>
+                <li data-theme="d"><a 
+                    href="#pause" 
+                    id="control-pause" 
+                    class="action-link control-pause" 
+                    data-cmd="pause" 
+                    data-icon="custom">Pause</a></li>
+                <li data-theme="d"><a href="#next" 
+                    id="control-next" 
+                    class="action-link" 
+                    data-cmd="next" 
+                    data-icon="custom">Next</a></li>
+                <li data-theme="d"><a 
+                    href="#ratePopup" 
+                    data-position-to="window" 
+                    data-icon="star" 
+                    data-inline="true" 
+                    data-rel="popup" 
+                    class="footer-rating">?</a></li>
+            </ul>
+        </div>
+    </div>
+    <p style="text-align: center;">&nbsp;</p>

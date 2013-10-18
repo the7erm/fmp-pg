@@ -3,15 +3,8 @@
     <title>fmp - {{ playing.get_artist_title() }}</title>
     {% include "head.html"  ignore missing %}
 </head>
-<body>
-    {% include "search-form.html" ignore missing %}
-    
+<body>{% include "search-form.html" ignore missing %}</div> 
 
-    <script type="text/html" id="tpl-search">
-        <div class="ui-input-search ui-btn-corner-all ui-btn-shadow ui-icon-searchfield ui-body-c">
-            <%- text %>
-        </div>
-    </script>
     <div id="file-box"></div>
     
     <input type="range" name="volume-slider" data-theme="d" data-highlight="true" id="volume-slider" value="60" min="0" max="100" step="1" />

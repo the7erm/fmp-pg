@@ -6,53 +6,31 @@
 <body>
     
     {% include "search-form.html" ignore missing %}
-    <div id="history-results" ></div>
 
     <style>
-    .file {
-        border: 1px dotted #000;
-        background: #DDD;
-        margin:5px;
-        padding:5px;
-        color:#000;
-    }
-    
-    .file:hover {
-        background: #CCC;
-        border: 1px solid #000;
-    }
-    .float-right {
-        float:right;
-    }
+        .file {
+            border: 1px dotted #000;
+            background: #DDD;
+            margin:5px;
+            padding:5px;
+            color:#000;
+        }
+        
+        .file:hover {
+            background: #CCC;
+            border: 1px solid #000;
+        }
     </style>
 
     <div id="history"></div>
-    <div id="tmp-div" style='display:none;'></div>
     <script type="text/javascript">
         $(document).bind('pageinit', function(){
-            var historyView = new HistoryView({
+            var historyView = new PagerView({
                 el: "#history",
                 collection: new HistoryCollection({{ results|safe }})
             }).render();
-            var playerData = {
-                    "player": {{ player.to_dict()|tojson|safe }}, 
-                    "playing": {{ playing.to_full_dict()|tojson|safe }},
-                    "volume": {{ volume|tojson|safe }},
-                    "extended": {{ extended|tojson|safe }}
-                },
-                conductor = new ConductorModel(playerData),
-                controlView = new ControlView({
-                    "el": "#player-control",
-                    "conductor": conductor
-                });
-            controlView.render();
-            conductor.playing.on("change:basename", function(){
-                $("#footer_artist_title").html(conductor.getArtistTitleLink());
-            });
-            $("#footer_artist_title").html(conductor.getArtistTitleLink());
         });
     </script>
-
     <div data-role="footer" data-position="fixed" data-theme="d">
         <div id="footer_artist_title" class="float-left footer-artist-title"></div>
         <div id="player-control" class="float-right"></div>

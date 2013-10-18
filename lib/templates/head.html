@@ -1,8 +1,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=yes, target-densitydpi=device-dpi" />
+    <link rel="stylesheet" type="text/css" 
+            href="/static/js/lib/jquery-ui-1.10.3/themes/base/minified/jquery-ui.min.css" />
     <link rel="stylesheet" href="/static/js/lib/jquery-mobile-1.3.2/jquery.mobile-1.3.2.min.css" />
     <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
-    <link rel="stylesheet" type="text/css" 
-                           href="/static/js/lib/jquery-ui-1.10.3/themes/base/minified/jquery-ui.min.css" />
+
 
     <script type="text/javascript" src="/static/js/lib/jquery-ui-1.10.3/jquery-1.9.1.min.js"></script>
     <script type="text/javascript" 
@@ -20,13 +21,29 @@
 
     <script type="text/javascript">
         jQuery.fx.off = true;
+        $.mobile.ajaxEnabled = false;
         $(document).bind('pageinit', function(){
-            
+            $.fx.off = true;
             $.mobile.ajaxEnabled = false;
-            
+            var blacklist = { 
+                tapToggleBlacklist: ".star-rating, "+
+                                    "img, "+
+                                    "a, "+
+                                    "button, "+
+                                    "input, "+
+                                    "select, "+
+                                    "textarea, "+
+                                    ".ui-header-fixed, "+
+                                    ".ui-footer-fixed, "+
+                                    ".ui-grid-d, "+
+                                    ".ui-popup-screen, "+
+                                    ".ui-popup, "+
+                                    "#footer" 
+            };
+            $("[data-role=header]").fixedtoolbar(blacklist);
+            $("[data-role=footer]").fixedtoolbar(blacklist);
+            /*
             $("[data-role=header]").fixedtoolbar({ disablePageZoom: false });
-            $("[data-role=footer]").fixedtoolbar({ disablePageZoom: false });
-            $("[data-role=header]").fixedtoolbar({ tapToggleBlacklist: ".star-rating, img, a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed" });
-            $("[data-role=footer]").fixedtoolbar({ tapToggleBlacklist: ".star-rating, img, a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed" });
+            $("[data-role=footer]").fixedtoolbar({ disablePageZoom: false }); */
         });
     </script>

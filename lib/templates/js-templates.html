@@ -14,7 +14,7 @@
 <script type="text/html" id="tpl-rating">
     <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>" id="usid-<%- usid %>">
         <td><%= uname %></td> 
-        <td class="star-rating nowrap" data-usid="<%= usid %>" data-fid="<%= fid %>" data-rating="<%- rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ><%- rating %></td>
+        <td class="star-rating nowrap" data-usid="<%= usid %>" data-fid="<%= fid %>" data-rating="<%- rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" data-sha512="<%= sha512 %>"></td>
         <td class="true_score_td"><span class="true_score"><% print (true_score.toFixed(1)); %></span>
               <div class='rate-me<%= rating == 6 ? "" : " hidden" %>'>RATE ME</div></td>
     </tr>
@@ -23,17 +23,25 @@
 
 <script type="text/html" id="tpl-item">
     <div class="float-left"><%- label %></div>
-    <div class="float-left item-text"><%- text %></div><br clear="left">
+    <div class="float-left item-text"><%
+        if (typeof href != 'undefined') {
+            %><a href="<%= href %>" onclick="document.location.href=this.href;"><%
+        }
+    %><%- text %><%
+        if (typeof href != 'undefined') {
+            %></a><%
+        }
+    %></div><br clear="left">
 </script>
 
 <script type="text/html" id="tpl-file-info">
-    <%  
+    <%
         var itemTemplate = _.template($("#tpl-item").html()),
             albums = model.get('albums') || [],
             artists = model.get('artists') || [],
             genres = model.get('genres') || [],
             artist_title = model.getArtistTitle();
-        
+        %><a name="fid-<%- model.get('fid') %>">fid-<%- model.get('fid') %></a><br><%
         print(itemTemplate({"label": 'Folder:', 'text': model.get('dirname')}));
         print(itemTemplate({"label": 'Filename:', 'text': model.get('basename')}));
         if (artists) {
@@ -66,6 +74,17 @@
                                          "text": g['genre']}));
                     renderedGenres.push(g['genre']);
                 }
+            });
+        }
+
+        if(typeof dups != 'undefined' && dups.length > 0) {
+            _.each(dups, function(d) {
+                
+                print(itemTemplate({
+                    "label": 'Dup:', 
+                    "text": d['fid'], 
+                    "href": "/search/?q="+d['sha512']
+                }));
             });
         }
     %>
@@ -117,12 +136,31 @@
 
 
 <script type="text/html" id="tpl-media-control">
+    <% if (isNav) {
+        %><li><%
+    } %>
     <a class='action-link' href="/player/prev" data-cmd="prev"><img src="/static/images/media-seek-backward.png" data-cmd="prev"></a>
+    <% if (isNav) {
+        %></li><li><%
+    } %>
     {% if playingState == "PLAYING" %}
         <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-pause.png" data-cmd="pause"></a>
     {% else %}
         <a class='action-link' href="/player/pause" data-cmd="pause"><img id="play-pause-img" src="/static/images/media-playback-start.png" data-cmd="pause"></a>
     {% endif %}
+     <% if (isNav) {
+        %></li><li><%
+    } %>
     <a class='action-link' href="/player/next" data-cmd="next"><img src="/static/images/media-seek-forward.png" data-cmd="next"></a>
+     <% if (isNav) {
+        %></li><%
+    } %>
 </script>
 
+
+<script type="text/html" id="tpl-search">
+    <div class="ui-input-search ui-btn-corner-all ui-btn-shadow ui-icon-searchfield ui-body-c">
+        <%- text %>
+    </div>
+</script>
+    

@@ -194,6 +194,9 @@ class FObj:
 
     def to_dict(self):
         ratings = {}
+        sha512=""
+        if "sha512" in self.db_info:
+            sha512 = self.db_info["sha512"]
         if hasattr(self,"ratings_and_scores") and \
            hasattr(self.ratings_and_scores,"ratings_and_scores"):
             for r in self.ratings_and_scores.ratings_and_scores:
@@ -209,7 +212,7 @@ class FObj:
                     if isinstance(v,datetime.datetime):
                         v = v.isoformat()
                     ratings[r['uid']][k] = v
-                
+                ratings[r['uid']]["sha512"] = sha512
             # print "RATINGS:",ratings
         fid = "-1"
         eid = "-1"
@@ -230,6 +233,7 @@ class FObj:
         title = ""
         if self.tags_easy and 'title' in self.tags_easy and self.tags_easy['title']:
             title = self.tags_easy['title'][0]
+        
 
         return {
             "fid": fid,
@@ -240,7 +244,8 @@ class FObj:
             "basename": self.basename,
             "dirname": self.dirname,
             "ratings": ratings,
-            "title": title
+            "title": title,
+            "sha512": sha512
             # "tags": self.tags_hard or self.tags_easy or {}
         }
 

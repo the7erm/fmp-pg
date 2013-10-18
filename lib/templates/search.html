@@ -6,47 +6,8 @@
 <body>
     
     {% include "search-form.html" ignore missing %}
-    <div id="loading">
-        Loading ...
-    </div>
-    {% if results: %}
-        <div id="search_results" ></div>
-    {% endif %}
-    <div class="loading">Loading ...</div>
-
-    <style>
-    .file {
-        border: 1px dotted #000;
-        background: #DDD;
-        margin:5px;
-        padding:5px;
-        color:#000;
-    }
-    
-    .file:hover {
-        background: #CCC;
-        border: 1px solid #000;
-    }
-    .float-right {
-        float:right;
-    }
-    </style>
-
-    <div id="tmp-div" style='display:none;'></div>
     <script type="text/javascript">
-        
-
-
         $(document).bind('pageinit', function(){
-            var row_template = _.template($("#tpl-row").html()),
-                rating_template = _.template($("#tpl-rating").html()),
-                item_template = _.template($("#tpl-item").html()),
-                file_info_template = _.template($("#tpl-file-info").html()),
-                ratings_table_template = _.template($("#tpl-ratings-table").html()),
-                $window = $(window),
-                $document = $(document),
-                $loading = $("#loading"),
-                $_loading = $(".loading");
             var playerData = {
                     "player": {{ player.to_dict()|tojson|safe }}, 
                     "playing": {{ playing.to_full_dict()|tojson|safe }},
@@ -54,240 +15,47 @@
                     "extended": {{ extended|tojson|safe }}
                 },
                 conductor = new ConductorModel(playerData),
-                controlView = new ControlView({
-                    "el": "#player-control",
+                controlView = new FooterControlView({
+                    "el": "#footer",
                     "conductor": conductor
-                });
-            controlView.render();
-            conductor.playing.on("change:basename", function(){
-                $("#artist_title").html(conductor.getArtistTitleLink());
-            });
-            $("#artist_title").html(conductor.getArtistTitleLink());
-            function showLoading() {
-                $loading.show();
-            }
-            function hideLoading() {
-                $loading.hide();
-                $_loading.hide();
-            }
-            function onRate(score, evt) {
-                var _this = $(this),
-                    uid = _this.data("uid"), 
-                    fid = _this.data("fid");
-                if (!uid || !fid) {
-                    return;
-                }
-                if (!score) {
-                    score = "0";
-                }
-                $.ajax({
-                    "url":"/",
-                    "data":{
-                        "fid": fid,
-                        "cmd": "rate",
-                        "uid": uid,
-                        "status": 1,
-                        "value": score,
-                    },
-                    'dataType':'json'
-                }).done(function(data){
-                    _this.siblings(".true_score_td").text(
-                        Math.round(data["ratings"][uid]['true_score'], 2));
-                });
-            }
+                }).render(),
+                footerView = new FooterView({conductor:conductor}).render();
+        });
+    </script>
+    <br>
+    <br>
+    <div id="results"></div>
+    <style>
+        .file {
+            border: 1px dotted #000;
+            background: #DDD;
+            margin:5px;
+            padding:5px;
+            color:#000;
+        }
+        
+        .file:hover {
+            background: #CCC;
+            border: 1px solid #000;
+        }
+    </style>
 
-            var preload_img = new Image("");
-            
-            var load_lock = false,
-                end_of_list = false,
-                start = 0,
-                limit = 10,
-                None = null,
-                $search_results = $("#search_results"),
-                files = {{ results|safe }},
-                addFile = function() {
-                    var file = files.shift();
-                    if (!file) {
-                        load_lock = false;
-                        hideLoading();
-                        $window.scroll();
-                        return;
-                    }
-                    file.itemTemplate = item_template;
-                    if (_.isUndefined(file, 'cued')) {
-                        file.cued = false;
-                    }
-                    file.cued = file.cued == null ? false : true;
-                    var file_html = row_template(file),
-                        el = $("<div clear='both'></div>");
-
-                    el.append(file_html);
-
-                    var rt_div = el.find(".ratings-table-div");
-                    rt_div.html(ratings_table_template({})).hide();
-                    $search_results.append(el);
-                    el.trigger("create");
-                    var album_art = el.find(".album-art"),
-                        loading_data_for = el.find(".loading_data_for");
-                    album_art.hide();
-                    // el.find(".album-art").prop("src", "/static/images/ajax-loader.gif");
-                    el.find(".loading_data_for").show();
-                    el.one("inview",function(){
-                        var el = $(this);
-
-                        album_art.show();
-                        $.ajax({
-                            cache: false,
-                            url: "/file-info/"+file.fid + "/",
-                            'dataType':'json'
-                        }).done(function (file) {
-                            album_art.hide();
-                            // console.log("FILE:",file);
-                            rt_div.show();
-
-                            file.model = new Backbone.Model(file);
-                            file.model.getArtistTitle = function() { 
-                                return this.get('artist_title'); 
-                            };
-                            var file_info_html = file_info_template(file);
-                            loading_data_for.hide();
-                            var file_info = el.find(".file-info"),
-                                rt = rt_div.find('.ratings-table');
-                            
-                            file_info.html(file_info_html);
-
-                            _.each(file.usi, function(u){
-                                var dta = u;
-                                    dta['fid']  = file.fid;
-                                var row_html = rating_template(dta);
-                                rt.append(row_html);
-                                
-                            });
-
-                            rt.find(".star-rating").raty({
-                                score: function () {
-                                    return $(this).data("rating")
-                                },
-                                click: onRate,
-                                path: '/static/images/raty/',
-                                cancel: true,
-                                cancelOff : 'cancel-off-big.png',
-                                cancelOn  : 'cancel-on-big.png',
-                                starHalf  : 'star-half-big.png',
-                                starOff   : 'star-off-big.png',
-                                starOn    : 'star-on-big.png',
-                                size:24
-                            });
-
-                            el.find('.add-to-preload')
-                              .click(function(){
-                                console.log("arguments",arguments)
-                                var _this = $(this),
-                                    cued = _this.data('cued') ? false : true,
-                                    sign = cued ? "minus" : "plus",
-                                    fid = _this.data('fid'),
-                                    $parent = _this.parent(),
-                                    $ui_icon = $parent.find('.ui-icon');
-                                console.log("_this.data(\"cued\"):", _this.data("cued"));
-                                console.log("cued:",cued)
-                                el.toggleClass('cued', cued);
-                                // $parent.find(".ui-btn-text").text();
-                                if (sign == "plus") {
-                                    $ui_icon.removeClass("ui-icon-minus").addClass("ui-icon-plus");
-                                } else {
-                                    $ui_icon.removeClass("ui-icon-plus").addClass("ui-icon-minus");
-                                }
-                                
-                                _this.data('cued', cued);
-                                _this.data("icon", sign)
-                                _this.trigger("refresh");
-                                console.log("clicked");
-                                $.ajax("/cue/", {
-                                   data: {
-                                        'fid': fid,
-                                        'cue': cued
-                                   }
-                                });
-                              }).data(file);
-                            
-                            // console.log(file_html);
-                            // el.animate({height:"auto"}, 200);
-                            // el.animateAuto("height", 2000);
-                            
-                        });
-                        
-                    });
-                    addFile();
-                    
-                };
-
-            function processResponse(response) {
-                start = parseInt(start);
-                response = jQuery.parseJSON(response);
-                if (response.length == 0) {
-                    load_lock = true;
-                    end_of_list = true;
-                    console.log("END OF LIST!!!");
-                    $loading.text("End of results for "+{{ q|tojson|safe }});
-                    setTimeout(hideLoading, 5000);
-                    return;
-                }
-                _.each(response, function(f,k){
-                    files.push(f);
-                }, this);
-                if (response.length > 0 || files.length > 0) {
-                    addFile();
-                }
-                // img.show().lazyload();
-            }
-            
-            function loadData() {
-                if (load_lock) {
-                    // console.log("loadData load_lock:",load_lock);
-                    return;
-                }
-                showLoading();
-                // console.log("load_lock:",load_lock);
-                load_lock = true;
-                start = parseInt(start)+limit;
-
-                // console.log("load_lock:",load_lock);
-                $.ajax({
-                    type: "get",
-                    url: "/search",
-                    cache: false,
-                    data:{
-                            "l": parseInt(limit),
-                            "s": parseInt(start), 
-                            "ajax": 1, 
-                            "q": {{ q|tojson|safe }},
-                            "f": {{ filter_by|tojson|safe }}
-                         },
-                    success: processResponse,
-                    error: function(){
-                        load_lock = false;
-                        hideLoading();
-                    }
-                });
-                
-            }
-            function loadDataWhenAtBottom() {
-                if ($window.scrollTop() + ($window.height() * 10) >= ($document.height() - $window.height())) {
-                    loadData();
-                }
-            }
-            load_lock = true;
-            window.setTimeout(addFile, 1000);
-            $window.scroll(loadDataWhenAtBottom);
-
-           
+    <script type="text/javascript">
+        $(document).bind('pageinit', function(){
+            var searchCollection = new SearchCollection({{ results|safe }}, {
+                    query: {{ q|tojson|safe }},
+                    filter: {{ filter_by|tojson|safe }},
+                    offset: 10
+                }),
+                searchView = new PagerView({
+                    el: "#results",
+                    collection: searchCollection
+                }).render();
         });
     </script>
 
-    <div data-role="footer" data-position="fixed" data-theme="d">
-        <div id="artist_title" class="float-left footer-artist-title"></div>
-        <div id="player-control" class="float-right"></div>
-    </div>
+    {% include "footer.html" ignore missing %}
     {% include "js-templates.html" ignore missing %}
+
 </body>
 </html>

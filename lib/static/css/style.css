@@ -218,6 +218,10 @@ input.ui-input-text.ui-slider-input {
     font-size: 0.85em;
 }
 
+.ratings-table td {
+    background: #fff;
+}
+
 .file-info {
     max-width: 80%;
     min-width: 50%;
@@ -230,10 +234,12 @@ input.ui-input-text.ui-slider-input {
 
 .footer-artist-title {
     word-wrap:break-word; 
-    max-width:50%; 
-    max-height:50px; 
-    overflow:hidden; 
+    max-width:30%; 
+    overflow:hidden;
     text-overflow: ellipsis;
+    float:left;
+    max-height: 55px;
+    font-size: 0.75em;
 }
 
 .item-text {
@@ -243,3 +249,12 @@ input.ui-input-text.ui-slider-input {
     word-wrap:break-word;
     max-height: 20px;
 }
+
+.center-wrapper {
+    margin:0 auto;
+    margin-left:auto;
+    margin-right:auto;
+    align:center;
+    text-align:center;
+}
+
