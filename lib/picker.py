@@ -101,10 +101,19 @@ def associate_gernes():
              LEFT JOIN file_genres fg ON fg.fid = f.fid 
              WHERE fg.fid IS NULL""",(undefined['gid'],))
 
+def insert_duplicate_files_into_dont_pick():
+  query("""INSERT INTO dont_pick (fid, reason) 
+                 SELECT DISTINCT fid, 'sha512 already in preload'
+                 FROM files 
+                 WHERE sha512 IN (SELECT sha512 
+                                  FROM files f, preload p 
+                                  WHERE p.fid = f.fid)""")
+
 def populate_dont_pick():
     associate_gernes()
     query("TRUNCATE dont_pick")
     query("INSERT INTO dont_pick (fid, reason) SELECT fid, 'already in preload' FROM preload")
+    insert_duplicate_files_into_dont_pick()
     listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
 
     if listeners:
@@ -360,6 +369,7 @@ def populate_preload_for_uid(uid, min_amount=0):
         print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(f['fid'],))
         insert_fid_into_preload(f['fid'], uid, "true_score >= %s" % (true_score, ))
         insert_artists_in_preload_into_dont_pick()
+        insert_duplicate_files_into_dont_pick()
 
     for i in range(0,10):
         sample = get_random_unplayed_sample(uid)
@@ -373,6 +383,7 @@ def populate_preload_for_uid(uid, min_amount=0):
 
         insert_fid_into_preload(f['fid'], uid, "random unplayed")
         insert_artists_in_preload_into_dont_pick()
+        insert_duplicate_files_into_dont_pick()
 
     preload = get_preload()
 
@@ -396,7 +407,8 @@ def remove_songs_in_preload_for_users_who_are_not_listening():
 def remove_duplicates_from_preload():
     duplicates = get_results_assoc("""SELECT count(f.sha512) AS total, f.sha512 
                                       FROM files f, preload p 
-                                      WHERE f.fid = p.fid AND f.sha512 != ''
+                                      WHERE f.fid = p.fid AND (f.sha512 != ''
+                                        OR f.sha512 IS NOT NULL)
                                       GROUP BY f.sha512 
                                       HAVING count(f.sha512) > 1""")
     for d in duplicates:

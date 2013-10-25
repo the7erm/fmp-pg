@@ -18,6 +18,7 @@
 #
 
 import gobject, gtk, gc
+import glib 
 # gobject.threads_init()
 
 from lib.__init__ import *
@@ -129,6 +130,7 @@ do the same thing.
 
 DBusGMainLoop(set_as_default=True)
 print os.environ
+
 try:
     bus = dbus.SessionBus()
     server = bus.get_object('org.mpris.MediaPlayer2', '/fmp')

@@ -498,24 +498,6 @@ def search_data():
     print "end:", time.time() - start_time
     return json_dump(results)
 
-@app.route('/history-data/', methods=['GET'])
-def history_data():
-    start, limit = get_start_limit()
-    offset = "%d" % start
-    limit = "%d" % limit
-    # LIMIT %d OFFSET %d
-    history = get_results_assoc("""SELECT uh.*, uname
-                                   FROM user_history uh, users u
-                                   WHERE uh.uid = u.uid AND 
-                                         u.listening = true AND
-                                         time_played IS NOT NULL 
-                                   ORDER BY time_played DESC, admin DESC, uname
-                                   LIMIT """+limit+""" OFFSET """+offset)
-    results = []
-    for h in history:
-        h = dict(h)
-        results.append(h)
-    return json_dump(results)
 
 def get_start_limit():
     start = "%s" % request.args.get("s", "0")
@@ -642,7 +624,7 @@ def history_data():
     offset = "%d" % start
     limit = "%d" % limit
     # LIMIT %d OFFSET %d
-    history = get_results_assoc("""SELECT uh.*, uname
+    history_res = get_results_assoc("""SELECT uh.*, uname
                                    FROM user_history uh, users u
                                    WHERE uh.uid = u.uid AND 
                                          u.listening = true AND
@@ -650,7 +632,7 @@ def history_data():
                                    ORDER BY time_played DESC, admin DESC, uname
                                    LIMIT """+limit+""" OFFSET """+offset)
     results = []
-    for h in history:
+    for h in history_res:
         h = dict(h)
         results.append(h)
     return json_dump(results)
