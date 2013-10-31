@@ -9,7 +9,19 @@
     
     <input type="range" name="volume-slider" data-theme="d" data-highlight="true" id="volume-slider" value="60" min="0" max="100" step="1" />
 
+    <div id="vol-buttons" class="float-right">
+        <button class="vol-down" data-inline="true" data-theme="d" data-mini="true">-</button>
+        <button class="vol-up" data-inline="true" data-theme="d" data-mini="true">+</button>
+    </div>
+    <br clear="both">
+
     <input type="range" name="seek-slider" data-theme="d" data-highlight="true" id="seek-slider" value="0" min="0" max="100" step="1000000000" />
+
+    <div id="seek-buttons" class="float-right">
+        <button class="seek-back" data-inline="true" data-theme="d" data-mini="true">&#171;</button>
+        <button class="seek-forward" data-inline="true" data-theme="d" data-mini="true">&#187;</button>
+    </div>
+    <br clear="both">
 
     <!--
     <pre id="debugs">
@@ -49,7 +61,7 @@
             var posView = new TimeSlider({
                 "el": "#seek-slider",
                 "model": conductor.pos
-            }).render(); 
+            }).render();
             var controlView = new ControlView({
                 "el": "#player-control",
                 "conductor": conductor
@@ -58,6 +70,14 @@
                 "el": "#time-status",
                 "conductor": conductor
             }).render();
+            var volumeButtonView = new VolumeButtonView({
+                "el": "#vol-buttons",
+                "model": conductor.volume
+            });
+            var seekButtonView = new SeekButtonView({
+                "el": "#seek-buttons",
+                "model": conductor.pos
+            });
             /*
             var conductorDebugView = new ModelDebugView({
                 "el": "#conductorPlayingModelDebug",
