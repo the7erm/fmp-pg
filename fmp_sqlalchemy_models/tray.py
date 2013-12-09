@@ -77,6 +77,12 @@ class ControllerIcon(TrayIcon):
         img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON)
         self.prev.set_image(img)
         self.menu.append(self.prev)
+
+        self.quit_item = gtk.ImageMenuItem("Quit")
+        img = gtk.image_new_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_BUTTON)
+        self.quit_item.set_image(img)
+        self.menu.append(self.quit_item)
+
         self.menu.show_all()
 
     def set_state(self, state):

@@ -179,11 +179,30 @@ class BaseClass(object):
 
         for field in fields:
             val = self.getattr(self, field)
-            if isinstance(val, datetime.datetime):
+            # print "Field:%s" % field
+            # print "field %s:%s %s" % (field, val, type(val))
+            
+            if isinstance(val, (datetime.datetime, datetime.date)):
                 val = val.isoformat()
+                # print "field %s:%s %s" % (field, val, type(val))
             obj[field] = val
+            if isinstance(val, list):
+                new_val = []
+                for v in val:
+                    new_val.append(v.to_dict())
+                obj[field] = new_val
 
         return json.dumps(obj, indent=4)
+
+    def to_dict(self):
+        obj = {}
+        for field in self.__repr_fields__:
+            val = self.getattr(self, field)
+            if isinstance(val, (datetime.datetime, datetime.date)):
+                val = val.isoformat()
+            # print "to_dict:%s %s %s" % (field, val, type(val))
+            obj[field] = val
+        return obj
 
 
 class FileLocation(BaseClass, Base):
@@ -1154,6 +1173,7 @@ class UserFileInfo(BaseClass, Base):
             for h in recent:
                 total += h.percent_played
             avg = total / len(recent)
+
         self.true_score = ((self.rating * 2 * 10.0) +
                            (self.skip_score * 10.0) +
                            (self.percent_played) +

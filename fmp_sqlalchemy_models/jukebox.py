@@ -26,6 +26,8 @@ from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
                              UserFileInfo, session
 
+import flask_server
+
 from gst import STATE_NULL, STATE_PAUSED, STATE_PLAYING
 
 gtk.gdk.threads_init()
@@ -34,14 +36,19 @@ HISTORY_LENGTH = 100
 
 class JukeBox:
     def __init__(self):
-        self.percent_played = -10
-        self.pos_float = -10.0
+        self.percent_played = -100
+        self.pos_float = -100.0
         self.controller_icon = None
         self.rating_icon = None
         self.init_history()
         self.init_picker()
         self.init_player()
         self.init_tray()
+        self.init_flask()
+
+    def init_flask(self):
+        flask_server.jukebox = self
+        flask_server.start()
 
     def init_tray(self):
         self.init_rating_icon()
@@ -54,6 +61,7 @@ class JukeBox:
         self.controller_icon.play_pause_item.connect("activate", self.on_play_pause)
         self.controller_icon.next.connect("activate", self.on_next)
         self.controller_icon.prev.connect("activate", self.on_prev)
+        self.controller_icon.quit_item.connect("activate", self.quit)
         self.player.connect('state-changed', self.on_state_change)
         self.on_state_change(self.player, self.player.playingState)
 
@@ -70,6 +78,9 @@ class JukeBox:
 
     def on_prev(self, *args, **kwargs):
         self.prev()
+
+    def quit(self, *args, **kwargs):
+        gtk.main_quit()
 
     def on_seek_scroll(self, icon, event, *args, **kwargs):
         if event.direction == gtk.gdk.SCROLL_UP:
@@ -138,6 +149,7 @@ class JukeBox:
         self.pos_float = pos_float
         print "mark as played:", percent_played, "***", pos_float
         self.playing.mark_as_played(percent_played=percent_played)
+        print self.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 'genre'])
 
     def on_end_of_stream(self, *args, **kwargs):
         print "END OF STREAM"
@@ -165,6 +177,7 @@ class JukeBox:
         self.playing = file_info
         if self.controller_icon is not None and self.rating_icon is not None:
             self.set_tray_data()
+        self.playing.mark_as_played()
 
     def pause(self, *args, **kwargs):
         self.player.pause()
@@ -183,6 +196,9 @@ class JukeBox:
     @property
     def artist_title(self):
         return self.playing.artist_title
+
+    def __repr__(self):
+        return "<Jukebox Repr>".__repr__()
 
 
 if __name__ == '__main__':
