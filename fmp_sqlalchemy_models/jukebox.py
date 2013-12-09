@@ -170,7 +170,7 @@ class JukeBox:
         self.player.pause()
 
     def next(self, *args, **kwargs):
-        self.playing.inc_skip_score()
+        self.playing.deinc_skip_score()
         self.player.stop()
         self.index += 1
         self.start()
