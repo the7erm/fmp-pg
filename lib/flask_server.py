@@ -278,32 +278,81 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
                                         sha512, artist, f.fid, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
-                   FROM files f 
-                        LEFT JOIN preload p ON p.fid = f.fid
-                        LEFT JOIN file_artists fa ON fa.fid = f.fid
-                        LEFT JOIN artists a ON a.aid = fa.aid
-                    ORDER BY artist, title"""
+                        FROM files f 
+                             LEFT JOIN preload p ON p.fid = f.fid
+                             LEFT JOIN file_artists fa ON fa.fid = f.fid
+                             LEFT JOIN artists a ON a.aid = fa.aid
+                        ORDER BY artist, title"""
+
+    no_words_rating_query = """SELECT DISTINCT f.fid, dir as dirname, 
+                                               basename, title, sha512, artist, 
+                                               f.fid, p.fid AS cued, 
+                                               f.fid AS id, 'f' AS id_type
+                               FROM files f 
+                                    LEFT JOIN preload p ON p.fid = f.fid
+                                    LEFT JOIN file_artists fa ON fa.fid = f.fid
+                                    LEFT JOIN artists a ON a.aid = fa.aid,
+                                    user_song_info usi 
+                               WHERE rating = %s AND usi.fid = f.fid AND
+                                     usi.uid IN (SELECT uid 
+                                                 FROM users 
+                                                 WHERE listening = true)
+                               ORDER BY artist, title"""
+
 
     query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, sha512,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
-                   FROM files f 
-                        LEFT JOIN preload p ON p.fid = f.fid,
-                        keywords kw,
-                        plainto_tsquery('english', %s) query
-                    WHERE kw.fid = f.fid AND tsv @@ query
-                    ORDER BY ts_rank DESC
-                    """
+               FROM files f 
+                    LEFT JOIN preload p ON p.fid = f.fid,
+                    keywords kw,
+                    plainto_tsquery('english', %s) query
+               WHERE kw.fid = f.fid AND tsv @@ query
+               ORDER BY ts_rank DESC"""
+
+    rating_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, sha512,
+                               p.fid AS cued, ts_rank(tsv, query),
+                               f.fid AS id, 'f' AS id_type
+                      FROM files f 
+                           LEFT JOIN preload p ON p.fid = f.fid,
+                           keywords kw,
+                           plainto_tsquery('english', %s) query,
+                           user_song_info usi
+                      WHERE kw.fid = f.fid AND tsv @@ query AND 
+                            usi.rating = %s AND
+                            f.fid = usi.fid AND 
+                            usi.uid IN (SELECT uid 
+                                        FROM users 
+                                        WHERE listening = true)
+                      ORDER BY ts_rank DESC"""
+
+    rating_re = re.compile("rating\:(\d+)")
+    rating_match = rating_re.match(q)
+    rating = -1
+    if rating_match:
+        rating = rating_match.group(1)
+        q = q.replace("rating:%s" % rating, "").strip()
+
 
     if not q:
         query = no_words_query
+        if rating != -1:
+            query = no_words_rating_query
+
     # """+limit+""" OFFSET """+offset
     query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
     print "QUERY:%s" % query
     results = []
     
     try:
-        for r in get_results_assoc(query, (q,)):
+        args = (q,)
+        if rating != -1:
+            if q:
+                args = (q, rating)
+                query = rating_query
+            else:
+                args = (rating,)
+        for r in get_results_assoc(query, args):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
             # fd.cued = r.cued

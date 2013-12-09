@@ -687,7 +687,7 @@ def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
         rating = int(rating)
     except:
         return
-    if rating < 0 or rating > 5:
+    if rating < 0 or rating > 6:
         return 
 
     if selected is not None and selected:

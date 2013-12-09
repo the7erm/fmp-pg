@@ -29,6 +29,13 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     if filename == None:
         filename = join(root, name)
 
+    skip_dirs = ["/.minecraft/", "/resources/", "/minecraft/"]
+
+    for folder in skip_dirs:
+        if folder in filename:
+            print "skipping:", filename
+            return
+
     if "/.minecraft/" in filename:
         return
 

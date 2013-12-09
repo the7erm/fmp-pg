@@ -19,15 +19,16 @@
 
 ## TODO: add appindicator in __main__ section
 
-from __init__ import gtk_main_quit
 import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
 import base64
-import hashlib
 from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
 import gst
+
+def gtk_main_quit(*args, **kwargs):
+    gtk.main.quit()
 
 STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
@@ -63,53 +64,44 @@ class Player(gobject.GObject):
         self.volume = 1.0
         self.hide_window_timeout = None
         self.time_format = gst.Format(gst.FORMAT_TIME)
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        self.window.set_title("Video-Player")
-        
-        img_path = ""
-        if os.path.exists(sys.path[0]+"/images/"):
-            img_path = sys.path[0]+"/"
-        elif os.path.exists(sys.path[0]+"/../images/"):
-            img_path = sys.path[0]+"/../"
-        elif os.path.exists("../images/"):
-            img_path = "../"
-        
-        
-        self.window.set_icon_from_file(img_path+'images/tv.png');
-            
-        self.window.connect("destroy", gtk_main_quit)
-        self.window.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
-        self.window.add_events(gtk.gdk.KEY_PRESS_MASK |
-                               gtk.gdk.POINTER_MOTION_MASK |
-                               gtk.gdk.BUTTON_PRESS_MASK |
-                               gtk.gdk.SCROLL_MASK)
-        self.window.connect('key-press-event', self.on_key_press)
-        self.window.connect('motion-notify-event', self.show_controls)
-        # self.window.connect('button-press-event', self.show_controls)
-        self.window.connect('button-press-event', self.pause)
-        # self.window.connect('key-press-event', self.show_controls)
-        self.window.connect("scroll-event", self.on_scroll)
-        
-        self.window.set_title("Video-Player")
-        self.window.set_default_size(600, 400)
-        self.window.connect("destroy", gtk_main_quit, "WM destroy")
-        
+        self.init_window()
+        self.init_main_event_box()
+        self.init_main_vbox()
+        self.init_time_label()
+        self.init_movie_window()
+        self.init_controls()
+        self.init_player()
+        self.init_cursor()
+        self.init_buttons()
 
-        #main Event Box
-        mainEb = gtk.EventBox()
-        mainEb.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
-        mainEb.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
-        mainEb.connect('motion-notify-event',self.show_controls)
-        self.window.add(mainEb)
+    def init_cursor(self):
+        pix_data = """/* XPM */
+static char * invisible_xpm[] = {
+"1 1 1 1",
+"       c None",
+" "};"""
+        color = gtk.gdk.Color()
+        pix = gtk.gdk.pixmap_create_from_data(None, pix_data, 1, 1, 1, color, color)
+        self.invisble_cursor = gtk.gdk.Cursor(pix, pix, color, color, 0, 0)
+        
+        self.connect('state-changed',self.show_hide_play_pause)
+        self.hide_timeout = None
 
+    def init_main_event_box(self):
+        self.main_event_box = gtk.EventBox()
+        self.main_event_box.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
+        self.main_event_box.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
+        self.main_event_box.connect('motion-notify-event', self.show_controls)
+        self.window.add(self.main_event_box)
+
+    def init_main_vbox(self):
         # main box
         self.mainVBox = gtk.VBox()
         self.mainVBox.show()
-        mainEb.add(self.mainVBox)
+        self.main_event_box.add(self.mainVBox)
 
-        
+    def init_time_label(self):
         ## Time label ##
-                
         self.timeLabel = gtk.Label()
         self.timeLabel.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
         self.timeLabel.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
@@ -117,7 +109,8 @@ class Player(gobject.GObject):
         self.timeLabel.modify_font(pango.FontDescription("15"))
         self.mainVBox.pack_start(self.timeLabel,False,True)
         self.timeLabel.show()
-        
+
+    def init_movie_window(self):
         ## movie_window
         
         self.movie_window = gtk.DrawingArea()
@@ -130,12 +123,7 @@ class Player(gobject.GObject):
         self.movie_window.show()
         self.mainVBox.pack_start(self.movie_window, True, True)
 
-        self.connect('time-status',self.on_time_status)
-        
-        # eb = gtk.EventBox()
-        # eb.add(self.controls)
-        # eb.set_visible_window(False)
-
+    def init_controls(self):
         ### SET UP CONTROLS ###
         self.controls = gtk.HBox()
         self.prev_button = gtk.Button('',gtk.STOCK_MEDIA_PREVIOUS)
@@ -158,9 +146,7 @@ class Player(gobject.GObject):
         hb.pack_start(self.play_button,False,False)
         hb.pack_start(self.next_button,False,False)
         
-        self.controls.pack_start(e,False,False)
-
-        
+        self.controls.pack_start(e, False, False)
         
         hb = gtk.HBox()
         e = gtk.EventBox()
@@ -175,11 +161,10 @@ class Player(gobject.GObject):
         self.unfs_button.connect('clicked',self.toggle_full_screen)
 
         #### END OF SETTING UP CONTROLS ## ##
+        self.mainVBox.pack_end(self.controls, False, True)
 
-        self.mainVBox.pack_end(self.controls,False,True)
-
+    def init_player(self):
         self.player = gst.element_factory_make("playbin2", "player")
-        
         vol = self.player.get_property("volume")
         print "DEFAULT VOLUME:",vol
         bus = self.player.get_bus()
@@ -187,46 +172,46 @@ class Player(gobject.GObject):
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
-        
-        pix_data = """/* XPM */
-static char * invisible_xpm[] = {
-"1 1 1 1",
-"       c None",
-" "};"""
-        color = gtk.gdk.Color()
-        pix = gtk.gdk.pixmap_create_from_data(None, pix_data, 1, 1, 1, color, color)
-        self.invisble_cursor = gtk.gdk.Cursor(pix, pix, color, color, 0, 0)
-        
-        self.connect('state-changed',self.show_hide_play_pause)
-        self.hide_timeout = None
-        
-        
+    
+    def init_window(self):
+        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_title("Video-Player")
+
+        img_path = ""
+        if os.path.exists(sys.path[0]+"/images/"):
+            img_path = sys.path[0]+"/"
+        elif os.path.exists(sys.path[0]+"/../images/"):
+            img_path = sys.path[0]+"/../"
+        elif os.path.exists("../images/"):
+            img_path = "../"
+        self.window.set_icon_from_file(img_path+'images/tv.png')
+            
+        self.window.connect("destroy", gtk_main_quit)
+        self.window.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
+        self.window.add_events(gtk.gdk.KEY_PRESS_MASK |
+                               gtk.gdk.POINTER_MOTION_MASK |
+                               gtk.gdk.BUTTON_PRESS_MASK |
+                               gtk.gdk.SCROLL_MASK)
+        self.window.connect('key-press-event', self.on_key_press)
+        self.window.connect('motion-notify-event', self.show_controls)
+        # self.window.connect('button-press-event', self.show_controls)
+        self.window.connect('button-press-event', self.pause)
+        # self.window.connect('key-press-event', self.show_controls)
+        self.window.connect("scroll-event", self.on_scroll)
+        self.window.set_title("Video-Player")
+        self.window.set_default_size(600, 400)
+        self.window.connect("destroy", gtk_main_quit, "WM destroy")
+
+    def init_buttons(self):
+        self.connect('time-status', self.on_time_status)
+
         self.window.show_all()
         self.pause_button.hide()
         self.play_button.hide()
         self.controls.hide()
         self.show_hide_play_pause()
         self.window.hide()
-        
-        gobject.timeout_add(1000,self.update_time)
-    
-    def to_dict(self):
-        # "tags": self.tags
-        imgHash = ""
-        if 'image' in self.tags:
-            m = hashlib.md5()
-            m.update(self.tags['image'])
-            imgHash = m.hexdigest()
-        if 'preview-image' in self.tags:
-            m = hashlib.md5()
-            m.update(self.tags['preview-image'])
-            imgHash = m.hexdigest()
-        return {
-            "filename": self.filename,
-            "pos_data": self.pos_data,
-            "playingState": self.state_to_string(self.playingState),
-            "imgHash": imgHash
-        }
+        gobject.timeout_add(1000, self.update_time)
 
     def state_to_string(self, state):
         if state == PLAYING:
@@ -237,7 +222,7 @@ static char * invisible_xpm[] = {
             return "STOPPED"
         return "ERROR"
         
-    def show_hide_play_pause(self,*args):    
+    def show_hide_play_pause(self, *args):
         if self.playingState in (STOPPED, PAUSED):
             self.play_button.show()
             self.pause_button.hide()
@@ -341,7 +326,7 @@ static char * invisible_xpm[] = {
     def prev(self, *args, **kwargs):
         self.prev_button.emit('clicked')
         
-    def start(self,*args):
+    def start(self, *args):
         # self.play_thread_id = None
         self.tags = {}
         gc.collect()
@@ -376,7 +361,6 @@ static char * invisible_xpm[] = {
     def stop(self):
         self.player.set_state(STOPPED)
         
-        
     def set_volume(self,widget,value):
         self.volume = value
         print "set_volume:",self.volume
@@ -406,7 +390,16 @@ static char * invisible_xpm[] = {
 
         return "0:%02d" % (_secs)
 
-        
+    def get_pos(self):
+        pos_int = 0
+        try:
+            pos_int = self.player.query_position(self.time_format, None)[0]
+        except:
+            pass
+        return pos_int
+
+    def get_duration(self):
+        return self.player.query_duration(self.time_format, None)[0]
 
     def update_time(self, retry=True):
         #if self.playingState != PLAYING :
@@ -415,16 +408,13 @@ static char * invisible_xpm[] = {
 
         # print 'update_time';
         try:
-            dur_int = self.player.query_duration(self.time_format, None)[0]
+            dur_int = self.get_duration()
             dur_str = self.convert_ns(dur_int)
             self.dur_int = dur_int
         except:
             return True
-        
-        try:
-            pos_int = self.player.query_position(self.time_format, None)[0]
-        except:
-            pos_int = 0
+
+        pos_int = self.get_pos()
 
         if pos_int == 0 and retry:
             sleep(0.1)
@@ -440,7 +430,8 @@ static char * invisible_xpm[] = {
             # print pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent
             self.pos_int = pos_int
             self.left_int = left_int
-            self.emit('time-status', pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent)
+            self.emit('time-status', pos_int, dur_int, left_int, decimal, 
+                                     pos_str, dur_str, left_str, percent)
             self.pos_data = {
                 "pos_str": pos_str, 
                 "dur_str": dur_str, 
@@ -459,8 +450,6 @@ static char * invisible_xpm[] = {
             print "TypeError:",e
         
         return True
-
-    
         
     def pause(self, *args):
         self.playingState = self.player.get_state()[1]
@@ -552,7 +541,7 @@ static char * invisible_xpm[] = {
             self.emit('missing-plugin')
 
             
-    def control_seek(self,w,seek):
+    def control_seek(self, w, seek):
         print "control_seek:",seek
         self.seek(seek)
         

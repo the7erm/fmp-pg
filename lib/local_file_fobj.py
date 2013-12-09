@@ -145,9 +145,13 @@ class Local_File(fobj.FObj):
         if get_dups and self.db_info["sha512"]:
             self.prepare_dups(must_match=must_match)
 
+    @property
+    def filename(self):
+        return 
+
     def set_db_keywords(self):
         keywords = []
-
+        print "filename:", os.path.join(self.dirname, self.basename)
         root, ext = os.path.splitext(self.basename)
         if self.db_info['sha512']:
             keywords += [self.db_info['sha512']]
@@ -356,6 +360,10 @@ class Local_File(fobj.FObj):
               'drift:', now - self.last_time_marked_as_played
         print "self.last_percent_played:", self.last_percent_played
         self.update_artists_ltp()
+        query("""UPDATE files 
+                 SET ltp = NOW() 
+                 WHERE fid = %s""", 
+                 (self.db_info['fid'],))
         
         self.ratings_and_scores.mark_as_played(percent_played)
         for d in self.dups:
@@ -389,7 +397,7 @@ class Local_File(fobj.FObj):
                                        WHERE fa.aid = a.aid AND 
                                              fa.fid = %s RETURNING *;""",
                                        (self.db_info['fid'],))
-        self.ratings_and_scores.artists = artists;
+        self.ratings_and_scores.artists = artists
 
         return artists
 
@@ -573,7 +581,7 @@ class Local_File(fobj.FObj):
                     continue
                 if type(p) != unicode:
                     try:
-                        p = unicode(p,"utf8",errors='replace')
+                        p = unicode(p, "utf8",errors='replace')
                     except UnicodeEncodeError, err:
                         print "UnicodeEncodeError parts:",err
                         exit()

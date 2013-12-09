@@ -426,7 +426,7 @@ for g in possible_deleted_genres:
     if g['genre'] in genres_v1:
         print "v1 genre:",g['genre']
         continue
-    exeq("""DELETE FROM genres WHERE gid = %s""",(g['gid']))
+    exeq("""DELETE FROM genres WHERE gid = %s""",(g['gid'], ))
 
 
 # TODO DELETE all user_artist_history that has been removed.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # picker.py -- Pick songs.
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -37,29 +37,29 @@ populate_locked = False
 # DROP RULE "my_table_on_duplicate_ignore" ON "my_table";
 
 def wait():
-    print "leave1"
+    # print "leave1"
     gtk.gdk.threads_leave()
-    print "/leave1"
-    print "enter"
+    # print "/leave1"
+    # print "enter"
     gtk.gdk.threads_enter()
-    print "/enter"
+    # print "/enter"
     if gtk.events_pending():
         while gtk.events_pending():
             # print "pending:"
             gtk.main_iteration(False)
-    print "leave"
+    # print "leave"
     gtk.gdk.threads_leave()
-    print "/leave"
+    # print "/leave"
 
 def enter(msg=None):
-    print "enter:",msg
+    # print "enter:",msg
     gtk.gdk.threads_enter()
-    print "/enter:",msg
+    # print "/enter:",msg
 
 def leave(msg=None):
-    print "leave:",msg
+    # print "leave:",msg
     gtk.gdk.threads_leave()
-    print "/leave:",msg
+    # print "/leave:",msg
 
 def create_dont_pick():
     global dont_pick_created
@@ -274,8 +274,167 @@ def make_true_scores_list():
     return true_scores
 
 def insert_fid_into_preload(fid, uid, reason):
+    seq_info = is_sequential(fid)
+    if seq_info is None:
+        print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
+        query("""INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)""",
+                 (fid, uid, reason))
+        return
+
+    if 'aid' in seq_info:
+        next_file = get_next_file_in_artist_series(seq_info['aid'], uid)
+        if next_file:
+            fid = next_file['fid']
+            reason += " is sequential artist"
+
+    if 'gid' in seq_info:
+        next_file = get_next_file_in_genre_series(seq_info['gid'], uid)
+        if next_file:
+          fid = next_file['fid']
+          reason += " is sequential genre"
+    print "adding sequential:", get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
     query("""INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)""",
              (fid, uid, reason))
+
+def get_next_file_in_artist_series(aid, uid):
+    next_file = None
+    # Get the last file played by that artist
+    q = """SELECT f.dir, f.basename, ultp 
+           FROM files f, 
+                file_artists fa,
+                user_song_info usi
+           WHERE usi.fid = f.fid AND
+                 fa.fid = f.fid AND
+                 fa.aid = %s AND
+                 usi.uid = %s
+           ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
+                    ultp DESC, f.dir, f.basename
+           LIMIT 1"""
+    last_file = get_assoc(q, (aid, uid))
+    if last_file:
+        # Get the next artist in the series
+        next_file = get_assoc("""SELECT dir, basename, f.fid
+                                 FROM files f,
+                                      file_artists fa
+                                 WHERE dir >= %s AND
+                                       basename > %s AND
+                                       f.fid = fa.fid AND
+                                       fa.aid = %s
+                                 ORDER BY dir, basename
+                                 LIMIT 1""",
+                                 (last_file['dir'], last_file['basename'],
+                                  aid))
+        if next_file:
+            print "NEXT FILE:", next_file
+            return next_file
+    # If it's empty, get the first file in the series.
+    return get_assoc("""SELECT f.dir, f.basename, ultp, f.fid
+                        FROM files f, 
+                             file_artists fa,
+                             user_song_info usi
+                        WHERE usi.fid = f.fid AND
+                              fa.fid = f.fid AND
+                              fa.aid = %s AND
+                              usi.uid = %s
+                        ORDER BY f.dir, f.basename
+                        LIMIT 1""", (aid, uid))
+
+
+def get_next_file_in_genre_series(gid, uid):
+    next_file = None
+    # Get the last file played in that genre
+    print "g1"
+    q = """SELECT f.dir, f.basename, ultp
+           FROM files f
+                LEFT JOIN dont_pick dp ON dp.fid = f.fid, 
+                file_genres fg,
+                user_song_info usi
+           WHERE usi.fid = f.fid AND
+                 fg.fid = f.fid AND
+                 fg.gid = %s AND
+                 usi.uid = %s AND
+                 dp.fid IS NULL
+           ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
+                    ultp DESC, f.dir, f.basename
+           LIMIT 1"""
+    last_file = get_assoc(q, (gid, uid))
+
+    print "g2",pg_cur.mogrify(q, (gid, uid))
+    if last_file:
+        print "g2.1 LAST_FILE:", last_file
+        # Get the next artist in the series
+        q = """SELECT dir, basename, f.fid
+               FROM files f,
+                    file_genres fg
+               WHERE dir >= %s AND
+                     basename > %s AND
+                     f.fid = fg.fid AND
+                     fg.gid = %s
+               ORDER BY dir, basename
+               LIMIT 1"""
+        next_file = get_assoc(q, (last_file['dir'], last_file['basename'], gid))
+        print "g2.2"
+        print pg_cur.mogrify(q, (last_file['dir'], last_file['basename'], gid))
+        if next_file:
+            print "NEXT FILE:",next_file
+            return next_file
+    print "g3"
+    # If it's empty, get the first file in the series.
+    return get_assoc("""SELECT f.dir, f.basename, ultp, f.fid
+                        FROM files f, 
+                             file_genres fg,
+                             user_song_info usi
+                        WHERE usi.fid = f.fid AND
+                              fg.fid = f.fid AND
+                              fg.gid = %s AND
+                              usi.uid = %s
+                        ORDER BY f.dir, f.basename
+                        LIMIT 1""", (gid, uid))
+
+
+def is_sequential_artist(fid):
+    return get_assoc("""SELECT a.aid
+                        FROM file_artists fa, artists a 
+                        WHERE fid = %s AND 
+                              a.aid = fa.aid AND
+                              a.seq = true
+                        ORDER BY random()
+                        LIMIT 1""", 
+                        (fid,))
+
+
+def is_sequential_genre(fid):
+    return get_assoc("""SELECT g.gid
+                        FROM file_genres fg, genres g 
+                        WHERE fg.fid = %s AND 
+                              g.gid = fg.gid AND
+                              g.seq_genre = true
+                        ORDER BY random()
+                        LIMIT 1""", 
+                        (fid,))
+
+
+def is_sequential(fid):
+    print "is_sequential 1"
+    artist_info = is_sequential_artist(fid)
+    if artist_info:
+        print "*"*60,"ARTIST","*"*60
+        return {
+            'aid': artist_info['aid']
+        }
+    print "is_sequential 2"
+    genre_info = is_sequential_genre(fid)
+    if genre_info:
+        print "*"*60,"GENRE","*"*60
+        print genre_info
+        return {
+          'gid': genre_info['gid']
+        }
+    print "is_sequential 3"
+    return None
+
+
+
 
 def insert_artists_in_preload_into_dont_pick():
     query("""INSERT INTO dont_pick (fid, reason) 
@@ -366,7 +525,6 @@ def populate_preload_for_uid(uid, min_amount=0):
             empty_scores.append(true_score)
             continue
         wait()
-        print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(f['fid'],))
         insert_fid_into_preload(f['fid'], uid, "true_score >= %s" % (true_score, ))
         insert_artists_in_preload_into_dont_pick()
         insert_duplicate_files_into_dont_pick()
