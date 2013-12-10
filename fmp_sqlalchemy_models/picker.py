@@ -98,6 +98,26 @@ class Picker():
             self.add(dp)
         self.commit()
 
+    def insert_disabled_genres_into_dontpick(self):
+        # sqlalchemy.exc.InvalidRequestError: Could not find a FROM clause to 
+        # join from.  Tried joining to <class 'files_model_idea.Genre'>, but 
+        # got: Can't find any foreign key relationships between 'files_info' 
+        # and 'genres'.
+        disabled = session.query(FileInfo)\
+                          .join(Genre)\
+                          .distinct(FileInfo.fid)\
+                          .filter(
+                              Genre.enabled == False
+                          )\
+                          .all()
+
+        for f in disabled:
+          print "INSERT INTO DONTPICK 3", f.filename
+          dp = DontPick(fid=f.fid, reason="disabled genre")
+          self.add(dp)
+
+        self.commit()
+
     def do(self, *args, **kwargs):
         wait()
         print "PICKER DO"
@@ -107,6 +127,7 @@ class Picker():
             print "not needed there are no users with an empty preload"
             return True
         self.clear_dontpick()
+        self.insert_disabled_genres_into_dontpick()
         self.insert_most_recent_into_dontpick()
         self.inset_rated_0_into_dontpick()
         self.insert_preload_files_into_dontpick()
