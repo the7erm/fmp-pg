@@ -103,6 +103,9 @@ class Picker():
         # join from.  Tried joining to <class 'files_model_idea.Genre'>, but 
         # got: Can't find any foreign key relationships between 'files_info' 
         # and 'genres'.
+        # GOAL: SELECT fid 
+        #       FROM files_info fi, file_genres fg, genres g
+        #       WHERE fi.fid = fg.fid AND g.gid = fg.gid AND g.enabled = 0 
         disabled = session.query(FileInfo)\
                           .join(Genre)\
                           .distinct(FileInfo.fid)\
