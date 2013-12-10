@@ -28,7 +28,9 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql.expression import func
 import math
 import gtk
+import gobject
 gtk.gdk.threads_init()
+gobject.threads_init()
 
 def wait():
     # print "leave1"
@@ -61,6 +63,7 @@ class Picker():
 
     def clear_dontpick(self):
         session.query(DontPick).delete()
+        wait()
 
     def insert_most_recent_into_dontpick(self):
         total_files = session.query(FileInfo).count()
@@ -76,13 +79,27 @@ class Picker():
                                  .limit(ten_percent).all()
         
         for f in recently_played:
-            print f
+            print "INSERT INTO DONTPICK", f
             dp = DontPick(fid=f.fid, reason="recently played")
             self.add(dp)
         self.commit()
 
+    def inset_rated_0_into_dontpick(self):
+        rated_0 = session.query(UserFileInfo)\
+                         .join(User)\
+                         .distinct(UserFileInfo.fid, UserFileInfo.uid)\
+                         .filter(and_(
+                                    UserFileInfo.rating == 0,
+                                    User.listening == True
+                         )).all()
+        for f in rated_0:
+            print "INSERT INTO DONTPICK 2", f
+            dp = DontPick(fid=f.fid, reason="rated 0")
+            self.add(dp)
+        self.commit()
+
     def do(self, *args, **kwargs):
-        gtk.gdk.threads_leave()
+        wait()
         print "PICKER DO"
         random.shuffle(self.percents)
         users = self.get_users()
@@ -90,13 +107,10 @@ class Picker():
             print "not needed there are no users with an empty preload"
             return True
         self.clear_dontpick()
-        wait()
         self.insert_most_recent_into_dontpick()
-        wait()
+        self.inset_rated_0_into_dontpick()
         self.insert_preload_files_into_dontpick()
-        wait()
         self.insert_files_into_preload()
-        wait()
         return True
 
     def get_users(self):
@@ -170,7 +184,7 @@ class Picker():
     def pop(self):
         user = self.get_next_user()
         user.last_time_cued = datetime.datetime.now()
-        wait()
+        self.add(user)
         preload_entry = session.query(Preload)\
                                .filter(Preload.uid == user.uid)\
                                .order_by(Preload.priority.desc(), func.random())\
@@ -182,6 +196,7 @@ class Picker():
                                .limit(1)\
                                .one()
         session.query(Preload).filter(Preload.prfid == preload_entry.prfid).delete()
+        wait()
         return file_info
 
     def commit(self):
@@ -192,7 +207,6 @@ class Picker():
     def add(self, obj):
       wait()
       session.add(obj)
-      wait()
 
 if __name__ == "__main__":
     picker = Picker()

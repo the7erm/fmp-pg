@@ -14,7 +14,11 @@ jukebox = None
 
 @app.route('/')
 def index():
-    return jukebox.playing.json()
+    obj = {
+        'playing': jukebox.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 
+                                         'genres'])
+    }
+    return 
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 reactor.listenTCP(5050, Site(resource))

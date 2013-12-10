@@ -149,7 +149,7 @@ class JukeBox:
         self.pos_float = pos_float
         print "mark as played:", percent_played, "***", pos_float
         self.playing.mark_as_played(percent_played=percent_played)
-        print self.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 'genre'])
+        print self.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 'genres', 'filename'])
 
     def on_end_of_stream(self, *args, **kwargs):
         print "END OF STREAM"
@@ -183,8 +183,8 @@ class JukeBox:
         self.player.pause()
 
     def next(self, *args, **kwargs):
-        self.playing.deinc_skip_score()
         self.player.stop()
+        self.playing.deinc_skip_score()
         self.index += 1
         self.start()
 

@@ -399,7 +399,10 @@ static char * invisible_xpm[] = {
         return pos_int
 
     def get_duration(self):
-        return self.player.query_duration(self.time_format, None)[0]
+        try:
+            return self.player.query_duration(self.time_format, None)[0]
+        except gst.QueryError:
+            return -1
 
     def update_time(self, retry=True):
         #if self.playingState != PLAYING :
