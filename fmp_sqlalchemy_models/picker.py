@@ -22,8 +22,8 @@ import alchemy_session
 import datetime
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session
-from sqlalchemy import and_, distinct
+                             UserFileInfo, session, file_genre_association_table
+from sqlalchemy import and_, distinct, insert
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql.expression import func
 import math
@@ -66,8 +66,31 @@ class Picker():
         wait()
 
     def insert_most_recent_into_dontpick(self):
-        total_files = session.query(FileInfo).count()
-        ten_percent = int(total_files * 0.01)
+        """
+        q = session.query(FileInfo.fid, '\'disable genre - new\'')
+                   .distinct(FileInfo.fid)\
+                   .join(Genre, FileInfo.genres)
+                   .filter(Genre.enabled == False)
+        """
+        total_files = session.query(FileInfo)\
+                             .distinct(FileInfo.fid)\
+                             .join(Genre, FileInfo.genres)\
+                             .filter(Genre.enabled == True)\
+                             .count()
+        ten_percent = int(total_files * 0.1)
+        print "ten_percent:", ten_percent
+        q = session.query(UserFileInfo.fid, "'recently played'")\
+                   .join(User)\
+                   .distinct(UserFileInfo.fid, UserFileInfo.uid)\
+                   .filter(and_(
+                      UserFileInfo.ultp != None,
+                      User.listening == True
+                    ))\
+                   .order_by(UserFileInfo.ultp.desc())\
+                   .limit(ten_percent)
+        self.insert_into_dont_pick(q, [DontPick.fid, DontPick.reason, DontPick.junk])
+        return
+        
         recently_played = session.query(UserFileInfo)\
                                  .join(User)\
                                  .distinct(UserFileInfo.fid, UserFileInfo.uid)\
@@ -84,7 +107,15 @@ class Picker():
             self.add(dp)
         self.commit()
 
-    def inset_rated_0_into_dontpick(self):
+    def insert_rated_0_into_dontpick(self):
+        q = session.query(UserFileInfo.fid, '\'rated 0 - new\'', '\'junk\'')\
+                   .join(User)\
+                   .distinct(UserFileInfo.fid, UserFileInfo.uid)\
+                   .filter(and_(UserFileInfo.rating == 0,
+                                User.listening == True))
+        print "q:",q
+        self.insert_into_dont_pick(q)
+        return
         rated_0 = session.query(UserFileInfo)\
                          .join(User)\
                          .distinct(UserFileInfo.fid, UserFileInfo.uid)\
@@ -98,25 +129,45 @@ class Picker():
             self.add(dp)
         self.commit()
 
+    def insert_into_dont_pick(self, select=None, names=None):
+        if names is None:
+          names = (DontPick.fid, DontPick.reason, DontPick.junk)
+        print "select:", select
+        print "names:", names
+        ins = insert(DontPick).from_select(names=names, select=select)
+        print "ins:", ins
+        session.execute(ins)
+        session.commit()
+
     def insert_disabled_genres_into_dontpick(self):
-        # sqlalchemy.exc.InvalidRequestError: Could not find a FROM clause to 
-        # join from.  Tried joining to <class 'files_model_idea.Genre'>, but 
-        # got: Can't find any foreign key relationships between 'files_info' 
-        # and 'genres'.
-        # GOAL: SELECT fi.fid 
-        #       FROM files_info fi, file_genres fg, genres g
-        #       WHERE fi.fid = fg.fid AND g.gid = fg.gid AND g.enabled = 0 
+        """
+        q = session.query(UserFileInfo.fid, '\'rated 0 - new\'')\
+                   .join(User)\
+                   .distinct(UserFileInfo.fid, UserFileInfo.uid)\
+                   .filter(and_(UserFileInfo.uid == 1, 
+                                UserFileInfo.rating == 0,
+                                User.listening == True))
+        print "q:",q
+        """
+        q = session.query(FileInfo.fid, '\'disable genre - new\'', '\'test\'')\
+                   .join(Genre, FileInfo.genres)\
+                   .filter(Genre.enabled == False)
+        #  self.insert_into_dont_pick(q)
+        ins = insert(DontPick).from_select(names=[DontPick.fid, DontPick.reason, DontPick.junk], select=q)
+        print "ins:", ins
+        session.execute(ins,None)
+        session.commit()
+        return
         disabled = session.query(FileInfo)\
-                          .join(Genre)\
-                          .distinct(FileInfo.fid)\
+                          .join(Genre, FileInfo.genres)\
                           .filter(
                               Genre.enabled == False
                           )\
                           .all()
 
-        for f in disabled:
-          print "INSERT INTO DONTPICK 3", f.filename
-          dp = DontPick(fid=f.fid, reason="disabled genre")
+        for file_info in disabled:
+          print "INSERT INTO DONTPICK 3", file_info.fid
+          dp = DontPick(fid=file_info.fid, reason="disabled genre")
           self.add(dp)
 
         self.commit()
@@ -132,7 +183,7 @@ class Picker():
         self.clear_dontpick()
         self.insert_disabled_genres_into_dontpick()
         self.insert_most_recent_into_dontpick()
-        self.inset_rated_0_into_dontpick()
+        self.insert_rated_0_into_dontpick()
         self.insert_preload_files_into_dontpick()
         self.insert_files_into_preload()
         return True
@@ -157,10 +208,23 @@ class Picker():
                     self.insert_artist_into_dont_pick(preload_entry)
 
     def insert_preload_files_into_dontpick(self):
+        # self.insert_artist_into_dont_pick(None)
         for preload_entry in session.query(Preload).all():
             self.insert_artist_into_dont_pick(preload_entry)
+        
 
-    def insert_artist_into_dont_pick(self, preload_entry):
+    def insert_artist_into_dont_pick(self, preload_entry=None):
+        """
+        q = session.query(FileInfo.fid, '\'artist in preload\'', Artist.name)\
+                   .distinct(FileInfo.fid)\
+                   .join((Preload, FileInfo.preload),
+                         (Artist, FileInfo.artists),
+                         (DontPick, FileInfo.dontpick))\
+                   .filter(FileInfo.dontpick == None)
+
+        self.insert_into_dont_pick(q)
+        return
+        """
         print "adding to don't pick",
         for a in preload_entry.file.artists:
             for f in a.files:

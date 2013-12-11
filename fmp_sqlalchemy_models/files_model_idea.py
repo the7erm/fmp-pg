@@ -170,7 +170,7 @@ class BaseClass(object):
         return datetime.datetime.now()
 
     def json(self, fields=None):
-        if fields == None:
+        if fields is None:
             if hasattr(self, '__json_fields__') and getattr(self, '__json_fields__'):
                 fields = getattr(self, '__json_fields__')
             else:
@@ -971,6 +971,9 @@ class DontPick(BaseClass, Base):
     dpfid = Column(Integer, primary_key=True)
     fid = Column(Integer, ForeignKey('files_info.fid'))
     reason = Column(String, default="No reason")
+    junk = Column(String, default="")
+    # TODO: alembic
+    # alter table dont_pick  add column junk VARCHAR
     __repr_fields__ = [
         'dpfid',
         'fid',
