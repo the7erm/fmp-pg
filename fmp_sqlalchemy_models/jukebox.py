@@ -109,7 +109,7 @@ class JukeBox:
 
     def init_player(self):
         self.player = Player()
-        self.start()
+        self.start(mark_as_played=False)
         percent_played = self.playing.listeners_ratings[0].percent_played
         duration = self.player.get_duration()
         pos_ns = int(duration * (percent_played * 0.01))
@@ -159,7 +159,7 @@ class JukeBox:
         self.index += 1
         self.start()
         
-    def start(self):
+    def start(self, mark_as_played=True):
         try:
             fid = self.history[self.index]
             file_info = session.query(FileInfo)\
@@ -177,7 +177,8 @@ class JukeBox:
         self.playing = file_info
         if self.controller_icon is not None and self.rating_icon is not None:
             self.set_tray_data()
-        self.playing.mark_as_played()
+        if mark_as_played:
+            self.playing.mark_as_played()
 
     def pause(self, *args, **kwargs):
         self.player.pause()
