@@ -200,9 +200,10 @@ class Picker():
             for u in users:
                 f = self.get_file_for(u.uid, p)
                 if f is not None:
-                    print "adding:", f.fid, f.file.filename
+                    reason = "true_score >= %s" % p
+                    print "adding:", f.fid, f.file.filename, reason
                     preload_entry = Preload(fid=f.fid, uid=u.uid, 
-                                            reason="true_score >= %s" % p)
+                                            reason=reason)
                     self.add(preload_entry)
                     self.commit()
                     self.insert_artist_into_dont_pick(preload_entry)
@@ -269,15 +270,22 @@ class Picker():
                       .limit(1)\
                       .one()
 
+    def get_file_from_preload_for_uid(self, uid):
+        return session.query(Preload)\
+                      .filter(Preload.uid == uid)\
+                      .order_by(Preload.priority.desc(), func.random())\
+                      .limit(1)\
+                      .one()
+
     def pop(self):
         user = self.get_next_user()
         user.last_time_cued = datetime.datetime.now()
         self.add(user)
-        preload_entry = session.query(Preload)\
-                               .filter(Preload.uid == user.uid)\
-                               .order_by(Preload.priority.desc(), func.random())\
-                               .limit(1)\
-                               .one()
+        preload_entry = self.get_file_from_preload_for_uid(user.uid)
+        if not preload_entry:
+            self.do()
+            preload_entry = self.get_file_from_preload_for_uid(user.uid)
+
         wait()
         file_info = session.query(FileInfo)\
                                .filter(FileInfo.fid == preload_entry.fid)\

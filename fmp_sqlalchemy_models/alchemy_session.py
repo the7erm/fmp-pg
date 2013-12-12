@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql.expression import func
+from sqlalchemy.orm import sessionmaker, scoped_session
 import os
 import sys
 """
@@ -29,13 +28,39 @@ if "--pgsql" in sys.argv:
         db_connection_string = fp.read().strip()
         fp.close()
 
+class DB:
+    def __init__(self, db_connection_string):
+        self.db_connection_string = db_connection_string
+        self.engine = create_engine(db_connection_string, echo=False, 
+                                    encoding='utf-8', convert_unicode=True)
+        self.session_factory = None
+        self.Base = None
+        self.Session = None
+
+    def create_all(self, base):
+        if base is None or \
+           self.Base is not None or \
+           self.session_factory is not None:
+            return
+        self.Base = base
+        self.Base.metadata.create_all(self.engine)
+
+    def init_session_factory(self, base=None):
+        if self.session_factory is not None:
+            return
+        self.create_all(base)
+        self.session_factory = sessionmaker(bind=self.engine)
+
+    def session(self, base=None):
+        self.init_session_factory(base)
+
+        if self.Session is not None:
+            return self.Session()
+
+        self.Session = scoped_session(self.session_factory)
+        return self.Session()
+
+db = DB(db_connection_string)
+
 def make_session(Base):
-
-    # fmp_sqlalchemy_test
-    engine = create_engine(db_connection_string, echo=False, encoding='utf-8',
-                           convert_unicode=True)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-
-    session = Session()
-    return session
+    return db.session(Base)

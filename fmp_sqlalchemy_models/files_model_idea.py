@@ -205,6 +205,38 @@ class BaseClass(object):
         return obj
 
 
+class UserHistory(BaseClass, Base):
+    __tablename__ = 'user_history'
+
+    __table_args__ = (
+        UniqueConstraint('uid', 'fid', 'date_played', 
+                         name='uniq_idx_user_history_uid_fid_date_played'),
+    )
+    __repr_fields__ = [
+        'uhid',
+        'uid',
+        'ufid',
+        'fid',
+        'rating',
+        'skip_score',
+        'percent_played',
+        'true_score',
+        'time_played',
+        'date_played'
+    ]
+    uhid = Column(Integer, primary_key=True)
+    uid = Column(Integer, ForeignKey("users.uid"))
+    ufid = Column(Integer, ForeignKey("user_file_info.ufid"))
+    fid = Column(Integer, ForeignKey("files_info.fid"))
+    # eid = Column(Integer, ForeignKey("episodes.eid"))
+    rating = Column(Integer)
+    skip_score = Column(Integer)
+    percent_played = Column(Float)
+    true_score = Column(Float)
+    time_played = Column(DateTime(timezone=True))
+    date_played = Column(Date)
+
+
 class FileLocation(BaseClass, Base):
     __tablename__  = 'file_location'
     __table_args__ = (
@@ -249,10 +281,11 @@ class FileLocation(BaseClass, Base):
 
     @property
     def uri(self):
+        filename = self.filename
         if self.exists:
-            return "file://%s" % (urllib.quote(self.filename),)
+            return "file://%s" % (urllib.quote(filename.encode('utf8')),)
         else:
-            return urllib.quite(self.filename)
+            return urllib.quote(filename.encode('utf8'))
 
     @property
     def base(self):
@@ -424,7 +457,8 @@ class FileInfo(BaseClass, Base):
                            backref="file",
                            primaryjoin="and_(UserHistory.fid == FileInfo.fid, "
                                              "User.listening == True, "
-                                             "User.uid == UserHistory.uid)")
+                                             "User.uid == UserHistory.uid)",
+                           order_by=UserHistory.time_played.desc)
 
     listeners_ratings = relationship("UserFileInfo",
         primaryjoin="and_(UserFileInfo.fid == FileInfo.fid, "
@@ -777,6 +811,13 @@ class FileInfo(BaseClass, Base):
         selected = self.get_selected()
         return selected.rating
 
+    @property
+    def exists(self):
+        for l in self.locations:
+            if l.exists:
+                return True
+        return False
+
 class Folder(BaseClass, Base):
     __tablename__ = 'folders'
     foid = Column(Integer, primary_key=True)
@@ -1066,40 +1107,6 @@ class User(BaseClass, Base):
     preload = relationship("Preload", backref="user")
 
 
-class UserHistory(BaseClass, Base):
-    __tablename__ = 'user_history'
-
-    __table_args__ = (
-        UniqueConstraint('uid', 'fid', 'date_played', 
-                         name='uniq_idx_user_history_uid_fid_date_played'),
-    )
-
-
-    __repr_fields__ = [
-        'uhid',
-        'uid',
-        'ufid',
-        'fid',
-        'rating',
-        'skip_score',
-        'percent_played',
-        'true_score',
-        'time_played',
-        'date_played'
-    ]
-    uhid = Column(Integer, primary_key=True)
-    uid = Column(Integer, ForeignKey("users.uid"))
-    ufid = Column(Integer, ForeignKey("user_file_info.ufid"))
-    fid = Column(Integer, ForeignKey("files_info.fid"))
-    # eid = Column(Integer, ForeignKey("episodes.eid"))
-    rating = Column(Integer)
-    skip_score = Column(Integer)
-    percent_played = Column(Float)
-    true_score = Column(Float)
-    time_played = Column(DateTime(timezone=True))
-    date_played = Column(Date)
-
-
 class UserFileInfo(BaseClass, Base):
     __tablename__ = "user_file_info"
     __table_args__ = (
@@ -1205,7 +1212,7 @@ class UserFileInfo(BaseClass, Base):
 
     def set_skip_score(self, skip_score):
         skip_score = int(skip_score)
-        if skip_score > 10 or skip_score < 0:
+        if skip_score > 10 or skip_score < 1:
             return
 
         self.skip_score = skip_score
@@ -1275,7 +1282,6 @@ VIDEO_EXT = ('.flv', '.mpg' ,'.mpeg', '.avi', '.mov', '.mp4', '.m4a')
 
 session = alchemy_session.make_session(Base)
 
-
 def wait():
     # print "leave1"
     gtk.gdk.threads_leave()
@@ -1292,8 +1298,6 @@ def wait():
     # print "/leave"
 
 if __name__ == "__main__":
-    
-    
     create_user("erm", True, True)
     create_user("steph", True, False)
     create_user("sam", True, False)

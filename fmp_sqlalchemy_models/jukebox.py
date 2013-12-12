@@ -149,7 +149,9 @@ class JukeBox:
         self.pos_float = pos_float
         print "mark as played:", percent_played, "***", pos_float
         self.playing.mark_as_played(percent_played=percent_played)
-        print self.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 'genres', 'filename'])
+        print self.playing.json(['artists', 'titles', 'fid', 
+                                 'listeners_ratings', 'genres', 'filename', 
+                                 'history'])
 
     def on_end_of_stream(self, *args, **kwargs):
         print "END OF STREAM"
@@ -166,17 +168,26 @@ class JukeBox:
                                .filter(FileInfo.fid == fid)\
                                .limit(1)\
                                .one()
+            print "history:",file_info
         except IndexError:
             file_info = self.picker.pop()
+            while not file_info.exists:
+                print "MISSING FILE:%s", file_info.filename
+                file_info.mark_as_played(percent_played=-1)
+                self.picker.do()
+                file_info = self.picker.pop()
+
             self.history.append(file_info.fid)
             self.history = self.history[-HISTORY_LENGTH:]
             self.index = len(self.history) - 1
+            print "pop:",file_info
 
-        self.player.filename = file_info.filename
-        self.player.start()
         self.playing = file_info
+        self.player.filename = self.playing.uri
         if self.controller_icon is not None and self.rating_icon is not None:
             self.set_tray_data()
+        self.player.stop()
+        self.player.start()
         if mark_as_played:
             self.playing.mark_as_played()
 
@@ -184,14 +195,14 @@ class JukeBox:
         self.player.pause()
 
     def next(self, *args, **kwargs):
-        self.player.stop()
         self.playing.deinc_skip_score()
+        print "NEXT:",
+        print self.playing.listeners_ratings
         self.index += 1
         self.start()
 
     def prev(self, *args, **kwargs):
         self.index -= 1
-        self.player.stop()
         self.start()
 
     @property

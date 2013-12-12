@@ -333,10 +333,11 @@ static char * invisible_xpm[] = {
         uri = self.filename
         if os.path.isfile(self.filename):
             self.filename = os.path.realpath(self.filename)
-            uri = "file://" + urllib.quote(self.filename)
+            print "converting:", self.filename.__repr__()
+            uri = "file://" + urllib.quote(self.filename.encode())
             # print "QUOTED:%s" % urllib.quote(self.filename);
-        uri = uri.replace("\\'","%27")
-        uri = uri.replace("'","%27")
+            uri = uri.replace("\\'","%27")
+            uri = uri.replace("'","%27")
         if uri == "":
             print "empty uri"
             return;
