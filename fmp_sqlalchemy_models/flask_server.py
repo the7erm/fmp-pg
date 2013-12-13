@@ -5,20 +5,75 @@ from twisted.web.wsgi import WSGIResource
 from twisted.web.server import Site
 import gobject
 from twisted.internet import reactor
+import json
 
-from flask import Flask
+from flask import Flask, Response
+from flask import render_template
+from player_refactored import STOPPED, PAUSED, PLAYING
+
 app = Flask(__name__)
 app.debug = True
 
 jukebox = None
+JUKEBOX_PLAYING_KEYS = [
+    'fid',
+    'artist_title',
+    'artists',
+    'titles',
+    'genres',
+    'albums',
+    'listeners_ratings',
+]
 
 @app.route('/')
 def index():
-    obj = {
-        'playing': jukebox.playing.json(['artists', 'titles', 'fid', 'listeners_ratings', 
-                                         'genres'])
+    return render_template("index.html", jukebox=jukebox)
+
+def json_response(obj):
+    json_obj = json.dumps(obj, indent=4)
+    return Response(response=json_obj,
+                    status=200,
+                    mimetype="application/json")
+
+def status_obj():
+    player_state = jukebox.player.playingState
+    state = 'STOPPED'
+    if player_state == PLAYING:
+        state = 'PLAYING'
+    elif player_state == PAUSED:
+        state = 'PAUSED'
+        
+    return {
+        'playing': jukebox.playing.to_dict(JUKEBOX_PLAYING_KEYS),
+        'pos_data': jukebox.player.pos_data,
+        'state': state
     }
-    return 
+
+@app.route('/status/')
+def status():
+    obj = status_obj()
+    return json_response(obj)
+
+@app.route('/pause/')
+def pause():
+    jukebox.pause()
+    obj = status_obj()
+    obj['STATUS'] = 'SUCCESS'
+    return json_response(obj)
+
+@app.route('/next/')
+def next():
+    jukebox.next()
+    obj = status_obj()
+    obj['STATUS'] = 'SUCCESS'
+    return json_response(obj)
+
+@app.route('/prev/')
+def prev():
+    jukebox.prev()
+    obj = status_obj()
+    obj['STATUS'] = 'SUCCESS'
+    return json_response(obj)
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 reactor.listenTCP(5050, Site(resource))

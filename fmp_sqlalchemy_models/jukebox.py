@@ -116,6 +116,8 @@ class JukeBox:
         self.player.seek_ns(pos_ns)
         self.player.connect('time-status', self.on_time_status)
         self.player.connect('end-of-stream', self.on_end_of_stream)
+        self.player.next_button.connect('clicked', self.on_next)
+        self.player.prev_button.connect('clicked', self.on_prev)
 
     def init_history(self):
         self.index = 0

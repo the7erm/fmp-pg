@@ -177,6 +177,7 @@ class Picker():
         print "PICKER DO"
         random.shuffle(self.percents)
         users = self.get_users()
+
         if not users:
             print "not needed there are no users with an empty preload"
             return True

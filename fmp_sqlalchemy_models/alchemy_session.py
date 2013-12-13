@@ -2,6 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 import os
 import sys
+from sqlalchemy.pool import StaticPool
+
 """
 engine = create_engine(
             "postgresql+pg8000://scott:tiger@localhost/test",
@@ -31,8 +33,16 @@ if "--pgsql" in sys.argv:
 class DB:
     def __init__(self, db_connection_string):
         self.db_connection_string = db_connection_string
-        self.engine = create_engine(db_connection_string, echo=False, 
-                                    encoding='utf-8', convert_unicode=True)
+        kwargs = {
+            'echo': False,
+            'encoding': 'utf-8',
+            'convert_unicode': True
+        }
+        if db_connection_string.startswith('sqlite'):
+            kwargs['poolclass'] = StaticPool
+            kwargs['connect_args'] = { 'check_same_thread': False }
+
+        self.engine = create_engine(db_connection_string, **kwargs)
         self.session_factory = None
         self.Base = None
         self.Session = None

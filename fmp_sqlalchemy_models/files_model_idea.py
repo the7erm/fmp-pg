@@ -194,14 +194,24 @@ class BaseClass(object):
 
         return json.dumps(obj, indent=4)
 
-    def to_dict(self):
+    def to_dict(self, fields=None):
+        if fields is None:
+            if hasattr(self, '__json_fields__') and getattr(self, '__json_fields__'):
+                fields = getattr(self, '__json_fields__')
+            else:
+                fields = self.__repr_fields__
         obj = {}
-        for field in self.__repr_fields__:
+        for field in fields:
             val = self.getattr(self, field)
             if isinstance(val, (datetime.datetime, datetime.date)):
                 val = val.isoformat()
             # print "to_dict:%s %s %s" % (field, val, type(val))
             obj[field] = val
+            if isinstance(val, list):
+                new_val = []
+                for v in val:
+                    new_val.append(v.to_dict())
+                obj[field] = new_val
         return obj
 
 
