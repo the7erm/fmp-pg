@@ -11,6 +11,8 @@ from flask import Flask, Response
 from flask import render_template
 from player_refactored import STOPPED, PAUSED, PLAYING
 
+from files_model_idea import simple_rate
+
 app = Flask(__name__)
 app.debug = True
 
@@ -23,6 +25,7 @@ JUKEBOX_PLAYING_KEYS = [
     'genres',
     'albums',
     'listeners_ratings',
+    'history'
 ]
 
 @app.route('/')
@@ -42,7 +45,7 @@ def status_obj():
         state = 'PLAYING'
     elif player_state == PAUSED:
         state = 'PAUSED'
-        
+
     return {
         'playing': jukebox.playing.to_dict(JUKEBOX_PLAYING_KEYS),
         'pos_data': jukebox.player.pos_data,
@@ -71,6 +74,22 @@ def next():
 @app.route('/prev/')
 def prev():
     jukebox.prev()
+    obj = status_obj()
+    obj['STATUS'] = 'SUCCESS'
+    return json_response(obj)
+
+@app.route("/rate/<fid>/<uid>/<rating>")
+def rate(fid, uid, rating):
+    fid = int(fid)
+    uid = int(uid)
+    rating = int(rating)
+    # TODO LOOP THROUGH JUKEBOX
+    found = False
+    if jukebox.playing.fid == fid:
+        found = jukebox.rate(uid, rating)
+
+    if not found:
+        simple_rate(fid, uid, rating)
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)

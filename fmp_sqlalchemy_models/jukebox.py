@@ -207,6 +207,17 @@ class JukeBox:
         self.index -= 1
         self.start()
 
+    def rate(self, uid, rating):
+        
+        for l in self.playing.listeners_ratings:
+            if l.uid == uid:
+                print "RATING:",l
+                l.rate(rating)
+                self.set_tray_data()
+                return True
+
+        return False
+
     @property
     def artist_title(self):
         return self.playing.artist_title

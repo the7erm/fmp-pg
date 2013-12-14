@@ -22,7 +22,9 @@ import alchemy_session
 import datetime
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session, file_genre_association_table
+                             UserFileInfo, session, file_genre_association_table, \
+                             DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
+                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE
 from sqlalchemy import and_, distinct, insert
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql.expression import func
@@ -176,12 +178,13 @@ class Picker():
         wait()
         print "PICKER DO"
         random.shuffle(self.percents)
-        users = self.get_users()
-
+        users = self.get_listeners_with_empty_preload()
+        self.ensure_listener_ratings()
         if not users:
             print "not needed there are no users with an empty preload"
             return True
         self.clear_dontpick()
+        
         self.insert_disabled_genres_into_dontpick()
         self.insert_most_recent_into_dontpick()
         self.insert_rated_0_into_dontpick()
@@ -189,23 +192,51 @@ class Picker():
         self.insert_files_into_preload()
         return True
 
-    def get_users(self):
-        return session.query(User).filter(and_(
-                User.listening==True,
-                User.preload==None
-               )).all()
+    def ensure_listener_ratings(self):
+        listeners = self.get_listeners_with_empty_preload()
+        for l in listeners:
+          wait()
+          q = session.query('\'%s\'' % l.uid,
+                            FileInfo.fid, 
+                            '\'%s\'' % DEFAULT_RATING,
+                            '\'%s\'' % DEFAULT_SKIP_SCORE,
+                            '\'%s\'' % DEFAULT_PERCENT_PLAYED,
+                            '\'%s\'' % DEFAULT_TRUE_SCORE)\
+                     .filter(~FileInfo.listeners_ratings.any(UserFileInfo.uid == l.uid))
+          ins = insert(UserFileInfo).from_select(('fid', 
+                                                  'uid',
+                                                  'rating', 
+                                                  'skip_score', 
+                                                  'percent_played',
+                                                  'true_score'), 
+                                                 select=q)
+          session.execute(ins,None)
+          self.commit()
+
+
+    def get_listeners_with_empty_preload(self):
+        # SELECT u.uid FROM users u LEFT JOIN preload p ON p.uid = u.uid WHERE p.uid IS NULL AND u.uid = 1;
+        q = session.query(User)\
+                      .filter(and_(
+                        User.listening == True,
+                        User.preload == None
+                      ))
+        return q.all()
 
     def insert_files_into_preload(self):
-        users = self.get_users()
-        for p in self.percents:
+        users = self.get_listeners_with_empty_preload()
+        for true_score in self.percents:
             for u in users:
-                f = self.get_file_for(u.uid, p)
+                print "u.uid:", u.uid
+                print "PRELOAD:", u.preload
+                f = self.get_file_for(u.uid, true_score)
                 if f is not None:
-                    reason = "true_score >= %s" % p
+                    reason = "true_score >= %s" % true_score
                     print "adding:", f.fid, f.file.filename, reason
                     preload_entry = Preload(fid=f.fid, uid=u.uid, 
                                             reason=reason)
                     self.add(preload_entry)
+                    # u.preload.add(preload_entry)
                     self.commit()
                     self.insert_artist_into_dont_pick(preload_entry)
 

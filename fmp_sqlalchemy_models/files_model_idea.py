@@ -1114,7 +1114,8 @@ class User(BaseClass, Base):
     selected = Column(Boolean, default=False)
     last_time_cued = Column(DateTime, index=True)
     rating_data = relationship("UserFileInfo", backref="user")
-    preload = relationship("Preload", backref="user")
+    preload = relationship("Preload", backref="user",
+                           primaryjoin="User.uid == Preload.uid")
 
 
 class UserFileInfo(BaseClass, Base):
@@ -1123,7 +1124,8 @@ class UserFileInfo(BaseClass, Base):
         UniqueConstraint('fid', 'uid', name='uniq_idx_fid_uid'),
     )
     __repr_fields__ = [
-        'ufid', 
+        'ufid',
+        'uid',
         'fid',
         'user.uname',
         'rating',
@@ -1306,6 +1308,16 @@ def wait():
     # print "leave"
     gtk.gdk.threads_leave()
     # print "/leave"
+
+def simple_rate(fid, uid, rating):
+    user_file_info = session.query(UserFileInfo)\
+                            .filter(and_(
+                                UserFileInfo.fid == fid,
+                                UserFileInfo.uid == uid,
+                             ))\
+                            .limit(1)\
+                            .one()
+    user_file_info.rate(rating)
 
 if __name__ == "__main__":
     create_user("erm", True, True)
