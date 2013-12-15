@@ -71,10 +71,10 @@
     <li>
         <h3 class='history-user'><%- user %></h3>
         <p><strong>Fid:<span class='history-fid'><%- fid %></span></strong></p>
+        <p><strong>True Score:<span class='history-true_score'><%- true_score.toFixed(2) %></span></strong></p>
         <p><strong>Percent Played:<span class='history-percent_played'><%- percent_played.toFixed(2) %></span></strong></p>
         <p><strong>Rating:<span class='history-rating'><%- rating %></span></strong></p>
         <p><strong>Skip Score:<span class='history-skip_score'><%- skip_score %></span></strong></p>
-        <p><strong>True Score:<span class='history-true_score'><%- true_score.toFixed(2) %></span></strong></p>
     </li>
 </script>
 
@@ -178,7 +178,7 @@
             this.parentEl = options.parentEl;
         },
         onModelChange: function(){
-            console.log("MODEL CHANGED:", self.model.toJSON());
+            // console.log("MODEL CHANGED:", self.model.toJSON());
         },
         render: function(){
             return this;
@@ -242,21 +242,13 @@
                     present.set(v);
                 }
             });
-
-            /* $("#history").text("works");
-
-            var playing_history = conductor.get('playing.history');
-            _.each(playing_history, function(v, k){
-
-            }); */
         });
         var renderRatings = function(){
-            $("#history").find("ul").empty();
             var ratings = conductor.get('playing.listeners_ratings') || [],
                 $ratings = $("#ratings");
             $ratings.empty();
             _.each(ratings, function(rating){
-                console.log("rating",rating)
+                // console.log("rating",rating)
                 var ratingDiv = $("<div></div>");
                 $ratings.append(ratingDiv);
                 var ratingView = new RatingButtonView({
@@ -268,8 +260,14 @@
                 }).render();
             });
         }
+        var clearHistory = function() {
+            $("#history").find("ul").empty();
+            historyCollection.reset();
+        }
         conductor.on("change:playing.fid", renderRatings);
         conductor.on("change:playing.listeners_ratings.length", renderRatings);
+        conductor.on("change:playing.fid", clearHistory);
+        conductor.on("change:playing.listeners_ratings.length", clearHistory);
     });
 </script>
 {% include "footer.html" %}

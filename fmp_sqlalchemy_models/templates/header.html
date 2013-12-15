@@ -122,7 +122,8 @@
             $('.player-control').removeClass("ui-btn-active");
             $.ajax({
               url: this.href,
-              dataType: 'json'
+              dataType: 'json',
+              cache:false,
             }).done(function(data, textStatus, jqXHR){
                 conductor.set(data);
             }).always(function(jqXHR, textStatus, errorThrown){
@@ -137,7 +138,7 @@
             playing_keywords.empty();
 
             _.each(keywords, function(v, k){
-                console.log("keyword:",v);
+                // console.log("keyword:",v);
                 playing_keywords.append(template(v));
             });
             
@@ -161,7 +162,7 @@
 <div data-role="page" data-theme="b" id="page">
     <div data-role="header" data-theme="b" data-position="fixed">
         <a href="#left-panel" data-theme="b" data-icon="grid" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open left panel</a>
-        <a href="#right-panel" data-theme="b" data-icon="arrow-r" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>
+        <a href="#right-panel" data-theme="b" data-icon="gear" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>
         <div style='text-align:center; max-width:75%; margin:auto; padding:10px;'>
             <span>FMP - </span>
             <span class='playing-artist-title'>{{jukebox.playing.artist_title}}</span>
