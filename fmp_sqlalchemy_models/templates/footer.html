@@ -1,7 +1,14 @@
     </div>
     <div data-role="panel" id="left-panel" data-theme="b">
-        <p>Left reveal panel.</p>
-        <a href="#" data-rel="close" data-role="button" data-mini="true" data-inline="true" data-icon="delete" data-iconpos="right">Close</a>
+        <div data-role="controlgroup" data-type="horizontal" data-mini="true">
+            <a href="/"  data-iconpos="notext" data-icon="home" data-role="button">Home</a>
+            <a href="/search/"  data-iconpos="notext" data-icon="search" data-role="button">Search</a>
+            <a href="#" data-rel="close" data-iconpos="notext" data-role="button" data-mini="true" data-inline="true" data-icon="delete" data-iconpos="right">Close</a>
+        </div>
+        
+        <br>
+        <p>Tags for <strong><span class='playing-artist-title'></span></strong>:</p>
+        <div class="playing-keywords"></div>
     </div><!-- /panel -->
 
     <div data-role="panel" id="right-panel" data-display="push" data-position="right" data-theme="c">

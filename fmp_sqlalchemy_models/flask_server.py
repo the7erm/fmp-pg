@@ -25,12 +25,17 @@ JUKEBOX_PLAYING_KEYS = [
     'genres',
     'albums',
     'listeners_ratings',
-    'history'
+    'history',
+    'keywords'
 ]
 
 @app.route('/')
 def index():
     return render_template("index.html", jukebox=jukebox)
+
+@app.route('/search/')
+def search():
+    return render_template("search.html", jukebox=jukebox)
 
 def json_response(obj):
     json_obj = json.dumps(obj, indent=4)

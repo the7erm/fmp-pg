@@ -18,11 +18,28 @@
             height: 30px;
             width: 30px;
         }
+
+        .keyword {
+            float:left;
+            padding-top:3px;
+            margin-right:2px;
+            padding-bottom:3px;
+            padding-right:5px;
+            padding-left:5px;
+        }
+        a.keyword {
+            text-overflow: ellipsis;
+            max-width: 50%;
+            overflow: hidden;
+            font-size:0.75em;
+            
+        }
     </style>
 </head>
 <body>
 <script type="text/javascript">
     $(document).bind("mobileinit", function () {
+        $.mobile.ajaxEnabled = false;
         var ConductorModel = Backbone.DeepModel.extend({
                 url: "/status/",
                 idAttribute: "fid",
@@ -108,6 +125,19 @@
                 $('.player-control').removeClass("ui-btn-active");
             });
         });
+
+        conductor.on("change:playing.keywords", function(){
+            var playing_keywords = $(".playing-keywords"),
+                keywords = conductor.get("playing.keywords"),
+                template = _.template("<a class='keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='/search/?q=<%= encodeURIComponent(word) %>'><%- word %></a>")
+            playing_keywords.empty();
+
+            _.each(keywords, function(v, k){
+                console.log("keyword:",v);
+                playing_keywords.append(template(v));
+            });
+            
+        });
     });
     $( document ).on( "pageinit", "#page", function() {
         $( document ).on( "swipeleft swiperight", "#page", function( e ) {
@@ -125,15 +155,15 @@
     });
 </script>
 <div data-role="page" data-theme="b" id="page">
-    <div data-role="header" data-theme="b" data-position="fixed" style='text-align:center;'>
-        
-        <a href="#left-panel" data-theme="b" data-icon="arrow-l" data-iconpos="notext" data-shadow="false" data-iconshadow="false" class="ui-icon-nodisc">Open left panel</a>
-        <a href="#right-panel" data-theme="b" data-icon="arrow-r" data-iconpos="notext" data-shadow="false" data-iconshadow="false" class="ui-icon-nodisc">Open right panel</a>
-        <div style="padding:15px;">
+    <div data-role="header" data-theme="b" data-position="fixed">
+        <a href="#left-panel" data-theme="b" data-icon="arrow-l" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open left panel</a>
+        <a href="#right-panel" data-theme="b" data-icon="arrow-r" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>
+        <div style='text-align:center; max-width:75%; margin:auto; padding:10px;'>
             <span>FMP - </span>
             <span class='playing-artist-title'>{{jukebox.playing.artist_title}}</span>
              - 
             <span class='playing-time-status'>{{jukebox.player.pos_data['pos_str']}}</span>
+            
         </div>
     </div>
     <div data-role="content">
