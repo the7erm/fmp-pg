@@ -48,11 +48,11 @@
                 var artist_title = this.get('playing.artist_title') || 'failed',
                     title_string = "FMP - "+artist_title;
                 document.title = title_string;
-                $('.artist-title').text(artist_title);
+                $('.playing-artist-title').text(artist_title);
             },
             on_change_time = function(){
                  var pos_str = this.get('pos_data.pos_str') || 'failed';
-                 $('.time-status').text(pos_str);
+                 $('.playing-time-status').text(pos_str);
             },
             on_state_change = function(){
                 var state = this.get('state') || 'STOPPED';
@@ -91,7 +91,7 @@
             if (seconds < 10) {
                 seconds = "0"+seconds;
             }
-            $('.time-status').text(minutes+":"+seconds);
+            $('.playing-time-status').text(minutes+":"+seconds);
             return true;
         }, 1000);
 
@@ -109,14 +109,31 @@
             });
         });
     });
+    $( document ).on( "pageinit", "#page", function() {
+        $( document ).on( "swipeleft swiperight", "#page", function( e ) {
+            // We check if there is no open panel on the page because otherwise
+            // a swipe to close the left panel would also open the right panel (and v.v.).
+            // We do this by checking the data that the framework stores on the page element (panel: open).
+            if ( $.mobile.activePage.jqmData( "panel" ) !== "open" ) {
+                if ( e.type === "swipeleft"  ) {
+                    $( "#right-panel" ).panel( "open" );
+                } else if ( e.type === "swiperight" ) {
+                    $( "#left-panel" ).panel( "open" );
+                }
+            }
+        });
+    });
 </script>
-<div data-role="page" data-theme="b">
+<div data-role="page" data-theme="b" id="page">
     <div data-role="header" data-theme="b" data-position="fixed" style='text-align:center;'>
+        
+        <a href="#left-panel" data-theme="b" data-icon="arrow-l" data-iconpos="notext" data-shadow="false" data-iconshadow="false" class="ui-icon-nodisc">Open left panel</a>
+        <a href="#right-panel" data-theme="b" data-icon="arrow-r" data-iconpos="notext" data-shadow="false" data-iconshadow="false" class="ui-icon-nodisc">Open right panel</a>
         <div style="padding:15px;">
             <span>FMP - </span>
-            <span class='artist-title'>{{jukebox.playing.artist_title}}</span>
+            <span class='playing-artist-title'>{{jukebox.playing.artist_title}}</span>
              - 
-            <span class='time-status'>{{jukebox.player.pos_data['pos_str']}}</span>
+            <span class='playing-time-status'>{{jukebox.player.pos_data['pos_str']}}</span>
         </div>
     </div>
     <div data-role="content">

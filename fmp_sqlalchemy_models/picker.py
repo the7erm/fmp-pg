@@ -228,7 +228,6 @@ class Picker():
         for true_score in self.percents:
             for u in users:
                 print "u.uid:", u.uid
-                print "PRELOAD:", u.preload
                 f = self.get_file_for(u.uid, true_score)
                 if f is not None:
                     reason = "true_score >= %s" % true_score

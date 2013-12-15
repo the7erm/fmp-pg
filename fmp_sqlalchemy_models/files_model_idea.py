@@ -232,7 +232,8 @@ class UserHistory(BaseClass, Base):
         'percent_played',
         'true_score',
         'time_played',
-        'date_played'
+        'date_played',
+        'user.uname'
     ]
     uhid = Column(Integer, primary_key=True)
     uid = Column(Integer, ForeignKey("users.uid"))
@@ -245,6 +246,7 @@ class UserHistory(BaseClass, Base):
     true_score = Column(Float)
     time_played = Column(DateTime(timezone=True))
     date_played = Column(Date)
+    user = relationship("User")
 
 
 class FileLocation(BaseClass, Base):

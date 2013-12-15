@@ -126,13 +126,13 @@ static char * invisible_xpm[] = {
     def init_controls(self):
         ### SET UP CONTROLS ###
         self.controls = gtk.HBox()
-        self.prev_button = gtk.Button('',gtk.STOCK_MEDIA_PREVIOUS)
-        self.pause_button = gtk.Button('',gtk.STOCK_MEDIA_PAUSE)
-        self.play_button = gtk.Button('',gtk.STOCK_MEDIA_PLAY)
-        self.next_button = gtk.Button('',gtk.STOCK_MEDIA_NEXT)
+        self.prev_button = gtk.Button('', gtk.STOCK_MEDIA_PREVIOUS)
+        self.pause_button = gtk.Button('', gtk.STOCK_MEDIA_PAUSE)
+        self.play_button = gtk.Button('', gtk.STOCK_MEDIA_PLAY)
+        self.next_button = gtk.Button('', gtk.STOCK_MEDIA_NEXT)
         
-        self.fs_button = gtk.Button('',gtk.STOCK_FULLSCREEN)
-        self.unfs_button = gtk.Button('',gtk.STOCK_LEAVE_FULLSCREEN)
+        self.fs_button = gtk.Button('', gtk.STOCK_FULLSCREEN)
+        self.unfs_button = gtk.Button('', gtk.STOCK_LEAVE_FULLSCREEN)
         
         self.pause_button.connect('clicked', self.pause)
         self.play_button.connect('clicked', self.pause)

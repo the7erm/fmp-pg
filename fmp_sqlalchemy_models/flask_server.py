@@ -11,7 +11,7 @@ from flask import Flask, Response
 from flask import render_template
 from player_refactored import STOPPED, PAUSED, PLAYING
 
-from files_model_idea import simple_rate
+from files_model_idea import simple_rate, FileInfo, session
 
 app = Flask(__name__)
 app.debug = True
@@ -93,6 +93,33 @@ def rate(fid, uid, rating):
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
+
+
+
+@app.route("/stream/<fid>/<format>")
+def stream(fid, format):
+    def do_stream(fid, format):
+        file_info = session.query(FileInfo)\
+                           .filter(FileInfo.fid==fid)\
+                           .limit(1)\
+                           .one()
+        fp = open(file_info.filename, "r")
+        data = fp.read(102400)
+        yield data
+        while data:
+            data = fp.read(102400)
+            yield data
+    if format == 'mp3':
+        mimetype = "audio/mpeg"
+    if format == 'ogg':
+        mimetype = "audio/ogg"
+    """
+    <audio controls>
+      <source src="horse.ogg" type="audio/ogg">
+      <source src="horse.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+    </audio>"""
+    return Response(do_stream(fid, format), mimetype=mimetype)
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 reactor.listenTCP(5050, Site(resource))
