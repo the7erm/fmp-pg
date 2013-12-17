@@ -60,6 +60,8 @@
 <br clear="all">
 <div id="history"></div>
 <br clear="all">
+<div id="user-agent"></div>
+<br clear="all">
 <script type="text/html" id="tpl-history">
     <h2>History - <span class='playing-artist-title'></span></h2>
     <ul data-role="listview" data-theme="d" data-divider-theme="d" class="history-listview"></ul>
@@ -113,6 +115,7 @@
 </script>
 
 <script type="text/javascript">
+
     window.RatingButtonView = Backbone.View.extend({
         rating: 6,
         uid: 0,
@@ -223,6 +226,12 @@
     });
 
     $(document).bind("mobileinit", function () {
+         
+        $('#user-agent').text(navigator.userAgent);
+        var ps4Re = /PlayStation\ 4/i;
+        if (ps4Re.test(navigator.userAgent)) {
+            document.body.width=300;
+        } 
         var historyModel = new HistoryModel(),
             historyCollection = new HistoryCollection(),
             historyView = new HistoryView({

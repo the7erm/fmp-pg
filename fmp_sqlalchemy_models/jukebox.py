@@ -24,7 +24,7 @@ import gtk
 import gobject
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session
+                             UserFileInfo, session, make_session
 
 import flask_server
 

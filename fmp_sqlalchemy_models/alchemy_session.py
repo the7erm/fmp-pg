@@ -72,5 +72,5 @@ class DB:
 
 db = DB(db_connection_string)
 
-def make_session(Base):
+def make_session(Base=None):
     return db.session(Base)

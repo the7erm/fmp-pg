@@ -1,0 +1,271 @@
+{% include "header.html" ignore missing %}
+<div id="js-player" style='width:100%; border:1px solid #000;'></div>
+<div data-role="controlgroup" data-type="horizontal">
+    <a class='player-control' href="/prev/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img src="/static/img/media-skip-backward.png"></a>
+    <a class='player-control' href="/pause/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img class='playing-state-img' src="/static/img/media-playback-pause.png"></a>
+    <a class='player-control' href="/next/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img src="/static/img/media-skip-forward.png"></a>
+   
+</div>
+<div data-role="fieldcontain">
+    <fieldset data-role="controlgroup">
+        <legend>Listeners</legend>
+        {% for user in listeners %}
+            <input type="checkbox"
+                   data-uid="{{user.uid}}"
+                   name="checkbox-{{user.uid}}" 
+                   id="checkbox-{{user.uid}}" 
+                   class="web-listeners" 
+                   {% if user.listening %} 
+                        checked 
+                   {% endif %} />
+            <label for="checkbox-{{user.uid}}">{{user.uname}}</label>
+        {% endfor %}
+    </fieldset>
+</div>
+
+
+<a href="#" id="tmp-play-btn"><img src="/static/img/media-record.png"></a>
+<a href="#" id="play-btn">Play</a>
+<script type="text/javascript">
+
+    var WebPlayerView = Backbone.View.extend({
+        supportedMimeTypes: {},
+        initialize: function(options){
+            this.vid = document.createElement('audio');
+            this.vid.id = "video-player";
+            this.vid.style.width = "100%";
+            this.vid.seekable = true;
+            this.bindVideoEvents();
+            this.checkSupportedTypes();
+            this.el = options.el;
+            this.vid.controls = true;
+            this.fid = options.fid;
+            this.uids = [1, 2];
+            this.lastPercentPlayed = -100;
+            this.lastCurrentTime = -100;
+            this.lastUpdateTime = -100;
+        },
+        bindVideoEvents: function(){
+            var $vid = $(this.vid);
+            
+            var events = [
+                'abort',
+                'canplay',
+                'canplaythrough',
+                'durationchange',
+                'emptied',
+                'ended',
+                'error',
+                'loadeddata',
+                'loadedmetadata',
+                'loadstart',
+                'pause',
+                'play',
+                'playing',
+                 // 'progress',
+                'ratechange',
+                'seeked',
+                'seeking',
+                'stalled',
+                // 'suspend',
+                // 'timeupdate',
+                'volumechange',
+                'waiting'
+            ];
+            // _.bind(function, object, [*arguments])
+            _.each(events, function(evt){
+                this.vid.addEventListener(evt, _.bind(this.logEvent, this));
+            }, this);
+            this.vid.addEventListener('timeupdate', _.bind(this.onTimeStatus, this));
+            this.vid.addEventListener('ended', _.bind(this.markAsCompleted, this));
+            // this.vid.addEventListener('progress', _.bind(this.markeAsCompleted, this));
+        },
+        logEvent: function(evt, arg2){
+            if (evt.type == "timeupdate") {
+
+                return;
+            }
+            console.log("event:", evt.type, evt, arg2);
+            if (evt.type == "progress") {
+                this.markAsPlayed();
+            }
+        },
+        onTimeStatus: function() {
+            if (!this.vid.duration) {
+                return;
+            }
+            var currentTime = parseFloat(this.vid.currentTime);
+            /*
+            conductor.on("change:pos_data.pos_str", on_change_time);
+            conductor.on("change:state", on_state_change);
+            */
+            if (this.lastUpdateTime <= (currentTime + 1) ||
+                this.lastUpdateTime >= (currentTime + 1)) {
+                window.updateTime(currentTime);
+                this.lastUpdateTime = currentTime;
+            }
+            this.markAsPlayed();
+        },
+        markAsPlayed: function() {
+            
+            var currentTime = parseFloat(this.vid.currentTime);
+            
+            
+            if (currentTime > this.lastCurrentTime - 5 &&
+                currentTime < this.lastCurrentTime + 5) {
+                return;
+            }
+            this.lastCurrentTime = currentTime;
+            var percent_played = this.vid.currentTime / this.vid.duration * 100;
+            this.sendPercentPlayed(percent_played);
+        },
+        markAsCompleted: function() {
+            console.log("markAsCompleted:", evt.type, evt);
+            this.sendPercentPlayed(100.0);
+            this.lastCurrentTime = -100;
+            this.lastPercentPlayed = -100;
+        },
+        sendPercentPlayed: function(percent_played) {
+            // /mark-as-played/<fid>/<percent_played>/<uids>
+            console.log("DISABLED sendPercentPlayed:", percent_played);
+            return;
+            $.ajax({
+              url: "/mark-as-played/"+this.fid+"/"+percent_played+"/"+this.uids.join(","),
+              dataType: 'json',
+            }).done(function(data, textStatus, jqXHR) {
+            });
+        },
+        checkSupportedTypes:function(){
+            var mimeTypes = {
+                'ogg': 'video/ogg',
+                'mp4': 'video/mp4',
+                'webm': 'video/webm',
+                'mp3': 'audio/mpeg',
+                'ogg': 'audio/ogg',
+                'mp4': 'audio/mp4'
+            };
+            this.supportedMimeTypes = {};
+            _.each(mimeTypes, function(mimeType, ext){
+                if (this.vid.canPlayType(mimeType)) {
+                    this.supportedMimeTypes[ext] = mimeType;
+                }
+            }, this);
+        },
+        render: function(){
+            if (_.isEmpty(this.supportedMimeTypes)) {
+                this.$el.text("Your browser does not support the web player");
+                return this;
+            }
+            this.$el.empty();
+            this.$el.append(this.vid);
+            this.$el.css("width","100%");
+            this.vid.style.width="100%";
+            this.$el.append("<br clear='all'>");
+            this.vid.src = this.getSrc();
+            $("#tmp-play-btn").click(_.bind(this.onClick, this));
+            // $(this.vid).click(_.bind(this.onClick, this));
+            return this;
+        },
+        setSrc: function(fid) {
+            this.fid = fid;
+            this.vid.src = this.getSrc();
+            this.vid.play();
+            this.getFileInfo();
+        },
+        getFileInfo: function(){
+            $.ajax({
+              url: "/file-info/"+this.fid,
+              dataType: 'json',
+              cache: false
+            }).done(_.bind(this.processFileInfo, this));
+        },
+        processFileInfo:function(data, textStatus, jqXHR) {
+            conductor.set('playing', data);
+        },
+        getSrc: function() {
+            var uri = "/stream/"+this.fid+"/?mimetypes=",
+                mimetypes = [];
+            _.each(this.supportedMimeTypes, function(mimeType, ext){
+                mimetypes.push(encodeURIComponent(mimeType))
+                // this.$el.append(mimeType+"<br>");
+            }, this);
+            uri += mimetypes.join(",");
+            return uri;
+        },
+        onClick: function(evt) {
+            // this.$el.append("CLICKED this.vid.paused:"+this.vid.paused+"<br>");
+            if (this.vid.paused) {
+                this.vid.play();
+            } else {
+                this.vid.pause();
+            }
+        }
+    });
+    $(document).bind("mobileinit", function () {
+        var playlist = [],
+            uids = [],
+            playlistIndex = 0;
+        // $("input.web-listeners:checked");
+        _.each($("input.web-listeners:checked"), function(el){
+            uids.push($(el).data('uid'))
+        });
+        
+        var webPlayer = new WebPlayerView({
+            "el": "#js-player",
+            "fid": "{{ jukebox.playing.fid }}"
+        }).render();
+        $(".web-listeners").bind("change", function(evt){
+            var checked = evt.currentTarget.checked,
+                uid = evt.currentTarget.dataset.uid;
+            console.log("CHANGED:", checked, uid);
+            $.ajax({
+              url: "/listening/"+uid+"/"+checked,
+              dataType: 'json',
+              cache: false
+            }).done(function(data, textStatus, jqXHR) {
+            });
+        });
+        $('.player-control').unbind();
+        $('.player-control').bind("tap", function(evt, ui){
+            evt.preventDefault();
+            $('.player-control').removeClass("ui-btn-active");
+            console.log("TAP:",evt);
+            var pause_re = /\/pause\/$/i,
+                next_re = /\/next\/$/i,
+                prev_re = /\/prev\/$/i,
+                href = evt.currentTarget.href;
+            if (pause_re.test(href)) {
+                if (webPlayer.vid.paused) {
+                    webPlayer.vid.play();
+                } else {
+                    webPlayer.vid.pause();
+                }
+            } else if (next_re.test(href)) {
+                playlistIndex += 1;
+                webPlayer.setSrc(playlist[playlistIndex]);
+            } else if (prev_re.test(href)) {
+                playlistIndex -= 1;
+                webPlayer.setSrc(playlist[playlistIndex]);
+            }
+            setTimeout(function(){
+                $('.player-control').removeClass("ui-btn-active");
+            }, 100);
+        });
+        webPlayer.vid.addEventListener("play", function(){
+            $('.playing-state-img').attr('src', '/static/img/media-playback-pause.png');
+        });
+        webPlayer.vid.addEventListener("pause", function(){
+            $('.playing-state-img').attr('src', '/static/img/media-playback-start.png');
+        });
+        $.ajax({
+          url: "/history/"+uids.join(","),
+          dataType: 'json',
+          cache: false
+        }).done(function(data, textStatus, jqXHR) {
+            playlist = data;
+            webPlayer.setSrc(playlist[0]);
+        });
+        clearInterval(conductorFetchInterval);
+    });
+</script>
+{% include "footer.html" ignore missing %}

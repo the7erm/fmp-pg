@@ -302,14 +302,11 @@ class Picker():
                       .one()
 
     def get_file_from_preload_for_uid(self, uid):
-        try:
-          return session.query(Preload)\
-                        .filter(Preload.uid == uid)\
-                        .order_by(Preload.priority.desc(), func.random())\
-                        .limit(1)\
-                        .one()
-        except NoResultFound:
-          return None
+        return session.query(Preload)\
+                      .filter(Preload.uid == uid)\
+                      .order_by(Preload.priority.desc(), func.random())\
+                      .limit(1)\
+                      .one()
 
     def pop(self):
         user = self.get_next_user()
@@ -319,8 +316,7 @@ class Picker():
         if not preload_entry:
             self.do()
             preload_entry = self.get_file_from_preload_for_uid(user.uid)
-            if not preload_entry:
-                return
+
         wait()
         file_info = session.query(FileInfo)\
                                .filter(FileInfo.fid == preload_entry.fid)\

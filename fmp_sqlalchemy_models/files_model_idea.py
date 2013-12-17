@@ -28,15 +28,16 @@ import pprint
 import urllib
 import gtk
 import logging
-import alchemy_session
 import json
+
+from alchemy_session import make_session
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref, deferred
 from sqlalchemy import Column, Integer, String, DateTime, Text, Float,\
                        UniqueConstraint, Boolean, Table, ForeignKey, Date, \
                        Unicode, and_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import NoResultFound
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3, HeaderNotFoundError
@@ -106,7 +107,9 @@ class BaseClass(object):
         except IntegrityError, e:
             session.rollback()
             log.error("IntegrityError:%s ROLLBACK", e)
-
+        except InvalidRequestError, e:
+            session.rollback()
+            log.error("InvalidRequestError:%s ROLLBACK", e)
         delta = datetime.datetime.now() - start_save
         log.info("%s save time:%s", self.__class__.__name__, delta.total_seconds())
         wait()
@@ -830,6 +833,36 @@ class FileInfo(BaseClass, Base):
                 return True
         return False
 
+    @property 
+    def ext(self):
+        for l in self.locations:
+            if l.exists:
+                return l.ext
+        return None
+
+    @property
+    def size(self):
+        for l in self.locations:
+            if l.exists:
+                return l.size
+        return 0
+
+    @property
+    def mimetype(self):
+        ext = self.ext
+        return MIME_TYPES.get(ext)
+
+    def get_best_mime(self, supported_mimetypes):
+        if self.mimetype in supported_mimetypes:
+            return self.mimetype
+
+        if MIME_TYPES['.mp3'] in supported_mimetypes:
+            return MIME_TYPES['.mp3']
+        if MIME_TYPES['.ogg'] in supported_mimetypes:
+            return MIME_TYPES['.ogg']
+        return None
+
+
 class Folder(BaseClass, Base):
     __tablename__ = 'folders'
     foid = Column(Integer, primary_key=True)
@@ -1293,8 +1326,29 @@ def create_user(uname, admin=False, listening=True):
 AUDIO_EXT = ('.mp3', '.ogg', '.wma', '.wmv')
 VIDEO_EXT = ('.flv', '.mpg' ,'.mpeg', '.avi', '.mov', '.mp4', '.m4a')
 
+AUDIO_MIMES = {
+    '.m4a': 'audio/mp4a-latm',
+    '.mp3': "audio/mpeg",
+    '.ogg': "audio/ogg",
+    '.wma': "audio/x-ms-wma",
+    '.wmv': "audio/x-ms-wmv",
+}
 
-session = alchemy_session.make_session(Base)
+VIDEO_MIMES = {
+    '.avi': "video/avi",
+    '.flv': "video/x-flv",
+    '.mov': "video/quicktime",
+    '.mp4': "video/mpeg",
+    '.mpg': "video/mpeg",
+    '.mpeg': "video/mpeg",
+}
+
+MIME_TYPES = {}
+MIME_TYPES.update(AUDIO_MIMES)
+MIME_TYPES.update(VIDEO_MIMES)
+
+
+session = make_session(Base)
 
 def wait():
     # print "leave1"
