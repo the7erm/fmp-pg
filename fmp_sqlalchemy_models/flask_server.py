@@ -119,8 +119,8 @@ def file_info(fid):
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
-    
-    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    dict_file_info = file_info.to_dict(JUKEBOX_PLAYING_KEYS, session=session)
+    resp = json_response(dict_file_info)
     session.close()
     return resp
 
@@ -295,9 +295,11 @@ def mark_as_played(fid, percent_played, uids):
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
+    file_info.mark_as_played(percent_played=percent_played, uids=uids, session=session)
+    file_info.save(session=session)
+    resp = json_response(file_info.to_dict())
     session.close()
-    file_info.mark_as_played(percent_played=percent_played, uids=uids)
-    return json_response(file_info.to_dict())
+    return resp
 
 @app.route("/inc-skip-score/<fid>/<uids>")
 def inc_skip_score(fid, uids):
@@ -307,12 +309,14 @@ def inc_skip_score(fid, uids):
         return json_response({"STATUS": "FAIL"})
     session = make_session()
     file_info = session.query(FileInfo)\
-                       .query(FileInfo.fid == fid)\
+                       .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
+    
+    file_info.inc_skip_score(uids=uids, session=session)
+    resp = json_response(file_info.to_dict())
     session.close()
-    file_info.inc_skip_score(uids=uids)
-    return json_response(file_info.to_dict())
+    return resp
 
 @app.route("/deinc-skip-score/<fid>/<uids>")
 def deinc_skip_score(fid, uids):
@@ -322,12 +326,13 @@ def deinc_skip_score(fid, uids):
         return json_response({"STATUS": "FAIL"})
     session = make_session()
     file_info = session.query(FileInfo)\
-                       .query(FileInfo.fid == fid)\
+                       .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
+    file_info.deinc_skip_score(uids=uids, session=session)
+    resp = json_response(file_info.to_dict())
     session.close()
-    file_info.deinc_skip_score(uids=uids)
-    return json_response(file_info.to_dict())
+    return resp
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 reactor.listenTCP(5050, Site(resource))

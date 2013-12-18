@@ -25,10 +25,8 @@ from picker import wait
 
 gtk.gdk.threads_init()
 
-
-
 class TrayIcon:
-    def __init__(self):
+    def __init__(self, session=None):
         self.init_icon()
         self.init_menu()
 
@@ -97,7 +95,8 @@ class ControllerIcon(TrayIcon):
         self.state = state
 
 class RatingIcon(TrayIcon):
-    def __init__(self, playing=None):
+    def __init__(self, playing=None, session=None):
+        self.session = session
         self.rating = 6
         paths = [
             os.path.join(sys.path[0], "images"),
@@ -143,7 +142,7 @@ class RatingIcon(TrayIcon):
     def on_rate(self, item, rating):
         print "on_rate:", item, rating
         if self.playing is not None:
-            self.playing.rate(rating=rating, selected=True)
+            self.playing.rate(rating=rating, selected=True, session=self.session)
         self.set_rating(rating)
 
     def on_rating_scroll(self, icon, event, *args, **kwargs):
@@ -167,7 +166,7 @@ class RatingIcon(TrayIcon):
         self.rating = rating
         if self.playing is not None:
             wait()
-            self.playing.rate(rating=rating, selected=True)
+            self.playing.rate(rating=rating, selected=True, session=self.session)
         self.icon.set_from_file(os.path.join(self.image_path, "rate.%s.svg.png" % rating))
         wait()
 

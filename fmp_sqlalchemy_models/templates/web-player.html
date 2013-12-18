@@ -178,6 +178,7 @@
             this.resetTimes();
         },
         doResume:function(data){
+            console.log("DATA:", data)
             console.log(data.listeners_ratings);
             console.log("this.vid.duration:",this.vid.duration);
             var resumeTime = this.vid.duration * parseFloat(data.listeners_ratings[0].percent_played) * 0.01;

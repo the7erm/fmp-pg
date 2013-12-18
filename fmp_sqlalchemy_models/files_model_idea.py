@@ -90,17 +90,16 @@ file_keywords_association_table = Table("file_keywords", Base.metadata,
 
 class BaseClass(object):
 
-    def pre_save(self):
+    def pre_save(self, session=None):
         return
 
-    def post_save(self):
+    def post_save(self, session=None):
         return
 
-    def save(self):
+    def save(self, session=None):
         wait()
         start_save = datetime.datetime.now()
-        self.pre_save()
-        session = make_session()
+        self.pre_save(session=session)
         saved = False
         try:
             session.add(self)
@@ -112,10 +111,8 @@ class BaseClass(object):
         except InvalidRequestError, e:
             session.rollback()
             log.error("InvalidRequestError:%s ROLLBACK", e)
-        finally:
-            session.close()
         if saved:
-            self.post_save()
+            self.post_save(session=session)
         delta = datetime.datetime.now() - start_save
         log.info("%s save time:%s", self.__class__.__name__, delta.total_seconds())
         wait()
@@ -178,7 +175,7 @@ class BaseClass(object):
             return datetime_object
         return datetime.datetime.now()
 
-    def json(self, fields=None):
+    def json(self, fields=None, session=None):
         if fields is None:
             if hasattr(self, '__json_fields__') and getattr(self, '__json_fields__'):
                 fields = getattr(self, '__json_fields__')
@@ -198,12 +195,12 @@ class BaseClass(object):
             if isinstance(val, list):
                 new_val = []
                 for v in val:
-                    new_val.append(v.to_dict())
+                    new_val.append(v.to_dict(session=session))
                 obj[field] = new_val
 
         return json.dumps(obj, indent=4)
 
-    def to_dict(self, fields=None):
+    def to_dict(self, fields=None, session=None):
         if fields is None:
             if hasattr(self, '__json_fields__') and getattr(self, '__json_fields__'):
                 fields = getattr(self, '__json_fields__')
@@ -219,7 +216,7 @@ class BaseClass(object):
             if isinstance(val, list):
                 new_val = []
                 for v in val:
-                    new_val.append(v.to_dict())
+                    new_val.append(v.to_dict(session=session))
                 obj[field] = new_val
         return obj
 
@@ -362,13 +359,14 @@ class FileLocation(BaseClass, Base):
             return
         self.file_stats = os.stat(self.filename)
 
-    def update_stats(self):
+    def update_stats(self, session=None):
         self.set_stats()
         self.mtime = self.get_mtime()
         self.ctime = self.get_ctime()
         self.size = self.get_size()
 
-    def scan(self, filename=None, dirname=None, basename=None, save=True):
+    def scan(self, filename=None, dirname=None, basename=None, save=True,
+             session=None):
         if dirname is not None and basename is not None:
             dirname = self.utf8(dirname)
             basename = self.utf8(basename)
@@ -377,16 +375,16 @@ class FileLocation(BaseClass, Base):
         filename = self.utf8(os.path.realpath(os.path.expanduser(filename)))
         self.dirname, self.basename = os.path.split(filename)
         if save:
-            self.save()
+            self.save(session=session)
 
-    def pre_save(self):
+    def pre_save(self, session=None):
         if self.has_changed:
-            self.update_hash()
-            self.update_stats()
+            self.update_hash(session=session)
+            self.update_stats(session=session)
             # self.update_hash()
             # self.update_mtime()
 
-    def update_hash(self):
+    def update_hash(self, session=None):
         self.set_stats(True)
         log.info("calculating hash:%s", self.filename)
         delta = datetime.timedelta(0, 1)
@@ -410,7 +408,6 @@ class FileLocation(BaseClass, Base):
             m.update(data)
         
         fingerprint = m.hexdigest()
-        session = make_session()
         try:
             file_info = session.query(FileInfo).filter(and_(
                 FileInfo.fingerprint == fingerprint,
@@ -418,8 +415,7 @@ class FileLocation(BaseClass, Base):
             )).one()
         except NoResultFound:
             file_info = FileInfo(fingerprint=fingerprint, size=size)
-            file_info.save()
-        session.close()
+            file_info.save(session=session)
 
         self.fid = file_info.fid
         found = False
@@ -430,7 +426,7 @@ class FileLocation(BaseClass, Base):
 
         if not found:
             file_info.locations.append(self)
-            file_info.save()
+            file_info.save(session=session)
 
 
 class FileInfo(BaseClass, Base):
@@ -498,46 +494,45 @@ class FileInfo(BaseClass, Base):
     dontpick = relationship("DontPick", backref="file")
     preload = relationship("Preload", backref="file")
 
-    def mark_as_played(self, when=None, percent_played=0, uids=None):
+    def mark_as_played(self, when=None, percent_played=0, uids=None, session=None):
         log.warn("TODO: mark_as_played")
         # Step 1 mark file as played
         self.ltp = self.now_if_none(when)
-        self.mark_artists_as_played()
-        self.mark_listeners_as_played(when, percent_played, uids=uids)
-        self.save()
+        self.mark_artists_as_played(session=session)
+        self.mark_listeners_as_played(when, percent_played, uids=uids, session=session)
+        self.save(session=session)
 
-    def mark_listeners_as_played(self, when=None, percent_played=0, uids=None):
+    def mark_listeners_as_played(self, when=None, percent_played=0, uids=None, 
+                                 session=None):
         log.info("MARK LISTENERS AS PLAYED")
         when = self.now_if_none(when)
-        self.add_user_file_info_for_all_listeners()
-        listeners_ratings = self.get_listener_ratings(uids)
+        self.add_user_file_info_for_all_listeners(session=session)
+        listeners_ratings = self.get_listener_ratings(uids, session=session)
         for user_rating in listeners_ratings:
-            user_rating.mark_as_played(when=when, percent_played=percent_played)
+            user_rating.mark_as_played(when=when, percent_played=percent_played,
+                                       session=session)
 
-    def mark_artists_as_played(self, when=None):
+    def mark_artists_as_played(self, when=None, session=None):
         when = self.now_if_none(when)
-        session = make_session()
         session.add(self)
         for a in self.artists:
-            a.mark_as_played(when)
-        session.close()
+            a.mark_as_played(when, session=session)
+        
 
-    def rate(self, uid=None, rating=None, selected=False):
+    def rate(self, uid=None, rating=None, selected=False, session=None):
         log.info("Rate uid:%s rating:%s selected:%s", uid, rating, selected)
         if selected:
             user_file_info = self.get_selected()
-            user_file_info.rate(rating)
+            user_file_info.rate(rating, session=session)
             return
 
         if uid is None:
             return
         for user_file_info in self.listeners_ratings:
             if user_file_info.uid == uid:
-                user_file_info.rate(rating)
+                user_file_info.rate(rating, session=session)
 
     def get_selected(self):
-        session = make_session()
-        session.add(self)
         selected_listener = None
         for l in self.listeners_ratings:
             if l.user.selected == True:
@@ -545,26 +540,29 @@ class FileInfo(BaseClass, Base):
                 break
         if selected_listener is None:
             selected_listener = self.listeners_ratings[0]
-        session.close()
+            self.listeners_ratings[0].selected = True
         return selected_listener
 
-    def update_id3_info(self):
+    def get_locations(self):
+        return self.locations
+
+    def update_id3_info(self, session=None):
         for loc in self.locations:
             if loc.ext != '.mp3':
-                self.set_artist_title_from_base(loc.base)
+                self.set_artist_title_from_base(loc.base, session=session)
             else:
-                self.set_id3_info(loc.filename, loc.base)
+                self.set_id3_info(loc.filename, loc.base, session=session)
 
-    def set_id3_info(self, filename=None, base=None):
+    def set_id3_info(self, filename=None, base=None, session=None):
         if filename is None or base is None:
             for loc in self.locations:
-                self.set_id3_info(loc.filename, loc.base)
+                self.set_id3_info(loc.filename, loc.base, session=session)
             return
         
         try:
             audio = MP3(filename, ID3=EasyID3)
         except HeaderNotFoundError:
-            self.set_artist_title_from_base(base)
+            self.set_artist_title_from_base(base, session=session)
             return
 
         fields = [("artist", Artist, "artists"),
@@ -581,26 +579,27 @@ class FileInfo(BaseClass, Base):
                         self.add_artists(value)
                         continue
 
-                    obj = self.insert_or_get(get_type, value)
+                    obj = self.insert_or_get(get_type, value, session=session)
                     current_values = getattr(self, attr)
                     # print "current_values file_info.%s:" % attr,current_values
                     if obj not in current_values:
                         current_values.append(obj)
                         setattr(self, attr, current_values)
 
-    def add_artists(self, artist_string=""):
+    def add_artists(self, artist_string="", session=None):
         artists = self.parse_artist_string(artist_string)
         if not artists:
             return
-        
-        for artist in artists:
-            obj = self.insert_or_get(Artist, artist)
-            if obj not in self.artists:
+
+        for artist in self.artists:
+            obj = self.insert_or_get(Artist, artist, session=session)
+            if obj not in self_artists:
                 self.artists.append(obj)
 
-    def set_artist_title_from_base(self, base=None):
+    def set_artist_title_from_base(self, base=None, session=None):
         if base is None:
-            for loc in self.locations:
+            locations = self.get_locations()
+            for loc in locations:
                 self.set_artist_title_from_base(loc.base)
             return
 
@@ -618,29 +617,35 @@ class FileInfo(BaseClass, Base):
         title = title.strip()
         self.add_artists(artist)
         if title:
-            obj = self.insert_or_get(Title, title)
+            obj = self.insert_or_get(Title, title, session)
             if obj not in self.titles:
                 self.titles.append(obj)
 
-    def insert_or_get(self, get_type, name):
-        session = make_session()
+    def insert_or_get(self, get_type, name, session=None):
+        
         try:
-            info = session.query(get_type).filter(get_type.name==name).limit(1).one()
+            info = session.query(get_type)\
+                          .filter(get_type.name==name)\
+                          .limit(1)\
+                          .one()
         except NoResultFound:
             info = get_type(name=name)
-            info.save()
-        session.close()
+            info.save(session=session)
+            
         return info
 
-    def add_user_file_info_for_all_listeners(self):
-        session = make_session()
-        listeners = session.query(User).filter(User.listening==True).all()
-        session.close()
-        for user in listeners:
-            self.add_user_file_info(user)
+    def get_listeners(self, session=None):
+        listeners = session.query(User)\
+                           .filter(User.listening == True)\
+                           .all()
+        return listeners
 
-    def add_user_file_info(self, user):
-        session = make_session()
+    def add_user_file_info_for_all_listeners(self, session=None):
+        listeners = self.get_listeners(session)
+        for user in listeners:
+            self.add_user_file_info(user, session=session)
+
+    def add_user_file_info(self, user, session=None):
         session.add(self)
         try:
             ufinfo = session.query(UserFileInfo).filter(and_(
@@ -656,9 +661,7 @@ class FileInfo(BaseClass, Base):
                                   skip_score=DEFAULT_SKIP_SCORE, 
                                   percent_played=DEFAULT_PERCENT_PLAYED, 
                                   true_score=DEFAULT_TRUE_SCORE)
-            ufinfo.save()
-        finally:
-            session.close()
+            ufinfo.save(session=session)
 
     def parse_artist_string(self, artist_string=""):
         artist_string = artist_string.strip()
@@ -720,31 +723,26 @@ class FileInfo(BaseClass, Base):
 
         return final_words
 
-    def set_db_keywords(self):
+    def set_db_keywords(self, session=None):
         keywords = []
         # print "filename:", os.path.join(self.dirname, self.basename)
         keywords += [self.fingerprint]
-        for loc in self.locations:
+        for loc in self.get_locations():
             root, ext = os.path.splitext(loc.basename)
             # keywords += self.get_words_from_string(loc.basename)
             keywords += self.get_words_from_string(root)
             keywords += self.get_words_from_string(ext)
-        session = make_session()
-        session.add(self)
+        
         for a in self.artists:
-            session.add(a)
             keywords += self.get_words_from_string(a.name)
 
         for a in self.albums:
-            session.add(a)
             keywords += self.get_words_from_string(a.name)
 
         for g in self.genres:
-            session.add(g)
             keywords += self.get_words_from_string(g.name)
 
         for t in self.titles:
-            session.add(t)
             keywords += self.get_words_from_string(t.name)
         
         keywords = list(set(keywords))
@@ -778,18 +776,18 @@ class FileInfo(BaseClass, Base):
             if found:
                 continue
 
-            word = self.find_or_insert_keyword(nkw)
+            word = self.find_or_insert_keyword(nkw, session=session)
             self.keywords.append(word)
 
         self.keywords = list(set(self.keywords))
         #if keywords_to_delete:
         #   print self.keywords
         session.commit()
-        session.close()
+        
 
 
-    def find_or_insert_keyword(self, word):
-        session = make_session()
+    def find_or_insert_keyword(self, word, session=None):
+        
         kw = None
         try:
             kw = session.query(Keywords).filter(Keywords.word == word).limit(1).one()
@@ -797,26 +795,24 @@ class FileInfo(BaseClass, Base):
             kw = Keywords(word=word)
             session.add(kw)
             session.commit()
-        session.close()
+        
         return kw
 
     @property
     def has_changed(self):
-        session = make_session()
-        session.add(self)
         has_changed = False
         for loc in self.locations:
             if loc.has_changed:
                 has_changed = True
                 break
-        session.close()
+        
         return has_changed
 
-    def pre_save(self):
+    def pre_save(self, session=None):
         if self.has_changed:
-            self.update_id3_info()
-        self.set_db_keywords()
-        self.add_user_file_info_for_all_listeners()
+            self.update_id3_info(session=session)
+        self.set_db_keywords(session=session)
+        self.add_user_file_info_for_all_listeners(session=session)
         # self.file_exists = self.exists
 
     @property
@@ -833,8 +829,8 @@ class FileInfo(BaseClass, Base):
                 return l.uri
         return None
 
-    def get_listener_ratings(self, uids=None):
-        session = make_session()
+    def get_listener_ratings(self, uids=None, session=None):
+        
         if uids is None:
             session.add(self)
             listeners_ratings = self.listeners_ratings
@@ -844,25 +840,25 @@ class FileInfo(BaseClass, Base):
                                             UserFileInfo.uid.in_(uids),
                                             UserFileInfo.fid == self.fid))\
                                        .all()
-        session.close()
+
+        print "LISTENERS RATINGS:", listeners_ratings
+        
         return listeners_ratings
 
-    def inc_skip_score(self, uids=None):
-        listeners_ratings = self.get_listener_ratings(uids)
+    def inc_skip_score(self, uids=None, session=None):
+        listeners_ratings = self.get_listener_ratings(uids, session=session)
         for l in listeners_ratings:
-            l.inc_skip_score()
+            l.inc_skip_score(session=session)
 
-    def deinc_skip_score(self, uids=None):
-        listeners_ratings = self.get_listener_ratings(uids)
+    def deinc_skip_score(self, uids=None, session=None):
+        listeners_ratings = self.get_listener_ratings(uids, session=session)
         for l in listeners_ratings:
-            l.deinc_skip_score()
+            l.deinc_skip_score(session=session)
 
     @property
     def artist_title(self):
         artist = ""
         title = ""
-        session = make_session()
-        session.add(self)
         for a in self.artists:
             if a.name:
                 artist = a.name
@@ -873,21 +869,18 @@ class FileInfo(BaseClass, Base):
                 title = t.name
                 break
         if artist and title:
-            session.close()
+            
             return "%s - %s" % (artist, title)
-        session.close()
+        
         return self.base
 
     @property
     def base(self):
-        session = make_session()
-        session.add(self)
         base = None
         for l in self.locations:
             if l.exists:
                 base = l.base
                 break
-        session.close()
         return base
 
     @property
@@ -897,38 +890,29 @@ class FileInfo(BaseClass, Base):
 
     @property
     def exists(self):
-        session = make_session()
-        session.add(self)
         exists = False
         for l in self.locations:
             if l.exists:
                 exists = True
                 break
-        session.close()
         return exists
 
     @property 
     def ext(self):
-        session = make_session()
-        session.add(self)
         ext = None
         for l in self.locations:
             if l.exists:
                 ext = l.ext
                 break
-        session.close()
         return ext
 
     @property
     def size(self):
-        session = make_session()
-        session.add(self)
         size = 0
         for l in self.locations:
             if l.exists:
                 size = l.size
                 break
-        session.close()
         return size
 
     @property
@@ -1055,7 +1039,7 @@ class Folder(BaseClass, Base):
         dirname = dirname.decode('utf-8', errors='replace')
         basename = basename.decode('utf-8', errors='replace')
         location = False
-        session = make_session()
+        
         try:
             location = session.query(FileLocation).filter(
                 and_(FileLocation.dirname==dirname,
@@ -1064,7 +1048,7 @@ class Folder(BaseClass, Base):
                 log.info("Not changed:%s", location.filename)
                 # location.save()
                 # location.file.save()
-                session.close()
+                
                 return
         except NoResultFound:
             pass
@@ -1078,10 +1062,10 @@ class Folder(BaseClass, Base):
         log.info("processed:%s", location)
         end_time = datetime.datetime.now()
         delta = end_time - start_time
-        session.close()
+        
         print delta.total_seconds()
 
-    def scan(self, dirname=None, save=True):
+    def scan(self, dirname=None, save=True, session=None):
         skip_dirs = [
             '/minecraft/',
             '/.minecraft/',
@@ -1113,11 +1097,11 @@ class Folder(BaseClass, Base):
             self.insert_file_into_db(dirname, basename)
         self.scanned = True
         if save:
-            self.save()
+            self.save(session=session)
 
-    def pre_save(self):
+    def pre_save(self, session=None):
         if self.needs_scan:
-            self.scan(self.dirname, save=False)
+            self.scan(self.dirname, save=False, session=session)
         self.update_stats()
 
 class Artist(BaseClass, Base):
@@ -1133,10 +1117,10 @@ class Artist(BaseClass, Base):
     altp = Column(DateTime(timezone=True))
     seq = Column(Boolean, default=False)
 
-    def mark_as_played(self, when=None):
+    def mark_as_played(self, when=None, session=None):
         when = self.now_if_none(when)
         self.altp = when
-        self.save()
+        self.save(session=session)
 
 
 class DontPick(BaseClass, Base):
@@ -1280,15 +1264,15 @@ class UserFileInfo(BaseClass, Base):
                                              "User.listening == True, "
                                              "User.uid == UserHistory.uid)")"""
 
-    def mark_as_played(self, when=None, percent_played=0):
+    def mark_as_played(self, when=None, percent_played=0, session=None):
         self.ultp = self.now_if_none(when)
         self.percent_played = percent_played
-        self.calculate_true_score()
-        self.update_history()
-        self.save()
+        self.calculate_true_score(session=session)
+        self.update_history(session=session)
+        self.save(session=session)
         # session.add(self)
 
-    def update_history(self):
+    def update_history(self, session=None):
         found = False
         today = self.ultp.date()
         current_history = None
@@ -1306,13 +1290,12 @@ class UserFileInfo(BaseClass, Base):
         current_history.true_score = self.true_score
         current_history.date_played = self.ultp.date()
         current_history.time_played = self.ultp
-        self.save()
+        self.save(session=session)
 
-    def calculate_true_score(self):
-        session = make_session()
+    def calculate_true_score(self, session=None):
         session.add(self)
         recent = self.history[0:5]
-        session.close()
+        
         if not recent:
             avg = DEFAULT_PERCENT_PLAYED
         else:
@@ -1326,9 +1309,8 @@ class UserFileInfo(BaseClass, Base):
                            (self.percent_played) +
                            avg
                           ) / 4
-        
 
-    def rate(self, rating):
+    def rate(self, rating, session=None):
         log.info("UserFileInfo.RATE:%s", rating)
         if rating is None:
             return
@@ -1336,30 +1318,30 @@ class UserFileInfo(BaseClass, Base):
         if rating < 0 or rating > 5 or rating == self.rating:
             return
         self.rating = rating
-        self.save()
+        self.save(session=session)
 
-    def inc_skip_score(self):
+    def inc_skip_score(self, session=None):
         skip_score = self.skip_score
         skip_score += 1
-        self.set_skip_score(skip_score)
+        self.set_skip_score(skip_score, session=session)
 
-    def deinc_skip_score(self):
+    def deinc_skip_score(self, session=None):
         skip_score = self.skip_score
         skip_score -= 1
-        self.set_skip_score(skip_score)
+        self.set_skip_score(skip_score, session=session)
 
-    def set_skip_score(self, skip_score):
+    def set_skip_score(self, skip_score, session=None):
         skip_score = int(skip_score)
         if skip_score > 10 or skip_score < 1:
             return
 
         self.skip_score = skip_score
-        self.save()
+        self.save(session=session)
 
-    def pre_save(self):
-        self.calculate_true_score()
+    def pre_save(self, session=None):
+        self.calculate_true_score(session=session)
 
-def scan(folder):
+def scan(folder, session=None):
     skip_dirs = [
         '/minecraft/',
         '/.minecraft/',
@@ -1384,7 +1366,7 @@ def scan(folder):
         if skip:
             log.info("Skipping:%s", dirname)
             continue
-        session = make_session()
+        
         try:
             folder_info = session.query(Folder)\
                                  .filter(Folder.dirname == dirname)\
@@ -1392,8 +1374,7 @@ def scan(folder):
                                  .one()
         except NoResultFound:
             folder_info = Folder(dirname=dirname)
-        finally:
-            session.close()
+            
         has_media = folder_info.has_media
         if has_media and folder_info.needs_scan:
             log.info("Scanning:%s", dirname)
@@ -1404,11 +1385,11 @@ def scan(folder):
             log.info("Already Scanned:%s", dirname)
 
 def create_user(uname, admin=False, listening=True):
-    session = make_session()
+    
     try:
         user = session.query(User).filter(User.uname==uname).limit(1).one()
         log.info("User:%s already exists", user.uname)
-        session.close()
+        
         return
     except NoResultFound:
         pass
@@ -1460,7 +1441,7 @@ def wait():
     # print "/leave"
 
 def simple_rate(fid, uid, rating):
-    session = make_session()
+    
     user_file_info = session.query(UserFileInfo)\
                             .filter(and_(
                                 UserFileInfo.fid == fid,
@@ -1468,7 +1449,7 @@ def simple_rate(fid, uid, rating):
                              ))\
                             .limit(1)\
                             .one()
-    session.close()
+    
     user_file_info.rate(rating)
     user_file_info.save()
 

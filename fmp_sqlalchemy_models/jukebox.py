@@ -36,7 +36,8 @@ NANO_SECOND = 1000000000.0
 HISTORY_LENGTH = 100
 
 class JukeBox:
-    def __init__(self):
+    def __init__(self, session):
+        self.session = session
         self.percent_played = -100
         self.pos_float = -100.0
         self.controller_icon = None
@@ -46,6 +47,7 @@ class JukeBox:
         self.init_player()
         self.init_tray()
         self.init_flask()
+        
 
     def init_flask(self):
         flask_server.jukebox = self
@@ -67,7 +69,7 @@ class JukeBox:
         self.on_state_change(self.player, self.player.playingState)
 
     def init_rating_icon(self):
-        self.rating_icon = RatingIcon(self.playing)
+        self.rating_icon = RatingIcon(self.playing, session=self.session)
 
     def on_play_pause(self, *args, **kwargs):
         self.pause()
@@ -97,13 +99,14 @@ class JukeBox:
 
     def set_tray_data(self):
         self.rating_icon.playing = self.playing
+        self.rating_icon.session = self.session
         self.controller_icon.set_tooltip(self.artist_title)
         self.rating_icon.set_tooltip(self.artist_title)
         self.rating_icon.set_rating(self.playing.rating)
         wait()
 
     def init_picker(self):
-        self.picker = Picker()
+        self.picker = Picker(session=self.session)
         # self.picker.do()
         # self.playing = self.picker.pop()
         gobject.timeout_add(15000, self.picker.do)
@@ -111,10 +114,7 @@ class JukeBox:
     def init_player(self):
         self.player = Player()
         self.start(mark_as_played=False)
-        session = make_session()
-        session.add(self.playing)
         percent_played = self.playing.listeners_ratings[0].percent_played
-        session.close()
         duration = self.player.get_duration()
         pos_ns = int(duration * (percent_played * 0.01))
         self.player.seek_ns(pos_ns)
@@ -134,18 +134,16 @@ class JukeBox:
         _filter = User.listening==True
         if uids is not None and isinstance(uids, list):
             _filter = User.uid.in_(uids)
-        session = make_session()
-        recent_history = session.query(UserFileInfo)\
-                      .filter(_filter)\
-                      .order_by(UserFileInfo.ultp.desc())\
-                      .limit(HISTORY_LENGTH)
+        recent_history = self.session.query(UserFileInfo)\
+                                     .filter(_filter)\
+                                     .order_by(UserFileInfo.ultp.desc())\
+                                     .limit(HISTORY_LENGTH)
 
         for h1 in recent_history:
             if h1 and h1.fid not in history and h1.fid:
                 history.append(h1.fid)
 
         history.reverse()
-        session.close()
         return history
 
 
@@ -164,14 +162,15 @@ class JukeBox:
         self.percent_played = percent_played
         self.pos_float = pos_float
         print "mark as played:", percent_played, "***", pos_float
-        self.playing.mark_as_played(percent_played=percent_played)
+        self.playing.mark_as_played(percent_played=percent_played, 
+                                    session=self.session)
         print self.playing.json(['artists', 'titles', 'fid', 
                                  'listeners_ratings', 'genres', 'filename', 
                                  'history'])
 
     def on_end_of_stream(self, *args, **kwargs):
         print "END OF STREAM"
-        self.playing.inc_skip_score()
+        self.playing.inc_skip_score(session=self.session)
         self.percent_played = -100
         self.pos_float = -100.0
         self.index += 1
@@ -183,18 +182,16 @@ class JukeBox:
             fid = self.history[self.index]
             print "self.history:",self.history
             print "FID:", fid
-            session = make_session()
-            file_info = session.query(FileInfo)\
-                               .filter(FileInfo.fid == fid)\
-                               .limit(1)\
-                               .one()
-            print "history:",file_info
-            session.close()
+            file_info = self.session.query(FileInfo)\
+                                    .filter(FileInfo.fid == fid)\
+                                    .limit(1)\
+                                    .one()
+            print "file_info:",file_info
         except IndexError:
             file_info = self.picker.pop()
             while not file_info.exists:
                 print "MISSING FILE:%s", file_info.filename
-                file_info.mark_as_played(percent_played=-1)
+                file_info.mark_as_played(percent_played=-1, session=self.session)
                 self.picker.do()
                 file_info = self.picker.pop()
 
@@ -210,13 +207,13 @@ class JukeBox:
         self.player.stop()
         self.player.start()
         if mark_as_played:
-            self.playing.mark_as_played()
+            self.playing.mark_as_played(session=self.session)
 
     def pause(self, *args, **kwargs):
         self.player.pause()
 
     def next(self, *args, **kwargs):
-        self.playing.deinc_skip_score()
+        self.playing.deinc_skip_score(session=self.session)
         print "NEXT:",
         print self.playing.listeners_ratings
         self.index += 1
@@ -227,7 +224,6 @@ class JukeBox:
         self.start()
 
     def rate(self, uid, rating):
-        
         for l in self.playing.listeners_ratings:
             if l.uid == uid:
                 print "RATING:",l
@@ -246,5 +242,6 @@ class JukeBox:
 
 
 if __name__ == '__main__':
-    jukebox = JukeBox()
+    session = make_session()
+    jukebox = JukeBox(session)
     gtk.main()
