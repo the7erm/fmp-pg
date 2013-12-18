@@ -137,6 +137,29 @@
             });
         });
 
+
+        $(".web-listeners").bind("change", function(evt){
+            var checked = evt.currentTarget.checked,
+                uid = evt.currentTarget.dataset.uid;
+            console.log("CHANGED:", checked, uid);
+            if (webPlayer) {
+                if (checked) {
+                webPlayer.uids.push(uid);
+                } else {
+                    webPlayer.uids = _.without(webPlayer.uids, [uid]); 
+                }
+            }
+            $.ajax({
+              url: "/listening/"+uid+"/"+checked,
+              dataType: 'json',
+              cache: false
+            }).done(function(data, textStatus, jqXHR) {
+
+                
+
+            });
+        });
+
         conductor.on("change:playing.keywords", function(){
             var playing_keywords = $(".playing-keywords"),
                 keywords = conductor.get("playing.keywords"),

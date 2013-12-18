@@ -18,16 +18,16 @@
 #
 import random
 import sys
-import alchemy_session
 import datetime
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session, file_genre_association_table, \
+                             UserFileInfo, file_genre_association_table, \
                              DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
-                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE
+                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE, \
+                             make_session
 from sqlalchemy import and_, distinct, insert
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.sql.expression import func
+from sqlalchemy.sql.expression import func, not_
 import math
 import gtk
 import gobject
@@ -64,7 +64,9 @@ class Picker():
         self.percents = percents
 
     def clear_dontpick(self):
+        session = make_session()
         session.query(DontPick).delete()
+        session.close()
         wait()
 
     def insert_most_recent_into_dontpick(self):
@@ -74,6 +76,7 @@ class Picker():
                    .join(Genre, FileInfo.genres)
                    .filter(Genre.enabled == False)
         """
+        session = make_session()
         total_files = session.query(FileInfo)\
                              .distinct(FileInfo.fid)\
                              .join(Genre, FileInfo.genres)\
@@ -90,8 +93,9 @@ class Picker():
                     ))\
                    .order_by(UserFileInfo.ultp.desc())\
                    .limit(ten_percent)
-        self.insert_into_dont_pick(q, [DontPick.fid, DontPick.reason, DontPick.junk])
-        return
+        self.insert_into_dont_pick(session, q, [DontPick.fid, DontPick.reason, DontPick.junk])
+        session.close()
+        """
         
         recently_played = session.query(UserFileInfo)\
                                  .join(User)\
@@ -108,15 +112,19 @@ class Picker():
             dp = DontPick(fid=f.fid, reason="recently played")
             self.add(dp)
         self.commit()
+        """
 
     def insert_rated_0_into_dontpick(self):
+        session = make_session()
         q = session.query(UserFileInfo.fid, '\'rated 0 - new\'', '\'junk\'')\
                    .join(User)\
                    .distinct(UserFileInfo.fid, UserFileInfo.uid)\
                    .filter(and_(UserFileInfo.rating == 0,
                                 User.listening == True))
-        print "q:",q
-        self.insert_into_dont_pick(q)
+        print "q:", q
+        self.insert_into_dont_pick(session, q)
+        session.close()
+        """
         return
         rated_0 = session.query(UserFileInfo)\
                          .join(User)\
@@ -130,10 +138,11 @@ class Picker():
             dp = DontPick(fid=f.fid, reason="rated 0")
             self.add(dp)
         self.commit()
+        """
 
-    def insert_into_dont_pick(self, select=None, names=None):
+    def insert_into_dont_pick(self, session, select=None, names=None):
         if names is None:
-          names = (DontPick.fid, DontPick.reason, DontPick.junk)
+            names = (DontPick.fid, DontPick.reason, DontPick.junk)
         print "select:", select
         print "names:", names
         ins = insert(DontPick).from_select(names=names, select=select)
@@ -151,14 +160,19 @@ class Picker():
                                 User.listening == True))
         print "q:",q
         """
+        session = make_session()
         q = session.query(FileInfo.fid, '\'disable genre - new\'', '\'test\'')\
                    .join(Genre, FileInfo.genres)\
                    .filter(Genre.enabled == False)
         #  self.insert_into_dont_pick(q)
-        ins = insert(DontPick).from_select(names=[DontPick.fid, DontPick.reason, DontPick.junk], select=q)
+        ins = insert(DontPick).from_select(
+            names=[DontPick.fid, DontPick.reason, DontPick.junk], 
+            select=q)
         print "ins:", ins
         session.execute(ins,None)
-        session.commit()
+        self.commit(session)
+        session.close()
+        """
         return
         disabled = session.query(FileInfo)\
                           .join(Genre, FileInfo.genres)\
@@ -173,6 +187,7 @@ class Picker():
           self.add(dp)
 
         self.commit()
+        """
 
     def do(self, *args, **kwargs):
         wait()
@@ -182,9 +197,9 @@ class Picker():
         self.ensure_listener_ratings()
         if not users:
             print "not needed there are no users with an empty preload"
+            self.clean_preload()
             return True
         self.clear_dontpick()
-        
         self.insert_disabled_genres_into_dontpick()
         self.insert_most_recent_into_dontpick()
         self.insert_rated_0_into_dontpick()
@@ -192,8 +207,26 @@ class Picker():
         self.insert_files_into_preload()
         return True
 
+    def clean_preload(self):
+        session = make_session()
+        listeners = session.query(User)\
+                           .filter(User.listening == True)\
+                           .all()
+        uids = []
+        for l in listeners:
+            uids.append(l.uid)
+        if not uids:
+            session.close()
+            return
+        entries = session.query(Preload).filter(not_(Preload.uid.in_(uids))).all()
+        for e in entries:
+            session.query(Preload).filter(Preload.prfid == e.prfid).delete()
+        session.commit()
+        session.close()
+
     def ensure_listener_ratings(self):
         listeners = self.get_listeners_with_empty_preload()
+        session = make_session()
         for l in listeners:
           wait()
           q = session.query('\'%s\'' % l.uid,
@@ -210,18 +243,21 @@ class Picker():
                                                   'percent_played',
                                                   'true_score'), 
                                                  select=q)
-          session.execute(ins,None)
-          self.commit()
+          session.execute(ins, None)
+          self.commit(session)
 
 
     def get_listeners_with_empty_preload(self):
         # SELECT u.uid FROM users u LEFT JOIN preload p ON p.uid = u.uid WHERE p.uid IS NULL AND u.uid = 1;
+        session = make_session()
         q = session.query(User)\
                       .filter(and_(
                         User.listening == True,
                         User.preload == None
                       ))
-        return q.all()
+        res = q.all()
+        session.close()
+        return res
 
     def insert_files_into_preload(self):
         users = self.get_listeners_with_empty_preload()
@@ -230,22 +266,27 @@ class Picker():
                 print "u.uid:", u.uid
                 f = self.get_file_for(u.uid, true_score)
                 if f is not None:
+                    session = make_session()
                     reason = "true_score >= %s" % true_score
                     print "adding:", f.fid, f.file.filename, reason
                     preload_entry = Preload(fid=f.fid, uid=u.uid, 
                                             reason=reason)
-                    self.add(preload_entry)
+                    self.add(session, preload_entry)
                     # u.preload.add(preload_entry)
-                    self.commit()
-                    self.insert_artist_into_dont_pick(preload_entry)
+                    self.commit(session)
+                    self.insert_artist_into_dont_pick(session, preload_entry)
+                    session.close()
 
     def insert_preload_files_into_dontpick(self):
         # self.insert_artist_into_dont_pick(None)
+        session = make_session()
         for preload_entry in session.query(Preload).all():
-            self.insert_artist_into_dont_pick(preload_entry)
+            self.insert_artist_into_dont_pick(session, preload_entry)
+        self.commit(session)
+        session.close()
         
 
-    def insert_artist_into_dont_pick(self, preload_entry=None):
+    def insert_artist_into_dont_pick(self, session, preload_entry=None):
         """
         q = session.query(FileInfo.fid, '\'artist in preload\'', Artist.name)\
                    .distinct(FileInfo.fid)\
@@ -262,13 +303,14 @@ class Picker():
             for f in a.files:
                 print f.fid,
                 sys.stdout.flush()
-                self.add(DontPick(fid=f.fid, reason="artist"))
-        self.commit()
-        
+                self.add(session, DontPick(fid=f.fid, reason="artist"))
+        self.commit(session)
         print "\n"
 
 
     def get_file_for(self, uid, true_score):
+        session = make_session()
+        ufi = None
         try:
             wait()
             ufi = session.query(UserFileInfo)\
@@ -283,57 +325,82 @@ class Picker():
                          .order_by(UserFileInfo.ultp.asc(), func.random())\
                          .limit(1)\
                          .one()
-            wait()
-            return ufi
         except NoResultFound:
-            return None
+            ufi = None
+        finally:
+            session.close()
+        wait()
+        return ufi
 
     def clear_preload(self, uid=None):
+        session = make_session()
         if uid is None:
             session.query(Preload).delete()
         else:
             session.query(Preload).filter(Preload.uid == uid).delete()
+        session.commit()
+        session.close()
 
     def get_next_user(self):
-        return session.query(User)\
-                      .filter(User.listening==True)\
-                      .order_by(User.last_time_cued.asc())\
-                      .limit(1)\
-                      .one()
+        session = make_session()
+        user = None
+        try:
+            user = session.query(User)\
+                          .filter(User.listening==True)\
+                          .order_by(User.last_time_cued.asc())\
+                          .limit(1)\
+                          .one()
+        except NoResultFound:
+            user = None
+        finally:
+            session.close()
+        return user
 
     def get_file_from_preload_for_uid(self, uid):
-        return session.query(Preload)\
-                      .filter(Preload.uid == uid)\
-                      .order_by(Preload.priority.desc(), func.random())\
-                      .limit(1)\
-                      .one()
+        session = make_session()
+        preload_entry = None
+        try:
+            preload_entry = session.query(Preload)\
+                                   .filter(Preload.uid == uid)\
+                                   .order_by(Preload.priority.desc(), 
+                                             func.random())\
+                                   .limit(1)\
+                                   .one()
+        except NoResultFound:
+            preload_entry = None
+        session.close()
+        return preload_entry
 
     def pop(self):
         user = self.get_next_user()
         user.last_time_cued = datetime.datetime.now()
-        self.add(user)
         preload_entry = self.get_file_from_preload_for_uid(user.uid)
         if not preload_entry:
             self.do()
             preload_entry = self.get_file_from_preload_for_uid(user.uid)
 
         wait()
+        session = make_session()
         file_info = session.query(FileInfo)\
                                .filter(FileInfo.fid == preload_entry.fid)\
                                .limit(1)\
                                .one()
-        session.query(Preload).filter(Preload.prfid == preload_entry.prfid).delete()
-        wait()
+        session.query(Preload)\
+               .filter(Preload.prfid == preload_entry.prfid)\
+               .delete()
+        self.commit(session)
+        session.close()
         return file_info
 
-    def commit(self):
-      wait()
-      session.commit()
-      wait()
+    def commit(self, session=None):
+        wait()
+        if session is not None:
+            session.commit()
+        wait()
 
-    def add(self, obj):
-      wait()
-      session.add(obj)
+    def add(self, session, obj):
+        wait()
+        session.add(obj)
 
 if __name__ == "__main__":
     picker = Picker()

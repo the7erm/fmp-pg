@@ -6,30 +6,13 @@
     <a class='player-control' href="/next/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img src="/static/img/media-skip-forward.png"></a>
    
 </div>
-<div data-role="fieldcontain">
-    <fieldset data-role="controlgroup">
-        <legend>Listeners</legend>
-        {% for user in listeners %}
-            <input type="checkbox"
-                   data-uid="{{user.uid}}"
-                   name="checkbox-{{user.uid}}" 
-                   id="checkbox-{{user.uid}}" 
-                   class="web-listeners" 
-                   {% if user.listening %} 
-                        checked 
-                   {% endif %} />
-            <label for="checkbox-{{user.uid}}">{{user.uname}}</label>
-        {% endfor %}
-    </fieldset>
-</div>
-
-
-<a href="#" id="tmp-play-btn"><img src="/static/img/media-record.png"></a>
-<a href="#" id="play-btn">Play</a>
 <script type="text/javascript">
 
     var WebPlayerView = Backbone.View.extend({
         supportedMimeTypes: {},
+        playlist: [],
+        playlistIndex: 0,
+        uids: [],
         initialize: function(options){
             this.vid = document.createElement('audio');
             this.vid.id = "video-player";
@@ -41,6 +24,9 @@
             this.vid.controls = true;
             this.fid = options.fid;
             this.uids = [1, 2];
+            this.resetTimes();
+        },
+        resetTimes: function() {
             this.lastPercentPlayed = -100;
             this.lastCurrentTime = -100;
             this.lastUpdateTime = -100;
@@ -109,8 +95,7 @@
         markAsPlayed: function() {
             
             var currentTime = parseFloat(this.vid.currentTime);
-            
-            
+
             if (currentTime > this.lastCurrentTime - 5 &&
                 currentTime < this.lastCurrentTime + 5) {
                 return;
@@ -120,19 +105,40 @@
             this.sendPercentPlayed(percent_played);
         },
         markAsCompleted: function() {
-            console.log("markAsCompleted:", evt.type, evt);
+            console.log("markAsCompleted");
             this.sendPercentPlayed(100.0);
-            this.lastCurrentTime = -100;
-            this.lastPercentPlayed = -100;
+            this.resetTimes();
+            this.incSkipScore();
+            this.incIndex();
+        },
+        incIndex: function(){
+            this.playlistIndex += 1;
+            console.log("this.playlistIndex:", this.playlistIndex);
+            if (this.playlist[this.playlistIndex]) {
+                this.setSrc(this.playlist[this.playlistIndex]);
+            }
+            this.popPreload();
+        },
+        deIncSkipScore: function() {
+            $.ajax({
+              url: "/deinc-skip-score/"+this.fid+"/"+this.uids.join(","),
+              dataType: 'json',
+              cache: false
+            });
+        },
+        incSkipScore: function() {
+            $.ajax({
+              url: "/inc-skip-score/"+this.fid+"/"+this.uids.join(","),
+              dataType: 'json',
+              cache: false
+            });
         },
         sendPercentPlayed: function(percent_played) {
             // /mark-as-played/<fid>/<percent_played>/<uids>
-            console.log("DISABLED sendPercentPlayed:", percent_played);
-            return;
+            console.log("this.uids:",this.uids)
             $.ajax({
               url: "/mark-as-played/"+this.fid+"/"+percent_played+"/"+this.uids.join(","),
               dataType: 'json',
-            }).done(function(data, textStatus, jqXHR) {
             });
         },
         checkSupportedTypes:function(){
@@ -162,22 +168,33 @@
             this.vid.style.width="100%";
             this.$el.append("<br clear='all'>");
             this.vid.src = this.getSrc();
-            $("#tmp-play-btn").click(_.bind(this.onClick, this));
-            // $(this.vid).click(_.bind(this.onClick, this));
             return this;
         },
-        setSrc: function(fid) {
+        setSrc: function(fid, resume) {
             this.fid = fid;
             this.vid.src = this.getSrc();
             this.vid.play();
-            this.getFileInfo();
+            this.getFileInfo(resume);
+            this.resetTimes();
         },
-        getFileInfo: function(){
+        doResume:function(data){
+            console.log(data.listeners_ratings);
+            console.log("this.vid.duration:",this.vid.duration);
+            var resumeTime = this.vid.duration * parseFloat(data.listeners_ratings[0].percent_played) * 0.01;
+            console.log("Resume Time:", resumeTime)
+            this.vid.currentTime = resumeTime;
+        },
+        getFileInfo: function(resume) {
             $.ajax({
               url: "/file-info/"+this.fid,
               dataType: 'json',
               cache: false
-            }).done(_.bind(this.processFileInfo, this));
+            }).done(_.bind(this.processFileInfo, this))
+            .always(_.bind(function(data){
+                if (resume) {
+                    this.vid.addEventListener("canplaythrough", _.once(_.bind(this.doResume, this, data)));
+                }
+            }, this));
         },
         processFileInfo:function(data, textStatus, jqXHR) {
             conductor.set('playing', data);
@@ -192,13 +209,39 @@
             uri += mimetypes.join(",");
             return uri;
         },
-        onClick: function(evt) {
-            // this.$el.append("CLICKED this.vid.paused:"+this.vid.paused+"<br>");
-            if (this.vid.paused) {
-                this.vid.play();
-            } else {
-                this.vid.pause();
+        popPreload: function(cb) {
+            $.ajax({
+              url: "/pop-preload/",
+              dataType: 'json',
+              cache: false
+            }).done(_.bind(this.appendToPlaylist, this));
+        },
+        appendToPlaylist: function(data, textStatus, jqXHR) {
+            if (data) {
+                if (!this.playlist[this.playlistIndex]) {
+                    this.playlist.push(data.fid);
+                    this.setSrc(this.playlist[this.playlistIndex]);
+                } else {
+                    this.playlist.push(data.fid);
+                }
             }
+        },
+        next: function() {
+            this.deIncSkipScore();
+            this.incIndex();
+        },
+        prev: function() {
+            var playlistIndex = this.playlistIndex;
+            playlistIndex -= 1;
+            if (this.playlist[playlistIndex]) {
+                this.playlistIndex = playlistIndex;
+                this.setSrc(this.playlist[playlistIndex]);
+                this.popPreload();
+            }
+        },
+        setIndex: function(idx, resume) {
+            this.playlistIndex = idx;
+            this.setSrc(this.playlist[this.playlistIndex], resume);
         }
     });
     $(document).bind("mobileinit", function () {
@@ -209,22 +252,12 @@
         _.each($("input.web-listeners:checked"), function(el){
             uids.push($(el).data('uid'))
         });
-        
         var webPlayer = new WebPlayerView({
             "el": "#js-player",
             "fid": "{{ jukebox.playing.fid }}"
         }).render();
-        $(".web-listeners").bind("change", function(evt){
-            var checked = evt.currentTarget.checked,
-                uid = evt.currentTarget.dataset.uid;
-            console.log("CHANGED:", checked, uid);
-            $.ajax({
-              url: "/listening/"+uid+"/"+checked,
-              dataType: 'json',
-              cache: false
-            }).done(function(data, textStatus, jqXHR) {
-            });
-        });
+        webPlayer.uids = uids;
+
         $('.player-control').unbind();
         $('.player-control').bind("tap", function(evt, ui){
             evt.preventDefault();
@@ -241,11 +274,10 @@
                     webPlayer.vid.pause();
                 }
             } else if (next_re.test(href)) {
-                playlistIndex += 1;
-                webPlayer.setSrc(playlist[playlistIndex]);
+                webPlayer.next();
+                
             } else if (prev_re.test(href)) {
-                playlistIndex -= 1;
-                webPlayer.setSrc(playlist[playlistIndex]);
+                webPlayer.prev();
             }
             setTimeout(function(){
                 $('.player-control').removeClass("ui-btn-active");
@@ -261,9 +293,10 @@
           url: "/history/"+uids.join(","),
           dataType: 'json',
           cache: false
-        }).done(function(data, textStatus, jqXHR) {
-            playlist = data;
-            webPlayer.setSrc(playlist[0]);
+        }).done(function(playlist, textStatus, jqXHR) {
+            playlistIndex = playlist.length - 1;
+            webPlayer.playlist = playlist;
+            webPlayer.setIndex(playlistIndex, true);
         });
         clearInterval(conductorFetchInterval);
     });

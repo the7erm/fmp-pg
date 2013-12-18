@@ -24,7 +24,8 @@ import gtk
 import gobject
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session, make_session
+                             UserFileInfo, make_session
+from sqlalchemy.orm.exc import NoResultFound
 
 import flask_server
 
@@ -110,7 +111,10 @@ class JukeBox:
     def init_player(self):
         self.player = Player()
         self.start(mark_as_played=False)
+        session = make_session()
+        session.add(self.playing)
         percent_played = self.playing.listeners_ratings[0].percent_played
+        session.close()
         duration = self.player.get_duration()
         pos_ns = int(duration * (percent_played * 0.01))
         self.player.seek_ns(pos_ns)
@@ -121,19 +125,29 @@ class JukeBox:
 
     def init_history(self):
         self.index = 0
-        self.history = []
-        history = session.query(UserFileInfo)\
-                         .filter(User.listening==True)\
-                         .order_by(UserFileInfo.ultp.desc())\
-                         .limit(HISTORY_LENGTH)
-
-        for h1 in history:
-            if h1.fid not in self.history:
-                self.history.append(h1.fid)
-
-        self.history.reverse()
+        self.history = self.get_history()
         if self.history:
             self.index = len(self.history) - 1
+
+    def get_history(self, uids=None):
+        history = []
+        _filter = User.listening==True
+        if uids is not None and isinstance(uids, list):
+            _filter = User.uid.in_(uids)
+        session = make_session()
+        recent_history = session.query(UserFileInfo)\
+                      .filter(_filter)\
+                      .order_by(UserFileInfo.ultp.desc())\
+                      .limit(HISTORY_LENGTH)
+
+        for h1 in recent_history:
+            if h1 and h1.fid not in history and h1.fid:
+                history.append(h1.fid)
+
+        history.reverse()
+        session.close()
+        return history
+
 
     def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
                        pos_str, dur_str, left_str, percent):
@@ -164,13 +178,18 @@ class JukeBox:
         self.start()
         
     def start(self, mark_as_played=True):
+        print "START"
         try:
             fid = self.history[self.index]
+            print "self.history:",self.history
+            print "FID:", fid
+            session = make_session()
             file_info = session.query(FileInfo)\
                                .filter(FileInfo.fid == fid)\
                                .limit(1)\
                                .one()
             print "history:",file_info
+            session.close()
         except IndexError:
             file_info = self.picker.pop()
             while not file_info.exists:
@@ -182,7 +201,7 @@ class JukeBox:
             self.history.append(file_info.fid)
             self.history = self.history[-HISTORY_LENGTH:]
             self.index = len(self.history) - 1
-            print "pop:",file_info
+            print "pop:", file_info
 
         self.playing = file_info
         self.player.filename = self.playing.uri

@@ -15,9 +15,11 @@ from flask import Flask, Response, render_template, request, send_file
 from player_refactored import STOPPED, PAUSED, PLAYING
 from jukebox import HISTORY_LENGTH
 
-from files_model_idea import simple_rate, FileInfo, session, MIME_TYPES, \
+from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
                              AUDIO_MIMES, VIDEO_MIMES, make_session, User, \
                              UserFileInfo
+
+from sqlalchemy.orm.exc import NoResultFound
 
 TEMP_FOLDER = "/home/erm/tmp/converted/"
 
@@ -37,51 +39,57 @@ JUKEBOX_PLAYING_KEYS = [
     'keywords'
 ]
 
+def get_listeners():
+    session = make_session()
+    listeners = session.query(User).order_by(User.admin.desc(), User.uname.asc()).all()
+    session.close()
+    return listeners
+
 @app.route('/')
 def index():
-    return render_template("index.html", jukebox=jukebox)
+    listeners = get_listeners()
+    return render_template("index.html", jukebox=jukebox, listeners=listeners)
 
 @app.route('/search/')
 def search():
-    return render_template("search.html", jukebox=jukebox)
+    listeners = get_listeners()
+    return render_template("search.html", jukebox=jukebox, listeners=listeners)
 
 @app.route('/history/<uids>')
 def history(uids):
     uids = uids.split(',')
-    history = []
-    db_history = session.query(UserFileInfo)\
-                     .filter(User.uid.in_(uids))\
-                     .order_by(UserFileInfo.ultp.desc())\
-                     .limit(HISTORY_LENGTH)
-
-    for h1 in db_history:
-        if h1.fid not in history:
-            history.append(h1.fid)
-    history.reverse()
+    history = jukebox.get_history(uids);
     return json_response(history)
 
 @app.route('/listening/<uid>/<state>')
 def listening(uid, state):
     uid = int(uid)
     listening_state = False
-    print "state:",state
     if state == 'true':
         listening_state = True
-
-    user = session.query(User)\
-                  .filter(User.uid == uid)\
-                  .limit(1)\
-                  .one()
-
-    if user:
+    session = make_session()
+    try:
+        user = session.query(User)\
+                      .filter(User.uid == uid)\
+                      .limit(1)\
+                      .one()
         user.listening = listening_state
         user.save()
-        print "SAVED!"
-    return json_response({'STATUS': 'SUCCESS'})
+        resp = json_response({'STATUS': 'SUCCESS'})
+    except NoResultFound:
+        resp = json_response({'STATUS': 'FAIL'})
+    finally:
+        session.close()
+    return resp
+
+@app.route("/pop-preload/")
+def pop_preload():
+    file_info = jukebox.picker.pop()
+    return json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
 
 @app.route('/web-player/')
 def web_player():
-    listeners = session.query(User).order_by(User.admin.desc(), User.uname.asc()).all()
+    listeners = get_listeners()
     return render_template("web-player.html", jukebox=jukebox, listeners=listeners)
 
 def json_response(obj):
@@ -106,12 +114,15 @@ def status_obj():
 
 @app.route('/file-info/<fid>')
 def file_info(fid):
+    session = make_session()
     file_info = session.query(FileInfo)\
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
-                       
-    return json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    session.close()
+    return resp
 
 @app.route('/status/')
 def status():
@@ -156,7 +167,6 @@ def rate(fid, uid, rating):
 
 @app.route("/stream/<fid>/")
 def stream(fid):
-
     def do_converting_stream(filename, mimetype):
         # gst-launch  -q filesrc location=./test.avi ! 
         # decodebin2 ! audioconvert  ! lame ! fdsink fd=1 > out.mp3
@@ -229,12 +239,14 @@ def stream(fid):
         os.unlink(lock_file)
         dstfp.close()
 
+    session = make_session()
     mimetypes = request.args.get("mimetypes", "")
     mimetypes = mimetypes.split(',')
     file_info = session.query(FileInfo)\
                        .filter(FileInfo.fid==fid)\
                        .limit(1)\
                        .one()
+
     mimetype = file_info.get_best_mime(mimetypes)
     send_as_file = True
     filename = file_info.filename
@@ -257,7 +269,7 @@ def stream(fid):
             send_as_file = False
 
     print "MADEIT", mimetype
-    
+    session.close()
     if send_as_file:
         return send_file_partial(filename, mimetype=mimetype)
     response = Response(stream_handler(filename, mimetype), mimetype=mimetype)
@@ -272,12 +284,50 @@ def stream(fid):
 
 @app.route("/mark-as-played/<fid>/<percent_played>/<uids>")
 def mark_as_played(fid, percent_played, uids):
+    fid = int(fid)
     uids = uids.split(',')
     percent_played = float(percent_played)
     obj = {}
     obj['STATUS'] = 'SUCCESS'
-    print "MARKE AS PLAYED", "uids:", uids, "percent_played:", percent_played
-    return json_response({})
+    print "MARCUS PLAYED", "uids:", uids, "percent_played:", percent_played
+    session = make_session()
+    file_info = session.query(FileInfo)\
+                       .filter(FileInfo.fid == fid)\
+                       .limit(1)\
+                       .one()
+    session.close()
+    file_info.mark_as_played(percent_played=percent_played, uids=uids)
+    return json_response(file_info.to_dict())
+
+@app.route("/inc-skip-score/<fid>/<uids>")
+def inc_skip_score(fid, uids):
+    fid = int(fid)
+    uids = uids.split(',')
+    if not fid or not uids:
+        return json_response({"STATUS": "FAIL"})
+    session = make_session()
+    file_info = session.query(FileInfo)\
+                       .query(FileInfo.fid == fid)\
+                       .limit(1)\
+                       .one()
+    session.close()
+    file_info.inc_skip_score(uids=uids)
+    return json_response(file_info.to_dict())
+
+@app.route("/deinc-skip-score/<fid>/<uids>")
+def deinc_skip_score(fid, uids):
+    fid = int(fid)
+    uids = uids.split(',')
+    if not fid or not uids:
+        return json_response({"STATUS": "FAIL"})
+    session = make_session()
+    file_info = session.query(FileInfo)\
+                       .query(FileInfo.fid == fid)\
+                       .limit(1)\
+                       .one()
+    session.close()
+    file_info.deinc_skip_score(uids=uids)
+    return json_response(file_info.to_dict())
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 reactor.listenTCP(5050, Site(resource))

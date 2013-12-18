@@ -7,6 +7,20 @@
 
     <div data-role="panel" id="right-panel" data-display="push" data-position="right" data-theme="b">
         {% include "panel-header.html" ignore missing %}
+        <legend>Listeners</legend>
+        <fieldset data-role="controlgroup">
+            {% for user in listeners %}
+                <input type="checkbox"
+                       data-uid="{{user.uid}}"
+                       name="checkbox-{{user.uid}}" 
+                       id="checkbox-{{user.uid}}" 
+                       class="web-listeners" 
+                       {% if user.listening %} 
+                            checked 
+                       {% endif %} />
+                <label for="checkbox-{{user.uid}}">{{user.uname}}</label>
+            {% endfor %}
+        </fieldset>
     </div><!-- /panel -->
     <div data-role="footer" data-theme="b" data-position="fixed">
         <div data-role="controlgroup" data-type="horizontal" style="text-align:center;">
