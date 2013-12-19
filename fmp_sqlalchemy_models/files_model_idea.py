@@ -37,7 +37,8 @@ from sqlalchemy.orm import relationship, backref, deferred
 from sqlalchemy import Column, Integer, String, DateTime, Text, Float,\
                        UniqueConstraint, Boolean, Table, ForeignKey, Date, \
                        Unicode, and_
-from sqlalchemy.exc import IntegrityError, InvalidRequestError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError, InterfaceError,\
+                           OperationalError
 from sqlalchemy.orm.exc import NoResultFound
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3, HeaderNotFoundError
@@ -111,6 +112,9 @@ class BaseClass(object):
         except InvalidRequestError, e:
             session.rollback()
             log.error("InvalidRequestError:%s ROLLBACK", e)
+        except OperationalError, e:
+            log.error("OperationalError:%s ROLLBACK", e)
+            session.rollback()
         if saved:
             self.post_save(session=session)
         delta = datetime.datetime.now() - start_save
@@ -278,7 +282,7 @@ class FileLocation(BaseClass, Base):
     mtime = Column(DateTime(timezone=False), nullable=True, index=True)
     ctime = Column(DateTime(timezone=False), nullable=True, index=True)
     file_exists = Column(Boolean, default=False)
-    size = Column(Integer, index=True, default=0)
+    file_size = Column(Integer, index=True, default=0)
 
     def __init__(self, *args, **kwargs):
         self.file_stats = None
@@ -324,9 +328,9 @@ class FileLocation(BaseClass, Base):
             
         if self.ctime != ctime:
             log.info("ctime %s != self.ctime %s", ctime, self.ctime)
-        if self.size != size:
-            log.info("size %s != self.size %s", size, self.size)
-        return (self.mtime != mtime or self.ctime != ctime or self.size != size)
+        if self.file_size != size:
+            log.info("size %s != self.size %s", size, self.file_size)
+        return (self.mtime != mtime or self.ctime != ctime or self.file_size != size)
 
     def update_mtime(self):
         self.mtime = self.get_mtime()
@@ -359,7 +363,7 @@ class FileLocation(BaseClass, Base):
             return
         self.file_stats = os.stat(self.filename)
 
-    def update_stats(self, session=None):
+    def update_stats(self):
         self.set_stats()
         self.mtime = self.get_mtime()
         self.ctime = self.get_ctime()
@@ -380,7 +384,7 @@ class FileLocation(BaseClass, Base):
     def pre_save(self, session=None):
         if self.has_changed:
             self.update_hash(session=session)
-            self.update_stats(session=session)
+            self.update_stats()
             # self.update_hash()
             # self.update_mtime()
 
@@ -408,14 +412,24 @@ class FileLocation(BaseClass, Base):
             m.update(data)
         
         fingerprint = m.hexdigest()
+        log.info("calculating fingerprint:%s", fingerprint)
         try:
             file_info = session.query(FileInfo).filter(and_(
                 FileInfo.fingerprint == fingerprint,
-                FileInfo.size == size
-            )).one()
-        except NoResultFound:
-            file_info = FileInfo(fingerprint=fingerprint, size=size)
+                FileInfo.file_size == size
+            ))\
+            .limit(1)\
+            .one()
+        except NoResultFound, e:
+            log.info("file info not found:%s", e)
+            log.info("ADDING")
+            file_info = FileInfo(fingerprint=fingerprint, file_size=size)
+            log.info("/ADDING")
+            session.add(file_info)
+            session.commit()
+            print "SAVED"
             file_info.save(session=session)
+            print "/SAVED"
 
         self.fid = file_info.fid
         found = False
@@ -453,7 +467,7 @@ class FileInfo(BaseClass, Base):
     ltp = Column(DateTime(timezone=True), nullable=True, index=True)
     
     fingerprint = Column(String(132), index=True)
-    size = Column(Integer, index=True, default=0)
+    file_size = Column(Integer, index=True, default=0)
     
     artists = relationship("Artist", 
                            secondary=file_artists_association_table,
@@ -476,7 +490,8 @@ class FileInfo(BaseClass, Base):
                            backref="file",
                            primaryjoin="and_(UserHistory.fid == FileInfo.fid, "
                                              "User.listening == True, "
-                                             "User.uid == UserHistory.uid)",
+                                             "User.uid == UserHistory.uid, "
+                                             "UserHistory.time_played != None)",
                            order_by=UserHistory.time_played.desc)
 
     listeners_ratings = relationship("UserFileInfo",
@@ -499,7 +514,8 @@ class FileInfo(BaseClass, Base):
         # Step 1 mark file as played
         self.ltp = self.now_if_none(when)
         self.mark_artists_as_played(session=session)
-        self.mark_listeners_as_played(when, percent_played, uids=uids, session=session)
+        self.mark_listeners_as_played(when, percent_played, uids=uids, 
+                                      session=session)
         self.save(session=session)
 
     def mark_listeners_as_played(self, when=None, percent_played=0, uids=None, 
@@ -727,20 +743,25 @@ class FileInfo(BaseClass, Base):
         keywords = []
         # print "filename:", os.path.join(self.dirname, self.basename)
         keywords += [self.fingerprint]
-        for loc in self.get_locations():
+        print "LOOPING THROUGH LOCATIONS"
+        for loc in self.locations:
             root, ext = os.path.splitext(loc.basename)
             # keywords += self.get_words_from_string(loc.basename)
             keywords += self.get_words_from_string(root)
             keywords += self.get_words_from_string(ext)
         
+        print "LOOPING THROUGH ARTISTS"
         for a in self.artists:
             keywords += self.get_words_from_string(a.name)
 
+        print "LOOPING THROUGH ALBUMS"
         for a in self.albums:
             keywords += self.get_words_from_string(a.name)
 
+        print "LOOPING THROUGH GENRES"
         for g in self.genres:
             keywords += self.get_words_from_string(g.name)
+        
 
         for t in self.titles:
             keywords += self.get_words_from_string(t.name)
@@ -794,7 +815,7 @@ class FileInfo(BaseClass, Base):
         except NoResultFound:
             kw = Keywords(word=word)
             session.add(kw)
-            session.commit()
+            # session.commit()
         
         return kw
 
@@ -830,9 +851,8 @@ class FileInfo(BaseClass, Base):
         return None
 
     def get_listener_ratings(self, uids=None, session=None):
-        
+        print "GET LISTENERS RATINGS:", uids
         if uids is None:
-            session.add(self)
             listeners_ratings = self.listeners_ratings
         else:
             listeners_ratings = session.query(UserFileInfo)\
@@ -911,7 +931,7 @@ class FileInfo(BaseClass, Base):
         size = 0
         for l in self.locations:
             if l.exists:
-                size = l.size
+                size = l.file_size
                 break
         return size
 
@@ -1028,7 +1048,7 @@ class Folder(BaseClass, Base):
     def get_files_count(self):
         return len(self.get_files())
 
-    def insert_file_into_db(self, dirname, basename):
+    def insert_file_into_db(self, dirname, basename, session=None):
         base, ext = os.path.splitext(basename)
         ext = ext.lower()
         if ext not in AUDIO_EXT and ext not in VIDEO_EXT:
@@ -1043,7 +1063,9 @@ class Folder(BaseClass, Base):
         try:
             location = session.query(FileLocation).filter(
                 and_(FileLocation.dirname==dirname,
-                     FileLocation.basename==basename)).one()
+                     FileLocation.basename==basename))\
+                .limit(1)\
+                .one()
             if not location.has_changed:
                 log.info("Not changed:%s", location.filename)
                 # location.save()
@@ -1058,7 +1080,7 @@ class Folder(BaseClass, Base):
             log.info("scan:%s", location.filename)
             location.scan(dirname=dirname, basename=basename, save=False)
         log.info("saving:%s", location.filename)
-        location.save()
+        location.save(session=session)
         log.info("processed:%s", location)
         end_time = datetime.datetime.now()
         delta = end_time - start_time
@@ -1084,7 +1106,7 @@ class Folder(BaseClass, Base):
             return
         if os.path.isfile(dirname):
             dirname, basename = os.path.split(dirname)
-            self.insert_file_into_db(dirname, basename)
+            self.insert_file_into_db(dirname, basename, session=session)
             return
         self.dirname = dirname
         self.update_stats()
@@ -1094,7 +1116,7 @@ class Folder(BaseClass, Base):
             if not os.path.isfile(filename):
                 continue
             dirname, basename = os.path.split(filename)
-            self.insert_file_into_db(dirname, basename)
+            self.insert_file_into_db(dirname, basename, session=session)
         self.scanned = True
         if save:
             self.save(session=session)
@@ -1248,7 +1270,8 @@ class UserFileInfo(BaseClass, Base):
     percent_played = Column(Float, index=True, default=DEFAULT_PERCENT_PLAYED)
     true_score = Column(Float, index=True, default=DEFAULT_TRUE_SCORE)
     ultp = Column(DateTime(timezone=True))
-    history = relationship("UserHistory", backref="user_file_info",
+    history = relationship("UserHistory", 
+                           backref="user_file_info",
                            order_by=UserHistory.time_played.desc)
 
     """
@@ -1276,10 +1299,12 @@ class UserFileInfo(BaseClass, Base):
         found = False
         today = self.ultp.date()
         current_history = None
+        log.info("Looping through history")
         for h in self.history:
             if h.date_played == today:
                 current_history = h
                 break
+        log.info("done looping through history")
         if current_history is None:
             current_history = UserHistory(uid=self.uid, fid=self.fid)
             self.history.append(current_history)
@@ -1294,7 +1319,14 @@ class UserFileInfo(BaseClass, Base):
 
     def calculate_true_score(self, session=None):
         session.add(self)
-        recent = self.history[0:5]
+        try:
+            recent = self.history[0:5]
+        except IndexError, e:
+            log.error("IndexError:%s",e)
+            recent = None
+        except InterfaceError, e:
+            log.error("InterfaceError:%s",e)
+            recent = None
         
         if not recent:
             avg = DEFAULT_PERCENT_PLAYED
@@ -1378,13 +1410,14 @@ def scan(folder, session=None):
         has_media = folder_info.has_media
         if has_media and folder_info.needs_scan:
             log.info("Scanning:%s", dirname)
-            folder_info.save()
+            print "SAVING folder_info:",dirname
+            folder_info.save(session=session)
         elif not has_media:
             log.info("No Media:%s", dirname)
         else:
             log.info("Already Scanned:%s", dirname)
 
-def create_user(uname, admin=False, listening=True):
+def create_user(uname, admin=False, listening=True, session=None):
     
     try:
         user = session.query(User).filter(User.uname==uname).limit(1).one()
@@ -1395,7 +1428,7 @@ def create_user(uname, admin=False, listening=True):
         pass
 
     user = User(uname=uname, admin=admin, listening=listening)
-    user.save()
+    user.save(session)
     log.info("Created user:%s", user)
 
 AUDIO_EXT = ('.mp3', '.ogg', '.wma', '.wmv')
@@ -1422,7 +1455,6 @@ MIME_TYPES = {}
 MIME_TYPES.update(AUDIO_MIMES)
 MIME_TYPES.update(VIDEO_MIMES)
 
-
 # session = make_session(Base)
 
 def wait():
@@ -1440,8 +1472,7 @@ def wait():
     gtk.gdk.threads_leave()
     # print "/leave"
 
-def simple_rate(fid, uid, rating):
-    
+def simple_rate(fid, uid, rating, session=None):
     user_file_info = session.query(UserFileInfo)\
                             .filter(and_(
                                 UserFileInfo.fid == fid,
@@ -1450,25 +1481,26 @@ def simple_rate(fid, uid, rating):
                             .limit(1)\
                             .one()
     
-    user_file_info.rate(rating)
-    user_file_info.save()
+    user_file_info.rate(rating, session=session)
+    # user_file_info.save()
 
 if __name__ == "__main__":
-    create_user("erm", True, True)
-    create_user("steph", True, False)
-    create_user("sam", True, False)
-    create_user("halle", True, False)
+    session = make_session(Base)
+    create_user("erm", True, True, session=session)
+    create_user("steph", True, False, session=session)
+    create_user("sam", True, False, session=session)
+    create_user("halle", True, False, session=session)
     users = session.query(User).all()
 
     # f = session.query(File).order_by(FileInfo.ltp.asc(),func.random()).limit(1).one()
     # print "F:",f 
     # sys.exit()
-    scan("/home/erm/Amazon MP3")
-    scan("/home/erm/dwhelper")
-    scan("/home/erm/halle")
-    scan("/home/erm/mp3")
-    scan("/home/erm/ogg")
-    scan("/home/erm/sam")
-    scan("/home/erm/steph")
-    scan("/home/erm/stereofame")
-    scan("/home/erm/Videos")
+    scan("/home/erm/Amazon MP3", session=session)
+    scan("/home/erm/dwhelper", session=session)
+    scan("/home/erm/halle", session=session)
+    scan("/home/erm/mp3", session=session)
+    scan("/home/erm/ogg", session=session)
+    scan("/home/erm/sam", session=session)
+    scan("/home/erm/steph", session=session)
+    scan("/home/erm/stereofame", session=session)
+    scan("/home/erm/Videos", session=session)

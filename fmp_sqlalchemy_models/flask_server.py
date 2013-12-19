@@ -14,12 +14,19 @@ import re
 from flask import Flask, Response, render_template, request, send_file
 from player_refactored import STOPPED, PAUSED, PLAYING
 from jukebox import HISTORY_LENGTH
+from picker import Picker
 
 from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
-                             AUDIO_MIMES, VIDEO_MIMES, make_session, User, \
-                             UserFileInfo
+                             AUDIO_MIMES, VIDEO_MIMES, User, \
+                             UserFileInfo, Base
 
 from sqlalchemy.orm.exc import NoResultFound
+from alchemy_session import db_connection_string, DB
+
+db = DB(db_connection_string)
+
+def make_session():
+    return db.session(Base)
 
 TEMP_FOLDER = "/home/erm/tmp/converted/"
 
@@ -27,6 +34,7 @@ app = Flask(__name__)
 app.debug = True
 
 jukebox = None
+jukebox_fid = None
 JUKEBOX_PLAYING_KEYS = [
     'fid',
     'artist_title',
@@ -40,26 +48,49 @@ JUKEBOX_PLAYING_KEYS = [
 ]
 
 def get_listeners():
+    print "GET LISTENERS:"
     session = make_session()
+    print "SESSION MADE"
     listeners = session.query(User).order_by(User.admin.desc(), User.uname.asc()).all()
+    print "GOT LISTENERS ... "
+    print "GOT LISTENERS:", listeners
     session.close()
     return listeners
 
+def get_file_info(fid):
+    session = make_session()
+    file_info = session.query(FileInfo)\
+                       .filter(FileInfo.fid == fid)\
+                       .limit(1)\
+                       .one()
+    print "GET FILE INFO:", file_info.to_dict(JUKEBOX_PLAYING_KEYS)
+    session.close()
+    return file_info
+
 @app.route('/')
 def index():
+    print "INDEX"
     listeners = get_listeners()
-    return render_template("index.html", jukebox=jukebox, listeners=listeners)
+    print "GOT LISTNERS"
+    playing = get_file_info(jukebox.fid)
+    pos_data = jukebox.player.pos_data
+    return render_template("index.html", pos_data=pos_data, playing=playing, 
+                           listeners=listeners)
 
 @app.route('/search/')
 def search():
     listeners = get_listeners()
-    return render_template("search.html", jukebox=jukebox, listeners=listeners)
+    playing = get_file_info(jukebox.fid)
+    return render_template("search.html", playing=playing, listeners=listeners)
 
 @app.route('/history/<uids>')
 def history(uids):
+    session = make_session()
     uids = uids.split(',')
-    history = jukebox.get_history(uids);
-    return json_response(history)
+    history = jukebox.get_history(uids, session=session);
+    resp = json_response(history)
+    session.close()
+    return resp
 
 @app.route('/listening/<uid>/<state>')
 def listening(uid, state):
@@ -74,7 +105,7 @@ def listening(uid, state):
                       .limit(1)\
                       .one()
         user.listening = listening_state
-        user.save()
+        user.save(session=session)
         resp = json_response({'STATUS': 'SUCCESS'})
     except NoResultFound:
         resp = json_response({'STATUS': 'FAIL'})
@@ -84,13 +115,24 @@ def listening(uid, state):
 
 @app.route("/pop-preload/")
 def pop_preload():
-    file_info = jukebox.picker.pop()
-    return json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    print '@app.route("/pop-preload/")'
+    session = make_session()
+    picker = Picker(session=session)
+    file_info = picker.pop()
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    session.commit()
+    session.close()
+    print '[DONE]@app.route("/pop-preload/")'
+    return resp
 
 @app.route('/web-player/')
 def web_player():
+    print "WEB player"
     listeners = get_listeners()
-    return render_template("web-player.html", jukebox=jukebox, listeners=listeners)
+    playing = get_file_info(jukebox.fid)
+    pos_data = jukebox.player.pos_data
+    return render_template("web-player.html", pos_data=pos_data, 
+                           playing=playing, listeners=listeners)
 
 def json_response(obj):
     json_obj = json.dumps(obj, indent=4)
@@ -106,19 +148,19 @@ def status_obj():
     elif player_state == PAUSED:
         state = 'PAUSED'
 
+    playing = get_file_info(jukebox.fid)
+
     return {
-        'playing': jukebox.playing.to_dict(JUKEBOX_PLAYING_KEYS),
+        'playing': playing.to_dict(JUKEBOX_PLAYING_KEYS),
         'pos_data': jukebox.player.pos_data,
         'state': state
     }
 
 @app.route('/file-info/<fid>')
 def file_info(fid):
+    file_info = get_file_info(fid)
     session = make_session()
-    file_info = session.query(FileInfo)\
-                       .filter(FileInfo.fid == fid)\
-                       .limit(1)\
-                       .one()
+    session.add(file_info)
     dict_file_info = file_info.to_dict(JUKEBOX_PLAYING_KEYS, session=session)
     resp = json_response(dict_file_info)
     session.close()
@@ -139,6 +181,7 @@ def pause():
 @app.route('/next/')
 def next():
     jukebox.next()
+    time.sleep(1)
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
@@ -146,6 +189,7 @@ def next():
 @app.route('/prev/')
 def prev():
     jukebox.prev()
+    time.sleep(1)
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
@@ -156,10 +200,14 @@ def rate(fid, uid, rating):
     uid = int(uid)
     rating = int(rating)
     found = False
-    if jukebox.playing.fid == fid:
+    
+    if jukebox.fid == fid:
         found = jukebox.rate(uid, rating)
     if not found:
-        simple_rate(fid, uid, rating)
+        session = make_session()
+        simple_rate(fid, uid, rating, session)
+        session.commit()
+        session.close()
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
@@ -167,6 +215,7 @@ def rate(fid, uid, rating):
 
 @app.route("/stream/<fid>/")
 def stream(fid):
+    print '@app.route("/stream/%s/")' % (fid,)
     def do_converting_stream(filename, mimetype):
         # gst-launch  -q filesrc location=./test.avi ! 
         # decodebin2 ! audioconvert  ! lame ! fdsink fd=1 > out.mp3
@@ -240,13 +289,17 @@ def stream(fid):
         dstfp.close()
 
     session = make_session()
+    print "made session"
     mimetypes = request.args.get("mimetypes", "")
     mimetypes = mimetypes.split(',')
+    fid = int(fid)
+    print "GETTING FILE INFO"
     file_info = session.query(FileInfo)\
-                       .filter(FileInfo.fid==fid)\
+                       .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
-
+    session.add(file_info)
+    print "fetched file info."
     mimetype = file_info.get_best_mime(mimetypes)
     send_as_file = True
     filename = file_info.filename
@@ -271,15 +324,16 @@ def stream(fid):
     print "MADEIT", mimetype
     session.close()
     if send_as_file:
+        print '[DONE]@app.route("/stream/%s/") send as file' % (fid,)
         return send_file_partial(filename, mimetype=mimetype)
-    response = Response(stream_handler(filename, mimetype), mimetype=mimetype)
+    response = Response(do_converting_stream(filename, mimetype), mimetype=mimetype)
     if size:
         response.headers.add('Content-Length', str(size))
         response.headers.add('Content-Range', 'bytes 0-%s/%s' % (size, size))
         response.headers.add('Accept-Ranges', 'bytes')
         # response.headers.add('Content-Type', mimetype)
         # Content-Range:bytes 0-6202476/6202477
-        
+    print '[DONE]@app.route("/stream/%s/") convert' % (fid,)
     return response
 
 @app.route("/mark-as-played/<fid>/<percent_played>/<uids>")
@@ -287,6 +341,7 @@ def mark_as_played(fid, percent_played, uids):
     fid = int(fid)
     uids = uids.split(',')
     percent_played = float(percent_played)
+    print '@app.route("/mark-as-played/%s/%s/%s")' % (fid, percent_played, uids)
     obj = {}
     obj['STATUS'] = 'SUCCESS'
     print "MARCUS PLAYED", "uids:", uids, "percent_played:", percent_played
@@ -296,8 +351,8 @@ def mark_as_played(fid, percent_played, uids):
                        .limit(1)\
                        .one()
     file_info.mark_as_played(percent_played=percent_played, uids=uids, session=session)
-    file_info.save(session=session)
     resp = json_response(file_info.to_dict())
+    print '[DONE]@app.route("/mark-as-played/%s/%s/%s")' % (fid, percent_played, uids)
     session.close()
     return resp
 
@@ -305,6 +360,7 @@ def mark_as_played(fid, percent_played, uids):
 def inc_skip_score(fid, uids):
     fid = int(fid)
     uids = uids.split(',')
+    print '@app.route("/inc-skip-score/%s/%s")' % (fid, uids)
     if not fid or not uids:
         return json_response({"STATUS": "FAIL"})
     session = make_session()
@@ -316,12 +372,14 @@ def inc_skip_score(fid, uids):
     file_info.inc_skip_score(uids=uids, session=session)
     resp = json_response(file_info.to_dict())
     session.close()
+    print '[DONE]@app.route("/inc-skip-score/%s/%s")' % (fid, uids)
     return resp
 
 @app.route("/deinc-skip-score/<fid>/<uids>")
 def deinc_skip_score(fid, uids):
     fid = int(fid)
     uids = uids.split(',')
+    print '@app.route("/deinc-skip-score/%s/%s")' % (fid, uids)
     if not fid or not uids:
         return json_response({"STATUS": "FAIL"})
     session = make_session()
@@ -332,6 +390,7 @@ def deinc_skip_score(fid, uids):
     file_info.deinc_skip_score(uids=uids, session=session)
     resp = json_response(file_info.to_dict())
     session.close()
+    print '[DONE]@app.route("/deinc-skip-score/%s/%s")' % (fid, uids)
     return resp
 
 resource = WSGIResource(reactor, reactor.getThreadPool(), app)

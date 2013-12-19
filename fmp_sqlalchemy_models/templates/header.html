@@ -8,7 +8,6 @@
           href="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.css"></link>
     <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
     
-    
     <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.0/backbone-min.js"></script>
     <script src="/static/js/lib/deep-model.min.js"></script>
@@ -38,45 +37,48 @@
             font-size:0.75em;
             
         }
+        div.containing-element .ui-slider-switch { 
+            width: 6em;
+        }
     </style>
 </head>
 <body>
 <script type="text/javascript">
     $(document).bind("mobileinit", function () {
         $.mobile.ajaxEnabled = false;
-        window.formatTime = function(seconds) {
-            var seconds = Math.floor(parseFloat(seconds)),
-                minutes = Math.floor(seconds / 60),
-                seconds = seconds % 60;
-            if (seconds < 10) {
-                seconds = "0"+seconds;
+        var uids = [];
+        _.each($("input.web-listeners:checked"), function(el){
+            uids.push($(el).data('uid'))
+        });
+        var playerMode = readCookie("playerMode") || "remote";
+        window.conductor = new ConductorModel({
+            "mode": playerMode,
+            "uids": uids
+        });
+        eraseCookie("playerMode");
+        createCookie('playerMode', conductor.get("mode"), 365);
+        $("#player-mode").find('option').each(function(i, el){
+            console.log('conductor.get("mode")', conductor.get("mode"))
+            var $el = $(el);
+            if ($el.val() == conductor.get("mode")) {
+                $el.prop('selected', true);
+            } else {
+                $el.prop('selected', false);
             }
-            return minutes+":"+seconds;
-        }
-        window.updateTime = function(seconds) {
-            $('.playing-time-status').text(window.formatTime(seconds));
-        }
-        var ConductorModel = Backbone.DeepModel.extend({
-                url: "/status/",
-                idAttribute: "fid",
-                listenerLength: 0,
-                initialize: function() {
-                    Backbone.DeepModel.prototype.initialize.apply(this, arguments);
-                    this.on("change:playing.listeners_ratings", this.checkListenersLength)
-                },
-                checkListenersLength: function() {
-                    var listeners_ratings = this.get("playing.listeners_ratings") || [],
-                        listeners_ratings_length = listeners_ratings.length;
-                    if (this.listenerLength == listeners_ratings_length) {
-                        return;
-                    }
-                    this.listenerLength = listeners_ratings_length;
-                    this.trigger("change:playing.listeners_ratings.length");
-                }
-            }),
+        });
+        window.webPlayer = new WebPlayerView({
+            "el": "#js-player",
+            'conductor': conductor,
+            'fid': {{ playing.fid }},
+            'resume': false,
+        }).render();
+        var controlerView  = new ControllerView({
+                "$els": $('.player-control'),
+                "conductor": conductor, 
+                "webPlayer": webPlayer
+            }).render(),
             pause_img = "/static/img/media-playback-pause.png",
             play_img = "/static/img/media-playback-start.png";
-            window.conductor = new ConductorModel(); 
             on_change_title = function(){
                 var artist_title = this.get('playing.artist_title') || 'failed',
                     title_string = "FMP - "+artist_title;
@@ -98,66 +100,26 @@
         conductor.on("change:playing.artist_title", on_change_title);
         conductor.on("change:pos_data.pos_str", on_change_time);
         conductor.on("change:state", on_state_change);
-        conductorFetchInterval = setInterval(function() {
-            conductor.fetch();
-            console.log("conductor.fetch")
-            return true;
-        }, 5000);
         conductor.fetch();
-        nano_second = 1000000000;
-
-        setInterval(function(){
-            var state = conductor.get('state');
-            if (state != 'PLAYING') {
-                return;
-            }
-            var pos = parseInt(conductor.get('pos_data.pos_int')) || 1;
-            /*
-            "dur_str": "3:54", 
-            "dur_int": 234495000000, */
-
-            pos += nano_second;
-            conductor.set('pos_data.pos_int', pos);
-            window.updateTime(Math.floor(pos / nano_second));
-            return true;
-        }, 1000);
-
-        $('.player-control').bind("tap", function(evt, ui){
-            evt.preventDefault();
-            
-            $('.player-control').removeClass("ui-btn-active");
-            $.ajax({
-              url: this.href,
-              dataType: 'json',
-              cache:false,
-            }).done(function(data, textStatus, jqXHR){
-                conductor.set(data);
-            }).always(function(jqXHR, textStatus, errorThrown){
-                $('.player-control').removeClass("ui-btn-active");
-            });
-        });
-
 
         $(".web-listeners").bind("change", function(evt){
             var checked = evt.currentTarget.checked,
                 uid = evt.currentTarget.dataset.uid;
             console.log("CHANGED:", checked, uid);
-            if (webPlayer) {
+            if (typeof(webPlayer) != 'undefined') {
+                var uids = conductor.get('uids') || [];
                 if (checked) {
-                webPlayer.uids.push(uid);
+                    uids.push(uid);
                 } else {
-                    webPlayer.uids = _.without(webPlayer.uids, [uid]); 
+                    uids = _.without(uids, uid); 
                 }
+                conductor.set("uids", uids);
             }
             $.ajax({
               url: "/listening/"+uid+"/"+checked,
               dataType: 'json',
               cache: false
-            }).done(function(data, textStatus, jqXHR) {
-
-                
-
-            });
+            }).done(function(data, textStatus, jqXHR) {});
         });
 
         conductor.on("change:playing.keywords", function(){
@@ -165,12 +127,10 @@
                 keywords = conductor.get("playing.keywords"),
                 template = _.template("<a class='keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='/search/?q=<%= encodeURIComponent(word) %>'><%- word %></a>")
             playing_keywords.empty();
-
             _.each(keywords, function(v, k){
                 // console.log("keyword:",v);
                 playing_keywords.append(template(v));
             });
-            
         });
     });
     $( document ).on( "pageinit", "#page", function() {
@@ -186,6 +146,20 @@
                 }
             }
         });
+        
+        $("#player-mode").on("change", function(evt) {
+            var selected = $(evt.currentTarget).find("option:selected").val();
+            if (selected == 'web') {
+                // breakdown remote init web
+                conductor.set("mode", "web");
+                webPlayer.$el.show();
+            } else {
+                conductor.set("mode", "remote");
+                webPlayer.$el.hide();
+                // breakdown web init remote
+            }
+            conductor.initInterval();
+        });
     });
 </script>
 <div data-role="page" data-theme="b" id="page">
@@ -194,11 +168,11 @@
         <a href="#right-panel" data-theme="b" data-icon="gear" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>
         <div style='text-align:center; max-width:75%; margin:auto; padding:10px;'>
             <span>FMP - </span>
-            <span class='playing-artist-title'>{{jukebox.playing.artist_title}}</span>
+            <span class='playing-artist-title'>{{playing.artist_title}}</span>
              - 
-            <span class='playing-time-status'>{{jukebox.player.pos_data['pos_str']}}</span>
+            <span class='playing-time-status'>{{pos_data['pos_str']}}</span>
             
         </div>
     </div>
     <div data-role="content">
-        
+    <div id="js-player" style='width:100%;'></div>

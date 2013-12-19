@@ -24,7 +24,7 @@ import gtk
 import gobject
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, make_session
+                             UserFileInfo, make_session, Base, and_
 from sqlalchemy.orm.exc import NoResultFound
 
 import flask_server
@@ -47,7 +47,6 @@ class JukeBox:
         self.init_player()
         self.init_tray()
         self.init_flask()
-        
 
     def init_flask(self):
         flask_server.jukebox = self
@@ -109,7 +108,7 @@ class JukeBox:
         self.picker = Picker(session=self.session)
         # self.picker.do()
         # self.playing = self.picker.pop()
-        gobject.timeout_add(15000, self.picker.do)
+        gobject.timeout_add(15000, self.picker.do_wrapper)
 
     def init_player(self):
         self.player = Player()
@@ -129,22 +128,26 @@ class JukeBox:
         if self.history:
             self.index = len(self.history) - 1
 
-    def get_history(self, uids=None):
+    def get_history(self, uids=None, session=None):
+        if session is None:
+            session = self.session
         history = []
-        _filter = User.listening==True
+        _filter = and_(User.listening==True, 
+                       UserFileInfo.ultp != None)
         if uids is not None and isinstance(uids, list):
-            _filter = User.uid.in_(uids)
-        recent_history = self.session.query(UserFileInfo)\
-                                     .filter(_filter)\
-                                     .order_by(UserFileInfo.ultp.desc())\
-                                     .limit(HISTORY_LENGTH)
+            _filter = and_(User.uid.in_(uids),
+                           UserFileInfo.ultp != None)
+        recent_history = session.query(UserFileInfo)\
+                                .filter(_filter)\
+                                .order_by(UserFileInfo.ultp.desc())\
+                                .limit(HISTORY_LENGTH)
 
         for h1 in recent_history:
             if h1 and h1.fid not in history and h1.fid:
                 history.append(h1.fid)
 
         history.reverse()
-        return history
+        return history;
 
 
     def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
@@ -164,6 +167,7 @@ class JukeBox:
         print "mark as played:", percent_played, "***", pos_float
         self.playing.mark_as_played(percent_played=percent_played, 
                                     session=self.session)
+        print "**MARKED"
         print self.playing.json(['artists', 'titles', 'fid', 
                                  'listeners_ratings', 'genres', 'filename', 
                                  'history'])
@@ -226,8 +230,9 @@ class JukeBox:
     def rate(self, uid, rating):
         for l in self.playing.listeners_ratings:
             if l.uid == uid:
-                print "RATING:",l
-                l.rate(rating)
+                print "JUKEBOX RATING:",l
+                l.rate(rating, session=self.session)
+                print "JUKEBOX DONE RATING"
                 self.set_tray_data()
                 return True
 
@@ -237,11 +242,15 @@ class JukeBox:
     def artist_title(self):
         return self.playing.artist_title
 
+    @property 
+    def fid(self):
+        return self.playing.fid
+
     def __repr__(self):
         return "<Jukebox Repr>".__repr__()
 
 
 if __name__ == '__main__':
-    session = make_session()
+    session = make_session(Base)
     jukebox = JukeBox(session)
     gtk.main()

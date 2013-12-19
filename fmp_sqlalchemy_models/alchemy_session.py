@@ -23,12 +23,12 @@ db_connection_string = 'sqlite:///{CONFIG_PATH}file_info_idea.sqlite.db'.format(
     "CONFIG_PATH": CONFIG_PATH
 })
 
-if "--pgsql" in sys.argv:
-    CONNECTION_FILE = os.path.join(CONFIG_PATH,"db-connection-string")
-    if os.path.exists(CONNECTION_FILE):
-        fp = open(CONNECTION_FILE, 'r')
-        db_connection_string = fp.read().strip()
-        fp.close()
+# if "--pgsql" in sys.argv:
+CONNECTION_FILE = os.path.join(CONFIG_PATH,"db-connection-string")
+if os.path.exists(CONNECTION_FILE):
+    fp = open(CONNECTION_FILE, 'r')
+    db_connection_string = fp.read().strip()
+    fp.close()
 
 class DB:
     def __init__(self, db_connection_string):
@@ -40,7 +40,7 @@ class DB:
         }
         if db_connection_string.startswith('sqlite'):
             kwargs['poolclass'] = StaticPool
-            kwargs['connect_args'] = { 'check_same_thread': False }
+            # kwargs['connect_args'] = { 'check_same_thread': False }
 
         self.engine = create_engine(db_connection_string, **kwargs)
         self.session_factory = None

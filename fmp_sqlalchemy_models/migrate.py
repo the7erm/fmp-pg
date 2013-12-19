@@ -31,8 +31,9 @@ import gtk
 import gobject
 from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
                              Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, session, NoResultFound, and_
+                             UserFileInfo, make_session, NoResultFound, and_
 
+session = make_session()
 gobject.threads_init()
 gtk.gdk.threads_init()
 
@@ -319,7 +320,7 @@ WHERE user_file_info.fid = :fid_1 AND users.uname = :uname_1"""
                    h2.fid == user_file_info.fid and \
                    h2.date_played == h1['date_played']:
                     found = True
-                   break
+                    break
 
             if found:
                 print "FOUND:",dict(h1)
@@ -334,9 +335,9 @@ WHERE user_file_info.fid = :fid_1 AND users.uname = :uname_1"""
                                       true_score=h1['true_score'],
                                       time_played=h1['time_played'],
                                       date_played=h1['date_played'])
-            user_history.save()
+            user_history.save(session=session)
             user_file_info.history.append(user_history)
-            user_file_info.save()
+            user_file_info.save(session=session)
             """
             uhid = Column(Integer, primary_key=True)
             uid = Column(Integer, ForeignKey("users.uid"))
@@ -366,9 +367,10 @@ WHERE user_file_info.fid = :fid_1 AND users.uname = :uname_1"""
                 "user_history_pkey" PRIMARY KEY, btree (uhid)
                 "uid_id_id_type_date_played" UNIQUE, btree (uid, id, id_type, date_played)
             """
-        user_file_info.rate(r['rating'])
-        print user_file_info.json()
-        print user_file_info.history
+        user_file_info.rate(r['rating'], session=session)
+        print "location_info.filename:", location_info.filename
+        print "user_file_info.json()",user_file_info.json()
+        print "user_file_info.history", user_file_info.history
         session.commit()
 
 

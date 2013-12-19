@@ -49,13 +49,8 @@
         overflow: auto;
         -webkit-overflow-scrolling: touch;
     }
+    .containing-element {width: 30em;}
 </style>
-<!--
-<audio controls>
-    <source src="/stream/{{jukebox.playing.fid}}/ogg" type="audio/ogg">
-    <source src="/stream/{{jukebox.playing.fid}}/mp3" type="audio/mpeg">
-    Your browser does not support the audio element.
-</audio> -->
 <div id="ratings"></div>
 <br clear="all">
 <div id="history"></div>
@@ -115,116 +110,6 @@
 </script>
 
 <script type="text/javascript">
-
-    window.RatingButtonView = Backbone.View.extend({
-        rating: 6,
-        uid: 0,
-        fid: 0,
-        template: _.template($("#tpl-rating-button").html()),
-        initialize: function(options){
-            this.fid = options.fid;
-            this.rating = options.rating;
-            this.uid = options.uid;
-            this.user = options.user;
-            this.menu_id = "rating-popup-menu-"+this.fid+"-"+this.uid;
-        },
-        render: function(){
-            this.$el.html(this.template({
-                "rating": this.rating,
-                "uid": this.uid,
-                "fid": this.fid,
-                "menu_id": this.menu_id,
-                "user": this.user,
-            })).trigger( "create" );
-            this.$popupMenu = $("#"+this.menu_id);
-            this.$popupMenu.find('.rating-popup-link')
-                           .bind("click", _.bind(this.onRate, this));
-            return this;
-        },
-        onRate: function(evt) {
-            evt.preventDefault();
-            this.$popupMenu.popup("close");
-            var _this = this;
-            this.rating = $(evt.currentTarget).data("rating");
-            this.syncRatingImg();
-            $.ajax({
-              url: evt.currentTarget.href,
-              dataType: 'json'
-            }).done(function(data, textStatus, jqXHR) {
-                var conductor_fid = conductor.get("playing.fid") || 0;
-                if (conductor_fid == _this.fid) {
-                    conductor.set(data);
-                }
-            });
-        },
-        syncRatingImg: function() {
-            var popup_button = this.$(".open-popup");
-            for (var i=0;i<7;i++) {
-                popup_button.removeClass("rating-"+i)
-            }
-            popup_button.addClass("rating-"+this.rating);
-        }
-    });
-
-    window.HistoryModel = Backbone.Model.extend({
-        idAttribute: "uhid",
-    });
-
-    window.HistoryCollection = Backbone.Collection.extend({
-        model: HistoryModel
-    })
-
-    window.HistoryViewLiView = Backbone.View.extend({
-        initialize: function(options){
-            this.model = options.model;
-            this.model.on("change", this.onModelChange);
-            this.parentEl = options.parentEl;
-        },
-        onModelChange: function(){
-            // console.log("MODEL CHANGED:", self.model.toJSON());
-        },
-        render: function(){
-            return this;
-        }
-    });
-
-    window.HistoryView = Backbone.View.extend({
-        template: _.template($("#tpl-history").html()),
-        template_li_divider: _.template($("#tpl-history-li-divider").html()),
-        template_li: _.template($("#tpl-history-li").html()),
-        initialize: function(options) {
-            this.collection = options.collection;
-            this.model = options.model;
-            this.el = options.el;
-            this.collection.on("add", this.onAddCollection, this);
-        },
-        onAddCollection: function(model, collection, evt){
-            if (evt.add) {
-                var attrs = model.toJSON();
-                attrs['user'] = model.get('user.uname');
-                this.$ul.append(this.template_li_divider(attrs));
-                this.$ul.append(this.template_li(attrs));
-                this.$ul.listview("refresh");
-                model.el = this.$ul.find("li:last");
-                model.on("change", this.onModelChange, this);
-            }
-        },
-        onModelChange:function(model){
-            _.each(model.changed, function(v, k){
-                if (k == 'percent_played' || k == 'true_score') {
-                    v = v.toFixed(2);
-                }
-                model.el.find(".history-"+k).text(v);
-            });
-        },
-        render: function() {
-            this.$el.html(this.template({}));
-            this.$ul = this.$el.find("ul");
-            this.$ul.trigger("create");
-            return this;
-        }
-    });
-
     $(document).bind("mobileinit", function () {
          
         $('#user-agent').text(navigator.userAgent);
@@ -237,46 +122,13 @@
             historyView = new HistoryView({
                 "el": "#history",
                 "model": historyModel,
-                "collection": historyCollection
+                "collection": historyCollection,
+                "conductor": conductor
+            }).render(),
+            ratingsView = new RatingView({
+                "el": "#ratings",
+                "conductor": conductor
             }).render();
-        conductor.on("change:playing.history",function(){
-            var playing_history = conductor.get('playing.history');
-            _.each(playing_history, function(v, k){
-                var present = historyView.collection.get(v.uhid);
-                v.time_played = new Date(v.time_played);
-                v.date = new Date(v.date);
-                if (!present) {
-                    historyCollection.add(v);
-                } else {
-                    present.set(v);
-                }
-            });
-        });
-        var renderRatings = function(){
-            var ratings = conductor.get('playing.listeners_ratings') || [],
-                $ratings = $("#ratings");
-            $ratings.empty();
-            _.each(ratings, function(rating){
-                // console.log("rating",rating)
-                var ratingDiv = $("<div></div>");
-                $ratings.append(ratingDiv);
-                var ratingView = new RatingButtonView({
-                    "user": rating['user.uname'],
-                    "uid": rating.uid,
-                    "fid": rating.fid,
-                    "rating": rating.rating,
-                    "el": ratingDiv
-                }).render();
-            });
-        }
-        var clearHistory = function() {
-            $("#history").find("ul").empty();
-            historyCollection.reset();
-        }
-        conductor.on("change:playing.fid", renderRatings);
-        conductor.on("change:playing.listeners_ratings.length", renderRatings);
-        conductor.on("change:playing.fid", clearHistory);
-        conductor.on("change:playing.listeners_ratings.length", clearHistory);
     });
 </script>
 {% include "footer.html" %}

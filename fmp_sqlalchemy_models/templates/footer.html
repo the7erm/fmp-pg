@@ -1,3 +1,4 @@
+    
     </div>
     <div data-role="panel" id="left-panel" data-theme="b">
         {% include "panel-header.html" ignore missing %}
@@ -7,6 +8,13 @@
 
     <div data-role="panel" id="right-panel" data-display="push" data-position="right" data-theme="b">
         {% include "panel-header.html" ignore missing %}
+        <div class="containing-element">
+          <label for="player-mode">Player Mode:</label>
+          <select name="player-mode" id="player-mode" data-role="slider" data-mini="true">
+            <option value="web">Web</option>
+            <option value="remote" selected>Remote</option>
+          </select>
+        </div>
         <legend>Listeners</legend>
         <fieldset data-role="controlgroup">
             {% for user in listeners %}
@@ -48,6 +56,7 @@
         </div>
     </div>
 </div>
+<script src="/static/js/lib/fmp.js"></script>
 <script src="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js"></script>
 </body>
 </html>

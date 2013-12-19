@@ -23,7 +23,8 @@ import sys, os, time, thread, signal, urllib, gc
 import gobject, pygst, pygtk, gtk, appindicator, pango
 import base64
 from time import sleep
-# gobject.threads_init()
+gobject.threads_init()
+gtk.gdk.threads_init()
 pygst.require("0.10")
 import gst
 
