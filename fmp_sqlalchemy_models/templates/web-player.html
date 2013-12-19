@@ -16,12 +16,6 @@
             "el": "#js-player",
             "fid": "{{ playing.fid }}"
         }).render();
-        webPlayer.vid.addEventListener("play", function(){
-            $('.playing-state-img').attr('src', '/static/img/media-playback-pause.png');
-        });
-        webPlayer.vid.addEventListener("pause", function(){
-            $('.playing-state-img').attr('src', '/static/img/media-playback-start.png');
-        });
         $.ajax({
           url: "/history/"+uids.join(","),
           dataType: 'json',

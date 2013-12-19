@@ -275,36 +275,8 @@ window.WebPlayerView = Backbone.View.extend({
         this.incSkipScore();
         this.incIndex();
     },
-    incIndex: function(){
-        var playlistIndex = this.playlistIndex + 1;
-        console.log("this.playlistIndex:", playlistIndex);
-        this.setIndex(playlistIndex);
-        this.popPreload();
-    },
     getUids: function(){
         return this.conductor.get("uids") || [];
-    },
-    deIncSkipScore: function() {
-        var uids = this.getUids();
-        if (!uids) {
-            return;
-        }
-        $.ajax({
-          url: "/deinc-skip-score/"+this.fid+"/"+uids.join(","),
-          dataType: 'json',
-          cache: false
-        });
-    },
-    incSkipScore: function() {
-        var uids = this.getUids();
-        if (!uids) {
-            return;
-        }
-        $.ajax({
-          url: "/inc-skip-score/"+this.fid+"/"+uids.join(","),
-          dataType: 'json',
-          cache: false
-        });
     },
     sendPercentPlayed: function(percent_played) {
         if (this.conductor.isRemoteMode()) {
@@ -338,28 +310,11 @@ window.WebPlayerView = Backbone.View.extend({
             }
         }, this);
     },
-    render: function(){
-        if (_.isEmpty(this.supportedMimeTypes)) {
-            this.$el.text("Your browser does not support the web player");
-            return this;
-        }
-        this.$el.empty();
-        this.$el.append(this.vid);
-        this.$el.css("width","100%");
-        this.vid.style.width="100%";
-        this.$el.append("<br clear='all'>");
-        this.vid.src = this.getSrc();
-        if (this.conductor.isRemoteMode()) {
-            // this.$el.hide();
-        }
-        return this;
-    },
     setSrc: function(fid, resume) {
         this.fid = fid;
         this.vid.src = this.getSrc();
         if (this.conductor.isWebMode()) {
             this.vid.play();
-            return;
         }
         this.getFileInfo(resume);
         this.resetTimes();
@@ -376,6 +331,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.vid.currentTime = resumeTime;
     },
     getFileInfo: function(resume) {
+        console.log("getFileInfo")
         $.ajax({
           url: "/file-info/"+this.fid,
           dataType: 'json',
@@ -388,6 +344,7 @@ window.WebPlayerView = Backbone.View.extend({
         }, this));
     },
     processFileInfo:function(data, textStatus, jqXHR) {
+        console.log("processFileInfo:", data);
         conductor.set('playing', data);
     },
     getSrc: function() {
@@ -400,36 +357,27 @@ window.WebPlayerView = Backbone.View.extend({
         uri += mimetypes.join(",");
         return uri;
     },
-    popPreload: function(cb) {
-        if (this.popPreload_locked) {
-            return;
-        }
-        this.popPreload_locked = true;
-        $.ajax({
-          url: "/pop-preload/",
-          dataType: 'json',
-          cache: false
-        }).done(_.bind(this.appendToPlaylist, this, cb));
-    },
-    appendToPlaylist: function(cb, data, textStatus, jqXHR) {
-        if (data) {
-            this.playlist.push(data.fid);
-            if (cb) {
-                cb();
-            }
-        }
-        this.popPreload_locked = false;
-    },
     next: function() {
         console.log("webPlayer Next");
         this.deIncSkipScore();
         this.incIndex();
     },
-    prev: function() {
-        console.log("webPlayer Prev");
-        var playlistIndex = this.playlistIndex;
-        playlistIndex -= 1;
-        this.setIndex(idx);
+    deIncSkipScore: function() {
+        var uids = this.getUids();
+        if (!uids) {
+            return;
+        }
+        $.ajax({
+          url: "/deinc-skip-score/"+this.fid+"/"+uids.join(","),
+          dataType: 'json',
+          cache: false
+        });
+    },
+    incIndex: function(){
+        var playlistIndex = this.playlistIndex + 1;
+        console.log("this.playlistIndex:", playlistIndex);
+        this.setIndex(playlistIndex);
+        this.popPreload();
     },
     setIndex: function(idx, resume) {
         if (idx < 0) {
@@ -453,6 +401,59 @@ window.WebPlayerView = Backbone.View.extend({
         if (idx == this.playlist.length) {
             this.popPreload();
         }
+    },
+    popPreload: function(cb) {
+        if (this.popPreload_locked) {
+            return;
+        }
+        this.popPreload_locked = true;
+        $.ajax({
+          url: "/pop-preload/",
+          dataType: 'json',
+          cache: false
+        }).done(_.bind(this.appendToPlaylist, this, cb));
+    },
+    appendToPlaylist: function(cb, data, textStatus, jqXHR) {
+        if (data) {
+            this.playlist.push(data.fid);
+            if (cb) {
+                cb();
+            }
+        }
+        this.popPreload_locked = false;
+    },
+    prev: function() {
+        console.log("webPlayer Prev");
+        var playlistIndex = this.playlistIndex;
+        playlistIndex -= 1;
+        this.setIndex(idx);
+    },
+    incSkipScore: function() {
+        var uids = this.getUids();
+        if (!uids) {
+            return;
+        }
+        $.ajax({
+          url: "/inc-skip-score/"+this.fid+"/"+uids.join(","),
+          dataType: 'json',
+          cache: false
+        });
+    },
+    render: function(){
+        if (_.isEmpty(this.supportedMimeTypes)) {
+            this.$el.text("Your browser does not support the web player");
+            return this;
+        }
+        this.$el.empty();
+        this.$el.append(this.vid);
+        this.$el.css("width","100%");
+        this.vid.style.width="100%";
+        this.$el.append("<br clear='all'>");
+        this.vid.src = this.getSrc();
+        if (this.conductor.isRemoteMode()) {
+            // this.$el.hide();
+        }
+        return this;
     }
 });
 
