@@ -350,11 +350,14 @@ class Picker():
         session.commit()
         
 
-    def get_next_user(self):
+    def get_next_user(self, uids=None):
         user = None
+        _filter = User.listening==True
+        if uids is not None and isinstance(uids, list):
+            _filter = User.uid.in_(uids)
         try:
             user = self.session.query(User)\
-                          .filter(User.listening==True)\
+                          .filter(_filter)\
                           .order_by(User.last_time_cued.asc())\
                           .limit(1)\
                           .one()
@@ -376,12 +379,12 @@ class Picker():
             preload_entry = None
         return preload_entry
 
-    def pop(self):
-        user = self.get_next_user()
+    def pop(self, uids=None):
+        user = self.get_next_user(uids=uids)
         user.last_time_cued = datetime.datetime.now()
         preload_entry = self.get_file_from_preload_for_uid(user.uid)
         if not preload_entry:
-            self.do()
+            self.do(uids=uids)
             preload_entry = self.get_file_from_preload_for_uid(user.uid)
 
         wait()

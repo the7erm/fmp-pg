@@ -21,6 +21,7 @@ from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
                              UserFileInfo, Base
 
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import InvalidRequestError
 from alchemy_session import db_connection_string, DB
 
 db = DB(db_connection_string)
@@ -113,26 +114,18 @@ def listening(uid, state):
         session.close()
     return resp
 
-@app.route("/pop-preload/")
-def pop_preload():
-    print '@app.route("/pop-preload/")'
+@app.route("/pop-preload/<uids>")
+def pop_preload(uids):
+    print '@app.route("/pop-preload/%s")' % (uids,)
+    uids = uids.split(",")
     session = make_session()
     picker = Picker(session=session)
-    file_info = picker.pop()
+    file_info = picker.pop(uids)
     resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
     session.commit()
     session.close()
     print '[DONE]@app.route("/pop-preload/")'
     return resp
-
-@app.route('/web-player/')
-def web_player():
-    print "WEB player"
-    listeners = get_listeners()
-    playing = get_file_info(jukebox.fid)
-    pos_data = jukebox.player.pos_data
-    return render_template("web-player.html", pos_data=pos_data, 
-                           playing=playing, listeners=listeners)
 
 def json_response(obj):
     json_obj = json.dumps(obj, indent=4)
@@ -346,12 +339,30 @@ def mark_as_played(fid, percent_played, uids):
     obj['STATUS'] = 'SUCCESS'
     print "MARCUS PLAYED", "uids:", uids, "percent_played:", percent_played
     session = make_session()
-    file_info = session.query(FileInfo)\
-                       .filter(FileInfo.fid == fid)\
-                       .limit(1)\
-                       .one()
+    print "session made for markus"
+    try_cnt = 0;
+    while try_cnt < 10:
+        try:
+            file_info = session.query(FileInfo)\
+                               .filter(FileInfo.fid == fid)\
+                               .limit(1)\
+                               .one()
+        except InvalidRequestError, e:
+            try_cnt += 1
+            print "InvalidRequestError:",e
+            session.rollback()
+            time.sleep(0.1)
+            continue
+        break
+
+    if try_cnt >= 10:
+        session.close()
+        return json_response({})
+
+    print "file_info was fetched"
     file_info.mark_as_played(percent_played=percent_played, uids=uids, session=session)
-    resp = json_response(file_info.to_dict())
+    print "actual mark_as_played succeeded"
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS, session=session))
     print '[DONE]@app.route("/mark-as-played/%s/%s/%s")' % (fid, percent_played, uids)
     session.close()
     return resp

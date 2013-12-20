@@ -4,10 +4,12 @@ window.RatingButtonView = Backbone.View.extend({
     fid: 0,
     template: _.template($("#tpl-rating-button").html()),
     initialize: function(options){
+        Backbone.View.prototype.initialize.apply(this, arguments);
         this.fid = options.fid;
         this.rating = options.rating;
         this.uid = options.uid;
         this.user = options.user;
+        this.conductor = options.conductor;
         this.menu_id = "rating-popup-menu-"+this.fid+"-"+this.uid;
     },
     render: function(){
@@ -33,9 +35,9 @@ window.RatingButtonView = Backbone.View.extend({
           url: evt.currentTarget.href,
           dataType: 'json'
         }).done(function(data, textStatus, jqXHR) {
-            var conductor_fid = conductor.get("playing.fid") || 0;
+            var conductor_fid = this.conductor.get("playing.fid") || 0;
             if (conductor_fid == _this.fid) {
-                conductor.set(data);
+                this.conductor.set({"playing": data});
             }
         });
     },
@@ -53,11 +55,49 @@ window.HistoryModel = Backbone.Model.extend({
 });
 
 window.HistoryCollection = Backbone.Collection.extend({
-    model: HistoryModel
+    model: HistoryModel,
+    initialize: function() {
+        Backbone.Collection.prototype.initialize.apply(this, arguments);
+        this.sortField = "time_played";
+        this.sortDirection = "DESC";
+    },
+    setSortField: function (field, direction) {
+       this.sortField = field;
+       this.sortDirection = direction;
+    },
+
+    comparator: function (m) {
+       return m.get(this.sortField);
+    },
+
+    // Overriding sortBy (copied from underscore and just swapping left and right for reverse sort)
+    sortBy: function (iterator, context) {
+       var obj = this.models,
+           direction = this.sortDirection;
+
+       return _.pluck(_.map(obj, function (value, index, list) {
+           return {
+               value: value,
+               index: index,
+               criteria: iterator.call(context, value, index, list)
+           };
+       }).sort(function (left, right) {
+           // swap a and b for reverse sort
+           var a = direction === "ASC" ? left.criteria : right.criteria,
+               b = direction === "ASC" ? right.criteria : left.criteria;
+
+           if (a !== b) {
+               if (a > b || a === void 0) return 1;
+               if (a < b || b === void 0) return -1;
+           }
+           return left.index < right.index ? -1 : 1;
+       }), 'value');
+    }
 })
 
 window.HistoryViewLiView = Backbone.View.extend({
     initialize: function(options){
+        Backbone.View.prototype.initialize.apply(this, arguments);
         this.model = options.model;
         this.model.on("change", this.onModelChange);
         this.parentEl = options.parentEl;
@@ -75,12 +115,14 @@ window.HistoryView = Backbone.View.extend({
     template_li_divider: _.template($("#tpl-history-li-divider").html()),
     template_li: _.template($("#tpl-history-li").html()),
     initialize: function(options) {
+        Backbone.View.prototype.initialize.apply(this, arguments);
         this.collection = options.collection;
         this.model = options.model;
         this.el = options.el;
+        this.collection.setSortField("time_played", "ASC");
         this.collection.on("add", this.onAddCollection, this);
         this.conductor = options.conductor;
-        this.conductor.on("change:playing.fid",_.bind(this.clearHistory, this));
+        this.conductor.on("change:playing.fid", _.bind(this.clearHistory, this));
         this.conductor.on("change:playing.history", _.bind(this.updateHistory, this));
     },
     clearHistory: function() {
@@ -88,20 +130,34 @@ window.HistoryView = Backbone.View.extend({
         this.collection.reset();
     },
     updateHistory: function(){
-        var playing_history = this.conductor.get('playing.history');
+        var playing_history = this.conductor.get('playing.history'),
+            rebuild = false;
         _.each(playing_history, function(v, k) {
             var present = this.collection.get(v.uhid);
             v.time_played = new Date(v.time_played);
             v.date = new Date(v.date);
             if (!present) {
-                this.collection.add(v);
+                rebuild = true;
             } else {
                 present.set(v);
             }
         }, this);
+        if (rebuild) {
+            this.clearHistory();
+            _.each(playing_history, function(v, k) {
+                var present = this.collection.get(v.uhid);
+                v.time_played = new Date(v.time_played);
+                v.date = new Date(v.date);
+                if (!present) {
+                    this.collection.add(v);
+                } else {
+                    present.set(v);
+                }
+            }, this);
+        }
     },
-    onAddCollection: function(model, collection, evt){
-        console.log("onAddCollection evt:",evt)
+    onAddCollection: function(model, collection, evt) {
+        console.log("onAddCollection evt:", evt);
         if (evt.add) {
             var attrs = model.toJSON();
             attrs['user'] = model.get('user.uname');
@@ -147,21 +203,22 @@ window.WebPlayerView = Backbone.View.extend({
     supportedMimeTypes: {},
     playlist: [],
     playlistIndex: 0,
+    refetchTimeout: null,
     initialize: function(options){
+        Backbone.View.prototype.initialize.apply(this, arguments);
         this.vid = document.createElement('audio');
         this.vid.id = "video-player";
         this.vid.style.width = "100%";
         this.vid.seekable = true;
-        this.bindVideoEvents();
+        this.vid.controls = true;
+        this.bindEvents();
         this.checkSupportedTypes();
         this.el = options.el;
-        this.vid.controls = true;
         this.fid = options.fid;
+        this.resume = options.resume || false;
         this.resetTimes();
-        this.conductor = options.conductor;
         this.$playingStateImg = $('.playing-state-img');
-        this.vid.addEventListener("play", _.bind(this.onPlay, this));
-        this.vid.addEventListener("pause", _.bind(this.onPause, this));
+        this.conductor = options.conductor;
         this.conductor.on("change:playing.fid", _.bind(this.setSrcToConductor, this));
         this.conductor.on("change:mode", _.bind(this.onChangeMode, this));
     },
@@ -175,6 +232,9 @@ window.WebPlayerView = Backbone.View.extend({
         }
     },
     setSrcToConductor: function() {
+        if (this.conductor.isWebMode()) {
+            return;
+        }
         var fid = this.conductor.get("playing.fid");
         console.log("setSrcToConductor:", fid);
         this.playlist.push(fid);
@@ -195,7 +255,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.lastCurrentTime = -100;
         this.lastUpdateTime = -100;
     },
-    bindVideoEvents: function(){
+    bindEvents: function(){
         var $vid = $(this.vid);
         
         var events = [
@@ -228,6 +288,8 @@ window.WebPlayerView = Backbone.View.extend({
         }, this);
         this.vid.addEventListener('timeupdate', _.bind(this.onTimeStatus, this));
         this.vid.addEventListener('ended', _.bind(this.markAsCompleted, this));
+        this.vid.addEventListener("play", _.bind(this.onPlay, this));
+        this.vid.addEventListener("pause", _.bind(this.onPause, this));
         // this.vid.addEventListener('progress', _.bind(this.markeAsCompleted, this));
     },
     logEvent: function(evt, arg2){
@@ -257,7 +319,6 @@ window.WebPlayerView = Backbone.View.extend({
         this.markAsPlayed();
     },
     markAsPlayed: function() {
-        
         var currentTime = parseFloat(this.vid.currentTime);
 
         if (currentTime > this.lastCurrentTime - 5 &&
@@ -287,12 +348,14 @@ window.WebPlayerView = Backbone.View.extend({
         if (!uids) {
             return;
         }
-        console.log("sendPercentPlayed uids:", uids);
+        console.log("sendPercentPlayed uids:", uids, percent_played);
         $.ajax({
           url: "/mark-as-played/"+this.fid+"/"+percent_played+"/"+uids.join(","),
           dataType: 'json',
           cache: false
-        });
+        }).done(_.bind(this.processFileInfo, this));
+        createCookie("percent_played", percent_played);
+        createCookie("playing_fid", this.fid);
     },
     checkSupportedTypes:function(){
         var mimeTypes = {
@@ -310,42 +373,64 @@ window.WebPlayerView = Backbone.View.extend({
             }
         }, this);
     },
-    setSrc: function(fid, resume) {
+    setSrc: function(fid) {
         this.fid = fid;
         this.vid.src = this.getSrc();
         if (this.conductor.isWebMode()) {
             this.vid.play();
+            createCookie("playing_fid", fid);
         }
-        this.getFileInfo(resume);
+        this.getFileInfo();
         this.resetTimes();
     },
     doResume:function(data){
         if (this.conductor.isRemoteMode()) {
             return;
         }
+        if (!this.resume) {
+            return;
+        }
+        this.resume = false;
         console.log("DATA:", data)
         console.log(data.listeners_ratings);
-        console.log("this.vid.duration:",this.vid.duration);
+        console.log("this.vid.duration:", this.vid.duration);
         var resumeTime = this.vid.duration * parseFloat(data.listeners_ratings[0].percent_played) * 0.01;
         console.log("Resume Time:", resumeTime)
         this.vid.currentTime = resumeTime;
+        this.vid.play();
     },
-    getFileInfo: function(resume) {
-        console.log("getFileInfo")
+    getFileInfo: function() {
+        console.log("getFileInfo");
         $.ajax({
           url: "/file-info/"+this.fid,
           dataType: 'json',
           cache: false
         }).done(_.bind(this.processFileInfo, this))
-        .always(_.bind(function(data){
-            if (resume) {
-                this.vid.addEventListener("canplaythrough", _.once(_.bind(this.doResume, this, data)));
-            }
-        }, this));
+          .fail(_.bind(this.retryIn2Seconds, this));
     },
-    processFileInfo:function(data, textStatus, jqXHR) {
+    clearRefetch: function(){
+        if (this.refetchTimeout) {
+            clearTimeout(this.refetchTimeout);
+            this.refetchTimeout = null;
+        }
+    },
+    retryIn2Seconds: function() {
+        this.clearRefetch();
+        this.refetchTimeout = setTimeout(_.bind(this.getFileInfo ,this), 2000);
+    },
+    processFileInfo: function(data, textStatus, jqXHR) {
+        if (!data) {
+            return;
+        }
+        this.clearRefetch();
         console.log("processFileInfo:", data);
-        conductor.set('playing', data);
+        this.conductor.set('playing', data);
+        if (this.resume) {
+            this.vid.addEventListener("canplaythrough", _.once(
+                _.bind(
+                    this.doResume, this, data
+                )));
+        }
     },
     getSrc: function() {
         var uri = "/stream/"+this.fid+"/?mimetypes=",
@@ -374,17 +459,19 @@ window.WebPlayerView = Backbone.View.extend({
         });
     },
     incIndex: function(){
-        var playlistIndex = this.playlistIndex + 1;
-        console.log("this.playlistIndex:", playlistIndex);
-        this.setIndex(playlistIndex);
+        var idx = this.playlistIndex + 1;
+        console.log("incIndex idx:", idx);
+        this.setIndex(idx);
         this.popPreload();
     },
-    setIndex: function(idx, resume) {
+    setIndex: function(idx) {
         if (idx < 0) {
             return;
         }
-        console.log("setIndex:this.playlist.length",this.playlist.length)
-        console.log("IDX",idx)
+        console.log("setIndex:this.playlist.length", this.playlist.length);
+        console.log("IDX", idx);
+        console.log("this.playlist[idx]", this.playlist[idx]);
+
         if (idx == this.playlist.length) {
             console.log("idx == this.playlist.length:", idx,'==', this.playlist.length);
             this.popPreload(_.once(
@@ -393,25 +480,32 @@ window.WebPlayerView = Backbone.View.extend({
                 }, 
                 this)
             ));
+            return;
         }
-        if (this.playlist[idx]) {
+
+        if (!_.isUndefined(this.playlist[idx])) {
             this.playlistIndex = idx;
-            this.setSrc(this.playlist[this.playlistIndex], resume);
+            this.setSrc(this.playlist[this.playlistIndex]);
+            
         }
-        if (idx == this.playlist.length) {
-            this.popPreload();
-        }
+        
     },
     popPreload: function(cb) {
         if (this.popPreload_locked) {
+            console.log("popPreload_locked")
             return;
         }
         this.popPreload_locked = true;
+        var uids = this.getUids();
         $.ajax({
-          url: "/pop-preload/",
+          url: "/pop-preload/"+uids.join(","),
           dataType: 'json',
           cache: false
-        }).done(_.bind(this.appendToPlaylist, this, cb));
+        }).done(_.bind(this.appendToPlaylist, this, cb))
+          .fail(_.bind(
+            function() {
+                this.popPreload_locked = false;
+            }, this));
     },
     appendToPlaylist: function(cb, data, textStatus, jqXHR) {
         if (data) {
@@ -419,6 +513,8 @@ window.WebPlayerView = Backbone.View.extend({
             if (cb) {
                 cb();
             }
+        } else {
+            console.log("NO DATA");
         }
         this.popPreload_locked = false;
     },
@@ -449,9 +545,15 @@ window.WebPlayerView = Backbone.View.extend({
         this.$el.css("width","100%");
         this.vid.style.width="100%";
         this.$el.append("<br clear='all'>");
-        this.vid.src = this.getSrc();
         if (this.conductor.isRemoteMode()) {
-            // this.$el.hide();
+            this.$el.hide();
+            this.vid.pause();
+        } else {
+            this.$el.show();
+            this.resume = true;
+            this.playlist.push(this.fid);
+            this.setIndex(0);
+            this.vid.play();
         }
         return this;
     }
@@ -478,7 +580,6 @@ window.ConductorModel = Backbone.DeepModel.extend({
         this.on("change:mode", _.bind(this.setModeCookie, this));
     },
     setModeCookie: function() {
-        eraseCookie("playerMode");
         createCookie('playerMode', conductor.get("mode"), 365);
     },
     initInterval: function(){
@@ -495,6 +596,7 @@ window.ConductorModel = Backbone.DeepModel.extend({
         if (!this.checkStateInterval) {
             this.checkStateInterval = setInterval(_.bind(this.incSecond, this), 1000);
         }
+        this.fetch();
     },
     initWebIntervals: function() {
         if (this.fetchInterval) {
@@ -576,7 +678,6 @@ window.ControllerView = Backbone.View.extend({
         this.doWebPlayerAction(el);
     },
     doRemoteAction: function(el){
-        console.log("doRemoteAction el:", el);
         $.ajax({
           url: el.href,
           dataType: 'json',
@@ -623,7 +724,6 @@ window.RatingView = Backbone.View.extend({
         this.conductor = options.conductor;
         this.conductor.on("change:playing.fid", this.renderRatings, this);
         this.conductor.on("change:playing.listeners_ratings.length", this.renderRatings, this);
-
     },
     renderRatings: function(){
         var ratings = this.conductor.get('playing.listeners_ratings') || [];
@@ -636,7 +736,8 @@ window.RatingView = Backbone.View.extend({
                 "uid": rating.uid,
                 "fid": rating.fid,
                 "rating": rating.rating,
-                "el": ratingDiv
+                "el": ratingDiv,
+                "conductor": this.conductor
             }).render();
         }, this);
     },
@@ -647,25 +748,36 @@ window.RatingView = Backbone.View.extend({
 });
 
 window.createCookie = function(name, value, days) {
-    if (days) {
-        var date = new Date();
-        date.setTime(date.getTime()+(days*24*60*60*1000));
-        var expires = "; expires="+date.toGMTString();
-    } else var expires = "";
-    document.cookie = name+"="+value+expires+"; path=/";
+    if (typeof(days) == 'undefined') {
+        days = 365;
+    }
+    var date = new Date();
+    date.setTime(date.getTime()+(days*24*60*60*1000));
+    var expires = "; expires="+date.toGMTString(),
+        cookieData = name+"="+value+expires+"; path=/";
+    console.log("createCookie:",cookieData)
+    document.cookie = cookieData;
 }
 
 window.readCookie = function(name) {
-    var nameEQ = name + "=";
-    var ca = document.cookie.split(';');
+    var nameEQ = name + "=",
+        ca = document.cookie.split(';'),
+        value = null;
     for(var i=0;i < ca.length;i++) {
         var c = ca[i];
-        while (c.charAt(0)==' ') c = c.substring(1,c.length);
-        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        while (c.charAt(0)==' ') {
+            c = c.substring(1,c.length);
+        }
+        if (c.indexOf(nameEQ) == 0) {
+            value = c.substring(nameEQ.length,c.length);
+            break;
+        }
     }
-    return null;
+    console.log("readCookie:", name, value);
+    return value;
 }
 
 window.eraseCookie = function (name) {
-    createCookie(name,"",-1);
+    createCookie(name, "", -1);
+    console.log("eraseCookie:",name);
 }
