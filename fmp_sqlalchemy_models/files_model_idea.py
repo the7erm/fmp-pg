@@ -1333,7 +1333,8 @@ class UserFileInfo(BaseClass, Base):
         else:
             total = 0
             for h in recent:
-                total += h.percent_played
+                if h.percent_played:
+                    total += h.percent_played
             avg = total / len(recent)
 
         self.true_score = ((self.rating * 2 * 10.0) +

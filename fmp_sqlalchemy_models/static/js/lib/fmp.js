@@ -33,7 +33,7 @@ window.RatingButtonView = Backbone.View.extend({
         this.syncRatingImg();
         $.ajax({
           url: evt.currentTarget.href,
-          dataType: 'json'
+          dataType: 'json',
         }).done(function(data, textStatus, jqXHR) {
             var conductor_fid = this.conductor.get("playing.fid") || 0;
             if (conductor_fid == _this.fid) {
@@ -211,6 +211,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.vid.style.width = "100%";
         this.vid.seekable = true;
         this.vid.controls = true;
+        this.vid.loop = false;
         this.bindEvents();
         this.checkSupportedTypes();
         this.el = options.el;
@@ -337,7 +338,11 @@ window.WebPlayerView = Backbone.View.extend({
         this.incIndex();
     },
     getUids: function(){
-        return this.conductor.get("uids") || [];
+        if (this.conductor.isRemoteMode()) {
+            return this.conductor.get("uids") || [];
+        }
+        var uids = this.conductor.get("singleModeUid") || "";
+        return [uids];
     },
     sendPercentPlayed: function(percent_played) {
         if (this.conductor.isRemoteMode()) {
@@ -352,10 +357,17 @@ window.WebPlayerView = Backbone.View.extend({
         $.ajax({
           url: "/mark-as-played/"+this.fid+"/"+percent_played+"/"+uids.join(","),
           dataType: 'json',
-          cache: false
+          cache: false,
+          type: 'POST',
+          data: this.postData()
         }).done(_.bind(this.processFileInfo, this));
-        createCookie("percent_played", percent_played);
-        createCookie("playing_fid", this.fid);
+    },
+    postData: function() {
+        return {
+            'mode': this.conductor.get('mode'),
+            'webPlayerMode': this.conductor.get('webPlayerMode'),
+            'singleModeUid': this.conductor.get('singleModeUid')
+        }
     },
     checkSupportedTypes:function(){
         var mimeTypes = {
@@ -377,9 +389,11 @@ window.WebPlayerView = Backbone.View.extend({
         this.fid = fid;
         this.vid.src = this.getSrc();
         if (this.conductor.isWebMode()) {
-            this.vid.play();
-            createCookie("playing_fid", fid);
+            this.vid.autoplay = true;
+        } else {
+            this.vid.autoplay = false;
         }
+        this.vid.load();
         this.getFileInfo();
         this.resetTimes();
     },
@@ -571,16 +585,42 @@ window.ConductorModel = Backbone.DeepModel.extend({
         this.on("change:playing.listeners_ratings", this.checkListenersLength);
         options = options || {};
         var mode = options.mode || "remote",
-            uids = options.uids || [];
+            uids = options.uids || [],
+            webPlayerMode = options.webPlayerMode || "multi",
+            singleModeUid = options.singleModeUid || uids[0] || [];
         this.set({
             "mode": mode,
-            "uids": uids
+            "uids": uids,
+            "webPlayerMode": webPlayerMode,
+            "singleModeUid": singleModeUid
         });
         this.initInterval();
-        this.on("change:mode", _.bind(this.setModeCookie, this));
+        this.on("change:mode", _.bind(this.setPlayerMode, this));
+        this.on("change:singleModeUid", _.bind(this.setSingleUid, this));
+        this.on("change:webPlayerMode", _.bind(this.setWebPlayerMode, this));
     },
     setModeCookie: function() {
-        createCookie('playerMode', conductor.get("mode"), 365);
+    },
+    setPlayerMode: function() {
+        $.ajax({
+          url: "/set-mode/"+this.get("mode"),
+          dataType: 'json',
+          cache:false,
+        });
+    },
+    setSingleUid: function() {
+        $.ajax({
+          url: "/set-single-player-uid/"+this.get("singleModeUid"),
+          dataType: 'json',
+          cache:false,
+        });
+    },
+    setWebPlayerMode: function(){
+        $.ajax({
+          url: "/set-web-player-mode/"+this.get("webPlayerMode"),
+          dataType: 'json',
+          cache:false,
+        });
     },
     initInterval: function(){
         if (this.isRemoteMode()) {
@@ -610,7 +650,7 @@ window.ConductorModel = Backbone.DeepModel.extend({
     },
     doFetch: function() {
         if (this.isRemoteMode()) {
-            this.fetch();
+            this.save();
         }
         return true;
     },
@@ -781,3 +821,43 @@ window.eraseCookie = function (name) {
     createCookie(name, "", -1);
     console.log("eraseCookie:",name);
 }
+
+window.AppRouter = Backbone.Router.extend({
+    routes:{
+        "":"home",
+        "search/": "search",
+        "search/:query":        "search",  // #search/kiwis
+        "search/:query/p:page": "search"   // #search/kiwis/p7
+    },
+ 
+    home: function () {
+        $("#history").show();
+        $("#search").hide();
+        console.log("home")
+    },
+ 
+    search: function () {
+        console.log("search")
+        $("#history").hide();
+        $("#search").show();
+    },
+ 
+});
+
+window.SearchCollection = Backbone.Collection.extend({
+    "url": function(){
+        return "/search/q="+encodeURIComponent(this.keywords)
+    }
+});
+
+window.SearchView = Backbone.View.extend({
+    template: _.template("#tpl-search-view"),
+    initialize: function(options) {
+        Backbone.View.prototype.initialize.apply(this, arguments);
+        this.conductor = options.conductor;
+    },
+    render: function(){
+        this.$el.html(this.template({}));
+        return this;
+    }
+});

@@ -90,23 +90,37 @@
             -webkit-overflow-scrolling: touch;
         }
         .containing-element {width: 30em;}
+
     </style>
 </head>
 <body>
+<script id="#tpl-search-view" type="text/html">
+<h1>Search results</h1>
+</script>
 <script type="text/javascript">
     $(document).bind("mobileinit", function () {
+        $.mobile.ajaxEnabled = false;
+        $.mobile.hashListeningEnabled = false;
+        $.mobile.pushStateEnabled = false;
+
+        app = new AppRouter();
+        Backbone.history.start();
+        
         $.mobile.ajaxEnabled = false;
         var uids = [];
         _.each($("input.web-listeners:checked"), function(el){
             uids.push($(el).data('uid'))
         });
-        var playerMode = readCookie("playerMode") || "remote";
+        var playerMode = {{ session.get("mode", "remote" )|tojson|safe }},
+            webPlayerMode = {{ session.get("webPlayerMode", "multi" )|tojson|safe }},
+            singleModeUid = {{ session.get("singleModeUid", playing.listeners_ratings[0].uid)|tojson|safe }};
         window.conductor = new ConductorModel({
             "mode": playerMode,
+            "webPlayerMode": webPlayerMode,
+            "singleModeUid": singleModeUid,
             "uids": uids
         });
-        createCookie('playerMode', conductor.get("mode"), 365);
-        var playing_fid = readCookie("playing_fid") || {{ playing.fid }},
+        var playing_fid = {{ session.get("playing_fid", playing.fid )|safe }},
             resume = true;
         if (conductor.isRemoteMode()) {
             playing_fid = {{ playing.fid }};
@@ -122,6 +136,7 @@
                 $el.prop('selected', false);
             }
         });
+
         window.webPlayer = new WebPlayerView({
             "el": "#js-player",
             'conductor': conductor,
@@ -156,7 +171,9 @@
         conductor.on("change:playing.artist_title", on_change_title);
         conductor.on("change:pos_data.pos_str", on_change_time);
         conductor.on("change:state", on_state_change);
-        conductor.fetch();
+        if (conductor.isRemoteMode()) {
+            conductor.fetch();
+        }
 
         $(".web-listeners").bind("change", function(evt){
             var checked = evt.currentTarget.checked,
@@ -171,17 +188,58 @@
                 }
                 conductor.set("uids", uids);
             }
+            $.mobile.showPageLoadingMsg("a", "Selecting files ... ");
             $.ajax({
               url: "/listening/"+uid+"/"+checked,
               dataType: 'json',
               cache: false
-            }).done(function(data, textStatus, jqXHR) {});
+            }).done(function(data, textStatus, jqXHR) {})
+              .always(function(){
+                    $.mobile.hidePageLoadingMsg();
+            });
         });
+
+        
+        $("#web-player-mode").find('option[value="'+webPlayerMode+'"]').prop('selected', true);
+        $("#web-player-mode").bind("change", function(evt){
+            var webPlayerMode = this.value;
+            conductor.set("webPlayerMode", this.value);
+            displayListeningOptions();
+        });
+        
+        $("#single-listener").find('option [value="'+singleModeUid+'"]').prop("selected", true);
+        $("#single-listener").bind("change", function() {
+            conductor.set("singleModeUid", this.value);
+            var uids = conductor.get("uids");
+            if (!_.contains(uids, this.value)) {
+                console.log("CHECKING:", this.value);
+                $("#checkbox-"+this.value).prop("checked", true).trigger("change");
+            }
+        });
+        window.displayListeningOptions = function(){
+            if (window.conductor.isRemoteMode()) {
+                console.log("conductor is remote")
+                $("#multi-listeners").show();
+                $("#single-listener-div").hide();
+                $("#web-player-mode-div").hide();
+            } else {
+                $("#web-player-mode-div").show();
+                var webPlayerMode = window.conductor.get("webPlayerMode") || "multi";
+                if (webPlayerMode == 'multi') {
+                    $("#multi-listeners").show();
+                    $("#single-listener-div").hide();
+                } else {
+                    $("#multi-listeners").hide();
+                    $("#single-listener-div").show();
+                }
+            }
+        }
+        displayListeningOptions();
 
         conductor.on("change:playing.keywords", function(){
             var playing_keywords = $(".playing-keywords"),
                 keywords = conductor.get("playing.keywords"),
-                template = _.template("<a class='keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='/search/?q=<%= encodeURIComponent(word) %>'><%- word %></a>")
+                template = _.template("<a class='keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='#/search/<%= encodeURIComponent(word) %>'><%- word %></a>")
             playing_keywords.empty();
             _.each(keywords, function(v, k){
                 // console.log("keyword:",v);
@@ -190,6 +248,7 @@
         });
     });
     $( document ).on( "pageinit", "#page", function() {
+        $("#page").css("display", "");
         $( document ).on( "swipeleft swiperight", "#page", function( e ) {
             // We check if there is no open panel on the page because otherwise
             // a swipe to close the left panel would also open the right panel (and v.v.).
@@ -215,10 +274,16 @@
                 // breakdown web init remote
             }
             conductor.initInterval();
+            displayListeningOptions()
         });
+        $("[data-role=header]").fixedtoolbar({ 
+            tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video",
+            transition: "none" });
+        $("[data-role=footer]").fixedtoolbar({ tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video",
+            transition: "none" });
     });
 </script>
-<div data-role="page" data-theme="b" id="page">
+<div data-role="page" data-theme="b" id="page" style='display:none;'>
     <div data-role="header" data-theme="b" data-position="fixed">
         <a href="#left-panel" data-theme="b" data-icon="grid" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open left panel</a>
         <a href="#right-panel" data-theme="b" data-icon="gear" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>

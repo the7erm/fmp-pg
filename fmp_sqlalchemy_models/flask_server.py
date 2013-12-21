@@ -11,14 +11,14 @@ import os
 import time
 import re
 
-from flask import Flask, Response, render_template, request, send_file
+from flask import Flask, Response, render_template, request, send_file, session
 from player_refactored import STOPPED, PAUSED, PLAYING
 from jukebox import HISTORY_LENGTH
 from picker import Picker
 
 from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
                              AUDIO_MIMES, VIDEO_MIMES, User, \
-                             UserFileInfo, Base
+                             UserFileInfo, Base, UserHistory, and_
 
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
@@ -33,6 +33,8 @@ TEMP_FOLDER = "/home/erm/tmp/converted/"
 
 app = Flask(__name__)
 app.debug = True
+app.secret_key = '\xd1\x1bF\xa7\xee\xdd\x1f\xce\xec\xd9\xff\x9a\xd5\x9c\x9d\x98qN\n\x0e\xec \xb7\xfb'
+
 
 jukebox = None
 jukebox_fid = None
@@ -49,34 +51,66 @@ JUKEBOX_PLAYING_KEYS = [
 ]
 
 def get_listeners():
-    print "GET LISTENERS:"
-    session = make_session()
-    print "SESSION MADE"
-    listeners = session.query(User).order_by(User.admin.desc(), User.uname.asc()).all()
-    print "GOT LISTENERS ... "
-    print "GOT LISTENERS:", listeners
-    session.close()
+    sqla_session = make_session()
+    listeners = sqla_session.query(User).order_by(User.admin.desc(), User.uname.asc()).all()
+    sqla_session.close()
     return listeners
 
 def get_file_info(fid):
-    session = make_session()
-    file_info = session.query(FileInfo)\
+    sqla_session = make_session()
+    file_info = sqla_session.query(FileInfo)\
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
     print "GET FILE INFO:", file_info.to_dict(JUKEBOX_PLAYING_KEYS)
-    session.close()
+    sqla_session.close()
     return file_info
 
 @app.route('/')
 def index():
-    print "INDEX"
     listeners = get_listeners()
-    print "GOT LISTNERS"
     playing = get_file_info(jukebox.fid)
     pos_data = jukebox.player.pos_data
+
+    playing_fid = get_playing_fid(listeners)
+    session['playing_fid'] = playing_fid
+
     return render_template("index.html", pos_data=pos_data, playing=playing, 
                            listeners=listeners)
+
+def get_playing_fid(listeners):
+    """
+    session['percent_played'] = percent_played
+    session['playing_fid'] = fid
+    session['mode'] = request.form['mode']
+    session['webPlayerMode'] = request.form['webPlayerMode']
+    session['singleModeUid'] = request.form['singleModeUid']
+    """
+
+    mode = session.get('mode', 'remote')
+    if mode == 'remote':
+        return jukebox.fid
+    web_player_mode = session.get('webPlayerMode', 'multi')
+    if web_player_mode == 'multi':
+        return session.get('playing_fid', jukebox.fid)
+
+    sqla_session = make_session()
+    try:
+        most_recent = sqla_session.query(UserHistory)\
+                                  .filter(and_(
+                                        UserHistory.uid == session.get(
+                                            'singleModeUid', listeners[0].uid),
+                                        UserHistory.ultp != None
+                                   ))\
+                                  .order_by(UserHistory.ultp.desc())\
+                              .limit(1)\
+                              .one()
+    except NoResultFound:
+        sqla_session.close()
+        return jukebox.fid
+    sqla_session.close()
+    return most_recent.fid
+
 
 @app.route('/search/')
 def search():
@@ -86,11 +120,11 @@ def search():
 
 @app.route('/history/<uids>')
 def history(uids):
-    session = make_session()
+    sqla_session = make_session()
     uids = uids.split(',')
-    history = jukebox.get_history(uids, session=session);
+    history = jukebox.get_history(uids, session=sqla_session);
     resp = json_response(history)
-    session.close()
+    sqla_session.close()
     return resp
 
 @app.route('/listening/<uid>/<state>')
@@ -99,31 +133,34 @@ def listening(uid, state):
     listening_state = False
     if state == 'true':
         listening_state = True
-    session = make_session()
+    sqla_session = make_session()
     try:
-        user = session.query(User)\
+        user = sqla_session.query(User)\
                       .filter(User.uid == uid)\
                       .limit(1)\
                       .one()
         user.listening = listening_state
-        user.save(session=session)
+        user.save(session=sqla_session)
+        if listening_state:
+            picker = Picker(session=sqla_session)
+            picker.do()
         resp = json_response({'STATUS': 'SUCCESS'})
     except NoResultFound:
         resp = json_response({'STATUS': 'FAIL'})
     finally:
-        session.close()
+        sqla_session.close()
     return resp
 
 @app.route("/pop-preload/<uids>")
 def pop_preload(uids):
     print '@app.route("/pop-preload/%s")' % (uids,)
     uids = uids.split(",")
-    session = make_session()
-    picker = Picker(session=session)
+    sqla_session = make_session()
+    picker = Picker(session=sqla_session)
     file_info = picker.pop(uids)
     resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
-    session.commit()
-    session.close()
+    sqla_session.commit()
+    sqla_session.close()
     print '[DONE]@app.route("/pop-preload/")'
     return resp
 
@@ -152,16 +189,19 @@ def status_obj():
 @app.route('/file-info/<fid>')
 def file_info(fid):
     file_info = get_file_info(fid)
-    session = make_session()
-    session.add(file_info)
-    dict_file_info = file_info.to_dict(JUKEBOX_PLAYING_KEYS, session=session)
+    sqla_session = make_session()
+    sqla_session.add(file_info)
+    dict_file_info = file_info.to_dict(JUKEBOX_PLAYING_KEYS)
     resp = json_response(dict_file_info)
-    session.close()
+    sqla_session.close()
     return resp
 
 @app.route('/status/')
 def status():
     obj = status_obj()
+    session['percent_played'] = obj['pos_data']['decimal'] * 100;
+    session['playing_fid'] = obj['playing']['fid'];
+    session['mode'] = 'remote'
     return json_response(obj)
 
 @app.route('/pause/')
@@ -197,10 +237,10 @@ def rate(fid, uid, rating):
     if jukebox.fid == fid:
         found = jukebox.rate(uid, rating)
     if not found:
-        session = make_session()
+        sqla_session = make_session()
         simple_rate(fid, uid, rating, session)
-        session.commit()
-        session.close()
+        sqla_session.commit()
+        sqla_session.close()
     obj = status_obj()
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
@@ -281,17 +321,17 @@ def stream(fid):
         os.unlink(lock_file)
         dstfp.close()
 
-    session = make_session()
+    sqla_session = make_session()
     print "made session"
     mimetypes = request.args.get("mimetypes", "")
     mimetypes = mimetypes.split(',')
     fid = int(fid)
     print "GETTING FILE INFO"
-    file_info = session.query(FileInfo)\
+    file_info = sqla_session.query(FileInfo)\
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
-    session.add(file_info)
+    sqla_session.add(file_info)
     print "fetched file info."
     mimetype = file_info.get_best_mime(mimetypes)
     send_as_file = True
@@ -315,7 +355,7 @@ def stream(fid):
             send_as_file = False
 
     print "MADEIT", mimetype
-    session.close()
+    sqla_session.close()
     if send_as_file:
         print '[DONE]@app.route("/stream/%s/") send as file' % (fid,)
         return send_file_partial(filename, mimetype=mimetype)
@@ -329,7 +369,7 @@ def stream(fid):
     print '[DONE]@app.route("/stream/%s/") convert' % (fid,)
     return response
 
-@app.route("/mark-as-played/<fid>/<percent_played>/<uids>")
+@app.route("/mark-as-played/<fid>/<percent_played>/<uids>", methods=['POST', 'GET'])
 def mark_as_played(fid, percent_played, uids):
     fid = int(fid)
     uids = uids.split(',')
@@ -338,34 +378,62 @@ def mark_as_played(fid, percent_played, uids):
     obj = {}
     obj['STATUS'] = 'SUCCESS'
     print "MARCUS PLAYED", "uids:", uids, "percent_played:", percent_played
-    session = make_session()
+    sqla_session = make_session()
     print "session made for markus"
     try_cnt = 0;
     while try_cnt < 10:
         try:
-            file_info = session.query(FileInfo)\
-                               .filter(FileInfo.fid == fid)\
-                               .limit(1)\
-                               .one()
+            file_info = sqla_session.query(FileInfo)\
+                                    .filter(FileInfo.fid == fid)\
+                                    .limit(1)\
+                                    .one()
+            print "file info:", file_info
         except InvalidRequestError, e:
             try_cnt += 1
+            print "*"*80
             print "InvalidRequestError:",e
-            session.rollback()
+            sqla_session.rollback()
             time.sleep(0.1)
             continue
         break
 
     if try_cnt >= 10:
-        session.close()
+        print "Failed"
+        sqla_session.close()
         return json_response({})
+    session['percent_played'] = percent_played
+    session['playing_fid'] = fid
+    session['mode'] = request.form['mode']
+    session['webPlayerMode'] = request.form['webPlayerMode']
+    session['singleModeUid'] = request.form['singleModeUid']
+
+    print "session:",session
 
     print "file_info was fetched"
-    file_info.mark_as_played(percent_played=percent_played, uids=uids, session=session)
+    file_info.mark_as_played(percent_played=percent_played, uids=uids, session=sqla_session)
     print "actual mark_as_played succeeded"
-    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS, session=session))
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
     print '[DONE]@app.route("/mark-as-played/%s/%s/%s")' % (fid, percent_played, uids)
-    session.close()
+    sqla_session.close()
     return resp
+
+@app.route("/set-mode/<mode>")
+def set_mode(mode):
+    if mode in ('web', 'remote'):
+        session['mode'] = mode
+    return json_response({'STATUS': 'SUCCESS'})
+
+@app.route("/set-web-player-mode/<mode>")
+def set_mode(mode):
+    if mode in ('multi', 'single'):
+        session['webPlayerMode'] = mode
+    return json_response({'STATUS': 'SUCCESS'})
+
+@app.route("/set-single-player-uid/<uid>")
+def set_mode(uid):
+    uid = int(uid)
+    session['singleModeUid'] = uid
+    return json_response({'STATUS': 'SUCCESS'})
 
 @app.route("/inc-skip-score/<fid>/<uids>")
 def inc_skip_score(fid, uids):
@@ -374,15 +442,15 @@ def inc_skip_score(fid, uids):
     print '@app.route("/inc-skip-score/%s/%s")' % (fid, uids)
     if not fid or not uids:
         return json_response({"STATUS": "FAIL"})
-    session = make_session()
-    file_info = session.query(FileInfo)\
+    sqla_session = make_session()
+    file_info = sqla_session.query(FileInfo)\
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
     
-    file_info.inc_skip_score(uids=uids, session=session)
-    resp = json_response(file_info.to_dict())
-    session.close()
+    file_info.inc_skip_score(uids=uids, session=sqla_session)
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    sqla_session.close()
     print '[DONE]@app.route("/inc-skip-score/%s/%s")' % (fid, uids)
     return resp
 
@@ -393,14 +461,14 @@ def deinc_skip_score(fid, uids):
     print '@app.route("/deinc-skip-score/%s/%s")' % (fid, uids)
     if not fid or not uids:
         return json_response({"STATUS": "FAIL"})
-    session = make_session()
-    file_info = session.query(FileInfo)\
+    sqla_session = make_session()
+    file_info = sqla_session.query(FileInfo)\
                        .filter(FileInfo.fid == fid)\
                        .limit(1)\
                        .one()
-    file_info.deinc_skip_score(uids=uids, session=session)
-    resp = json_response(file_info.to_dict())
-    session.close()
+    file_info.deinc_skip_score(uids=uids, session=sqla_session)
+    resp = json_response(file_info.to_dict(JUKEBOX_PLAYING_KEYS))
+    sqla_session.close()
     print '[DONE]@app.route("/deinc-skip-score/%s/%s")' % (fid, uids)
     return resp
 

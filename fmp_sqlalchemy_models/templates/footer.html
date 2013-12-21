@@ -1,12 +1,15 @@
-    
+    <h2> session </h2>
+    {% for k, v in session.iteritems() %}
+        {{k}}:{{v}}<br>
+    {% endfor %}
     </div>
-    <div data-role="panel" id="left-panel" data-theme="b">
+    <div data-role="panel" id="left-panel" data-theme="b" data-display="overlay" data-position="left">
         {% include "panel-header.html" ignore missing %}
         <p>Tags for <strong><span class='playing-artist-title'></span></strong>:</p>
         <div class="playing-keywords"></div>
     </div><!-- /panel -->
 
-    <div data-role="panel" id="right-panel" data-display="push" data-position="right" data-theme="b">
+    <div data-role="panel" id="right-panel" data-position="right" data-theme="b" data-display="overlay">
         {% include "panel-header.html" ignore missing %}
         <div class="containing-element">
           <label for="player-mode">Player Mode:</label>
@@ -15,8 +18,27 @@
             <option value="remote" selected>Remote</option>
           </select>
         </div>
+        <div class="containing-element" id="web-player-mode-div">
+          <label for="web-player-mode">Web Mode:</label>
+          <select name="web-player-mode" id="web-player-mode" data-role="slider" data-mini="true">
+            <option value="single" selected>Single</option>
+            <option value="multi">Multi</option>
+          </select>
+        </div>
         <legend>Listeners</legend>
-        <fieldset data-role="controlgroup">
+        <div data-role="fieldcontain" id="single-listener-div" >
+          <select name="single-listener" id="single-listener" data-native-menu="false">
+            {% for user in listeners %}
+            <option value="{{user.uid}}"
+                    data-uid="{{user.uid}}"
+                    class="single-web-listeners" 
+                    {% if user.listening %} 
+                        selected="selected" 
+                    {% endif %}>{{user.uname}}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <fieldset data-role="controlgroup" id="multi-listeners">
             {% for user in listeners %}
                 <input type="checkbox"
                        data-uid="{{user.uid}}"
@@ -29,7 +51,9 @@
                 <label for="checkbox-{{user.uid}}">{{user.uname}}</label>
             {% endfor %}
         </fieldset>
+        
     </div><!-- /panel -->
+
     <div data-role="footer" data-theme="b" data-position="fixed">
         <div data-role="controlgroup" data-type="horizontal" style="text-align:center;">
             <a class='player-control' 

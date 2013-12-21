@@ -113,6 +113,7 @@ class JukeBox:
     def init_player(self):
         self.player = Player()
         self.start(mark_as_played=False)
+        self.pause();
         percent_played = self.playing.listeners_ratings[0].percent_played
         duration = self.player.get_duration()
         pos_ns = int(duration * (percent_played * 0.01))
