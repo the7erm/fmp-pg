@@ -108,9 +108,12 @@
         
         $.mobile.ajaxEnabled = false;
         var uids = [];
-        _.each($("input.web-listeners:checked"), function(el){
-            uids.push($(el).data('uid'))
-        });
+        {% for user in listeners %}
+            {% if user.listening == true %}
+            uids.push({{user.uid}});
+            {% endif %}
+        {% endfor %}
+        
         var playerMode = {{ session.get("mode", "remote" )|tojson|safe }},
             webPlayerMode = {{ session.get("webPlayerMode", "multi" )|tojson|safe }},
             singleModeUid = {{ session.get("singleModeUid", playing.listeners_ratings[0].uid)|tojson|safe }};
@@ -284,7 +287,7 @@
             transition: "none" });
     });
 </script>
-<div data-role="page" data-theme="b" id="page" style='display:none;'>
+<div data-role="page" data-theme="b" id="page" >
     <div data-role="header" data-theme="b" data-position="fixed">
         <a href="#left-panel" data-theme="b" data-icon="grid" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open left panel</a>
         <a href="#right-panel" data-theme="b" data-icon="gear" data-iconpos="notext" data-shadow="false" data-iconshadow="false">Open right panel</a>

@@ -1,30 +1,8 @@
 {% include "header.html" ignore missing %}
 <div id="js-player" style='width:100%;'></div>
-
 <div data-role="controlgroup" data-type="horizontal">
     <a class='player-control' href="/prev/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img src="/static/img/media-skip-backward.png"></a>
     <a class='player-control' href="/pause/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img class='playing-state-img' src="/static/img/media-playback-pause.png"></a>
     <a class='player-control' href="/next/" data-theme="c" data-role="button" data-mini="true" data-inline="true"><img src="/static/img/media-skip-forward.png"></a>
-   
 </div>
-<script type="text/javascript">
-    $(document).bind("mobileinit", function () {
-        var playlist = [],
-            playlistIndex = 0;
-        // $("input.web-listeners:checked");
-        var webPlayer = new WebPlayerView({
-            "el": "#js-player",
-            "fid": "{{ playing.fid }}"
-        }).render();
-        $.ajax({
-          url: "/history/"+uids.join(","),
-          dataType: 'json',
-          cache: false
-        }).done(function(playlist, textStatus, jqXHR) {
-            playlistIndex = playlist.length - 1;
-            webPlayer.playlist = playlist;
-            webPlayer.setIndex(playlistIndex, true);
-        });
-    });
-</script>
 {% include "footer.html" ignore missing %}

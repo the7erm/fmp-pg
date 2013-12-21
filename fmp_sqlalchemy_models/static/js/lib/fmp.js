@@ -231,9 +231,6 @@ window.WebPlayerView = Backbone.View.extend({
         });
         this.setSrcToConductor();
     },
-    onPosChange: function() {
-        
-    },
     onChangeMode: function(){
         if (this.conductor.isRemoteMode()) {
             this.$el.hide();
@@ -857,7 +854,7 @@ window.AppRouter = Backbone.Router.extend({
     home: function () {
         $("#history").show();
         $("#search").hide();
-        console.log("home")
+        console.log("home");
     },
  
     search: function () {

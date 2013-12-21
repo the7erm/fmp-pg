@@ -11,23 +11,23 @@
 
     <div data-role="panel" id="right-panel" data-position="right" data-theme="b" data-display="overlay">
         {% include "panel-header.html" ignore missing %}
-        <div class="containing-element">
+        <div>
           <label for="player-mode">Player Mode:</label>
-          <select name="player-mode" id="player-mode" data-role="slider" data-mini="true">
+          <select name="player-mode" id="player-mode">
             <option value="web">Web</option>
             <option value="remote" selected>Remote</option>
           </select>
         </div>
-        <div class="containing-element" id="web-player-mode-div">
+        <div id="web-player-mode-div">
           <label for="web-player-mode">Web Mode:</label>
-          <select name="web-player-mode" id="web-player-mode" data-role="slider" data-mini="true">
+          <select name="web-player-mode" id="web-player-mode">
             <option value="single" selected>Single</option>
             <option value="multi">Multi</option>
           </select>
         </div>
         <legend>Listeners</legend>
         <div data-role="fieldcontain" id="single-listener-div" >
-          <select name="single-listener" id="single-listener" data-native-menu="false">
+          <select name="single-listener" id="single-listener" >
             {% for user in listeners %}
             <option value="{{user.uid}}"
                     data-uid="{{user.uid}}"

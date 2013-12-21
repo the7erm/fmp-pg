@@ -238,7 +238,7 @@ def rate(fid, uid, rating):
         found = jukebox.rate(uid, rating)
     if not found:
         sqla_session = make_session()
-        simple_rate(fid, uid, rating, session)
+        simple_rate(fid, uid, rating, sqla_session)
         sqla_session.commit()
         sqla_session.close()
     obj = status_obj()
@@ -478,6 +478,7 @@ def inc_skip_score(fid, uids):
     sqla_session.close()
     print '[DONE]@app.route("/inc-skip-score/%s/%s")' % (fid, uids)
     return resp
+
 
 @app.route("/deinc-skip-score/<fid>/<uids>")
 def deinc_skip_score(fid, uids):
