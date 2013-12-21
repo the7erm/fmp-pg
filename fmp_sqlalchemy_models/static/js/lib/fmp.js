@@ -299,10 +299,10 @@ window.WebPlayerView = Backbone.View.extend({
             'waiting'
         ];
         // _.bind(function, object, [*arguments])
-        """
+        /*
         _.each(events, function(evt){
             this.vid.addEventListener(evt, _.bind(this.logEvent, this));
-        }, this); """
+        }, this); */
         this.vid.addEventListener('timeupdate', _.bind(this.onTimeStatus, this));
         this.vid.addEventListener('ended', _.bind(this.markAsCompleted, this));
         this.vid.addEventListener("play", _.bind(this.onPlay, this));
