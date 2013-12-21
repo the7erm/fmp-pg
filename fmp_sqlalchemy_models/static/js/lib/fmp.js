@@ -222,6 +222,12 @@ window.WebPlayerView = Backbone.View.extend({
         this.conductor = options.conductor;
         this.conductor.on("change:playing.fid", _.bind(this.setSrcToConductor, this));
         this.conductor.on("change:mode", _.bind(this.onChangeMode, this));
+        this.vid.addEventListener("canplay", function(){
+            alert("canplay");
+        });
+        this.vid.addEventListener("loadstart", function(){
+            alert("loadstart");
+        });
     },
     onChangeMode: function(){
         if (this.conductor.isRemoteMode()) {
@@ -388,12 +394,20 @@ window.WebPlayerView = Backbone.View.extend({
     setSrc: function(fid) {
         this.fid = fid;
         this.vid.src = this.getSrc();
-        if (this.conductor.isWebMode()) {
+
+        var isWebMode = this.conductor.isWebMode();
+        if (isWebMode) {
             this.vid.autoplay = true;
         } else {
             this.vid.autoplay = false;
         }
         this.vid.load();
+        if (isWebMode) {
+            // quirk with android.
+            this.vid.autoplay = true;
+        } else {
+            this.vid.autoplay = false;
+        }
         this.getFileInfo();
         this.resetTimes();
     },
@@ -499,8 +513,7 @@ window.WebPlayerView = Backbone.View.extend({
 
         if (!_.isUndefined(this.playlist[idx])) {
             this.playlistIndex = idx;
-            this.setSrc(this.playlist[this.playlistIndex]);
-            
+            this.setSrc(this.playlist[idx]);
         }
         
     },
@@ -510,6 +523,7 @@ window.WebPlayerView = Backbone.View.extend({
             return;
         }
         this.popPreload_locked = true;
+        this.resume = false;
         var uids = this.getUids();
         $.ajax({
           url: "/pop-preload/"+uids.join(","),
@@ -565,9 +579,9 @@ window.WebPlayerView = Backbone.View.extend({
         } else {
             this.$el.show();
             this.resume = true;
+            this.vid.autoplay = true;
             this.playlist.push(this.fid);
             this.setIndex(0);
-            this.vid.play();
         }
         return this;
     }
@@ -599,28 +613,26 @@ window.ConductorModel = Backbone.DeepModel.extend({
         this.on("change:singleModeUid", _.bind(this.setSingleUid, this));
         this.on("change:webPlayerMode", _.bind(this.setWebPlayerMode, this));
     },
-    setModeCookie: function() {
-    },
     setPlayerMode: function() {
         $.ajax({
           url: "/set-mode/"+this.get("mode"),
           dataType: 'json',
           cache:false,
-        });
+        }).done(function(){});
     },
     setSingleUid: function() {
         $.ajax({
           url: "/set-single-player-uid/"+this.get("singleModeUid"),
           dataType: 'json',
           cache:false,
-        });
+        }).done(function(){  });
     },
     setWebPlayerMode: function(){
         $.ajax({
           url: "/set-web-player-mode/"+this.get("webPlayerMode"),
           dataType: 'json',
           cache:false,
-        });
+        }).done(function(){  });
     },
     initInterval: function(){
         if (this.isRemoteMode()) {

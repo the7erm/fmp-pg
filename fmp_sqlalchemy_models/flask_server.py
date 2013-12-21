@@ -100,9 +100,9 @@ def get_playing_fid(listeners):
                                   .filter(and_(
                                         UserHistory.uid == session.get(
                                             'singleModeUid', listeners[0].uid),
-                                        UserHistory.ultp != None
+                                        UserHistory.time_played != None
                                    ))\
-                                  .order_by(UserHistory.ultp.desc())\
+                                  .order_by(UserHistory.time_played.desc())\
                               .limit(1)\
                               .one()
     except NoResultFound:
@@ -419,18 +419,20 @@ def mark_as_played(fid, percent_played, uids):
 
 @app.route("/set-mode/<mode>")
 def set_mode(mode):
+    print "set_mode"
     if mode in ('web', 'remote'):
         session['mode'] = mode
     return json_response({'STATUS': 'SUCCESS'})
 
 @app.route("/set-web-player-mode/<mode>")
-def set_mode(mode):
+def set_webplayer_mode(mode):
+    print "set_webplayer_mode"
     if mode in ('multi', 'single'):
         session['webPlayerMode'] = mode
     return json_response({'STATUS': 'SUCCESS'})
 
 @app.route("/set-single-player-uid/<uid>")
-def set_mode(uid):
+def set_single_player_mode(uid):
     uid = int(uid)
     session['singleModeUid'] = uid
     return json_response({'STATUS': 'SUCCESS'})

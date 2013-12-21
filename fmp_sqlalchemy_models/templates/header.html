@@ -173,6 +173,8 @@
         conductor.on("change:state", on_state_change);
         if (conductor.isRemoteMode()) {
             conductor.fetch();
+        } else {
+            
         }
 
         $(".web-listeners").bind("change", function(evt){
@@ -274,7 +276,7 @@
                 // breakdown web init remote
             }
             conductor.initInterval();
-            displayListeningOptions()
+            displayListeningOptions();
         });
         $("[data-role=header]").fixedtoolbar({ 
             tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video",
