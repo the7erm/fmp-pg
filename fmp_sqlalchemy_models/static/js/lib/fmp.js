@@ -222,7 +222,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.conductor = options.conductor;
         this.conductor.on("change:playing.fid", _.bind(this.setSrcToConductor, this));
         this.conductor.on("change:mode", _.bind(this.onChangeMode, this));
-        this.conductor.on("change:pos_data.pos_str", _.bind(this.onPosChange, this));
+        // this.conductor.on("change:pos_data.pos_str", _.bind(this.onPosChange, this));
         this.vid.addEventListener("canplay", function(){
             // alert("canplay");
         });
