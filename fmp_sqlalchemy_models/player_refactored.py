@@ -469,6 +469,11 @@ static char * invisible_xpm[] = {
         self.emit('state-changed', self.playingState)
         self.update_time()
 
+    def force_pause(self, *args, **kwargs):
+        self.player.set_state(PAUSED)
+        self.playingState = self.player.get_state()[1]
+        self.emit('state-changed', self.playingState)
+        self.update_time()
     
     def on_message(self, bus, message):
         t = message.type

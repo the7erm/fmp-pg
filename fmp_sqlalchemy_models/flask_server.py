@@ -417,12 +417,35 @@ def mark_as_played(fid, percent_played, uids):
     sqla_session.close()
     return resp
 
-@app.route("/set-mode/<mode>")
-def set_mode(mode):
+@app.route("/set-mode/<mode>/<currentTime>")
+def set_mode(mode, currentTime):
     print "set_mode"
     if mode in ('web', 'remote'):
         session['mode'] = mode
+    if mode == 'remote':
+        sync_jukebox()
+    if mode == 'web' and jukebox.player.playingState == PLAYING:
+        print "MODE CHANGED TO WEB"
+        jukebox.player.force_pause()
+
     return json_response({'STATUS': 'SUCCESS'})
+
+def sync_jukebox():
+    # TODO make sure the user is listening (they should be, but just in case)
+    if jukebox.player.playingState == PLAYING:
+        return
+
+    playing_fid = int(session.get('playing_fid', jukebox.fid))
+    if jukebox.history[jukebox.index] != playing_fid:
+        jukebox.history.append(playing_fid)
+        juekbox.index = len(jukebox) - 1
+    jukebox.start(mark_as_played=False)
+    percent_played = float(session.get('percent_played', 
+                                        jukebox.playing.listeners_ratings[0].percent_played))
+    duration = jukebox.player.get_duration()
+    pos_ns = int(duration * (percent_played * 0.01))
+    jukebox.player.seek_ns(pos_ns)
+
 
 @app.route("/set-web-player-mode/<mode>")
 def set_webplayer_mode(mode):

@@ -173,8 +173,6 @@
         conductor.on("change:state", on_state_change);
         if (conductor.isRemoteMode()) {
             conductor.fetch();
-        } else {
-            
         }
 
         $(".web-listeners").bind("change", function(evt){
@@ -251,6 +249,7 @@
     });
     $( document ).on( "pageinit", "#page", function() {
         $("#page").css("display", "");
+        /*
         $( document ).on( "swipeleft swiperight", "#page", function( e ) {
             // We check if there is no open panel on the page because otherwise
             // a swipe to close the left panel would also open the right panel (and v.v.).
@@ -262,7 +261,7 @@
                     $( "#left-panel" ).panel( "open" );
                 }
             }
-        });
+        }); */
         
         $("#player-mode").on("change", function(evt) {
             var selected = $(evt.currentTarget).find("option:selected").val();

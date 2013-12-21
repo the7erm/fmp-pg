@@ -222,12 +222,17 @@ window.WebPlayerView = Backbone.View.extend({
         this.conductor = options.conductor;
         this.conductor.on("change:playing.fid", _.bind(this.setSrcToConductor, this));
         this.conductor.on("change:mode", _.bind(this.onChangeMode, this));
+        this.conductor.on("change:pos_data.pos_str", _.bind(this.onPosChange, this));
         this.vid.addEventListener("canplay", function(){
             // alert("canplay");
         });
         this.vid.addEventListener("loadstart", function(){
             // alert("loadstart");
         });
+        this.setSrcToConductor();
+    },
+    onPosChange: function() {
+        
     },
     onChangeMode: function(){
         if (this.conductor.isRemoteMode()) {
@@ -236,6 +241,9 @@ window.WebPlayerView = Backbone.View.extend({
         } else {
             this.$el.show();
             this.vid.play();
+            var ns = parseInt(this.conductor.get("pos_data.pos_int"));
+                seconds = ns / this.conductor.nano_second;
+            this.vid.currentTime = seconds;
         }
     },
     setSrcToConductor: function() {
@@ -263,6 +271,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.lastUpdateTime = -100;
     },
     bindEvents: function(){
+        
         var $vid = $(this.vid);
         
         var events = [
@@ -290,9 +299,10 @@ window.WebPlayerView = Backbone.View.extend({
             'waiting'
         ];
         // _.bind(function, object, [*arguments])
+        """
         _.each(events, function(evt){
             this.vid.addEventListener(evt, _.bind(this.logEvent, this));
-        }, this);
+        }, this); """
         this.vid.addEventListener('timeupdate', _.bind(this.onTimeStatus, this));
         this.vid.addEventListener('ended', _.bind(this.markAsCompleted, this));
         this.vid.addEventListener("play", _.bind(this.onPlay, this));
@@ -574,7 +584,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.vid.style.width="100%";
         this.$el.append("<br clear='all'>");
         if (this.conductor.isRemoteMode()) {
-            this.$el.hide();
+            // this.$el.hide();
             this.vid.pause();
         } else {
             this.$el.show();
@@ -614,8 +624,10 @@ window.ConductorModel = Backbone.DeepModel.extend({
         this.on("change:webPlayerMode", _.bind(this.setWebPlayerMode, this));
     },
     setPlayerMode: function() {
+        var mode = this.get("mode");
+            currentTime = window.webPlayer.vid.currentTime;
         $.ajax({
-          url: "/set-mode/"+this.get("mode"),
+          url: "/set-mode/"+mode+"/"+currentTime,
           dataType: 'json',
           cache:false,
         }).done(function(){});
@@ -662,7 +674,7 @@ window.ConductorModel = Backbone.DeepModel.extend({
     },
     doFetch: function() {
         if (this.isRemoteMode()) {
-            this.save();
+            this.fetch();
         }
         return true;
     },
