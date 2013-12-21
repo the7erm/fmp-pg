@@ -584,7 +584,7 @@ window.WebPlayerView = Backbone.View.extend({
         this.vid.style.width="100%";
         this.$el.append("<br clear='all'>");
         if (this.conductor.isRemoteMode()) {
-            // this.$el.hide();
+            this.$el.hide();
             this.vid.pause();
         } else {
             this.$el.show();
