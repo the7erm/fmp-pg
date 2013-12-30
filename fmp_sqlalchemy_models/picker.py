@@ -20,18 +20,31 @@ import random
 import sys
 import datetime
 import traceback
-from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
-                             Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, file_genre_association_table, \
-                             DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
-                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE, \
-                             make_session
-from sqlalchemy import and_, distinct, insert
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.sql.expression import func, not_
 import math
 import gtk
 import gobject
+
+
+from album import Album
+from artist import Artist
+from dont_pick import DontPick
+from file_info import FileInfo
+from file_location import FileLocation
+from genre import Genre
+from preload import Preload
+from title import Title
+from user import User
+from user_history import UserHistory
+from user_file_info import UserFileInfo
+
+from files_model_idea import DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
+                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE, \
+                             make_session
+
+from sqlalchemy import and_, distinct, insert
+from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.sql.expression import func, not_
+
 gtk.gdk.threads_init()
 gobject.threads_init()
 
@@ -78,10 +91,10 @@ class Picker():
                    .filter(Genre.enabled == False)
         """
         total_files = self.session.query(FileInfo)\
-                             .distinct(FileInfo.fid)\
-                             .join(Genre, FileInfo.genres)\
-                             .filter(Genre.enabled == True)\
-                             .count()
+                                  .distinct(FileInfo.fid)\
+                                  .join(Genre, FileInfo.genres)\
+                                  .filter(Genre.enabled == True)\
+                                  .count()
         ten_percent = int(total_files * 0.1)
         print "ten_percent:", ten_percent
 

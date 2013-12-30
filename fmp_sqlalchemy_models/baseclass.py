@@ -17,6 +17,24 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+import json
+import gtk
+import datetime
+import logging
+
+from sqlalchemy.exc import IntegrityError, InvalidRequestError, InterfaceError,\
+                           OperationalError
+
+gtk.gdk.threads_init()
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+hanlder = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+hanlder.setFormatter(formatter)
+hanlder.setLevel(logging.DEBUG)
+log.addHandler(hanlder)
+
 class BaseClass(object):
 
     def pre_save(self, session=None):
@@ -151,3 +169,20 @@ class BaseClass(object):
                     new_val.append(v.to_dict(session=session))
                 obj[field] = new_val
         return obj
+
+
+def wait():
+    # print "leave1"
+    gtk.gdk.threads_leave()
+    # print "/leave1"
+    # print "enter"
+    gtk.gdk.threads_enter()
+    # print "/enter"
+    if gtk.events_pending():
+        while gtk.events_pending():
+            # print "pending:"
+            gtk.main_iteration(False)
+    # print "leave"
+    gtk.gdk.threads_leave()
+    # print "/leave"
+

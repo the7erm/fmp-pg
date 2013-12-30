@@ -1,8 +1,10 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
+
 import os
 import sys
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.ext.declarative import declarative_base
 
 """
 engine = create_engine(
@@ -71,6 +73,8 @@ class DB:
         return self.Session()
 
 db = DB(db_connection_string)
+
+Base = declarative_base()
 
 def make_session(Base=None):
     return db.session(Base)
