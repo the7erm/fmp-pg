@@ -32,8 +32,11 @@ import urllib
 from alchemy_session import Base
 from baseclass import BaseClass, log
 from sqlalchemy import Column, Integer, String, DateTime, Float,\
-                       UniqueConstraint, ForeignKey, Date, Unicode, Boolean
+                       UniqueConstraint, ForeignKey, Date, Unicode, Boolean,\
+                       and_
+from file_info import FileInfo
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm.exc import NoResultFound
 
 class FileLocation(BaseClass, Base):
     __tablename__  = 'file_location'
@@ -161,8 +164,6 @@ class FileLocation(BaseClass, Base):
         if self.has_changed:
             self.update_hash(session=session)
             self.update_stats()
-            # self.update_hash()
-            # self.update_mtime()
 
     def update_hash(self, session=None):
         self.set_stats(True)
@@ -216,4 +217,6 @@ class FileLocation(BaseClass, Base):
 
         if not found:
             file_info.locations.append(self)
+
+        if self.has_changed or not found:
             file_info.save(session=session)

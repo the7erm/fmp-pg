@@ -829,28 +829,71 @@ window.AppRouter = Backbone.Router.extend({
         console.log("home");
     },
  
-    search: function (query) {
-        console.log("search:", query)
+    search: function (keywords, page) {
+        keywords = keywords || "";
+        page = page || 0;
+        console.log("keywords:", keywords)
+        console.log("page:", page)
         $("#history").hide();
-        $("#search").show();
+        $("#search").show().empty();
+        $("#search").trigger("create");
+        var searchView = new SearchView({
+            el: "#search",
+            collection: new SearchCollection({
+                keywords: keywords,
+                page: page
+            })
+        }).render();
     },
  
 });
 
 window.SearchCollection = Backbone.Collection.extend({
+    model: null,
+    pageModel: null,
+    initialize: function(options){
+        this.model = Backbone.DeepModel;
+        this.pageModel = new Backbone.Model({});
+        this.pageModel.idAttribute = "fid";
+        Backbone.Collection.prototype.initialize.apply(this, arguments);
+        var keywords = options.keywords || "",
+            page = parseInt(options.page) || 0;
+        this.pageModel.set({
+            keywords: keywords,
+            page: page,
+        });
+        this.pageModel.on("change", _.bind(this.fetch, this));
+    },
     "url": function(){
-        return "/search/q="+encodeURIComponent(this.keywords)
+        return "/search/?q="+encodeURIComponent(this.pageModel.get("keywords"))
     }
 });
 
 window.SearchView = Backbone.View.extend({
-    template: _.template("#tpl-search-view"),
+    template: _.template($("#tpl-search-view").html()),
+    itemTemplate: _.template($("#tpl-search-item").html()),
+    collection: null,
     initialize: function(options) {
         Backbone.View.prototype.initialize.apply(this, arguments);
-        this.conductor = options.conductor;
+        this.collection = options.collection || new SearchCollection();
+        this.collection.on("add", _.bind(this.onAddCollection, this));
     },
-    render: function(){
-        this.$el.html(this.template({}));
+    onAddCollection: function(model){
+        console.log("onAddCollection", model);
+        this.$results.append(this.itemTemplate({model:model}));
+        try {
+            this.$results.listview("refresh");
+        } catch(e) {
+            $("#search").trigger("create");
+        }
+        
+    },
+    render: function() {
+        this.$el.html(this.template());
+        this.$results = this.$el.find(".results");
+        this.$results.trigger("create");
+        console.log("CREATED")
+        this.collection.fetch();
         return this;
     }
 });

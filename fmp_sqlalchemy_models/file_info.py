@@ -22,7 +22,7 @@ import os
 from baseclass import BaseClass, log
 from alchemy_session import Base
 from sqlalchemy import Table, Integer, ForeignKey, DateTime, String, Column,\
-                       and_
+                       and_, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -31,12 +31,17 @@ from mutagen.mp3 import MP3, HeaderNotFoundError
 
 from album import Album
 from artist import Artist
+from dont_pick import DontPick
+from preload import Preload
 from genre import Genre
 from keywords import Keywords
+from preload import Preload
 from title import Title
 from user import User
 from user_file_info import UserFileInfo
 from user_history import UserHistory
+from constants import DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
+                      DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE
 
 numeric = re.compile("^[0-9]+$")
 
@@ -187,6 +192,7 @@ class FileInfo(BaseClass, Base):
     def update_id3_info(self, session=None):
         for loc in self.locations:
             if loc.ext != '.mp3':
+                print "!mp3"
                 self.set_artist_title_from_base(loc.base, session=session)
             else:
                 self.set_id3_info(loc.filename, loc.base, session=session)
@@ -200,6 +206,7 @@ class FileInfo(BaseClass, Base):
         try:
             audio = MP3(filename, ID3=EasyID3)
         except HeaderNotFoundError:
+            print "HEADER NOT FOUND"
             self.set_artist_title_from_base(base, session=session)
             return
 
@@ -209,12 +216,13 @@ class FileInfo(BaseClass, Base):
                   ("genre", Genre, "genres")]
         for key, get_type, attr in fields:
             if key in audio:
+                print "AUDIO[key]",audio[key]
                 for value in audio[key]:
                     value = value.strip()
                     if not value:
                         continue
                     if key == "artist":
-                        self.add_artists(value)
+                        self.add_artists(value, session)
                         continue
 
                     obj = self.insert_or_get(get_type, value, session=session)
@@ -225,13 +233,14 @@ class FileInfo(BaseClass, Base):
                         setattr(self, attr, current_values)
 
     def add_artists(self, artist_string="", session=None):
+        print "ARTIST STRING:",artist_string
         artists = self.parse_artist_string(artist_string)
         if not artists:
             return
 
-        for artist in self.artists:
+        for artist in artists:
             obj = self.insert_or_get(Artist, artist, session=session)
-            if obj not in self_artists:
+            if obj not in self.artists:
                 self.artists.append(obj)
 
     def set_artist_title_from_base(self, base=None, session=None):
@@ -253,17 +262,17 @@ class FileInfo(BaseClass, Base):
                 title = base
         artist = artist.strip()
         title = title.strip()
-        self.add_artists(artist)
+        self.add_artists(artist, session)
         if title:
             obj = self.insert_or_get(Title, title, session)
             if obj not in self.titles:
                 self.titles.append(obj)
 
     def insert_or_get(self, get_type, name, session=None):
-        
+        print "insert_or_get:", get_type, name, session
         try:
             info = session.query(get_type)\
-                          .filter(get_type.name==name)\
+                          .filter(get_type.name == name)\
                           .limit(1)\
                           .one()
         except NoResultFound:

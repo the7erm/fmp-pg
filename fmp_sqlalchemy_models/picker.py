@@ -37,9 +37,10 @@ from user import User
 from user_history import UserHistory
 from user_file_info import UserFileInfo
 
-from files_model_idea import DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
-                             DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE, \
-                             make_session
+from alchemy_session import make_session
+
+from constants import DEFAULT_RATING, DEFAULT_SKIP_SCORE, \
+                      DEFAULT_PERCENT_PLAYED, DEFAULT_TRUE_SCORE
 
 from sqlalchemy import and_, distinct, insert
 from sqlalchemy.orm.exc import NoResultFound

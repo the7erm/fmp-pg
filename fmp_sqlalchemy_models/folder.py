@@ -21,7 +21,11 @@ import os
 import datetime
 from baseclass import BaseClass, log
 from alchemy_session import Base
-from sqlalchemy import Column, Integer, Unicode, DateTime, Integer
+from file_location import FileLocation
+from constants import AUDIO_EXT, VIDEO_EXT
+from sqlalchemy import Column, Integer, Unicode, DateTime, Integer, Boolean, \
+                       and_
+from sqlalchemy.orm.exc import NoResultFound
 
 class Folder(BaseClass, Base):
     __tablename__ = 'folders'

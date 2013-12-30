@@ -166,8 +166,25 @@
     </style>
 </head>
 <body>
-<script id="#tpl-search-view" type="text/html">
+<script id="tpl-search-view" type="text/html">
 <h1>Search results</h1>
+<ul class="results" data-theme="d" data-divider-theme="d" data-role="listview" >
+</ul>
+</script>
+<script id="tpl-search-item" type="text/html">
+<li data-role="list-divider"><%- model.get("artist_title") %></li>
+<li>
+    <h2><%- model.get("artist_title") %></h2>
+    <p><strong>Youve been invited to a meeting at Filament Group in Boston, MA</strong></p>
+    <p>Hey Stephen, if youre available at 10am tomorrow, weve got a meeting with the jQuery team.</p>
+    <% if (model.get('ltp')) {
+        %><p class="ui-li-aside"><strong><%- new Date(model.get("ltp")) %></strong></p><%
+    } %>
+        
+    <% _.each(model.attributes, function(v, k){
+        %><p><%- k  %>:<%- v %><br></p><%
+    }); %>
+</li>
 </script>
 <script type="text/javascript">
     $(document).bind("mobileinit", function () {

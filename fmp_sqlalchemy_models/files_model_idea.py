@@ -41,8 +41,10 @@ from sqlalchemy.orm.exc import NoResultFound
 from baseclass import BaseClass
 from file_info import FileInfo
 from file_location import FileLocation
-from user_history import UserHistory
+from folder import Folder
 from user import User
+from user_file_info import UserFileInfo
+from user_history import UserHistory
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -51,15 +53,6 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 hanlder.setFormatter(formatter)
 hanlder.setLevel(logging.DEBUG)
 log.addHandler(hanlder)
-
-
-DEFAULT_RATING = 6
-DEFAULT_SKIP_SCORE = 8
-DEFAULT_PERCENT_PLAYED = 50.0
-DEFAULT_TRUE_SCORE = ((DEFAULT_RATING * 2 * 10) + 
-                      (DEFAULT_SKIP_SCORE * 10) + 
-                      DEFAULT_PERCENT_PLAYED
-                     ) / 3
 
 def scan(folder, session=None):
     skip_dirs = [
@@ -117,30 +110,6 @@ def create_user(uname, admin=False, listening=True, session=None):
     user = User(uname=uname, admin=admin, listening=listening)
     user.save(session)
     log.info("Created user:%s", user)
-
-AUDIO_EXT = ('.mp3', '.ogg', '.wma', '.wmv')
-VIDEO_EXT = ('.flv', '.mpg' ,'.mpeg', '.avi', '.mov', '.mp4', '.m4a')
-
-AUDIO_MIMES = {
-    '.m4a': 'audio/mp4a-latm',
-    '.mp3': "audio/mpeg",
-    '.ogg': "audio/ogg",
-    '.wma': "audio/x-ms-wma",
-    '.wmv': "audio/x-ms-wmv",
-}
-
-VIDEO_MIMES = {
-    '.avi': "video/avi",
-    '.flv': "video/x-flv",
-    '.mov': "video/quicktime",
-    '.mp4': "video/mpeg",
-    '.mpg': "video/mpeg",
-    '.mpeg': "video/mpeg",
-}
-
-MIME_TYPES = {}
-MIME_TYPES.update(AUDIO_MIMES)
-MIME_TYPES.update(VIDEO_MIMES)
 
 # session = make_session(Base)
 

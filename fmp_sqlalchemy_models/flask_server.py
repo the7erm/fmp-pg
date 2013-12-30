@@ -19,10 +19,16 @@ from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
 
-from user import User
-from file_info import FileInfo, file_keywords_association_table
+from artist import Artist
+from file_info import FileInfo, file_keywords_association_table, \
+                      file_artists_association_table, \
+                      file_titles_association_table
 from keywords import Keywords
-from files_model_idea import simple_rate, MIME_TYPES, AUDIO_MIMES, VIDEO_MIMES
+from title import Title
+from user import User
+
+from files_model_idea import simple_rate
+from constants import MIME_TYPES, AUDIO_MIMES, VIDEO_MIMES
 from baseclass import log
 from alchemy_session import db_connection_string, DB, Base
 db = DB(db_connection_string)
@@ -49,6 +55,16 @@ JUKEBOX_PLAYING_KEYS = [
     'listeners_ratings',
     'history',
     'keywords'
+]
+
+SEARCH_RESULTS_KEYS = [
+    'fid',
+    'artist_title',
+    'artists',
+    'titles',
+    'genres',
+    'albums',
+    'listeners_ratings',
 ]
 
 def get_listeners():
@@ -118,30 +134,20 @@ def search():
     sqla_session = make_session()
     keywords = request.args.get('q', '').lower().split(' ')
     offset = int(request.args.get('o', 0))
+    limit = int(request.args.get('l', 10))
 
     query = sqla_session.query(FileInfo)\
                         .join(file_keywords_association_table)\
                         .join(Keywords)\
                         .filter(Keywords.word.in_(keywords))\
-                        .limit(10)\
+                        .limit(limit)\
                         .offset(offset)
-
-    """
-    KEYWORDS: [u'test', u'again']
-    QUERY: SELECT files_info.fid AS files_info_fid, files_info.ltp AS files_info_ltp, files_info.fingerprint AS files_info_fingerprint, files_info.file_size AS files_info_file_size 
-    FROM files_info, keywords 
-    WHERE keywords.word IN (:word_1, :word_2)
-     LIMIT :param_1 OFFSET :param_2
-
-    This should have something referencing file_keywords table
-    """
-    
-    results_list = []
-    print "KEYWORDS:", keywords
     print "QUERY:",query
+    results_list = []
     for r in query.all():
-        results_list.append(r.to_dict(JUKEBOX_PLAYING_KEYS))
+        results_list.append(r.to_dict(SEARCH_RESULTS_KEYS))
     sqla_session.close()
+    print "LEN:", len(results_list)
     return json_response(results_list)
 
 @app.route('/history/<uids>')
