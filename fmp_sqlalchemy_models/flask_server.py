@@ -10,20 +10,19 @@ import subprocess
 import os
 import time
 import re
-
 from flask import Flask, Response, render_template, request, send_file, session
 from player_refactored import STOPPED, PAUSED, PLAYING
 from jukebox import HISTORY_LENGTH
 from picker import Picker
 
-from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
-                             AUDIO_MIMES, VIDEO_MIMES, User, \
-                             UserFileInfo, Base, UserHistory, and_
-
+from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
-from alchemy_session import db_connection_string, DB
 
+from user import User
+from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
+                             AUDIO_MIMES, VIDEO_MIMES
+from alchemy_session import db_connection_string, DB, Base
 db = DB(db_connection_string)
 
 def make_session():

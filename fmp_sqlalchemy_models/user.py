@@ -2,9 +2,8 @@
 from baseclass import BaseClass
 from alchemy_session import Base
 
-from sqlalchemy import Column, Integer, Unicode, Boolean
-from sqlalchemy.orm import relationship
-
+from sqlalchemy import Column, Integer, Unicode, Boolean, DateTime
+from sqlalchemy.orm import relationship, deferred
 
 class User(BaseClass, Base):
     __tablename__ = "users"

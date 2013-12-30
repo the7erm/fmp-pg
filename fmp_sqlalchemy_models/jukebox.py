@@ -20,11 +20,21 @@
 from picker import Picker, wait
 from player_refactored import Player
 from tray import ControllerIcon, RatingIcon
+from alchemy_session import make_session, Base
 import gtk
 import gobject
-from files_model_idea import FileLocation, FileInfo, Artist, DontPick, Genre,\
-                             Preload, Title, Album, User, UserHistory, \
-                             UserFileInfo, make_session, Base, and_
+from file_location import FileLocation
+from file_info import FileInfo
+from artist import Artist
+from dont_pick import DontPick
+from genre import Genre
+from preload import Preload
+from title import Title
+from album import Album
+from user import User
+from user_history import UserHistory
+from user_file_info import UserFileInfo
+from files_model_idea import make_session, Base, and_
 from sqlalchemy.orm.exc import NoResultFound
 
 import flask_server

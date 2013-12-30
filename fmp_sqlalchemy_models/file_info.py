@@ -16,11 +16,16 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
+import re
+import os
 
 from baseclass import BaseClass, log
 from alchemy_session import Base
-from sqlalchemy import Table, Integer, ForeignKey, DateTime, String, 
+from sqlalchemy import Table, Integer, ForeignKey, DateTime, String, Column,\
+                       and_
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm.exc import NoResultFound
+
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3, HeaderNotFoundError
 
@@ -31,7 +36,9 @@ from user import User
 from user_file_info import UserFileInfo
 from user_history import UserHistory
 from title import Title
+from keywords import Keywords
 
+numeric = re.compile("^[0-9]+$")
 
 file_albums_association_table = Table('file_albums', Base.metadata,
     Column('fid', Integer, ForeignKey('files_info.fid')),

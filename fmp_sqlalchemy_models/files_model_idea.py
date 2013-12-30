@@ -42,6 +42,7 @@ from baseclass import BaseClass
 from file_info import FileInfo
 from file_location import FileLocation
 from user_history import UserHistory
+from user import User
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)

@@ -1,9 +1,20 @@
 
-from baseclass import BaseClass
+from baseclass import BaseClass, log
 from alchemy_session import Base
 
-from sqlalchemy import Column, Integer, Unicode, Boolean, UniqueConstraint
+from user_history import UserHistory
+
+from sqlalchemy import Column, Integer, Unicode, Boolean, UniqueConstraint,\
+                       ForeignKey, Float, DateTime, Date
 from sqlalchemy.orm import relationship
+
+DEFAULT_RATING = 6
+DEFAULT_SKIP_SCORE = 8
+DEFAULT_PERCENT_PLAYED = 50.0
+DEFAULT_TRUE_SCORE = ((DEFAULT_RATING * 2 * 10) + 
+                      (DEFAULT_SKIP_SCORE * 10) + 
+                      DEFAULT_PERCENT_PLAYED
+                     ) / 3
 
 class UserFileInfo(BaseClass, Base):
     __tablename__ = "user_file_info"

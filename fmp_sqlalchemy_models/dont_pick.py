@@ -8,8 +8,8 @@ class DontPick(BaseClass, Base):
     __tablename__ = 'dont_pick'
     dpfid = Column(Integer, primary_key=True)
     fid = Column(Integer, ForeignKey('files_info.fid'))
-    reason = Column(Unicode, default="No reason")
-    junk = Column(Unicode, default="")
+    reason = Column(Unicode, default=u"No reason")
+    junk = Column(Unicode, default=u"")
     # TODO: alembic
     # alter table dont_pick  add column junk VARCHAR
     __repr_fields__ = [
