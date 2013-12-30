@@ -298,7 +298,7 @@ window.WebPlayerView = Backbone.View.extend({
         // _.bind(function, object, [*arguments])
         /*
         _.each(events, function(evt){
-            this.vid.addEventListener(evt, _.bind(this.logEvent, this));
+            this.vid.addEventListener(evt, _.bind(console.logEvent, this));
         }, this); */
         this.vid.addEventListener('timeupdate', _.bind(this.onTimeStatus, this));
         this.vid.addEventListener('ended', _.bind(this.markAsCompleted, this));
@@ -779,34 +779,6 @@ window.ControllerView = Backbone.View.extend({
     }
 });
 
-window.RatingView = Backbone.View.extend({
-    initialize: function(options){
-        Backbone.View.prototype.initialize.apply(this, arguments);
-        this.conductor = options.conductor;
-        this.conductor.on("change:playing.fid", this.renderRatings, this);
-        this.conductor.on("change:playing.listeners_ratings.length", this.renderRatings, this);
-    },
-    renderRatings: function(){
-        var ratings = this.conductor.get('playing.listeners_ratings') || [];
-        this.$el.empty()
-        _.each(ratings, function(rating){
-            var ratingDiv = $("<div></div>");
-            this.$el.append(ratingDiv);
-            var ratingView = new RatingButtonView({
-                "user": rating['user.uname'],
-                "uid": rating.uid,
-                "fid": rating.fid,
-                "rating": rating.rating,
-                "el": ratingDiv,
-                "conductor": this.conductor
-            }).render();
-        }, this);
-    },
-    render:function () {
-        this.renderRatings();
-        return this;
-    }
-});
 
 window.createCookie = function(name, value, days) {
     if (typeof(days) == 'undefined') {
@@ -879,6 +851,231 @@ window.SearchView = Backbone.View.extend({
     },
     render: function(){
         this.$el.html(this.template({}));
+        return this;
+    }
+});
+
+
+window.RatingModel = Backbone.DeepModel.extend({
+    name: "RatingModel",
+    idAttribute: "ufid",
+    initialize: function () {
+        Backbone.DeepModel.prototype.initialize.apply(this, arguments);
+    },
+    url: function() {
+        var rating = parseInt(this.get('rating'));
+        if (!rating) {
+            rating = "0";
+        }
+        // /rate/<fid>/<uid>/<rating>
+        return "/rate/"+this.get("fid")+"/"+this.get("uid")+"/"+rating;
+    },
+    getTrueScore: function () {
+        var trueScore = this.get('true_score') || -1;
+        return trueScore.toFixed(1);
+    },
+    getRating: function(defaultValue) {
+        if (!defaultValue) {
+            defaultValue = 6;
+        }
+        var rating = this.get('rating');
+        if (parseInt(rating) === 0) {
+            return 0;
+        }
+        return rating || defaultValue;
+    },
+});
+
+window.RatingsCollection = Backbone.Collection.extend({
+    model: RatingModel,
+    name: "RatingsCollection"
+});
+
+window.RatingView = Backbone.View.extend({
+    name: "RatingView",
+    model: null,
+    template: _.template($("#tpl-rating").html()),
+    table: null,
+    starSize: "big",
+    iconSet: {
+        cancelOff : 'cancel-off-big.png',
+        cancelOn  : 'cancel-on-big.png',
+        starHalf  : 'star-half-big.png',
+        starOff   : 'star-off-big.png',
+        starOn    : 'star-on-big.png'
+    },
+    initialize:function(options){
+        Backbone.View.prototype.initialize.apply(this, arguments);
+        this.model = options.model || new RatingModel();
+        this.model.on("change", this.onChange, this);
+        if (options.table) {
+            this.table = options.table;
+        }
+        if (options.starSize && options.starSize == 'small') {
+            this.iconSet = {
+                cancelOff : 'cancel-off.png',
+                cancelOn  : 'cancel-on.png',
+                starHalf  : 'star-half.png',
+                starOff   : 'star-off.png',
+                starOn    : 'star-on.png'
+            };
+        }
+    },
+    onChange:function(){
+        console.log("onChange changedAttributes:", this.model.changedAttributes());
+        var changedAttributes = this.model.changedAttributes();
+        if (!_.isUndefined(changedAttributes['true_score'])) {
+            var true_score = this.model.getTrueScore();
+            this.$el.find(".true_score").text(true_score);
+        }
+        if (!_.isUndefined(changedAttributes['rating'])) {
+            var rating = this.model.get('rating');
+            this.$tdStarRating.raty('score', this.model.getRating());
+            if (rating == 6) {
+                this.$el.find(".rate-me").show();
+            } else {
+                this.$el.find(".rate-me").hide();
+            }
+        }
+    },
+    render: function(){
+        console.log("render");
+        console.log("RatingView model:", this.model.toJSON());
+        var table = $("<table />");
+        table.append(this.template(this.model.toJSON()));
+        this.$el = table.find('tr');
+        delete table;
+        this.table.append(this.$el);
+        this.$tdStarRating = this.$el.find('.star-rating');
+        this.renderStars();
+        return this;
+    },
+    renderStars: function(){
+        var initData = {
+                path: "/static/img/raty/",
+                score: function () {
+                    var score = $(this).data("rating");
+                    if (score == 6) {
+                        return "0";
+                    }
+                    return score;
+                },
+                click: _.bind(this.onRate, this),
+                cancel: true,
+                hints: ['Not the greatest', 
+                        'Meh',
+                        'Good', 
+                        'Really good', 
+                        'Love it!'],
+                cancelHint: 'Please don\' play this ever again for me',
+            };
+        _.extend(initData, this.iconSet);
+        this.$tdStarRating.raty(initData);
+      },
+      onRate: function(score, evt){
+          evt.preventDefault();
+          if (score == null) {
+              score = 0;
+              this.$tdStarRating.raty('score', "0");
+          }
+          if (!score) {
+              score = "0";
+          }
+          this.model.set("rating", score);
+          this.model.save();
+      },
+      rate: function (ratingData) {
+            return;
+          if (_.isUndefined(ratingData) || $.isEmptyObject(ratingData)) {
+              return;
+          }
+          _.extend(ratingData, {
+              "cmd": "rate",
+              "status": 1,
+              "value": ratingData['rating']
+          });
+          $.ajax({
+              "url":"/",
+              "data": ratingData,
+              'dataType':'json'
+          }).done(_.bind(this.processStatus, this));
+      },
+});
+
+window.RatingsTableView = Backbone.View.extend({
+    debug: false,
+    name: "RatingsTableView",
+    collection: null,
+    template: _.template($("#tpl-ratings-table").html()),
+    ratingViews: {},
+    starSize:"big",
+    log: function(){
+        console.log.apply(console, args);
+    },
+    initialize: function(options) {
+        Backbone.View.prototype.initialize.apply(this, arguments);
+        this.collection = options.collection || new RatingsCollection();
+        this.collection.on("add", this.onAdd, this);
+        this.collection.on("change", this.onChange, this);
+        this.collection.on("remove", this.onRemove, this);
+        
+        if (options.$el) {
+            this.$el = options.$el;
+        }
+        if (options.starSize && options.starSize == "small") {
+            this.starSize = "small";
+        }
+    },
+    onChange: function(model, arg2){
+        if (!model) {
+            return; 
+        }
+        console.log("?????????????????????????????");
+        console.log("changedAttributes:", model.changedAttributes());
+        var ufid = model.get('ufid');
+        if (!this.ratingViews[ufid]) {
+            console.log("can't render rating:",ufid);
+            this.onAdd(model);
+        }
+        console.log("/?????????????????????????????");
+        this.hideOrShow();
+    },
+    onAdd: function(model){
+        console.log("++++++++++++++++++++++");
+        console.log("onAdd:",model);
+        var ufid = model.get('ufid');
+        this.ratingViews[ufid] = new RatingView({
+            model: model,
+            table: this.$el.find('.ratings-table'),
+            starSize: this.starSize
+        }).render();
+        console.log("/++++++++++++++++++++++");
+        this.hideOrShow();
+    },
+    onRemove: function(model){
+        console.log("---------------------------");
+        console.log("onRemove:",model);
+        var ufid = model.get('ufid');
+        this.$el.find("#ufid-"+ufid).remove();
+        delete this.ratingViews[ufid];
+        console.log("/---------------------------");
+        this.hideOrShow();
+    },
+    hideOrShow: function(){
+        if (this.collection.length >= 1) {
+            this.$el.show();
+        } else {
+            this.$el.hide();
+        }
+    },
+    render: function(){
+        console.log("render *(***");
+        this.$el.html(this.template({collection: this.collection}));
+        this.collection.each(function(model){
+            console.log("ADD MODEL:", model);
+            this.onAdd(model);
+        }, this);
+        this.hideOrShow();
         return this;
     }
 });

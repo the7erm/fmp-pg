@@ -227,7 +227,7 @@ def prev():
     obj['STATUS'] = 'SUCCESS'
     return json_response(obj)
 
-@app.route("/rate/<fid>/<uid>/<rating>")
+@app.route("/rate/<fid>/<uid>/<rating>", methods=['POST', 'PUT'])
 def rate(fid, uid, rating):
     fid = int(fid)
     uid = int(uid)

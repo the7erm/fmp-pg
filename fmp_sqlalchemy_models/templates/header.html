@@ -11,7 +11,9 @@
     <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.0/backbone-min.js"></script>
     <script src="/static/js/lib/deep-model.min.js"></script>
+
     <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+    <script src="/static/js/lib/jquery.raty.js"></script>
     <style>
         .player-control img {
             height: 25px;
@@ -90,7 +92,77 @@
             -webkit-overflow-scrolling: touch;
         }
         .containing-element {width: 30em;}
+        .nowrap {
+            white-space:nowrap;
+        }
+        .bordered {
+            border: solid #000 1px !important;
+            -moz-border-radius: 6px;
+            -webkit-border-radius: 6px;
+            border-radius: 6px;
+            -webkit-box-shadow: 0 1px 1px #ccc; 
+            -moz-box-shadow: 0 1px 1px #ccc; 
+            box-shadow: 0 1px 1px #ccc;
+        }
 
+            
+        .bordered td, .bordered th {
+            border-left: 1px solid #ccc !important;
+            border-top: 1px solid #ccc !important;
+            padding: 10px;
+            text-align: left;    
+        }
+
+        .bordered th {
+            -webkit-box-shadow: 0 1px 0 rgba(255,255,255,.8) inset; 
+            -moz-box-shadow:0 1px 0 rgba(255,255,255,.8) inset;  
+            box-shadow: 0 1px 0 rgba(255,255,255,.8) inset;        
+            border-top: none;
+            text-shadow: 0 1px 0 rgba(255,255,255,.5); 
+            color: #fff !important;
+        }
+
+        .bordered td:first-child, .bordered th:first-child {
+            border-left: none;
+        }
+
+        .bordered th:first-child {
+            -moz-border-radius: 6px 0 0 0;
+            -webkit-border-radius: 6px 0 0 0;
+            border-radius: 6px 0 0 0;
+        }
+
+        .bordered th:last-child {
+            -moz-border-radius: 0 6px 0 0;
+            -webkit-border-radius: 0 6px 0 0;
+            border-radius: 0 6px 0 0;
+        }
+
+        .bordered th:only-child{
+            -moz-border-radius: 6px 6px 0 0;
+            -webkit-border-radius: 6px 6px 0 0;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .bordered tr:last-child td:first-child {
+            -moz-border-radius: 0 0 0 6px;
+            -webkit-border-radius: 0 0 0 6px;
+            border-radius: 0 0 0 6px;
+        }
+
+        .bordered tr:last-child td:last-child {
+            -moz-border-radius: 0 0 6px 0;
+            -webkit-border-radius: 0 0 6px 0;
+            border-radius: 0 0 6px 0;
+        }
+        .rate-me {
+            font-weight: bold;
+            color: red;
+            font-size: 0.70em;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -281,10 +353,22 @@
             displayListeningOptions();
         });
         $("[data-role=header]").fixedtoolbar({ 
-            tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video",
+            tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video, .star-rating",
             transition: "none" });
-        $("[data-role=footer]").fixedtoolbar({ tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video",
+        $("[data-role=footer]").fixedtoolbar({ tapToggleBlacklist: "a, button, input, select, textarea, .ui-header-fixed, .ui-footer-fixed, audio, video, .star-rating",
             transition: "none" });
+        var listeners_ratings = conductor.get("playing.listeners_ratings");
+            console.log("plr", listeners_ratings)
+        var ratingCollection = new RatingsCollection(),
+            ratingTableView = new RatingsTableView({
+                "el":"#ratings",
+                "collection": ratingCollection
+            }).render();
+            conductor.on("change:playing.listeners_ratings", function(){
+                var listeners_ratings = conductor.get("playing.listeners_ratings");
+                ratingCollection.set(listeners_ratings);
+            });
+
     });
 </script>
 <div data-role="page" data-theme="b" id="page" >

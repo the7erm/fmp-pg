@@ -57,7 +57,26 @@
         </ul>
     </div>
 </script>
+<script type="text/html" id="tpl-ratings-table">
+    <table class="ratings-table bordered" cellspacing="0">
+        <thead class="ui-slider-bg ui-btn-active ui-btn-corner-all">
+            <tr>
+                <th>User</th>
+                <th>Rating</th>
+                <th>True Score</th>
+            </tr>
+        </thead>
+    </table>
+</script>
 
+<script type="text/html" id="tpl-rating">
+    <tr class="user-line" data-uid="<%= uid %>" data-fid="<%= fid %>" id="ufid-<%- ufid %>">
+        <td><%= user.uname %></td> 
+        <td class="star-rating nowrap" data-ufid="<%= ufid %>" data-fid="<%= fid %>" data-rating="<%- rating == 6 ? 0 : rating %>" data-uid="<%= uid %>" ></td>
+        <td class="true_score_td"><span class="true_score"><% print (true_score.toFixed(1)); %></span>
+              <div class='rate-me<%= rating == 6 ? "" : " hidden" %>'>RATE ME</div></td>
+    </tr>
+</script>
 <script type="text/javascript">
     $(document).bind("mobileinit", function () {
          
@@ -72,10 +91,6 @@
                 "el": "#history",
                 "model": historyModel,
                 "collection": historyCollection,
-                "conductor": conductor
-            }).render(),
-            ratingsView = new RatingView({
-                "el": "#ratings",
                 "conductor": conductor
             }).render();
         conductor.trigger("change:artist_title");
