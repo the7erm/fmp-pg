@@ -52,7 +52,7 @@ hanlder.setFormatter(formatter)
 hanlder.setLevel(logging.DEBUG)
 log.addHandler(hanlder)
 
-numeric = re.compile("^[0-9]+$")
+
 DEFAULT_RATING = 6
 DEFAULT_SKIP_SCORE = 8
 DEFAULT_PERCENT_PLAYED = 50.0

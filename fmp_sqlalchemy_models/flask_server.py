@@ -20,8 +20,10 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
 
 from user import User
-from files_model_idea import simple_rate, FileInfo, MIME_TYPES, \
-                             AUDIO_MIMES, VIDEO_MIMES
+from file_info import FileInfo
+from keywords import Keywords
+from files_model_idea import simple_rate, MIME_TYPES, AUDIO_MIMES, VIDEO_MIMES
+from baseclass import log
 from alchemy_session import db_connection_string, DB, Base
 db = DB(db_connection_string)
 
@@ -113,9 +115,30 @@ def get_playing_fid(listeners):
 
 @app.route('/search/')
 def search():
-    listeners = get_listeners()
-    playing = get_file_info(jukebox.fid)
-    return render_template("search.html", playing=playing, listeners=listeners)
+    sqla_session = make_session()
+    keywords = request.args.get('q', '').lower().split(' ')
+    offset = int(request.args.get('o', 0))
+
+    query = sqla_session.query(FileInfo)\
+                        .filter(Keywords.word.in_(keywords))\
+                        .limit(10)\
+                        .offset(offset)
+
+    """
+    KEYWORDS: [u'test', u'again']
+    QUERY: SELECT files_info.fid AS files_info_fid, files_info.ltp AS files_info_ltp, files_info.fingerprint AS files_info_fingerprint, files_info.file_size AS files_info_file_size 
+    FROM files_info, keywords 
+    WHERE keywords.word IN (:word_1, :word_2)
+     LIMIT :param_1 OFFSET :param_2
+    """
+    
+    results_list = []
+    print "KEYWORDS:", keywords
+    print "QUERY:",query
+    for r in query.all():
+        results_list.append(r.to_dict(JUKEBOX_PLAYING_KEYS))
+    sqla_session.close()
+    return json_response(results_list)
 
 @app.route('/history/<uids>')
 def history(uids):

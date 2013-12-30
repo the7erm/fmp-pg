@@ -23,18 +23,20 @@ from tray import ControllerIcon, RatingIcon
 from alchemy_session import make_session, Base
 import gtk
 import gobject
-from file_location import FileLocation
-from file_info import FileInfo
+from album import Album
 from artist import Artist
 from dont_pick import DontPick
+from file_info import FileInfo
+from file_location import FileLocation
 from genre import Genre
+from keywords import Keywords
 from preload import Preload
 from title import Title
-from album import Album
 from user import User
 from user_history import UserHistory
 from user_file_info import UserFileInfo
-from files_model_idea import make_session, Base, and_
+
+from sqlalchemy import and_
 from sqlalchemy.orm.exc import NoResultFound
 
 import flask_server

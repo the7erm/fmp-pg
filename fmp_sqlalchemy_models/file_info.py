@@ -32,11 +32,11 @@ from mutagen.mp3 import MP3, HeaderNotFoundError
 from album import Album
 from artist import Artist
 from genre import Genre
+from keywords import Keywords
+from title import Title
 from user import User
 from user_file_info import UserFileInfo
 from user_history import UserHistory
-from title import Title
-from keywords import Keywords
 
 numeric = re.compile("^[0-9]+$")
 

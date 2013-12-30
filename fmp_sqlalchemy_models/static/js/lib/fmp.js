@@ -829,8 +829,8 @@ window.AppRouter = Backbone.Router.extend({
         console.log("home");
     },
  
-    search: function () {
-        console.log("search")
+    search: function (query) {
+        console.log("search:", query)
         $("#history").hide();
         $("#search").show();
     },
@@ -854,7 +854,6 @@ window.SearchView = Backbone.View.extend({
         return this;
     }
 });
-
 
 window.RatingModel = Backbone.DeepModel.extend({
     name: "RatingModel",
