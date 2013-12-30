@@ -20,7 +20,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
 
 from user import User
-from file_info import FileInfo
+from file_info import FileInfo, file_keywords_association_table
 from keywords import Keywords
 from files_model_idea import simple_rate, MIME_TYPES, AUDIO_MIMES, VIDEO_MIMES
 from baseclass import log
@@ -120,6 +120,8 @@ def search():
     offset = int(request.args.get('o', 0))
 
     query = sqla_session.query(FileInfo)\
+                        .join(file_keywords_association_table)\
+                        .join(Keywords)\
                         .filter(Keywords.word.in_(keywords))\
                         .limit(10)\
                         .offset(offset)
