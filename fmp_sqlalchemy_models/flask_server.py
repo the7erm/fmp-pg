@@ -130,6 +130,8 @@ def search():
     FROM files_info, keywords 
     WHERE keywords.word IN (:word_1, :word_2)
      LIMIT :param_1 OFFSET :param_2
+
+    This should have something referencing file_keywords table
     """
     
     results_list = []
