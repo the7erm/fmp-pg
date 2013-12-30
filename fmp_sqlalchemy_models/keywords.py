@@ -2,7 +2,7 @@
 from baseclass import BaseClass
 from alchemy_session import Base
 
-from sqlalchemy import Column, Integer, Text
+from sqlalchemy import Column, Integer, Unicode
 
 class Keywords(BaseClass, Base):
     __tablename__ = 'keywords'
@@ -12,4 +12,4 @@ class Keywords(BaseClass, Base):
     ]
 
     kid = Column(Integer, primary_key=True)
-    word = Column(Text, unique=True)
+    word = Column(Unicode, unique=True)
