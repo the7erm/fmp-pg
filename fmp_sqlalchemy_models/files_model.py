@@ -34,7 +34,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3, HeaderNotFoundError
-
+from baseclass import BaseClass
 
 numeric = re.compile("^[0-9]+$")
 DEFAULT_RATING = 6
@@ -71,84 +71,6 @@ file_keywords_association_table = Table("file_keywords", Base.metadata,
     Column('fid', Integer, ForeignKey('files.fid')),
     Column('kid', Integer, ForeignKey('keywords.kid'))
 )
-
-class BaseClass(object):
-
-    def pre_save(self):
-        return
-
-    def post_save(self):
-        return
-
-    def save(self):
-        start_save = datetime.datetime.now()
-        self.pre_save()
-        session.add(self)
-        try:
-            session.commit()
-            self.post_save()
-        except IntegrityError:
-            session.rollback()
-            print "ROLLBACK"
-
-        delta = datetime.datetime.now() - start_save
-        print self.__class__.__name__,"save time:",delta.total_seconds()
-        
-
-    def getattr(self, obj, name, default=None):
-        if '.' in name:
-            name, rest = name.split('.', 1)
-            obj = getattr(obj, name)
-            if obj:
-                return self.getattr(obj, rest, default=default)
-            return None
-        return getattr(obj, name)
-
-    def get_value_repr(self, values, value, field=None, padding=0):
-        this_padding = " "*padding
-        if isinstance(value, list) and value:
-            start_string = "%s=[" % (field,)
-            values.append(start_string)
-            for val in value:
-                self.get_value_repr(values, val, padding=4)
-                 
-            values.append("]")
-            return
-        values_string = value.__repr__()
-        lines = values_string.split("\n")
-        if field:
-            values.append("%s=%s" % (field, lines[0]))
-        else:
-            values.append(this_padding+lines[0])
-        for l in lines[1:]:
-            values.append(this_padding+l)
-
-    def get_repr(self, obj, fields):
-        title = self.__class__.__name__
-        values = []
-        title_length = len(title) + 2
-        padding = " "*title_length
-        join_text = "\n%s" % padding
-
-        for field in fields:
-            value = self.getattr(obj, field)
-            self.get_value_repr(values, value, field, padding=len(field)+2)
-        
-        return "<%s(%s)>" % (title, join_text.join(values))
-
-    def __repr__(self):
-        return self.get_repr(self, self.__repr_fields__)
-
-    def utf8(self, string):
-        if not isinstance(string, unicode):
-            return unicode(string, "utf8", errors="replace")
-        return string
-
-    def now_if_none(self, datetime_object=None):
-        if datetime_object is not None:
-            return datetime_object
-        return datetime.datetime.now()
-
 
 class File(BaseClass, Base):
     __tablename__  = 'files'

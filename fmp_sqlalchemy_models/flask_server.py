@@ -16,6 +16,7 @@ from jukebox import HISTORY_LENGTH
 from picker import Picker
 
 from sqlalchemy import and_
+from sqlalchemy.sql import func
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import InvalidRequestError
 
@@ -136,18 +137,27 @@ def search():
     offset = int(request.args.get('o', 0))
     limit = int(request.args.get('l', 10))
 
-    query = sqla_session.query(FileInfo)\
-                        .join(file_keywords_association_table)\
-                        .join(Keywords)\
-                        .filter(Keywords.word.in_(keywords))\
+    query = sqla_session.query(Keywords.kid)\
+                        .filter(Keywords.word.in_(keywords))
+    kids = []
+    for q in query.all():
+        kids.append(str(q[0]))
+    query = sqla_session.query(file_keywords_association_table.c.fid,
+                               func.count('fid').label('total'))\
+                        .filter(file_keywords_association_table.c.kid.in_(kids))\
+                        .group_by(file_keywords_association_table.c.fid)\
+                        .order_by("total DESC")\
                         .limit(limit)\
                         .offset(offset)
-    print "QUERY:",query
+    result = query.all()
     results_list = []
-    for r in query.all():
-        results_list.append(r.to_dict(SEARCH_RESULTS_KEYS))
+    for r in result:
+        res = sqla_session.query(FileInfo)\
+                            .filter(FileInfo.fid == r[0])\
+                            .limit(1)\
+                            .one()
+        results_list.append(res.to_dict(SEARCH_RESULTS_KEYS))
     sqla_session.close()
-    print "LEN:", len(results_list)
     return json_response(results_list)
 
 @app.route('/history/<uids>')

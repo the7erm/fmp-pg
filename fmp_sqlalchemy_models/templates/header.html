@@ -25,7 +25,6 @@
         }
 
         .keyword {
-            float:left;
             padding-top:3px;
             margin-right:2px;
             padding-bottom:3px;
@@ -37,7 +36,6 @@
             max-width: 50%;
             overflow: hidden;
             font-size:0.75em;
-            
         }
         div.containing-element .ui-slider-switch { 
             width: 6em;
@@ -163,6 +161,9 @@
         .hidden {
             display: none;
         }
+        .float-left {
+            float:left;
+        }
     </style>
 </head>
 <body>
@@ -172,18 +173,45 @@
 </ul>
 </script>
 <script id="tpl-search-item" type="text/html">
-<li data-role="list-divider"><%- model.get("artist_title") %></li>
+<li data-role="list-divider"><%- artist_title %></li>
 <li>
-    <h2><%- model.get("artist_title") %></h2>
-    <p><strong>Youve been invited to a meeting at Filament Group in Boston, MA</strong></p>
-    <p>Hey Stephen, if youre available at 10am tomorrow, weve got a meeting with the jQuery team.</p>
-    <% if (model.get('ltp')) {
-        %><p class="ui-li-aside"><strong><%- new Date(model.get("ltp")) %></strong></p><%
+    <h2><%- artist_title %></h2>
+    <% if (artists && artists.length > 0) { 
+        %><p>Artists: <%
+        _.each(artists, function(artist){
+            %><a href="#/search/<%- artist.name %>" class='keyword ui-btn-up-c ui-btn-corner-all'><%- artist.name %></a><%
+        }); 
+        %></p><%
     } %>
-        
-    <% _.each(model.attributes, function(v, k){
-        %><p><%- k  %>:<%- v %><br></p><%
-    }); %>
+    <% if (titles && titles.length > 0) { 
+        %><p>Titles: <%
+        _.each(titles, function(title){
+            %><a href="#/search/<%- title.name %>" class='keyword ui-btn-up-c ui-btn-corner-all'><%- title.name %></a><%
+        }); 
+        %></p><%
+    } %>
+    <% if (albums && albums.length > 0) { 
+        %><p>Albums: <%
+        _.each(albums, function(album){
+            %><a href="#/search/<%- album.name %>" class='keyword ui-btn-up-c ui-btn-corner-all'><%- album.name %></a><%
+        }); 
+        %></p><%
+    } %>
+    <% if (genres && genres.length > 0) { 
+        %><p>Genres: <%
+        _.each(genres, function(genre){
+            %><a href="#/search/<%- genre.name %>" class='keyword ui-btn-up-c ui-btn-corner-all'><%- genre.name %></a><%
+        }); 
+        %></p><%
+    } %>
+    <% if (ltp) {
+        %><p class="ui-li-aside"><strong><%- new Date(ltp) %></strong></p><%
+    } %>
+
+    <% if (listeners_ratings) {
+
+    } %>
+    
 </li>
 </script>
 <script type="text/javascript">
@@ -331,7 +359,7 @@
         conductor.on("change:playing.keywords", function(){
             var playing_keywords = $(".playing-keywords"),
                 keywords = conductor.get("playing.keywords"),
-                template = _.template("<a class='keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='#/search/<%= encodeURIComponent(word) %>'><%- word %></a>")
+                template = _.template("<a class='float-left keyword ui-li-count ui-btn-up-c ui-btn-corner-all' href='#/search/<%= encodeURIComponent(word) %>'><%- word %></a>")
             playing_keywords.empty();
             _.each(keywords, function(v, k){
                 // console.log("keyword:",v);

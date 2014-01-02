@@ -880,7 +880,16 @@ window.SearchView = Backbone.View.extend({
     },
     onAddCollection: function(model){
         console.log("onAddCollection", model);
-        this.$results.append(this.itemTemplate({model:model}));
+        this.$results.append(this.itemTemplate({
+            artist_title: model.get('artist_title') || "",
+            artists: model.get('artists') || null,
+            genres: model.get('genres') || null,
+            titles: model.get('titles') || null,
+            albums: model.get('albums') || null,
+            listeners_ratings: model.get('listeners_ratings') || null,
+            fid: model.get('fid') || null,
+            ltp: model.get('ltp') || null
+        }));
         try {
             this.$results.listview("refresh");
         } catch(e) {

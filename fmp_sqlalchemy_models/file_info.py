@@ -322,7 +322,7 @@ class FileInfo(BaseClass, Base):
             if not l:
                 continue
 
-            all_seps = '/w\/|v\/|\/|,|&|\ and\ |\ ft\.|\ ft\ |\ \-\ |\-\ |\ \-|\ vs\ |\ vs\.\ |feat\. |feat\ |\ featuring\ /'
+            all_seps = '/w\/|v\/|\/|,|&|\ and\ |\ ft\.|\ ft\ |\ \-\ |\-\ |\ \-|\ vs\ |\ vs\.\ |feat\. |feat\ |\ featuring\ |\+/'
             parts = re.split(all_seps, l, re.I)
 
             for p in parts:
