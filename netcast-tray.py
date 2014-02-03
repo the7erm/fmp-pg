@@ -18,7 +18,7 @@
 #
 
 from lib.__init__ import *
-from lib.picker import wait, enter, leave
+from wait_util import wait, enter, leave
 import lib.fobj as fobj
 import os
 import sys

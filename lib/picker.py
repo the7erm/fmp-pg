@@ -22,6 +22,10 @@
 import gtk
 from __init__ import *
 from random import shuffle
+from local_file_fobj import Local_File
+from local_file_fobj import sanity_check
+from wait_util import wait
+from excemptions import CreationFailed
 
 global populate_locked, dont_pick_created
 dont_pick_created = False
@@ -36,30 +40,7 @@ populate_locked = False
 # INSERT INTO dont_pick (fid) SELECT fid FROM user_song_info WHERE rating = 0 AND uid = 1;
 # DROP RULE "my_table_on_duplicate_ignore" ON "my_table";
 
-def wait():
-    # print "leave1"
-    gtk.gdk.threads_leave()
-    # print "/leave1"
-    # print "enter"
-    gtk.gdk.threads_enter()
-    # print "/enter"
-    if gtk.events_pending():
-        while gtk.events_pending():
-            # print "pending:"
-            gtk.main_iteration(False)
-    # print "leave"
-    gtk.gdk.threads_leave()
-    # print "/leave"
 
-def enter(msg=None):
-    # print "enter:",msg
-    gtk.gdk.threads_enter()
-    # print "/enter:",msg
-
-def leave(msg=None):
-    # print "leave:",msg
-    gtk.gdk.threads_leave()
-    # print "/leave:",msg
 
 def create_dont_pick():
     global dont_pick_created
@@ -91,7 +72,8 @@ def associate_gernes():
     if not undefined:
         print "associate_gernes 2"
         undefined = get_assoc("""INSERT INTO genres (genre, enabled) 
-                                 VALUES(%s, true)""",("[undefined]",))
+                                 VALUES(%s, true)
+                                 RETURNING *""",("[undefined]",))
         print "associate_gernes 2.1"
 
     print "associate_gernes 3"
@@ -187,7 +169,7 @@ def populate_preload(uid=None, min_amount=0):
         for l in listeners:
             populate_preload(l['uid'], min_amount)
         return
-
+    populate_preload_for_uid(uid, min_amount)
     try:
         populate_preload_for_uid(uid, min_amount)
     except:
@@ -473,6 +455,40 @@ def get_single_random_unplayed(uid):
                         (uid,))
 
 
+def get_existing_file(uid, true_score):
+    file_info = None
+    while not file_info:
+        file_info = get_single_from_true_score(uid, true_score)
+
+        if not file_info:
+            print "nothing for:",true_score
+            wait()
+            return None
+        wait()
+        attrs = dict(file_info)
+        attrs['insert'] = False
+        print "get_existing_file attrs:",attrs
+        try:
+            fobj = Local_File(**attrs)
+            wait()
+        except CreationFailed, e:
+            print "get_existing_file CreationFailed:",e
+            print "file_info:", attrs
+            sanity_check(file_info['fid'])
+            file_info = None
+            continue
+
+        if not fobj.is_readable:
+          print "NOT READABLE:", fobj.filename
+          file_info = None
+          continue
+
+        if not fobj.exists:
+          print "MISSING:", fobj.filename
+          file_info = None
+          wait()
+    return file_info
+
 def populate_preload_for_uid(uid, min_amount=0):
     gtk.gdk.threads_leave()
     print "populate_preload_for_uid 1"
@@ -518,13 +534,14 @@ def populate_preload_for_uid(uid, min_amount=0):
         for f in sample:
             print "sample :",true_score, f
 
-        f = get_single_from_true_score(uid, true_score)
+        f = get_existing_file(uid, true_score)
 
         if not f:
             print "nothing for:",true_score
             empty_scores.append(true_score)
             continue
         wait()
+
         insert_fid_into_preload(f['fid'], uid, "true_score >= %s" % (true_score, ))
         insert_artists_in_preload_into_dont_pick()
         insert_duplicate_files_into_dont_pick()

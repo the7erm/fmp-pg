@@ -29,7 +29,6 @@ import re
 import lib.player as player
 import lib.notify as notify
 import lib.tray as tray
-import lib.picker as picker
 import math
 import dbus
 import dbus.service
@@ -40,6 +39,7 @@ import setproctitle
 
 import urllib
 import lib.fobj as fobj
+import lib.picker as picker
 import lib.local_file_fobj as local_file_fobj
 from lib.netcast_fobj import is_netcast
 
@@ -410,7 +410,7 @@ def start_playing(direction="inc"):
         deinc_index()
     retry_cnt = 0
     while isinstance(playing, local_file_fobj.Local_File) and not \
-          playing.exists and retry_cnt < 10:
+          playing.exists and playing.is_readable and retry_cnt < 10:
         retry_cnt += 1
         fp = open(os.path.join(config_dir,"missing.log"), "a")
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")

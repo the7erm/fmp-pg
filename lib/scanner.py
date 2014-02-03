@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # scanner.py -- Parse files, get .mp3 info.
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

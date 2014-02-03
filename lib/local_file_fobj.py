@@ -32,23 +32,28 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 import hashlib
-import os
 import sys
 import genres_v1
 import copy
+from wait_util import wait
+from file_location import FileLocation
 
 numeric = re.compile("^[0-9]+$")
 
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
-                 insert=False, silent=False, sha512=None, must_match=False, get_dups=True, **kwargs):
-
-        if kwargs.has_key('dir') and dirname is None:
+                 insert=False, silent=False, sha512=None, must_match=False, 
+                 get_dups=True, fingerprint=None, **kwargs):
+        if 'dir' in kwargs and dirname is None:
             dirname = kwargs['dir']
-
+        print "FID:", fid
+        print "DIRNAME:", dirname
+        print "BASNEAME", basename
+        print "FILENAME:", filename
         self.can_rate = True
         self.db_info = None
         db_info = None
+        self.locations = None
         self.artists = []
         self.albums = []
         self.genres = []
@@ -61,56 +66,31 @@ class Local_File(fobj.FObj):
         self.last_percent_played = 0
         self.last_time_marked_as_played = datetime.now()
 
-        if fid:
-            db_info = get_assoc("""SELECT * 
-                                   FROM files 
-                                   WHERE fid = %s LIMIT 1""",
-                                   (fid,))
+        self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
+                          dirname=dirname, basename=basename, filename=filename, 
+                          insert=insert)
+        
+        self.set_paths_from_locations()
 
-        if sha512 is not None and not db_info:
-            db_info = get_assoc("""SELECT * 
-                                   FROM files 
-                                   WHERE sha512 = %s 
-                                   LIMIT 1""",
-                                   (sha512,))
+        fobj.FObj.__init__(self, filename=self.filename, dirname=self.dirname, 
+                           basename=self.basename, **kwargs)
 
-        if not db_info:
-            if filename is not None:
-                filename = os.path.realpath(filename)
-                print "filename:",filename
-                dirname = os.path.dirname(filename)
-                basename = os.path.basename(filename)
-            elif dirname is not None and basename is not None:
-                filename = os.path.realpath(os.path.join(dirname, basename))
-                dirname = os.path.dirname(filename)
-                basename = os.path.basename(filename)
+        self.integrity_check(insert)
 
-            if not filename or not os.path.exists(filename):
-                self.exists = False
-                raise CreationFailed("File must exist on local drive:%s" % filename)
+        self.set_attribs()
+        self.can_rate = True
+        self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
+                                                   listening=True)
 
-            db_info = get_assoc("""SELECT * 
-                                   FROM files 
-                                   WHERE dir = %s AND basename = %s""",
-                                   (dirname, basename))
+        ok_to_hash = kwargs.get('hash', True)
 
-        if db_info:
-            filename = os.path.join(db_info['dir'], db_info['basename'])
-            dirname = db_info['dir']
-            basename = db_info['basename']
-            self.db_info = db_info
-        elif not insert:
-            raise CreationFailed(
-                "Unable to find file information based on:\n" +
-                "   fid:%s\n" % fid +
-                "   filename:%s\n" % filename +
-                "   dirname:%s\n" % dirname +
-                "   basename:%s\n" % basename
-            )
+        if ok_to_hash and (not self.db_info['sha512'] or self.mtime_changed()):
+            self.update_hash()
 
-        fobj.FObj.__init__(self, filename=filename, dirname=dirname, 
-                           basename=basename, **kwargs)
+        if get_dups and self.db_info["sha512"]:
+            self.prepare_dups(must_match=must_match)
 
+    def integrity_check(self, insert):
         if not self.is_audio and not self.is_video:
             raise CreationFailed("File is not an audio or video file:%s" % self.filename)
 
@@ -127,27 +107,158 @@ class Local_File(fobj.FObj):
         elif not self.db_info:
             raise CreationFailed("File is not in database:%s", (self.filename,))
 
-        self.set_attribs()
-        self.can_rate = True
-        self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
-                                                   listening=True)
-        #if not silent:
-        #    print "RatingsAndScores:",self.ratings_and_scores
+    def init_db_info(self, fid=None, sha512=None, fingerprint=None, dirname=None,
+                    basename=None, filename=None, insert=False):
+        if fid is not None :
+            self.db_info = self.get_db_info_from_fid(fid)
+            if self.db_info:
+                print "FROM FID:", dict(self.db_info)
+                return
+            else:
+                print "FAILED %s: FROM FID:" % (fid), db_info
 
-        ok_to_hash = True
+        if sha512 is not None:
+            self.db_info = self.get_db_info_from_sha512(sha512)
+            if self.db_info:
+                print "FROM sha512:", dict(self.db_info)
+                return
 
-        if kwargs.has_key('hash') and not kwargs['hash']:
-            ok_to_hash = False
+        if fingerprint is not None:
+            self.db_info = self.get_db_info_from_fingerprint(fingerprint)
+            if self.db_info:
+                print "FROM sha512:", dict(self.db_info)
+                return
+        
+        self.db_info = self.get_db_info_from_filename_dirname_basename(
+            filename=filename, dirname=dirname, basename=basename,
+            insert=insert)
 
-        if ok_to_hash and (not self.db_info['sha512'] or self.mtime_changed()):
-            self.update_hash()
+        if self.db_info:
+            print "FROM filename:", dict(self.db_info)
+            return
 
-        if get_dups and self.db_info["sha512"]:
-            self.prepare_dups(must_match=must_match)
+        if not insert:
+            self.db_info = None
+            raise CreationFailed(
+                "Unable to find file information based on:\n" +
+                "   fid:%s\n" % fid +
+                "   filename:%s\n" % filename +
+                "   dirname:%s\n" % dirname +
+                "   basename:%s\n" % basename
+            )
+                
 
     @property
-    def filename(self):
-        return 
+    def is_readable(self):
+        if not self.locations:
+            return False
+        for l in self.locations:
+            if l.exists and l.is_readable:
+                return True
+        return False
+
+    def get_paths_from_locations(self):
+        if not self.locations:
+            self.db_info = None
+            raise CreationFailed(
+                "No locations:\n" 
+            )
+        filname = None
+        dirname = None
+        basename = None
+        for l in self.locations:
+            print "L:", dict(l.db_info)
+            if l.exists and l.is_readable:
+                self.exists = l.exists
+                filename = l.filename
+                dirname = l.dirname
+                basename = l.basename
+                print "L:",dict(l.db_info)
+                break
+        return filename, dirname, basename
+
+    def get_db_info_from_filename_dirname_basename(
+            self, filename=None, dirname=None, basename=None, insert=False):
+        if not filename and not dirname and not basename:
+            return None
+        db_info = None
+        try:
+            location = FileLocation(filename=filename, dirname=dirname, 
+                                    basename=basename, insert=insert)
+            self.exists = location.exists
+            db_info = self.get_db_info_from_fid(location.fid)
+            if not db_info:
+                db_info = self.get_db_info_from_fingerprint(location.fingerprint)
+        except CreationFailed:
+            pass
+        return db_info
+
+    def get_db_info_from_sha512(self, sha512):
+        if sha512 is None:
+            return None
+        return get_assoc("""SELECT * 
+                            FROM files 
+                            WHERE sha512 = %s 
+                            LIMIT 1""",
+                        (sha512,))
+
+    def get_db_info_from_fid(self, fid):
+        if fid is None:
+            return None
+        return get_assoc("""SELECT * 
+                            FROM files 
+                            WHERE fid = %s 
+                            LIMIT 1""",
+                            (fid,))
+
+    def get_db_info_from_fingerprint(self, fingerprint):
+        if fingerprint is None:
+            return None
+        return get_assoc("""SELECT * 
+                            FROM files 
+                            WHERE fingerprint = %s 
+                            LIMIT 1""",
+                            (fingerprint,))
+
+
+    def get_locations(self, fid=None, fingerprint=None, insert=False):
+        print "GET LOCATIONS"
+        print self.db_info
+        locations = []
+        res_locations = []
+        if fingerprint and not locations:
+            locations = get_results_assoc("""SELECT *
+                                             FROM file_locations
+                                             WHERE fingerprint = %s""", 
+                                         (fingerprint,))
+            print "GET LOCATIONS 1", locations
+        
+        if fid and not locations:
+            locations = get_results_assoc("""SELECT *
+                                             FROM file_locations
+                                             WHERE fid = %s""", 
+                                         (fid,))
+            print "GET LOCATIONS 2", locations
+
+        for l in locations:
+            try:
+                args = dict(l)
+                args['insert'] = insert
+                loc = FileLocation(**args)
+                if loc.fingerprint == self.db_info['fingerprint']:
+                    res_locations.append(loc)
+            except CreationFailed:
+                pass
+
+        return res_locations
+
+    def print_locations(self):
+        print "print_locations"
+        for l in self.locations:
+            print "location exists:%s is_readable:%s %s" % (l.exists, 
+                                                            l.is_readable, 
+                                                            l.filename)
+
 
     def set_db_keywords(self):
         keywords = []
@@ -183,7 +294,9 @@ class Local_File(fobj.FObj):
         keywords = sorted(keywords, key=str.lower)
         print "AFTER:",keywords
 
-        present = get_assoc("""SELECT * FROM keywords WHERE fid = %s""",
+        present = get_assoc("""SELECT * 
+                               FROM keywords 
+                               WHERE fid = %s""",
                             (self.fid,))
 
         txt = " ".join(keywords)
@@ -233,6 +346,7 @@ class Local_File(fobj.FObj):
         return found
 
     def get_possible_dups(self):
+        return []
         if self.db_info['title']:
             # SELECT * FROM sometable WHERE UPPER(textfield) LIKE (UPPER('value') || '%')
             return get_results_assoc("""SELECT f.fid
@@ -261,6 +375,7 @@ class Local_File(fobj.FObj):
     def get_dups(self, must_match=False):
         results = []
         fids = []
+        return results
         
         dups = get_results_assoc("""SELECT fid
                                     FROM files f
@@ -364,10 +479,10 @@ class Local_File(fobj.FObj):
                  SET ltp = NOW() 
                  WHERE fid = %s""", 
                  (self.db_info['fid'],))
+
+        self.print_locations()
         
         self.ratings_and_scores.mark_as_played(percent_played)
-        for d in self.dups:
-            d.mark_as_played(percent_played)
         self.mark_as_played_when_percent = percent_played + 10
         if self.mark_as_played_when_percent > 100:
             self.mark_as_played_when_percent = 100
@@ -404,12 +519,11 @@ class Local_File(fobj.FObj):
     def set_attribs(self, quick=True):
         if not self.db_info:
             return
+
         self.fid = self.db_info['fid']
         self.ltp = self.db_info['ltp']
         self.mtime = self.db_info['mtime']
-        self.dirname = self.db_info['dir']
-        self.basename = self.db_info['basename']
-        self.filename = os.path.join(self.db_info['dir'], self.db_info['basename'])
+        self.set_paths_from_locations()
         self.get_artists()
         self.get_albums()
         self.get_genres()
@@ -419,25 +533,45 @@ class Local_File(fobj.FObj):
 
         self.set_db_keywords()
 
+    def set_paths_from_locations(self, db_info=None):
+        if db_info is None:
+            db_info = self.db_info
+
+        if not db_info:
+            self.dirname = None
+            self.basename = None
+            self.filename = None
+            return
+        
+        self.locations = self.get_locations(db_info['fid'], db_info['fingerprint'], insert=False)
+        
+        filename, dirname, basename = self.get_paths_from_locations()
+        self.dirname = dirname
+        self.basename = basename
+        self.filename = filename
+
 
     def get_artists(self):
         self.artists = get_results_assoc("""SELECT * 
                                             FROM artists a, file_artists fa 
-                                            WHERE fa.fid = %s AND fa.aid = a.aid""",
+                                            WHERE fa.fid = %s AND 
+                                                  fa.aid = a.aid""",
                                             (self.fid,))
         return self.artists
         
     def get_albums(self):
         self.albums = get_results_assoc("""SELECT * 
                                            FROM albums al, album_files af 
-                                           WHERE af.fid = %s AND af.alid = al.alid""", 
+                                           WHERE af.fid = %s AND 
+                                                 af.alid = al.alid""", 
                                            (self.fid,))
         return self.albums
 
     def get_genres(self):
         self.genres = get_results_assoc("""SELECT * 
                                            FROM genres g, file_genres fg 
-                                           WHERE fg.fid = %s AND g.gid = fg.gid""",
+                                           WHERE fg.fid = %s AND 
+                                                 g.gid = fg.gid""",
                                            (self.fid,))
         return self.genres
 
@@ -457,7 +591,8 @@ class Local_File(fobj.FObj):
             query("COMMIT")
             self.db_info = get_assoc("""SELECT *
                                         FROM files
-                                        WHERE dir = %s and basename = %s""",
+                                        WHERE dir = %s AND 
+                                              basename = %s""",
                                         (self.dirname, self.basename))
         self.set_attribs()
         print "insert:", os.path.join(self.dirname, self.basename)
@@ -813,7 +948,91 @@ def get_words_from_string(string):
     final_words = list(set(final_words))
 
     return final_words
-        
+
+def sanity_check(fid):
+    finfo = get_assoc("""SELECT *
+                         FROM files
+                         WHERE fid = %s""",(fid,))
+    if not finfo:
+        print "DELETING FID:",fid
+        delete_fid(fid)
+        wait()
+        return
+    print "SHIT'S FUCKED UP."
+
+
+def delete_fid(fid):
+    delete_user_history_for_fid(fid)
+    wait()
+    delete_ratings_for_fid(fid)
+    wait()
+    delete_locations_for_fid(fid)
+    wait()
+    delete_artist_for_fid(fid)
+    wait()
+    delete_genres_for_fid(fid)
+    wait()
+
+def delete_user_history_for_fid(fid):
+    query("""DELETE FROM user_history
+             WHERE id_type = 'f' AND id = %s """,(fid,))
+
+def delete_ratings_for_fid(fid):
+    query("""DELETE FROM user_song_info
+             WHERE fid = %s """,(fid,))
+
+def delete_locations_for_fid(fid):
+    query("""DELETE FROM file_locations 
+             WHERE fid = %s""", (fid,))
+
+def delete_artist_for_fid(fid):
+    artists_before = get_artists_for_fid(fid)
+    query("""DELETE FROM file_artists
+             WHERE fid = %s""",(fid,))
+    for artist in artists_before:
+        has_artist = get_files_for_aid(artist['aid'])
+        if not has_artist:
+            delete_artist(artist['aid'])
+
+def get_artists_for_fid(fid):
+    return get_results_assoc("""SELECT *
+                                FROM file_artists
+                                WHERE fid = %s""", (fid,))
+
+def get_files_for_aid(aid):
+    return get_results_assoc("""SELECT *
+                                FROM file_artists
+                                WHERE aid = %s""",(aid,))
+
+def delete_artist(aid):
+    query("""DELETE FROM artists 
+             WHERE aid = %s""", (aid,))
+
+
+def delete_genres_for_fid(fid):
+    genres_before = get_genres_for_fid(fid)
+    query("""DELETE FROM file_genres
+             WHERE fid = %s""",(fid,))
+    for genre in genres_before:
+        has_genre = get_files_for_gid(genre['gid'])
+        if not has_genre:
+            delete_genres(genre['gid'])
+
+def get_files_for_gid(gid):
+    return get_results_assoc("""SELECT *
+                                FROM file_genres 
+                                WHERE gid = %s""",(gid,))
+
+def delete_genres(gid):
+    query("""DELETE FROM genres 
+             WHERE gid = %s""", (gid,))
+
+def get_genres_for_fid(fid):
+    return get_results_assoc("""SELECT *
+                                FROM file_genres
+                                WHERE fid = %s""", (fid,))
+
+
 if __name__ == "__main__":
     import sys
     for arg in sys.argv[1:]:

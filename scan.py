@@ -21,12 +21,12 @@ from lib.__init__ import *
 import os
 import sys
 import lib.scanner as scanner
-import lib.file_object as file_object
-file_object.pg_conn = pg_conn
-file_object.pg_cur = pg_cur
-file_object.get_results_assoc = get_results_assoc
-file_object.get_assoc = get_assoc
-file_object.query = query
+# import lib.file_object as file_object
+# file_object.pg_conn = pg_conn
+# file_object.pg_cur = pg_cur
+# file_object.get_results_assoc = get_results_assoc
+# file_object.get_assoc = get_assoc
+# file_object.query = query
 
 args = sys.argv[1:]
 

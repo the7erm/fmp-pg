@@ -348,6 +348,64 @@ ALTER SEQUENCE file_genres_gid_seq OWNED BY file_genres.gid;
 
 
 --
+-- Name: file_locations; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE file_locations (
+    flid integer NOT NULL,
+    dirname character varying(255),
+    basename character varying(255),
+    atime timestamp with time zone,
+    mtime timestamp with time zone,
+    size integer DEFAULT 0,
+    fingerprint character varying(255),
+    fid integer,
+    fixed boolean,
+    front_fingerprint character varying(255),
+    middle_fingerprint character varying(255),
+    end_fingerprint character varying(255)
+);
+
+
+--
+-- Name: file_locations_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE file_locations_fid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: file_locations_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE file_locations_fid_seq OWNED BY file_locations.fid;
+
+
+--
+-- Name: file_locations_flid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE file_locations_flid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: file_locations_flid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE file_locations_flid_seq OWNED BY file_locations.flid;
+
+
+--
 -- Name: files; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -358,7 +416,11 @@ CREATE TABLE files (
     ltp timestamp with time zone,
     mtime timestamp with time zone,
     sha512 character varying(132),
-    title text
+    title text,
+    fingerprint character varying(255),
+    front_fingerprint character varying(255),
+    middle_fingerprint character varying(255),
+    end_fingerprint character varying(255)
 );
 
 
@@ -379,6 +441,90 @@ CREATE SEQUENCE files_fid_seq
 --
 
 ALTER SEQUENCE files_fid_seq OWNED BY files.fid;
+
+
+--
+-- Name: fingerprint_history; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE fingerprint_history (
+    fphid integer NOT NULL,
+    fid integer NOT NULL,
+    flid integer NOT NULL,
+    dirname character varying(255),
+    basename character varying(255),
+    fingerprint character varying(255),
+    atime timestamp with time zone,
+    mtime timestamp with time zone,
+    size integer,
+    front_fingerprint character varying(255),
+    middle_fingerprint character varying(255),
+    end_fingerprint character varying(255)
+);
+
+
+--
+-- Name: TABLE fingerprint_history; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE fingerprint_history IS 'fphid, dirname, basename, fid, flid';
+
+
+--
+-- Name: fingerprint_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE fingerprint_history_fid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: fingerprint_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE fingerprint_history_fid_seq OWNED BY fingerprint_history.fid;
+
+
+--
+-- Name: fingerprint_history_flid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE fingerprint_history_flid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: fingerprint_history_flid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE fingerprint_history_flid_seq OWNED BY fingerprint_history.flid;
+
+
+--
+-- Name: fingerprint_history_fphid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE fingerprint_history_fphid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: fingerprint_history_fphid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE fingerprint_history_fphid_seq OWNED BY fingerprint_history.fphid;
 
 
 --
@@ -1257,10 +1403,45 @@ ALTER TABLE ONLY file_genres ALTER COLUMN gid SET DEFAULT nextval('file_genres_g
 
 
 --
+-- Name: flid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY file_locations ALTER COLUMN flid SET DEFAULT nextval('file_locations_flid_seq'::regclass);
+
+
+--
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY file_locations ALTER COLUMN fid SET DEFAULT nextval('file_locations_fid_seq'::regclass);
+
+
+--
 -- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY files ALTER COLUMN fid SET DEFAULT nextval('files_fid_seq'::regclass);
+
+
+--
+-- Name: fphid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY fingerprint_history ALTER COLUMN fphid SET DEFAULT nextval('fingerprint_history_fphid_seq'::regclass);
+
+
+--
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY fingerprint_history ALTER COLUMN fid SET DEFAULT nextval('fingerprint_history_fid_seq'::regclass);
+
+
+--
+-- Name: flid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY fingerprint_history ALTER COLUMN flid SET DEFAULT nextval('fingerprint_history_flid_seq'::regclass);
 
 
 --
@@ -1444,6 +1625,30 @@ ALTER TABLE ONLY file_genres
 
 
 --
+-- Name: file_locations_dirname_basename_key; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY file_locations
+    ADD CONSTRAINT file_locations_dirname_basename_key UNIQUE (dirname, basename);
+
+
+--
+-- Name: file_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY file_locations
+    ADD CONSTRAINT file_locations_pkey PRIMARY KEY (flid);
+
+
+--
+-- Name: fingerprint_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY fingerprint_history
+    ADD CONSTRAINT fingerprint_history_pkey PRIMARY KEY (fphid);
+
+
+--
 -- Name: genres_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1593,6 +1798,125 @@ CREATE INDEX fid ON tags_text USING btree (fid);
 --
 
 CREATE UNIQUE INDEX fid_aid_index ON file_artists USING btree (fid, aid);
+
+
+--
+-- Name: fid_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fid_idx ON file_locations USING btree (fid);
+
+
+--
+-- Name: files_end_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX files_end_fingerprint_idx ON files USING btree (end_fingerprint);
+
+
+--
+-- Name: files_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX files_fingerprint_idx ON files USING btree (fingerprint);
+
+
+--
+-- Name: files_front_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX files_front_fingerprint_idx ON files USING btree (front_fingerprint);
+
+
+--
+-- Name: files_middle_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX files_middle_fingerprint_idx ON files USING btree (middle_fingerprint);
+
+
+--
+-- Name: fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fingerprint_idx ON file_locations USING btree (fingerprint);
+
+
+--
+-- Name: fph_atime_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_atime_idx ON fingerprint_history USING btree (atime);
+
+
+--
+-- Name: fph_basename; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_basename ON fingerprint_history USING btree (basename);
+
+
+--
+-- Name: fph_dirname; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_dirname ON fingerprint_history USING btree (dirname);
+
+
+--
+-- Name: fph_end_fingerprint; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_end_fingerprint ON fingerprint_history USING btree (end_fingerprint);
+
+
+--
+-- Name: fph_front_fingerprint; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_front_fingerprint ON fingerprint_history USING btree (front_fingerprint);
+
+
+--
+-- Name: fph_middle_fingerprint; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_middle_fingerprint ON fingerprint_history USING btree (middle_fingerprint);
+
+
+--
+-- Name: fph_mtime_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_mtime_idx ON fingerprint_history USING btree (mtime);
+
+
+--
+-- Name: fph_size_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX fph_size_idx ON fingerprint_history USING btree (size);
+
+
+--
+-- Name: loc_end_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX loc_end_fingerprint_idx ON file_locations USING btree (end_fingerprint);
+
+
+--
+-- Name: loc_front_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX loc_front_fingerprint_idx ON file_locations USING btree (front_fingerprint);
+
+
+--
+-- Name: loc_middle_fingerprint_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX loc_middle_fingerprint_idx ON file_locations USING btree (middle_fingerprint);
 
 
 --

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # file_object.py -- File object
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -42,7 +42,8 @@ except ImportError, err:
 numeric = re.compile("^[0-9]+$")
 
 class File_Obj:
-    def __init__(self,filename=None, fid=None, eid=None, insert=False, is_file=True, is_netcast=False):
+    def __init__(self,filename=None, fid=None, eid=None, insert=False, 
+                 is_file=True, is_netcast=False):
         self.fid = fid
         self.eid = eid
         self.artists = []
@@ -273,8 +274,6 @@ class File_Obj:
 
         self.update_tags()
         self.update_album()
-        # sys.exit()
-
     
 
     def update(self):
@@ -320,9 +319,6 @@ class File_Obj:
         
         album = get_assoc("SELECT * FROM albums al, artists a, album_artists ala WHERE al.album_name = %s AND a.aid = %s AND ala.aid = a.aid AND ala.alid = al.alid", (album_name, aid))
 
-        
-        
-        
         
         if not album:
             album = get_assoc("INSERT INTO albums (album_name) VALUES(%s) RETURNING *",(album_name,))

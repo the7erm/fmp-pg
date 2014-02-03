@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # netcast_fobj.py -- Netcast file obj
-#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #
 
 from __init__ import *
-from picker import wait, enter, leave
+from wait_util import wait, enter, leave
 from listeners import listeners
 import fobj
 import os
