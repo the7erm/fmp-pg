@@ -20,6 +20,7 @@
 from star_cell import CellRendererStar
 from __init__ import *
 import gtk, random, gobject
+from rating_utils import rate_for_uid
 
 
 class User_File_Info_Tree(gtk.TreeView):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/preload.py -- Display files in preload
-#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ from picker import wait
 from star_cell import CellRendererStar
 import gtk, gobject, os, datetime, math
 from subprocess import Popen
-from ratings_and_scores import rate_for_uid
+from rating_utils import rate_for_uid
 
 class Preload(gtk.ScrolledWindow):
     def __init__(self):

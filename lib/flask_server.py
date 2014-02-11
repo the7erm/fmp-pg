@@ -47,7 +47,7 @@ import time
 
 from flask import render_template
 import lib.fobj as fobj
-from lib.ratings_and_scores import rate as simple_rate
+from lib.rating_utils import rate as simple_rate
 from lib.local_file_fobj import get_words_from_string
 
 from tornado.wsgi import WSGIContainer
