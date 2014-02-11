@@ -399,10 +399,18 @@ class File_Info_Tab(gtk.ScrolledWindow):
                 self.genre_crumbs.insert_crumb(crumb, -2)
 
     def populate_artist_store(self,store):
+        artists = get_results_assoc("""SELECT artist FROM artists ORDER BY artist""")
+        for a in artists:
+            store.append([a['artist']])
+        return
         for a in self.fobj.artists:
             store.append([a['artist']])
 
     def populate_genre_store(self,store):
+        genres = get_results_assoc("""SELECT genre FROM genres ORDER BY genre""")
+        for g in genres:
+            store.append([g['genre']])
+        return
         for g in self.fobj.genres:
             store.append([g['genre']])
 

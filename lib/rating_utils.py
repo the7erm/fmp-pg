@@ -115,13 +115,15 @@ def calculate_true_score_for_selected(fid):
 
 
 def calculate_true_score_for_uid(fid, uid):
-    res = get_results_assoc(
-        """UPDATE user_song_info usi
+    q = """UPDATE user_song_info usi
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+""" 
            WHERE fid = %s AND uid = %s
-           RETURNING *""",
-           (fid, uid))
-    return res
+           RETURNING *"""
+    
+    mog = pg_cur.mogrify(q, (fid, uid))
+    # print mog
+    # res = get_results_assoc(mog)
+    return get_results_assoc(mog)
 
 def caclulate_true_score_for_usid(usid):
     return get_results_assoc(
@@ -204,3 +206,13 @@ def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
         return rate_for_uname(fid, uname, rating)
 
     return []
+
+
+def set_score_for_uid(fid, uid, score):
+    updated = get_results_assoc("""UPDATE user_song_info usi
+                                   SET score = %s
+                                   WHERE fid = %s AND uid = %s
+                                   RETURNING *""",
+                                 (score, fid, uid))
+    updated_again = calculate_true_score_for_uid(fid, uid)
+    return updated_again or updated or []
