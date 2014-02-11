@@ -164,7 +164,7 @@ class User_File_Info_Tree(gtk.TreeView):
         uname = liststore[path][1]
         rating = int(liststore[path][2])
         res = rate_for_uid(self.fid, uid, rating)
-        liststore[path][4] = res['true_score']
+        liststore[path][4] = res[0]['true_score']
         print "on_row_change: fid:%s uid:%s, uname:%s rating:%s" % (self.fid, uid, uname, rating)
         self.change_locked = False
 
