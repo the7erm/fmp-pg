@@ -1771,6 +1771,20 @@ CREATE UNIQUE INDEX artist ON artists USING btree (artist);
 
 
 --
+-- Name: basename_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX basename_idx ON file_locations USING btree (basename);
+
+
+--
+-- Name: dirname_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX dirname_idx ON file_locations USING btree (dirname);
+
+
+--
 -- Name: dont_pick_fid_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
