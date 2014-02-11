@@ -163,9 +163,9 @@ def populate_dont_pick():
 
 
 def remove_missing_files_from_preload():
-  files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, p.uid
-                               FROM preload p, files f, file_locations fl
-                               WHERE f.fid = p.fid AND fl.fid = p.fid""")
+  files = get_results_assoc("""SELECT p.fid, dirname, basename, p.uid
+                               FROM preload p, file_locations fl
+                               WHERE fl.fid = p.fid""")
 
   for f in files:
       if not os.path.exists(os.path.join(f['dirname'], f['basename'])):
@@ -294,44 +294,44 @@ def insert_fid_into_preload(fid, uid, reason):
 def get_next_file_in_artist_series(aid, uid):
     next_file = None
     # Get the last file played by that artist
-    q = """SELECT f.dir, f.basename, ultp 
-           FROM files f, 
+    q = """SELECT dirname, basename, ultp
+           FROM file_locations fl,
                 file_artists fa,
                 user_song_info usi
-           WHERE usi.fid = f.fid AND
-                 fa.fid = f.fid AND
+           WHERE usi.fid = fl.fid AND
+                 fa.fid = fl.fid AND
                  fa.aid = %s AND
                  usi.uid = %s
            ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
-                    ultp DESC, f.dir, f.basename
+                    ultp DESC, dirname, basename
            LIMIT 1"""
     last_file = get_assoc(q, (aid, uid))
     if last_file:
         # Get the next artist in the series
-        next_file = get_assoc("""SELECT dir, basename, f.fid
-                                 FROM files f,
-                                      file_artists fa
-                                 WHERE dir >= %s AND
+        next_file = get_assoc("""SELECT dirname, basename, fl.fid
+                                 FROM file_artists fa,
+                                      file_locations fl
+                                 WHERE dirname >= %s AND
                                        basename > %s AND
-                                       f.fid = fa.fid AND
+                                       fl.fid = fa.fid AND
                                        fa.aid = %s
-                                 ORDER BY dir, basename
+                                 ORDER BY dirname, basename
                                  LIMIT 1""",
-                                 (last_file['dir'], last_file['basename'],
+                                 (last_file['dirname'], last_file['basename'],
                                   aid))
         if next_file:
             print "NEXT FILE:", next_file
             return next_file
     # If it's empty, get the first file in the series.
-    return get_assoc("""SELECT f.dir, f.basename, ultp, f.fid
-                        FROM files f, 
-                             file_artists fa,
-                             user_song_info usi
-                        WHERE usi.fid = f.fid AND
-                              fa.fid = f.fid AND
+    return get_assoc("""SELECT dirname, basename, ultp, fl.fid
+                        FROM file_artists fa,
+                             user_song_info usi,
+                             file_locations fl
+                        WHERE usi.fid = fl.fid AND
+                              fa.fid = fl.fid AND
                               fa.aid = %s AND
                               usi.uid = %s
-                        ORDER BY f.dir, f.basename
+                        ORDER BY dirname, basename
                         LIMIT 1""", (aid, uid))
 
 
@@ -339,18 +339,18 @@ def get_next_file_in_genre_series(gid, uid):
     next_file = None
     # Get the last file played in that genre
     print "g1"
-    q = """SELECT f.dir, f.basename, ultp
-           FROM files f
-                LEFT JOIN dont_pick dp ON dp.fid = f.fid, 
+    q = """SELECT dirname, basename, ultp
+           FROM file_locations fl
+                LEFT JOIN dont_pick dp ON dp.fid = fl.fid, 
                 file_genres fg,
                 user_song_info usi
-           WHERE usi.fid = f.fid AND
-                 fg.fid = f.fid AND
+           WHERE usi.fid = fl.fid AND
+                 fg.fid = fl.fid AND
                  fg.gid = %s AND
                  usi.uid = %s AND
                  dp.fid IS NULL
            ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
-                    ultp DESC, f.dir, f.basename
+                    ultp DESC, dirname, basename
            LIMIT 1"""
     last_file = get_assoc(q, (gid, uid))
 
@@ -358,32 +358,32 @@ def get_next_file_in_genre_series(gid, uid):
     if last_file:
         print "g2.1 LAST_FILE:", last_file
         # Get the next artist in the series
-        q = """SELECT dir, basename, f.fid
-               FROM files f,
+        q = """SELECT dirname, basename, fl.fid
+               FROM file_locations fl,
                     file_genres fg
-               WHERE dir >= %s AND
+               WHERE dirname >= %s AND
                      basename > %s AND
-                     f.fid = fg.fid AND
+                     fl.fid = fg.fid AND
                      fg.gid = %s
-               ORDER BY dir, basename
+               ORDER BY dirname, basename
                LIMIT 1"""
-        next_file = get_assoc(q, (last_file['dir'], last_file['basename'], gid))
+        next_file = get_assoc(q, (last_file['dirname'], last_file['basename'], gid))
         print "g2.2"
-        print pg_cur.mogrify(q, (last_file['dir'], last_file['basename'], gid))
+        print pg_cur.mogrify(q, (last_file['dirname'], last_file['basename'], gid))
         if next_file:
             print "NEXT FILE:",next_file
             return next_file
     print "g3"
     # If it's empty, get the first file in the series.
-    return get_assoc("""SELECT f.dir, f.basename, ultp, f.fid
-                        FROM files f, 
+    return get_assoc("""SELECT dirname, basename, ultp, fl.fid
+                        FROM file_locations fl,
                              file_genres fg,
                              user_song_info usi
-                        WHERE usi.fid = f.fid AND
-                              fg.fid = f.fid AND
+                        WHERE usi.fid = fl.fid AND
+                              fg.fid = fl.fid AND
                               fg.gid = %s AND
                               usi.uid = %s
-                        ORDER BY f.dir, f.basename
+                        ORDER BY dirname, basename
                         LIMIT 1""", (gid, uid))
 
 
@@ -587,8 +587,8 @@ def populate_preload_for_uid(uid, min_amount=0):
 
 def get_preload():
     return get_results_assoc("""SELECT uid, basename 
-                                FROM preload p, files f 
-                                WHERE f.fid = p.fid 
+                                FROM preload p, file_locations fl
+                                WHERE fl.fid = p.fid
                                 ORDER BY basename""")
 
 
