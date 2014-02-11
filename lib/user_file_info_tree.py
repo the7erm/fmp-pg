@@ -112,13 +112,17 @@ class User_File_Info_Tree(gtk.TreeView):
                     if r[5] != u['percent_played']:
                         r[5] = u['percent_played']
 
-                    try:
-                        if r[6] != u['ultp'].strftime("%c"):
-                            r[6] = u['ultp'].strftime("%c")
-                    except AttributeError, err:
+                    if u['ultp'] is not None:
+                        try:
+                            if r[6] != u['ultp'].strftime("%c"):
+                                r[6] = u['ultp'].strftime("%c")
+                        except AttributeError, err:
+                            r[6] = "Never"
+                            u['ultp'] = "Never"
+                            print "AttributeError:",err
+                    else:
                         r[6] = "Never"
                         u['ultp'] = "Never"
-                        print "AttributeError:",err
 
                     break
             if not found:
