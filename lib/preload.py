@@ -22,6 +22,7 @@ from picker import wait
 from star_cell import CellRendererStar
 import gtk, gobject, os, datetime, math
 from subprocess import Popen
+from ratings_and_scores import rate_for_uid
 
 class Preload(gtk.ScrolledWindow):
     def __init__(self):
@@ -161,8 +162,7 @@ class Preload(gtk.ScrolledWindow):
         for uid in self.user_cols:
             print "uid:",uid
             rating = self.liststore[path][self.user_cols[uid]['rating']]
-            print "rating:", rating
-            res = get_assoc("UPDATE user_song_info SET rating = %s, true_score = (((%s * 2 * 10) + (score * 10) + percent_played) / 3) WHERE uid = %s AND fid = %s RETURNING *",(rating, rating, uid, fid))
+            res = rate_for_uid(fid, uid, rating)
             liststore[path][self.user_cols[uid]['true_score']] = res['true_score']
         self.change_locked = False
 
@@ -219,10 +219,12 @@ class Preload(gtk.ScrolledWindow):
                     return True
         wait()
         print "fetching files"
-        files = get_results_assoc("""SELECT p.fid, basename, p.uid, u.uname, reason 
-                                     FROM preload p, files f, users u 
-                                     WHERE f.fid = p.fid AND u.uid = p.uid 
-                                     ORDER BY basename""")
+        files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, p.uid, u.uname, reason 
+                                     FROM preload p, files f, users u,
+                                          file_locations fl
+                                     WHERE f.fid = p.fid AND u.uid = p.uid AND 
+                                           fl.fid = p.fid
+                                     ORDER BY fl.basename""")
         print "done fetching files"
         wait()
         for i, f in enumerate(files):
@@ -259,7 +261,11 @@ class Preload(gtk.ScrolledWindow):
 
     def create_row(self, f, cols):
         found = False
-        q = pg_cur.mogrify("SELECT *, age(now(), ultp) AS \"age\" FROM users u, user_song_info us WHERE us.uid = u.uid AND u.listening = true AND us.fid = %s ORDER BY admin DESC, uname", (f['fid'],))
+        q = pg_cur.mogrify("""SELECT *, age(now(), ultp) AS \"age\" 
+                              FROM users u, user_song_info us 
+                              WHERE us.uid = u.uid AND u.listening = true AND 
+                                    us.fid = %s 
+                              ORDER BY admin DESC, uname""", (f['fid'],))
         # print q
         db_user_file_info = get_results_assoc(q)
         user_file_info = []

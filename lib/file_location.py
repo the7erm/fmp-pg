@@ -150,7 +150,7 @@ class FileLocation:
     def get_file_info(self):
         file_info = None
         # get_file_info_by_dirname_basename WILL BE REMOVED WHEN file_locations take over.
-        file_info = self.get_file_info_by_dirname_basename(self.dirname, self.basename)
+        # file_info = self.get_file_info_by_dirname_basename(self.dirname, self.basename)
         if not file_info:
             file_info = self.get_file_info_by_fingerprint(self.fingerprint)
 
@@ -328,10 +328,6 @@ class FileLocation:
         if not self.db_info or key not in self.db_info:
             return default
         return self.db_info[key]
-
-
-
-
 
 
 if __name__ == "__main__":

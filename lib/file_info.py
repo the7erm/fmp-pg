@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # lib/file_info.py -- Display dialog about file
-#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -25,6 +25,65 @@ from history import History_Tree
 from file_tags import Tag_Table
 import mutagen
 import fobj
+
+class LocationTreeview:
+
+    # close the window and quit
+    def delete_event(self, widget, event, data=None):
+        gtk.main_quit()
+        return False
+
+    def __init__(self, locations):
+        # create a TreeStore with one string column to use as the model
+        self.liststore = gtk.ListStore(str, str, str, str, int, str, str)
+        
+        for l in locations:
+            print "loc:", l.filename
+            exists = "%s" % l.exists
+            is_readable = "%s" % l.is_readable
+            self.liststore.append([exists, is_readable, l.dirname, l.basename, l.size,
+                                   "%s" % l.atime, "%s" % l.mtime])
+
+        # create the TreeView using treestore
+        self.treeview = gtk.TreeView(self.liststore)
+
+        self.add_tv_column('exists', 0)
+        self.add_tv_column('readable', 1)
+        self.add_tv_column('dirname', 2)
+        self.add_tv_column('basename', 3)
+        self.add_tv_column('size', 4)
+        self.add_tv_column('atime', 5)
+        self.add_tv_column('mtime', 6)
+
+        # make it searchable
+        self.treeview.set_search_column(2)
+
+        # Allow drag and drop reordering of rows
+        self.treeview.set_reorderable(True)
+
+
+    def add_tv_column(self, title, col_num, sort_col=None):
+        # create the TreeViewColumn to display the data
+        col = gtk.TreeViewColumn(title)
+
+        # add tvcolumn to treeview
+        self.treeview.append_column(col)
+
+        # create a CellRendererText to render the data
+        cell = gtk.CellRendererText()
+
+        # add the cell to the tvcolumn and allow it to expand
+        col.pack_start(cell, True)
+
+        # set the cell "text" attribute to column 0 - retrieve text
+        # from that column in treestore
+        col.add_attribute(cell, 'text', col_num)
+
+        if sort_col is None:
+            sort_col = col_num
+
+        # Allow sorting on the column
+        col.set_sort_column_id(sort_col)
 
 class File_Info_Tab(gtk.ScrolledWindow):
     def __init__(self, fid=None, filename=None):
@@ -56,12 +115,14 @@ class File_Info_Tab(gtk.ScrolledWindow):
         self.file_info = self.fobj.db_info
 
         if self.file_info:
-            self.dirname = self.file_info['dir']
-            self.basename = self.file_info['basename']
+            print "FILE INFO:",self.file_info
+            self.dirname = self.fobj.dirname
+            self.basename = self.fobj.basename
             self.fid = self.file_info['fid']
-            self.filename = os.path.realpath(
-                os.path.join(self.file_info['dir'], self.file_info['basename'])
-            )
+            self.filename = self.fobj.filename
+
+        for loc in self.fobj.locations:
+            print "LOCATION:", loc.filename
 
         self.add_crap_to_the_tab()
         # self.vbox.pack_start(gtk.Label(""),True,True)
@@ -78,6 +139,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
         self.ratings_and_history_vbox = gtk.VBox()
         self.ratings_and_history_vbox.show()
         self.add_tab(self.ratings_and_history_vbox, "Ratings &amp; History")
+        self.add_locations()
         
         self.add_ratings_and_scores()
         self.add_history()
@@ -127,6 +189,9 @@ class File_Info_Tab(gtk.ScrolledWindow):
         dir_hbox.pack_start(self.file_label)
         dir_hbox.show()
         self.vbox.pack_start(dir_hbox, False, False)
+
+    def add_locations(self):
+        self.add_tab(LocationTreeview(self.fobj.locations).treeview, 'Locations')
 
     def add_artist_tags(self):
         artist_hbox = self.create_section("Artists: ")
@@ -195,7 +260,6 @@ class File_Info_Tab(gtk.ScrolledWindow):
         # history_hbox.pack_start(sw)
         
         self.ratings_and_history_vbox.pack_start(sw,True, True)
-        
 
     
     def create_crumb(self, typ, _id, text):
@@ -373,7 +437,7 @@ if __name__ == "__main__":
         sys.exit()
 
     w = gtk.Window()
-    w.set_title("FMP - File Info - %s" % tab.file_info['basename'])
+    w.set_title("FMP - File Info - %s" % tab.fobj.basename)
     w.set_default_size(800,600)
     w.set_position(gtk.WIN_POS_CENTER)
 

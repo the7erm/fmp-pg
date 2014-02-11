@@ -550,7 +550,8 @@ CALCULATE_TRUESCORE_FORMULA = """
      WHERE uh2.uid = usi.uid AND 
           uh2.id = usi.fid AND 
           uh2.id_type = 'f' AND
-          usi.uid = 1
+          usi.uid = 1 AND
+          percent_played != 0
      ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
               time_played DESC
      LIMIT 5
@@ -583,7 +584,8 @@ RATE_TRUESCORE_FORMULA = """
      WHERE uh2.uid = usi.uid AND 
           uh2.id = usi.fid AND 
           uh2.id_type = 'f' AND
-          usi.uid = 1
+          usi.uid = 1 AND
+          percent_played != 0
      ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
               time_played DESC
      LIMIT 5
@@ -599,7 +601,7 @@ def calculate_true_score(fid):
                 (SELECT uid FROM users WHERE listening = true)
          RETURNING *""",
          (fid,))
-  print res
+  # print res
   return res
 
 def calculate_true_score_for_selected(fid):
@@ -704,4 +706,19 @@ def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
 
     return []
 
+if __name__ == "__main__":
+  import sys
+  usi = get_results_assoc("""SELECT *
+                             FROM user_song_info usi
+                             ORDER BY uid, random()""")
 
+  for rating in usi:
+    res = calculate_true_score_for_uid(rating['fid'], rating['uid'])
+    for r in res:
+      if rating['true_score'] != r['true_score']:
+        print ""
+        print "b:", rating['uid'], rating['true_score'], rating
+        print "a:", r['uid'], r['true_score'], r
+      else:
+        print ".",
+        sys.stdout.flush()

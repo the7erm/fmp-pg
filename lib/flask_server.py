@@ -275,16 +275,18 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
     print "Q:",q
-    no_words_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title,
+    no_words_query = """SELECT DISTINCT f.fid, dirname, basename, title,
                                         sha512, artist, f.fid, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
                         FROM files f 
                              LEFT JOIN preload p ON p.fid = f.fid
                              LEFT JOIN file_artists fa ON fa.fid = f.fid
-                             LEFT JOIN artists a ON a.aid = fa.aid
+                             LEFT JOIN artists a ON a.aid = fa.aid,
+                             file_locations fl
+                        WHERE fl.fid = f.fid
                         ORDER BY artist, title"""
 
-    no_words_rating_query = """SELECT DISTINCT f.fid, dir as dirname, 
+    no_words_rating_query = """SELECT DISTINCT f.fid, dirname, 
                                                basename, title, sha512, artist, 
                                                f.fid, p.fid AS cued, 
                                                f.fid AS id, 'f' AS id_type
@@ -292,35 +294,42 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                                     LEFT JOIN preload p ON p.fid = f.fid
                                     LEFT JOIN file_artists fa ON fa.fid = f.fid
                                     LEFT JOIN artists a ON a.aid = fa.aid,
-                                    user_song_info usi 
+                                    user_song_info usi, 
+                                    file_locations fl
                                WHERE rating = %s AND usi.fid = f.fid AND
                                      usi.uid IN (SELECT uid 
                                                  FROM users 
-                                                 WHERE listening = true)
+                                                 WHERE listening = true) AND
+                                     fl.fid = f.fid
                                ORDER BY artist, title"""
 
 
-    query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, sha512,
+    query = """SELECT DISTINCT f.fid, dirname, basename, title, sha512,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
-               FROM files f 
+               FROM files f
                     LEFT JOIN preload p ON p.fid = f.fid,
                     keywords kw,
-                    plainto_tsquery('english', %s) query
-               WHERE kw.fid = f.fid AND tsv @@ query
+                    plainto_tsquery('english', %s) query,
+                    file_locations fl
+               WHERE kw.fid = f.fid AND 
+                     f.fid = fl.fid AND
+                     tsv @@ query
                ORDER BY ts_rank DESC"""
 
-    rating_query = """SELECT DISTINCT f.fid, dir as dirname, basename, title, sha512,
+    rating_query = """SELECT DISTINCT f.fid, dirname, basename, title, sha512,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
-                      FROM files f 
+                      FROM files f
                            LEFT JOIN preload p ON p.fid = f.fid,
                            keywords kw,
                            plainto_tsquery('english', %s) query,
-                           user_song_info usi
+                           user_song_info usi,
+                           file_locations fl
                       WHERE kw.fid = f.fid AND tsv @@ query AND 
                             usi.rating = %s AND
                             f.fid = usi.fid AND 
+                            fl.fid = fi.fid
                             usi.uid IN (SELECT uid 
                                         FROM users 
                                         WHERE listening = true)
@@ -392,20 +401,24 @@ def convert_res_to_dict(r):
 @app.route("/file-info/<fid>/")
 def file_info(fid, methods=["GET"]):
 
-    r = get_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
+    r = get_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
                                      sha512, p.fid AS cued
                      FROM files f 
-                        LEFT JOIN preload p ON p.fid = f.fid
-                     WHERE f.fid = %s""", 
+                          LEFT JOIN preload p ON p.fid = f.fid,
+                          file_locations fl
+                     WHERE f.fid = %s AND 
+                           fl.fid = f.fid""", 
                      (fid, ))
     rdict = convert_res_to_dict(r)
     rdict['dups'] = []
     if r['sha512']:
-        dups = get_results_assoc("""SELECT DISTINCT f.fid, dir as dirname, basename, title,
+        dups = get_results_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
                                      sha512, p.fid AS cued
                                     FROM files f 
-                                         LEFT JOIN preload p ON p.fid = f.fid
-                                    WHERE f.sha512 = %s AND f.fid != %s""", 
+                                         LEFT JOIN preload p ON p.fid = f.fid,
+                                         file_locations fl
+                                    WHERE f.sha512 = %s AND f.fid != %s AND
+                                          fl.fid = f.fid""", 
                                     (r['sha512'], fid))
         for d in dups:
             rdict['dups'].append(convert_res_to_dict(d))

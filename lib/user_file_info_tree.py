@@ -40,8 +40,6 @@ class User_File_Info_Tree(gtk.TreeView):
         
         self.set_model(self.store)
         self.set_headers_visible(True)
-        
-
         self.append_simple_col("Username", 1)
         
         cell = CellRendererStar(15,2)
@@ -64,7 +62,14 @@ class User_File_Info_Tree(gtk.TreeView):
         # select = self.get_selection()
         # select.set_mode(gtk.SELECTION_MULTIPLE)
 
-        self.query = pg_cur.mogrify("SELECT * FROM users u, user_song_info ui WHERE u.uid = ui.uid AND ui.fid = %s AND listening = true ORDER BY listening DESC, admin DESC, uname", (fid,))
+        self.query = pg_cur.mogrify("""SELECT * 
+                                       FROM users u, user_song_info ui 
+                                       WHERE u.uid = ui.uid AND ui.fid = %s AND 
+                                             listening = true 
+                                       ORDER BY listening DESC, 
+                                                admin DESC, 
+                                                uname""", 
+                                   (fid,))
 
         self.populate_liststore()
         if self.file_info:
@@ -151,18 +156,15 @@ class User_File_Info_Tree(gtk.TreeView):
         self.append_column(col)
 
     def on_row_change(self,liststore, path, itr):
-        # print "change_locked:",self.change_locked
         if self.change_locked:
             return
-        # print "change_locked:INNER"
         self.change_locked = True
         uid = int(liststore[path][0])
         uname = liststore[path][1]
         rating = int(liststore[path][2])
-        res = get_assoc("UPDATE user_song_info SET rating = %s, true_score = (((%s * 2 * 10) + (score * 10) + percent_played) / 3) WHERE uid = %s AND fid = %s RETURNING *",(rating, rating, uid, self.fid))
-        # print "RES:",res
+        res = rate_for_uid(self.fid, uid, rating)
         liststore[path][4] = res['true_score']
-        print "on_row_change: uid:%s, uname:%s rating:%s" % (uid, uname, rating)
+        print "on_row_change: fid:%s uid:%s, uname:%s rating:%s" % (self.fid, uid, uname, rating)
         self.change_locked = False
 
 

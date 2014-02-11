@@ -162,8 +162,21 @@ def populate_dont_pick():
     #    print "don't pick:",r
 
 
+def remove_missing_files_from_preload():
+  files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, p.uid
+                               FROM preload p, files f, file_locations fl
+                               WHERE f.fid = p.fid AND fl.fid = p.fid""")
+
+  for f in files:
+      if not os.path.exists(os.path.join(f['dirname'], f['basename'])):
+          print "!"*20,"MISSING","!"*20
+          print "MISSING:", f['fid']
+          query("""DELETE FROM preload WHERE fid = %s""", (f['fid'],))
+
+
 def populate_preload(uid=None, min_amount=0):
     remove_duplicates_from_preload()
+    remove_missing_files_from_preload()
     if not uid or uid is None:
         listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
         for l in listeners:
@@ -474,16 +487,21 @@ def get_existing_file(uid, true_score):
         except CreationFailed, e:
             print "get_existing_file CreationFailed:",e
             print "file_info:", attrs
+            wait()
             sanity_check(file_info['fid'])
             file_info = None
+            wait()
             continue
 
         if not fobj.is_readable:
+          print "*"*20,"NOT READABLE","*"*20
           print "NOT READABLE:", fobj.filename
           file_info = None
+          wait()
           continue
 
         if not fobj.exists:
+          print "*"*20,"MISSING","*"*20
           print "MISSING:", fobj.filename
           file_info = None
           wait()
@@ -492,7 +510,7 @@ def get_existing_file(uid, true_score):
 def populate_preload_for_uid(uid, min_amount=0):
     gtk.gdk.threads_leave()
     print "populate_preload_for_uid 1"
-    total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s",(uid,))
+    total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s", (uid,))
     if total['total'] > min_amount:
         print "uid: %s preload total: %s>%s :min_amount" % (uid, total['total'], min_amount)
         return

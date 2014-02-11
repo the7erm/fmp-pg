@@ -17,7 +17,12 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 
 
 from __init__ import *
-import gtk, datetime, time, math, gobject
+import gtk
+import datetime
+import time
+import math
+import gobject
+import pytz
 
 from preload import convert_delta_to_str
 
@@ -30,6 +35,8 @@ SELECT * FROM user_history WHERE fid = 22833;
 
 """
 
+EPOCH = datetime.datetime(1970,1,1, tzinfo=pytz.UTC)
+
 class History_Tree(gtk.TreeView):
     def __init__(self, fid=None, uid=None):
         self.fid = fid
@@ -41,6 +48,7 @@ class History_Tree(gtk.TreeView):
             str, # uname
             int, # percent_played
             str, # time_played
+            int, # time_played_int
             str, # time between
             int, # rating
             int, # score
@@ -53,8 +61,8 @@ class History_Tree(gtk.TreeView):
         self.append_simple_col("Score",7)
         self.append_simple_col("True Score",8)
         self.append_simple_col("Percent Played",3)
-        self.append_simple_col("Time Played",4)
-        self.append_simple_col("Time Between",5)
+        self.append_simple_col("Time Played", 4, 5)
+        self.append_simple_col("Time Between",6)
 
         # SELECT uh.*, age(uh.time_played, lag(time_played, 1, (SELECT max(time_played) FROM user_history uhl WHERE uhl.id = uh.id AND uhl.uid = uh.uid AND uhl.time_played < uh.time_played )) OVER ( PARTITION BY time_played ORDER BY time_played DESC )) AS time_between FROM user_history uh WHERE uh.id = 21067 AND uh.uid = 1 ORDER BY time_played DESC;
 
@@ -64,7 +72,32 @@ class History_Tree(gtk.TreeView):
         # self.query = pg_cur.mogrify("SELECT * FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY admin DESC, uname, time_played DESC", (fid,))
 
 
-        self.query = pg_cur.mogrify("SELECT u.*, uh.*, age(uh.time_played, lag(time_played, 1, (SELECT max(time_played) FROM user_history uhl WHERE uhl.id_type = uh.id_type AND uhl.id = uh.id AND uhl.uid = uh.uid AND uhl.time_played < uh.time_played )) OVER ( PARTITION BY time_played ORDER BY time_played DESC )) AS time_between FROM users u, user_history uh WHERE u.uid = uh.uid AND uh.id = %s AND uh.id_type = 'f' AND u.uid IN (SELECT uid FROM users WHERE listening = true) ORDER BY admin DESC, uname, time_played DESC", (fid,))
+        self.query = pg_cur.mogrify("""SELECT u.*, uh.*, 
+                                              age(uh.time_played, 
+                                                  lag(time_played, 1, 
+                                                      (
+                                                        SELECT max(time_played) 
+                                                        FROM user_history uhl 
+                                                        WHERE uhl.id_type = uh.id_type AND 
+                                                              uhl.id = uh.id AND 
+                                                              uhl.uid = uh.uid AND 
+                                                              uhl.time_played < uh.time_played 
+                                                     )
+                                                  ) OVER (
+                                                    PARTITION BY time_played 
+                                                    ORDER BY time_played DESC )
+                                                  ) AS time_between 
+                                        FROM users u, user_history uh 
+                                        WHERE u.uid = uh.uid AND 
+                                              uh.id = %s AND 
+                                              uh.id_type = 'f' AND 
+                                              u.uid IN (
+                                                SELECT uid 
+                                                FROM users 
+                                                WHERE listening = true)
+                                                ORDER BY admin DESC, 
+                                                         uname, 
+                                                         time_played DESC""", (fid,))
 
         self.populate_liststore()
 
@@ -95,6 +128,7 @@ class History_Tree(gtk.TreeView):
                 str, # uname
                 int, # percent_played
                 str, # time_played
+                int, # time_played_int
                 str, # time between
                 int, # rating
                 int, # score
@@ -105,9 +139,11 @@ class History_Tree(gtk.TreeView):
                 h['true_score'] = 0
 
             if isinstance(h['time_played'], datetime.datetime):
+                h['time_played_int'] = (h['time_played'] - EPOCH).total_seconds()
                 h['time_played'] = h['time_played'].strftime("%c")
             else:
                 h['time_played'] = 'Never'
+                h['time_played_int'] = 0
 
             if isinstance(h['time_between'], datetime.timedelta):
                 h['time_between'] = convert_delta_to_str(h['time_between'])
@@ -121,6 +157,7 @@ class History_Tree(gtk.TreeView):
                     uname, # uname
                     h['percent_played'],
                     h['time_played'], # time_played
+                    h['time_played_int'], # time_played_int
                     h['time_between'], # time_between
                     h['rating'],
                     h['score'],
@@ -139,9 +176,11 @@ class History_Tree(gtk.TreeView):
                 pp.pprint(h)
         return True
 
-    def append_simple_col(self, text, col_id):
+    def append_simple_col(self, text, col_id, sort_col=None):
         col = gtk.TreeViewColumn(text, gtk.CellRendererText(), text=col_id)
-        col.set_sort_column_id(col_id)
+        if sort_col is None:
+            sort_col = col_id
+        col.set_sort_column_id(sort_col)
         self.append_column(col)
 
     def timeBetween(self, lowDateTime, highDateTime):

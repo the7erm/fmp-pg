@@ -411,8 +411,6 @@ ALTER SEQUENCE file_locations_flid_seq OWNED BY file_locations.flid;
 
 CREATE TABLE files (
     fid integer NOT NULL,
-    dir character varying(255),
-    basename character varying(255),
     ltp timestamp with time zone,
     mtime timestamp with time zone,
     sha512 character varying(132),
@@ -1770,13 +1768,6 @@ CREATE INDEX altp_index ON artists USING btree (altp);
 --
 
 CREATE UNIQUE INDEX artist ON artists USING btree (artist);
-
-
---
--- Name: dir_basename; Type: INDEX; Schema: public; Owner: -; Tablespace: 
---
-
-CREATE UNIQUE INDEX dir_basename ON files USING btree (dir, basename);
 
 
 --

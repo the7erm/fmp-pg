@@ -278,7 +278,6 @@ if __name__ == '__main__':
             key = "user.%s.rating" % u['uid']
             rating = liststore[path][skel.map[key]]
             print "rating:", rating
-            
             res = get_assoc("""UPDATE user_song_info 
                                SET rating = %s, 
                                    true_score = (((%s * 2 * 10) + (score * 10) + 
@@ -300,8 +299,8 @@ if __name__ == '__main__':
                         ORDER BY time_played DESC LIMIT %d""" % history_length)
 
     skel.add_subquery("file", """SELECT basename AS \"title\" 
-                                 FROM files f 
-                                 WHERE fid = %s LIMIT 1""", 
+                                 FROM files f, file_locations l
+                                 WHERE f.fid = %s AND l.fid = f.fid LIMIT 1""", 
                                  ['id'], id_type_is_f, False)
 
     skel.add_subquery("file", """SELECT CONCAT(netcast_name,' - ',episode_title) AS \"title\" 
