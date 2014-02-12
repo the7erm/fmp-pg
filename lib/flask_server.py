@@ -592,10 +592,10 @@ def cue():
         if cue:
             query("""INSERT INTO preload (fid, uid, reason)
                      VALUES (%s, %s, %s)""", (fid, user['uid'], "From search"))
-            return "{cued:true}"
+            return file_info(fid)
         else:
             query("""DELETE FROM preload WHERE fid = %s""", (fid,))
-            return "{cued:false}"
+            return file_info(fid)
 
 def json_first(dta):
     if not dta:
