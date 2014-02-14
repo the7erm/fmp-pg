@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # migrate-mysql-data.py -- Migrate mysql data to postgres
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #

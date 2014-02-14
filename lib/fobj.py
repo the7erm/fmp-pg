@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # fobj.py -- File object
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>

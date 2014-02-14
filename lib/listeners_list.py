@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/users_list.py -- list of users.
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #

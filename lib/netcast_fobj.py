@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # netcast_fobj.py -- Netcast file obj
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
@@ -740,7 +740,8 @@ if __name__ == "__main__":
         "http://www.oneplace.com/ministries/thru-the-bible-with-j-vernon-mcgee/subscribe/podcast.xml",
         "http://revision3.com/tekzilla/feed/MP4-Large?subshow=false",
         "http://youarenotsosmart.libsyn.com/rss",
-        "http://feeds.feedburner.com/itsathing/cCoG?format=xml"
+        "http://feeds.feedburner.com/itsathing/cCoG?format=xml",
+        "http://www.badvoltage.org/feed/"
     ]
 
     for url in feeds:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # scan.py -- Scan files, and add them to your database
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #

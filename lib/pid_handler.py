@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/pid_handler.py -- handle pid, and make sure file is not running.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #

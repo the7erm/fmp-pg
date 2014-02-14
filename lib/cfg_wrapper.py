@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # ConfigWrapper.py -- main file.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #

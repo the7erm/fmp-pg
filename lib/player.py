@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/player.py -- main gstreamer player
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #
@@ -19,9 +19,19 @@
 
 ## TODO: add appindicator in __main__ section
 
-from __init__ import gtk_main_quit
-import sys, os, time, thread, signal, urllib, gc
-import gobject, pygst, pygtk, gtk, appindicator, pango
+from gtk_utils import gtk_main_quit
+import sys 
+import os 
+import time 
+import thread 
+import signal 
+import urllib 
+import gc
+import gobject 
+import pygst 
+import pygtk 
+import gtk 
+import pango
 import base64
 import hashlib
 from time import sleep
@@ -358,7 +368,7 @@ static char * invisible_xpm[] = {
         print "playing uri:",uri
         self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
-        self.player.set_property("volume",self.volume)
+        # self.player.set_property("volume",self.volume)
         self.player.set_state(PLAYING)
         self.hide_window_timeout = gobject.timeout_add(1000, self.hide_window)
         self.emit('state-changed', PLAYING)
@@ -380,7 +390,7 @@ static char * invisible_xpm[] = {
     def set_volume(self,widget,value):
         self.volume = value
         print "set_volume:",self.volume
-        self.player.set_property("volume",self.volume)
+        # self.player.set_property("volume",self.volume)
 
     def hide_window(self):
         gtk.gdk.threads_enter()
@@ -710,10 +720,15 @@ if __name__ == '__main__':
         
         
 
-    import appindicator, random
-    ind = appindicator.Indicator("fmp-player-cmd-indicator",
-                                       gtk.STOCK_CDROM,
-                                       appindicator.CATEGORY_APPLICATION_STATUS)
+    import random
+    #ind = appindicator.Indicator("fmp-player-cmd-indicator",
+    #                                   gtk.STOCK_CDROM,
+    #                                   appindicator.CATEGORY_APPLICATION_STATUS)
+    ind = gtk.StatusIcon()
+    ind.set_name("player.py")
+    ind.set_title("player.py")
+    # ind.connect("button-press-event", on_button_press)
+    ind.set_from_stock(gtk.STOCK_MEDIA_PLAY)
 
 
     pause_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON)
@@ -749,8 +764,8 @@ if __name__ == '__main__':
     quit_item.show()
     menu.append(quit_item)
 
-    ind.set_menu(menu)
-    ind.set_status(appindicator.STATUS_ACTIVE)
+    # ind.set_menu(menu)
+    # ind.set_status(appindicator.STATUS_ACTIVE)
     
     prevFiles = []
     currentFile = []
@@ -775,7 +790,7 @@ if __name__ == '__main__':
     player.connect('end-of-stream', next)
     player.connect('time-status', status)
     player.connect('error', error_msg)
-    ind.connect('scroll-event', player.ind_on_scroll)
+    ind.connect('scroll-event', player.on_scroll)
     player.connect('state-changed', on_playing_state_changed)
 
     player.next_button.connect('clicked',next)

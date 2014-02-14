@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # fmp-pg.py -- main file.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
@@ -32,10 +32,10 @@ import lib.tray as tray
 import math
 import dbus
 import dbus.service
-import alsaaudio
+# import alsaaudio
 import datetime
 import time
-import setproctitle
+# import setproctitle
 
 import urllib
 import lib.fobj as fobj
@@ -48,7 +48,7 @@ from subprocess import Popen, PIPE
 
 from ConfigParser import NoSectionError
 
-setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
+# setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):

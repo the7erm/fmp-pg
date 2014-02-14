@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # scanner.py -- Parse files, get .mp3 info.
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #

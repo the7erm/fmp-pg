@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/stock.py -- Show stock icons
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #

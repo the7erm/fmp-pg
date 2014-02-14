@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/netcast-tray.py -- Download/manage netcasts
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #

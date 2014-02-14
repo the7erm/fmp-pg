@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/flask_server.py -- flask server
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
@@ -31,13 +31,13 @@ import time
 import hashlib
 import json
 import socket
-import alsaaudio
+# import alsaaudio
 import logging
 import re
 import base64
 import StringIO
 
-from bson import json_util
+# from bson import json_util
 import json
 
 from player import PLAYING
@@ -175,6 +175,7 @@ def status():
                    volume=get_volume(), extended=extended)
 
 def get_volume():
+    return -1;
     cards = alsaaudio.cards()
     for i, c in enumerate(cards):
         try:

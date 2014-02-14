@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/history_dialog.py -- Dialog that shows history for a song.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #

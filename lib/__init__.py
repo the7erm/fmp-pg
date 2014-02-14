@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # /lib/__init__.py -- Initialize fmp
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #
@@ -28,13 +28,7 @@ import time
 import random
 import hashlib
 import cfg_wrapper
-import gtk
-import gobject
-gobject.threads_init()
-gtk.gdk.threads_init()
-
-global threads
-threads = []
+from gtk_utils import *
 
 DEFAULTS = {
     "Netcasts": {
@@ -117,17 +111,4 @@ MAX_TRUE_SCORE = (((6 * 2 * 10.0) + (6 * 10.0) +
 
 print "IMPORTED __init__"
 
-def kill_threads():
-    if not threads or len(threads) == 0:
-        return
-    print "__init__ threads:",threads
-    for t in threads:
-        print "KILLING THREAD:",t
-        try:
-            t._Thread__stop()
-        except:
-            print "COULDN'T KILL"
 
-def gtk_main_quit(*args, **kwargs):
-    kill_threads()
-    gtk.main_quit()

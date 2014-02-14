@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # local_file_fobj.py -- Netcast file obj
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>

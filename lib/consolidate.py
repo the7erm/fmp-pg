@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # consolidate.py -- consolidate files to use local files.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
 #

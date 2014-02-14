@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/notify.py -- send notification about file.
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #
@@ -22,13 +22,14 @@ import sys, os
 import pygtk
 pygtk.require('2.0')
 import gtk
-import notify2
+# import notify2
 from subprocess import Popen
 import mutagen
 
-notify2.init("Playing", mainloop='glib')
+# notify2.init("Playing", mainloop='glib')
 
 def more_info(n, action, fid):
+    return;
     n.close()
     print "action:",action
     print "fid:",fid

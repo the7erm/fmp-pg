@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # picker.py -- Pick songs.
 #    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>

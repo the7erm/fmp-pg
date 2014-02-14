@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/preload.py -- Display files in preload
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #

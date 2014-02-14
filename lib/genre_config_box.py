@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # lib/genre_config_box.py -- enable/disable genres
 #    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
 #
