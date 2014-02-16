@@ -217,8 +217,10 @@ def insert_missing_songs(uid):
                                         usi.uid = %s 
                           WHERE usi.fid IS NULL""", (uid,))
 
-    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, true_score) 
-                SELECT f.fid, '%s', '%s', '%s', '%s', '%s' 
+    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, 
+                                       true_score) 
+                SELECT f.fid, '%s', '%s', '%s', '%s', 
+                       '%s' 
                 FROM files f 
                 WHERE f.fid IN (%s)""" % (uid, DEFAULT_RATING, DEFAULT_SCORE, 
                                           DEFAULT_PERCENT_PLAYED, 
