@@ -20,7 +20,12 @@
 from __init__ import *
 from picker import wait
 from star_cell import CellRendererStar
-import gtk, gobject, os, datetime, math
+import gtk
+import gobject
+import os
+import datetime
+import math
+import pytz
 from subprocess import Popen
 from rating_utils import rate_for_uid
 
@@ -75,7 +80,10 @@ class Preload(gtk.ScrolledWindow):
         self.user_map_cols = {}
         self.user_cols = {}
         
-        self.listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname ASC")
+        self.listeners = get_results_assoc("""SELECT * 
+                                              FROM users 
+                                              WHERE listening = true 
+                                              ORDER BY admin DESC, uname ASC""")
         """
              Column     |           Type           |                           Modifiers           
             ----------------+--------------------------+-----------------------------------------------
@@ -97,7 +105,9 @@ class Preload(gtk.ScrolledWindow):
             [float, 'percent_played'],
             [float, 'true_score'],
             [str, 'ultp'],
-            [str, 'age']
+            [int, 'ultp_int'],
+            [str, 'age'],
+            [int, 'age_int']
         ]
 
         for u in self.listeners:
@@ -105,24 +115,27 @@ class Preload(gtk.ScrolledWindow):
             for typ, c in cols:
                 print typ, c
                 self.cols.append(typ)
-                if not self.user_cols.has_key(u['uid']):
+                if u['uid'] not in self.user_cols:
                     self.user_cols[u['uid']] = {}
                 self.user_map_cols[col_number] = {'uid':u['uid'], 'col':c}
                 self.user_cols[u['uid']][c] = col_number
                 col_number = col_number + 1
 
+
+        print "self.cols:",self.cols
         self.liststore = gtk.ListStore(*self.cols)
         
 
         # self.refresh_data()
 
-        self.append_simple_col("Filename",1)
-        self.append_simple_col("Cued For",2)
-        self.append_simple_col("Reason",3)
+        self.append_simple_col("Filename", 1)
+        self.append_simple_col("Cued For", 2)
+        self.append_simple_col("Reason", 3)
         for u in self.listeners:
             cell = CellRendererStar(15, self.user_cols[u['uid']]['rating'])
             cell.set_property('xalign',0.0)
-            col = gtk.TreeViewColumn('%s\'s Rating' % (u['uname'],), cell, rating=self.user_cols[u['uid']]['rating'])
+            col = gtk.TreeViewColumn('%s\'s Rating' % (u['uname'],), cell, 
+                                     rating=self.user_cols[u['uid']]['rating'])
             col.set_sort_column_id(self.user_cols[u['uid']]['rating'])
             col.set_resizable(True)
             self.tv.append_column(col)
@@ -130,24 +143,33 @@ class Preload(gtk.ScrolledWindow):
             self.tv.connect("button-press-event", cell.on_button_press)
 
         for u in self.listeners:
-            self.append_simple_col('%s\'s Skip Score' % (u['uname'],),self.user_cols[u['uid']]['score'])
+            self.append_simple_col('%s\'s Skip Score' % (u['uname'],),
+                                   self.user_cols[u['uid']]['score'])
 
         for u in self.listeners:
-            self.append_simple_col('%s\'s Percent Played' % (u['uname'],),self.user_cols[u['uid']]['percent_played'])
+            self.append_simple_col('%s\'s Percent Played' % (u['uname'],),
+                                   self.user_cols[u['uid']]['percent_played'])
 
         for u in self.listeners:
-            self.append_simple_col('%s\'s True Score' % (u['uname'],),self.user_cols[u['uid']]['true_score'])
+            self.append_simple_col('%s\'s True Score' % (u['uname'],),
+                                   self.user_cols[u['uid']]['true_score'])
 
         for u in self.listeners:
-            self.append_simple_col('%s\'s Last time played' % (u['uname'],), self.user_cols[u['uid']]['ultp'])
+            self.append_simple_col('%s\'s Last time played' % (u['uname'],), 
+                                   self.user_cols[u['uid']]['ultp'],
+                                   self.user_cols[u['uid']]['ultp_int'])
 
         for u in self.listeners:
-            self.append_simple_col('%s\'s Age' % (u['uname'],), self.user_cols[u['uid']]['age'])
+            self.append_simple_col('%s\'s Age' % (u['uname'],), 
+                                   self.user_cols[u['uid']]['age'],
+                                   self.user_cols[u['uid']]['age_int'])
 
 
-    def append_simple_col(self, text, col_id):
+    def append_simple_col(self, text, col_id, sort_col=None):
         col = gtk.TreeViewColumn(text, gtk.CellRendererText(), text=col_id)
-        col.set_sort_column_id(col_id)
+        if sort_col is None:
+            sort_col = col_id
+        col.set_sort_column_id(sort_col)
         col.set_resizable(True)
         self.tv.append_column(col)
 
@@ -198,9 +220,13 @@ class Preload(gtk.ScrolledWindow):
         self.reload_lock = True
         wait()
         print "preload.refresh_data"
-        cols = ['uid', 'rating', 'score', 'percent_played', 'true_score', 'ultp', 'age']
+        cols = ['uid', 'rating', 'score', 'percent_played', 'true_score', 'ultp', 
+                'ultp_int', 'age', 'age_int']
         self.change_locked = True
-        listeners = get_results_assoc("SELECT * FROM users WHERE listening = true ORDER BY admin DESC, uname ASC")
+        listeners = get_results_assoc("""SELECT *
+                                         FROM users 
+                                         WHERE listening = true 
+                                         ORDER BY admin DESC, uname ASC""")
         if len(self.listeners) != len(listeners):
             self.listeners = listeners
             self.create_treeview()
@@ -219,7 +245,8 @@ class Preload(gtk.ScrolledWindow):
                     return True
         wait()
         print "fetching files"
-        files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, p.uid, u.uname, reason 
+        files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, 
+                                            p.uid, u.uname, reason 
                                      FROM preload p, files f, users u,
                                           file_locations fl
                                      WHERE f.fid = p.fid AND u.uid = p.uid AND 
@@ -272,14 +299,23 @@ class Preload(gtk.ScrolledWindow):
 
         for r in db_user_file_info:
             r = dict(r)
-            for k, c in r.iteritems():
+            for k in r.keys():
+                c = r[k]
+                if k in ('ultp', 'age'):
+                    r[k+"_int"] = 0
+                
+                if not isinstance(c, datetime.datetime) and\
+                   not isinstance(c, datetime.timedelta):
+                    r[k] = c
+                    continue
+                
                 if isinstance(c, datetime.datetime):
-                    c = c.strftime("%c")
+                    r[k] = c.strftime("%c")
+                    r[k+"_int"] = int((c - datetime.datetime(1970,1,1,tzinfo=pytz.UTC)).total_seconds())
 
                 if isinstance(c, datetime.timedelta):
-                    c = convert_delta_to_str(c)
-                        
-                r[k] = c
+                    r[k] = convert_delta_to_str(c)
+                    r[k+"_int"] = int(c.total_seconds())
 
             user_file_info.append(r)
 
@@ -297,11 +333,9 @@ class Preload(gtk.ScrolledWindow):
             f['uname'],
             f['reason']
         ]
-        
         for u in user_file_info:
             for c in cols:
                 row.append(u[c])
-
         return row
 
     def update_row(self, r, cols, user_file_info):
