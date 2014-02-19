@@ -23,6 +23,7 @@ import glib
 
 from lib.__init__ import *
 from lib.listeners import listeners
+from lib.fmp_plugin import FmpPluginWrapper
 import os
 import sys
 import re
@@ -254,7 +255,15 @@ def update_history(percent_played=0):
 
 
 def mark_as_played(percent_played=0):
-    playing.mark_as_played(percent_played)
+    updated = playing.mark_as_played(percent_played)
+    res = []
+    if updated:
+        for r in updated:
+            res.append(dict(r))
+    plugins.write({
+        "mark-as-played": percent_played,
+        "res": res
+    })
 
 
 def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
@@ -266,6 +275,18 @@ def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str,
         # It's paused no need to update the database
         return
     last_percent_played_decimal = percent_played
+    plugins.write({
+        'time-status': {
+            'pos_int': pos_int,
+            'dur_int': dur_int,
+            'left_int': left_int,
+            'decimal': decimal,
+            'pos_str': pos_str,
+            'dur_str': dur_str,
+            'left_str': left_str,
+            'percent': percent
+        }
+    })
     mark_as_played(percent_played)
 
 
@@ -401,6 +422,9 @@ def on_end_of_stream(*args):
     global playing
     playing.inc_score()
     start_playing("inc")
+    plugins.write(
+        {'end-of-stream': True}
+    )
 
 def start_playing(direction="inc"):
     global playing
@@ -430,6 +454,7 @@ def start_playing(direction="inc"):
 def on_state_change(*args, **kwargs):
     gtk.gdk.threads_leave()
     tray.set_play_pause_item(plr.playingState)
+    plugins.write({'on-state-change':"%s" % plr.playingState})
 
 def quit(*args, **kwargs):
     try:
@@ -439,6 +464,20 @@ def quit(*args, **kwargs):
     plr.stop()
     gtk.threads_leave()
     gtk_main_quit()
+
+def on_scroll(widget, event):
+    plr.on_scroll(widget, event)
+    # <gtk.StatusIcon object at 0x211da50 (GtkStatusIcon at 0x1ab7280)>, <gtk.gdk.Event at 0x2d2d8c8: GDK_SCROLL x=11.00, y=11.00, direction=GDK_SCROLL_UP>
+    direction = ""
+    if event.direction == gtk.gdk.SCROLL_UP:
+        direction = "UP"
+    if event.direction == gtk.gdk.SCROLL_DOWN:
+        direction = "DOWN"
+    if event.direction == gtk.gdk.SCROLL_LEFT:
+        direction = "LEFT"
+    if event.direction == gtk.gdk.SCROLL_RIGHT:
+        direction = "RIGHT"
+    plugins.write({'on-scroll': direction })
 
 import flask_server
 flask_server.threads = threads
@@ -459,20 +498,7 @@ if not history:
     history = []
 
 for u in listeners.listeners:
-    missing_entries = get_results_assoc("""SELECT f.fid 
-                                           FROM files f 
-                                           LEFT JOIN user_song_info usi ON 
-                                                      usi.uid = %s AND usi.fid =f.fid 
-                                           WHERE usi.fid IS NULL;""", (u['uid'],))
-
-    for r in missing_entries:
-        print "inserting:", r
-        query("""INSERT INTO user_song_info (fid, uid, rating, score)
-                 VALUES(%s, %s, 6, 6)""",
-                     (r['fid'], u['uid']))
-
-
-
+    picker.insert_missing_songs(u['uid'])
 
 idx = len(history) - 1
 if idx < 0:
@@ -480,7 +506,6 @@ if idx < 0:
 try:
     item = dict(history[idx])
 except IndexError:
-
     populate_preload()
     append_file()
     try:
@@ -502,16 +527,18 @@ if plr.dur_int:
     except AttributeError:
         pass
 
+plugins = FmpPluginWrapper()
+
 plr.next_button.connect('clicked', on_next_clicked)
 plr.prev_button.connect('clicked', on_prev_clicked)
-plr.connect("time-status",on_time_status)
+plr.connect("time-status", on_time_status)
 plr.connect("end-of-stream", on_end_of_stream)
 plr.connect("state-changed", on_state_change)
 tray.play_pause_item.connect("activate", on_toggle_playing)
 tray.next.connect("activate", on_next_clicked)
 tray.prev.connect("activate", on_prev_clicked)
 tray.quit.connect("activate", quit)
-tray.icon.connect('scroll-event',plr.on_scroll)
+tray.icon.connect('scroll-event', on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)

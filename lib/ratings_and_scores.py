@@ -244,6 +244,7 @@ class RatingsAndScores:
             return
         updated = calculate_true_score(self.fid)
         self.update(updated)
+        return updated
 
     def calculate_true_score_for_uid(self, uid, force=False):
         if self.get_bedtime_mode() and force == False:
@@ -269,7 +270,7 @@ class RatingsAndScores:
 
         self.update(updated)
         
-        self.calculate_true_score()
+        updated2 = self.calculate_true_score()
         ceil_percent_played = math.ceil(percent_played)
 
         if self.last_percent_played != ceil_percent_played:
@@ -278,6 +279,8 @@ class RatingsAndScores:
                 self.update_history(percent_played)
 
             self.last_percent_played = ceil_percent_played
+
+        return updated2 or updated
 
     def mark_as_played_for_uid(self, uid=None, percent_played=0, when=None):
         if when is None:

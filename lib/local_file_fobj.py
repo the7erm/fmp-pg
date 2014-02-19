@@ -482,7 +482,7 @@ class Local_File(fobj.FObj):
 
         self.print_locations()
         
-        self.ratings_and_scores.mark_as_played(percent_played)
+        updated = self.ratings_and_scores.mark_as_played(percent_played)
         self.mark_as_played_when_percent = percent_played + 10
         if self.mark_as_played_when_percent > 100:
             self.mark_as_played_when_percent = 100
@@ -490,6 +490,8 @@ class Local_File(fobj.FObj):
         self.mark_as_played_when_time = now + timedelta(seconds=5)
         self.last_time_marked_as_played = now
         self.last_percent_played = percent_played
+        
+        return updated
 
     def update_history(self,percent_played=0):
         self.ratings_and_scores.update_history(percent_played=percent_played)
