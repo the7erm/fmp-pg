@@ -48,4 +48,4 @@ What it lacks:
 
 # Creating the database
 =======================
-`[sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)`
+[sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
