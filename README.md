@@ -24,7 +24,7 @@ Features:
 * Where you skip the percent played is recorded, and figured into the final
   true score.
 * Extensive history.
-* Netcasts.
+* Netcasts/podcasts
 * A file can have multiple artists. 
   * Artist parsing. 
     * `Foo vs/and/&/ft bar` will be tagged `Foo vs/and/&/ft Bar`, `Foo` and `Bar`
@@ -33,6 +33,8 @@ Features:
 * Sequentially play specific genres/artists (Like an audiobook, tv series)
 * PosgreSQL for the db.
 * Plays anything gstreamer will play.
+* Bedtime mode that won't apply a skip score, or percent played if a file is 
+  played through.
 
 The true score's formula is something like this:
 true_score = ((rating * 10 * 2) + (skip_score * 10) + percent_played + (average percent played for the last 5 times) ) / 4
@@ -45,7 +47,35 @@ What it lacks:
 * Gpodder sycn
 * Downloading album images
 * Plugin system.
+* A playlist.  (It's a jukebox doesn't need a playlist.)
+* A way to cue entire albums with one click.
 
 # Creating the database
 
-`pgsql <db-name>` [sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
+[You'll need to set up PostgreSQL](https://wiki.postgresql.org/wiki/Detailed_installation_guides)
+
+`pgsql <db-name> < ` [sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
+
+
+# Config file
+
+You'll need to create your own config file in `~/.fmp/` . 
+Netcasts/Podcasts are downloaded to `~/.fmp/cache/`
+
+```
+[password_salt]
+salt = 
+
+[Misc]
+bedtime_mode = false
+
+[postgres]
+username = <db-user>
+host = 127.0.0.1
+password = <db-password>
+port = 5432
+database = <db-name>
+
+[Netcasts]
+cue = true
+```
