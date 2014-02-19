@@ -6,7 +6,9 @@ Family Media Player
 This is my hello-world project.  When I learn something new I apply it to this
 concept.
 
-If you'd like to contribute I'd appreciate it.
+If you'd like to contribute I'd appreciate it.  I really don't recommend anyone
+use this unless you want to help develop it, and bring the concept to a useable 
+state for joe average user.
 
 Features:
 * Multiple listeners
