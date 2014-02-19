@@ -59,7 +59,7 @@ What it lacks:
 
 # Config file
 
-You'll need to create your own config file in `~/.fmp/` . 
+You'll need to create your own config file in `~/.fmp/config` . 
 Netcasts/Podcasts are downloaded to `~/.fmp/cache/`
 
 ```
