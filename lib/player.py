@@ -574,7 +574,7 @@ static char * invisible_xpm[] = {
             print "*"*80
             # self.window.show_now()
             # self.window.set_decorated(True)
-            self.clear_hide_timeout()
+            # self.clear_hide_timeout()
             # gtk.gdk.threads_enter()
             self.window.show_all()
             self.imagesink = message.src
