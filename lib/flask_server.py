@@ -31,7 +31,7 @@ import time
 import hashlib
 import json
 import socket
-# import alsaaudio
+import alsaaudio
 import logging
 import re
 import base64
