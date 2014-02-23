@@ -131,6 +131,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
         self.add_dir_and_basename()
         self.add_artist_tags()
         self.add_genre_tags()
+        self.add_album_tags()
         self.notebook = gtk.Notebook()
         self.notebook.set_scrollable(True)
         self.notebook.set_current_page(0)
@@ -236,6 +237,27 @@ class File_Info_Tab(gtk.ScrolledWindow):
         self.genre_crumbs.add_crumb(add_genre)
         self.vbox.pack_start(genre_hbox,False,False)
 
+    def add_album_tags(self):
+        album_hbox = self.create_section("Albums: ")
+        self.albums = self.fobj.albums
+
+        self.album_crumbs = Crumbs()
+        # crumbs.set_property("xalign",0.0)
+        # crumbs.set_property("yalign",0.0)
+        album_hbox.pack_start(self.album_crumbs, True, True)
+
+        for al in self.albums:
+            crumb = self.create_crumb('alid', al['alid'], al['album_name'])
+            self.album_crumbs.add_crumb(crumb)
+
+        add_album = gtk.Button()
+        add_image = gtk.image_new_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_MENU)
+        add_album.set_image(add_image)
+        add_album.connect("pressed", self.on_add_album)
+
+        self.album_crumbs.add_crumb(add_album)
+        self.vbox.pack_start(album_hbox, False, False)
+
     def add_ratings_and_scores(self):
         rating_hbox = self.create_section("Ratings, and Scores:")
         self.ratings_and_history_vbox.pack_start(rating_hbox, False, False)
@@ -320,41 +342,20 @@ class File_Info_Tab(gtk.ScrolledWindow):
             self.fobj.remove_artist(aid=_id)
         if typ == 'gid':
             self.fobj.remove_genre(gid=_id)
+        if typ == 'alid':
+            self.fobj.remove_album(alid=_id)
 
 
     def on_crumb_info(self, btn, btn_grp, typ, _id, text):
         print "on_crumb_info:", text
 
     def on_add_artist(self, btn):
-        dialog = gtk.Dialog()
-        entry = gtk.Entry()
-        
-        completion = gtk.EntryCompletion()
-        entry.set_completion(completion)
-        store = gtk.ListStore(str)
-        completion.set_model(store)
-        completion.set_text_column(0)
-        entry.show()
-        hbox = gtk.HBox()
-        label = gtk.Label("Add Artist:")
-        label.show()
-        hbox.pack_start(label,False,False)
-        hbox.pack_start(entry,True,True)
-        dialog.vbox.pack_start(hbox)
-        dialog.show_all()
-        dialog.add_action_widget(entry, gtk.RESPONSE_OK)
-        dialog.add_button(gtk.STOCK_ADD, gtk.RESPONSE_OK)
-        # d.connect("destroy", d.destroy)
-        gobject.idle_add(self.populate_artist_store, store)
-        resp = dialog.run()
-        dialog.hide()
-        text = entry.get_text()
-        text = text.strip()
-        dialog.destroy()
+        resp, text = self.add_dialog("Add Artist:", self.populate_artist_store)
         print "text:",text
         print "resp:",resp
         if resp == gtk.RESPONSE_OK and text:
             print "Saving:",text
+            # add_album(self, album_name, aid)
             artist = self.fobj.add_artist(text)
             if artist:
                 self.artists.append(artist)
@@ -363,31 +364,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
 
 
     def on_add_genre(self, btn):
-        dialog = gtk.Dialog()
-        entry = gtk.Entry()
-        
-        completion = gtk.EntryCompletion()
-        entry.set_completion(completion)
-        store = gtk.ListStore(str)
-        completion.set_model(store)
-        completion.set_text_column(0)
-        entry.show()
-        hbox = gtk.HBox()
-        label = gtk.Label("Add Genre:")
-        label.show()
-        hbox.pack_start(label,False,False)
-        hbox.pack_start(entry,True,True)
-        dialog.vbox.pack_start(hbox)
-        dialog.show_all()
-        dialog.add_action_widget(entry, gtk.RESPONSE_OK)
-        dialog.add_button(gtk.STOCK_ADD, gtk.RESPONSE_OK)
-        # d.connect("destroy", d.destroy)
-        gobject.idle_add(self.populate_genre_store, store)
-        resp = dialog.run()
-        dialog.hide()
-        text = entry.get_text()
-        text = text.strip()
-        dialog.destroy()
+        resp, text = self.add_dialog("Add Genre:", self.populate_genre_store)
         print "text:",text
         print "resp:",resp
         if resp == gtk.RESPONSE_OK and text:
@@ -398,21 +375,61 @@ class File_Info_Tab(gtk.ScrolledWindow):
                 crumb = self.create_crumb('gid', genre['gid'], genre['genre'])
                 self.genre_crumbs.insert_crumb(crumb, -2)
 
+    def add_dialog(self, label_text, populate_store_command):
+        dialog = gtk.Dialog()
+        entry = gtk.Entry()
+        
+        completion = gtk.EntryCompletion()
+        entry.set_completion(completion)
+        store = gtk.ListStore(str)
+        completion.set_model(store)
+        completion.set_text_column(0)
+        entry.show()
+        hbox = gtk.HBox()
+        label = gtk.Label(label_text)
+        label.show()
+        hbox.pack_start(label, False, False)
+        hbox.pack_start(entry, True, True)
+        dialog.vbox.pack_start(hbox)
+        dialog.show_all()
+        dialog.add_action_widget(entry, gtk.RESPONSE_OK)
+        dialog.add_button(gtk.STOCK_ADD, gtk.RESPONSE_OK)
+        # d.connect("destroy", d.destroy)
+        gobject.idle_add(populate_store_command, store)
+        resp = dialog.run()
+        dialog.hide()
+        text = entry.get_text()
+        text = text.strip()
+        dialog.destroy()
+        return resp, text
+
+    def on_add_album(self, *args, **kwargs):
+        print "on_add_album:", args, kwargs
+        resp, text = self.add_dialog("Add Album:", self.populate_album_store)
+        print "text:",text
+        print "resp:",resp
+        if resp == gtk.RESPONSE_OK and text:
+            print "Saving:",text
+            album = self.fobj.add_album(text)
+            if album:
+                self.albums.append(album)
+                crumb = self.create_crumb('alid', album['alid'], album['album_name'])
+                self.album_crumbs.insert_crumb(crumb, -2)
+
     def populate_artist_store(self,store):
         artists = get_results_assoc("""SELECT artist FROM artists ORDER BY artist""")
         for a in artists:
-            store.append([a['artist']])
-        return
-        for a in self.fobj.artists:
             store.append([a['artist']])
 
     def populate_genre_store(self,store):
         genres = get_results_assoc("""SELECT genre FROM genres ORDER BY genre""")
         for g in genres:
             store.append([g['genre']])
-        return
-        for g in self.fobj.genres:
-            store.append([g['genre']])
+
+    def populate_album_store(self, store):
+        albums = get_results_assoc("""SELECT album_name FROM albums ORDER BY album_name""")
+        for al in albums:
+            store.append([al['album_name']])
 
 
 if __name__ == "__main__":

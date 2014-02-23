@@ -699,6 +699,24 @@ class Local_File(fobj.FObj):
             if genre is not None and genre['genre'] not in genres_v1.genres_v1:
                 query("""DELETE FROM genres WHERE gid = %s""", (gid,))
 
+    def remove_album(self, alid=None):
+        album = None
+        for i, al in enumerate(self.albums):
+            if al['alid'] == alid:
+                print "del:",al
+                album = copy.deepcopy(self.albums[i])
+                del self.albums[i]
+        query("""DELETE FROM album_files 
+                 WHERE fid = %s AND alid = %s""",
+                 (self.fid, alid))
+        present = get_assoc("""SELECT count(*) AS total 
+                               FROM album_files af, files f
+                               WHERE f.fid = af.fid AND af.alid = %s""",
+                               (alid,))
+        if not present or present['total'] == 0:
+            if album is not None:
+                query("""DELETE FROM albums WHERE alid = %s""", (alid,))
+
     def parse_artist_string(self, artists):
         artists = artists.strip()
         combos = []
@@ -814,8 +832,12 @@ class Local_File(fobj.FObj):
         for c in combos:
             self.add_artist(c)
 
-    def add_album(self, album_name, aid):
-        if album_name == None:
+    def add_album(self, album_name, aid=None):
+        if album_name is None:
+            return
+        if aid is None:
+            for a in self.artists:
+                self.add_album(album_name, a['aid'])
             return
 
         album_name = album_name.strip()
