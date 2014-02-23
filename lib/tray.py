@@ -218,12 +218,7 @@ def on_activate_never_played(item, *args):
 
 def on_activate_webplayer(item, *args):
     print "on_activate_webplayer"
-    if os.path.exists(sys.path[0]+"/lib/player_window.py"):
-        Popen([sys.path[0]+"/lib/player_window.py"])
-        return
-    if os.path.exists(sys.path[0]+"/../lib/player_window.py"):
-        Popen([sys.path[0]+"/../lib/player_window.py"])
-        return
+    Popen(['xdg-open', "http://localhost:5050/"])
 
 if os.path.exists(sys.path[0]+"/images/angry-square.jpg"):
     image_path = sys.path[0]+"/images/"
@@ -289,7 +284,7 @@ img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON)
 prev.set_image(img)
 menu.append(prev)
 
-player_window_item = gtk.ImageMenuItem("Player")
+player_window_item = gtk.ImageMenuItem("Web Player")
 img = gtk.image_new_from_stock(gtk.STOCK_INFO, gtk.ICON_SIZE_BUTTON)
 player_window_item.set_image(img)
 menu.append(player_window_item)

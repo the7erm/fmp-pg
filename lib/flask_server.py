@@ -175,11 +175,10 @@ def status():
                    volume=get_volume(), extended=extended)
 
 def get_volume():
-    return -1;
     cards = alsaaudio.cards()
     for i, c in enumerate(cards):
         try:
-            m = alsaaudio.Mixer('Master',cardindex=i)
+            m = alsaaudio.Mixer('Master', cardindex=i)
             result = m.getvolume()
             volume = result.pop()
             return volume

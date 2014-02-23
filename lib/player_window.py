@@ -4,6 +4,9 @@ import webkit
 import gtk
 import gobject
 import thread
+import urllib
+import sys
+
 from __init__ import gtk_main_quit
 
 # win = gtk.Window(gtk.WINDOW_TOPLEVEL) 
@@ -13,7 +16,7 @@ from __init__ import gtk_main_quit
 # view.open("http://w3.org/") 
 
 class PlayerWindow(gtk.Window):
-    def __init__(self):
+    def __init__(self, search=None):
         gtk.Window.__init__(self)
         self.set_default_size(600, 400)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -23,7 +26,10 @@ class PlayerWindow(gtk.Window):
         sw = gtk.ScrolledWindow() 
         sw.add(view)
         self.vbox_container.pack_start(sw)
-        view.open("http://localhost:5050/") 
+        if search is None:
+            view.open("http://localhost:5050/")
+        elif search is not None:
+            view.open("http://localhost:5050/search/?q=%s" % urllib.quote(search))
         self.show_all()
 
     def on_button_press_event(self, *args, **kwargs):
@@ -45,7 +51,11 @@ class PlayerWindow(gtk.Window):
 
 
 if __name__ == '__main__':
-    w = PlayerWindow()
+    search = None
+    if sys.argv[1:]:
+        search = " ".join(sys.argv[1:])
+        print "SEARCH:", search
+    w = PlayerWindow(search=search)
     w.connect("destroy", gtk_main_quit)
     gtk.gdk.threads_init()
     gtk.main()

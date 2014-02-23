@@ -25,6 +25,7 @@ from history import History_Tree
 from file_tags import Tag_Table
 import mutagen
 import fobj
+import subprocess
 
 class LocationTreeview:
 
@@ -235,7 +236,7 @@ class File_Info_Tab(gtk.ScrolledWindow):
         add_genre.connect("pressed", self.on_add_genre)
 
         self.genre_crumbs.add_crumb(add_genre)
-        self.vbox.pack_start(genre_hbox,False,False)
+        self.vbox.pack_start(genre_hbox, False, False)
 
     def add_album_tags(self):
         album_hbox = self.create_section("Albums: ")
@@ -348,6 +349,8 @@ class File_Info_Tab(gtk.ScrolledWindow):
 
     def on_crumb_info(self, btn, btn_grp, typ, _id, text):
         print "on_crumb_info:", text
+        subprocess.Popen(['xdg-open', 
+                          "http://localhost:5050/search/?q=%s" % urllib.quote(text)])
 
     def on_add_artist(self, btn):
         resp, text = self.add_dialog("Add Artist:", self.populate_artist_store)
@@ -417,17 +420,23 @@ class File_Info_Tab(gtk.ScrolledWindow):
                 self.album_crumbs.insert_crumb(crumb, -2)
 
     def populate_artist_store(self,store):
-        artists = get_results_assoc("""SELECT artist FROM artists ORDER BY artist""")
+        artists = get_results_assoc("""SELECT artist 
+                                       FROM artists 
+                                       ORDER BY artist""")
         for a in artists:
             store.append([a['artist']])
 
     def populate_genre_store(self,store):
-        genres = get_results_assoc("""SELECT genre FROM genres ORDER BY genre""")
+        genres = get_results_assoc("""SELECT genre 
+                                      FROM genres 
+                                      ORDER BY genre""")
         for g in genres:
             store.append([g['genre']])
 
     def populate_album_store(self, store):
-        albums = get_results_assoc("""SELECT album_name FROM albums ORDER BY album_name""")
+        albums = get_results_assoc("""SELECT album_name
+                                      FROM albums
+                                      ORDER BY album_name""")
         for al in albums:
             store.append([al['album_name']])
 
@@ -450,7 +459,10 @@ if __name__ == "__main__":
             break
 
         if arg == "--latest":
-            file_info = get_assoc("SELECT * FROM user_song_info WHERE ultp IS NOT NULL ORDER BY ultp DESC LIMIT 1")
+            file_info = get_assoc("""SELECT * 
+                                     FROM user_song_info 
+                                     WHERE ultp IS NOT NULL 
+                                     ORDER BY ultp DESC LIMIT 1""")
             if not file_info:
                 print "couldn't find recent file."
                 sys.exit()
@@ -471,7 +483,3 @@ if __name__ == "__main__":
     w.connect("destroy", gtk_main_quit)
     # w.maximize()
     gtk.main()
-
-
-
-
