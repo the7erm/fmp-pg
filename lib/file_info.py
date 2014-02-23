@@ -26,6 +26,7 @@ from file_tags import Tag_Table
 import mutagen
 import fobj
 import subprocess
+import urllib
 
 class LocationTreeview:
 
