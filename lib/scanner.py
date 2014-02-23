@@ -11,7 +11,7 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
+#d
 #    You should have received a copy of the GNU General Public License
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -20,6 +20,7 @@
 import os
 from os.path import join, getsize
 from lib.local_file_fobj import Local_File, CreationFailed
+from file_location import FileLocation
 
 print "scanner.py called"
 
@@ -42,7 +43,8 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     filename = os.path.realpath(filename)
     print 'scanning:', filename
     try:
-        f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+        FileLocation(filename=filename, insert=True)
+        # f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
     except CreationFailed:
         pass
 
@@ -59,8 +61,3 @@ def scan_dir(directory, hash=True):
         for f in files:
             scan_file(root=root, name=f, hash=hash)
     already_scanned.append(directory)
-
-
-
-
-

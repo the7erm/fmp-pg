@@ -223,7 +223,7 @@ class FingerprintHistory:
                                   self.size,
                                   self.atime,
                                   self.mtime))
-        print "INSERT:", 
+        print "INSERT history:", 
         pprint.pprint(dict(record))
         if record:
             self.record = record

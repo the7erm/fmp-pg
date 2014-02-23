@@ -61,12 +61,15 @@ class FileLocation:
                     "   dirname:%s\n" % dirname +
                     "   basename:%s\n" % basename
                 )
+        
+        if dirname and basename:
+            filename = os.path.realpath(os.path.join(dirname, basename))
 
         if filename is not None:
+            if not self.is_supported_file(filename):
+                return
             self.set_data_by_filename(filename, insert=insert)
 
-        if dirname and basename:
-            self.set_data_by_filename(os.path.join(dirname, basename), insert=insert)
 
         self.sync_db_info()
         self.sync_files_info()
@@ -82,6 +85,14 @@ class FileLocation:
                                                       front_fingerprint=self.front_fingerprint, 
                                                       middle_fingerprint=self.middle_fingerprint, 
                                                       end_fingerprint=self.end_fingerprint)
+
+    def is_supported_file(self, filename):
+        dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))
+        base, ext = os.path.splitext(basename)
+        ext = ext.lower()
+        if ext not in audio_ext and ext not in video_ext:
+            return False
+        return True
 
     def set_data_by_filename(self, filename, insert=True):
         dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))
