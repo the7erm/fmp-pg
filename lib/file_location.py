@@ -45,6 +45,9 @@ except ImportError, err:
     print "run sudo apt-get install python-mutagen"
     exit(1)
 
+BAD_PARTIALS = ['/resources/', '/resourcepacks/', '/assets/', '/.minecraft',
+                '/minecraft']
+
 class FileLocation:
 
     def __init__(self, flid=None, dirname=None, basename=None, filename=None, 
@@ -67,6 +70,7 @@ class FileLocation:
 
         if filename is not None:
             if not self.is_supported_file(filename):
+                print "UNSUPPORTED:", filename
                 return
             self.set_data_by_filename(filename, insert=insert)
 
@@ -92,6 +96,10 @@ class FileLocation:
         ext = ext.lower()
         if ext not in audio_ext and ext not in video_ext:
             return False
+
+        for partial in BAD_PARTIALS:
+            if partial in filename:
+                return False
         return True
 
     def set_data_by_filename(self, filename, insert=True):

@@ -50,7 +50,7 @@ CALCULATE_TRUESCORE_FORMULA = """
           uh2.id = usi.fid AND 
           uh2.id_type = 'f' AND
           usi.uid = 1 AND
-          percent_played != 0
+          percent_played > 0
      ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
               time_played DESC
      LIMIT 5
@@ -84,7 +84,7 @@ RATE_TRUESCORE_FORMULA = """
           uh2.id = usi.fid AND 
           uh2.id_type = 'f' AND
           usi.uid = 1 AND
-          percent_played != 0
+          percent_played > 0
      ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
               time_played DESC
      LIMIT 5
