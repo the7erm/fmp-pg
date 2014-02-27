@@ -64,6 +64,7 @@ class Local_File(fobj.FObj):
         self.mark_as_played_when_time = datetime.now()
         self.mark_as_played_when_percent = 0
         self.last_percent_played = 0
+        self.mark_as_played_lock = False
         self.last_time_marked_as_played = datetime.now()
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
@@ -461,16 +462,22 @@ class Local_File(fobj.FObj):
             d.ratings_and_scores.check_recently_played(uid=None)
 
     def mark_as_played(self, percent_played=0):
+        if self.mark_as_played_lock:
+            print "="*10, "[mark_as_played_lock]", "="*10
+            print "WORKS mark_as_played_lock", percent_played
+            return
+        self.mark_as_played_lock = True
         now = datetime.now()
 
         if self.mark_as_played_when_percent > percent_played and \
            self.mark_as_played_when_time > now:
+            self.mark_as_played_lock = False
             return
 
         print "mark as played:", self.mark_as_played_when_percent, "<="
-        print "               ",percent_played
-        print "            or ",self.last_time_marked_as_played, "<="
-        print "               ",now
+        print "               ", percent_played
+        print "            or ", self.last_time_marked_as_played, "<="
+        print "               ", now
         print "self.last_time_marked_as_played:",self.last_time_marked_as_played, \
               'drift:', now - self.last_time_marked_as_played
         print "self.last_percent_played:", self.last_percent_played
@@ -490,7 +497,9 @@ class Local_File(fobj.FObj):
         self.mark_as_played_when_time = now + timedelta(seconds=5)
         self.last_time_marked_as_played = now
         self.last_percent_played = percent_played
-        
+        if percent_played < 100:
+            # Never unlock if the file is done playing.
+            self.mark_as_played_lock = False
         return updated
 
     def update_history(self,percent_played=0):
@@ -664,6 +673,7 @@ class Local_File(fobj.FObj):
             association =  get_assoc("""INSERT INTO file_artists (fid, aid) 
                                         VALUES(%s, %s) RETURNING *""", 
                                         (self.fid, artist['aid']))
+        self.set_db_keywords()
         return artist
 
     def remove_artist(self, aid=None):
@@ -680,6 +690,8 @@ class Local_File(fobj.FObj):
                                (aid,))
         if not present or present['total'] == 0:
             query("""DELETE FROM artists WHERE aid = %s""", (aid,))
+
+        self.set_db_keywords()
 
     def remove_genre(self, gid=None):
         genre = None
@@ -699,6 +711,8 @@ class Local_File(fobj.FObj):
             if genre is not None and genre['genre'] not in genres_v1.genres_v1:
                 query("""DELETE FROM genres WHERE gid = %s""", (gid,))
 
+        self.set_db_keywords()
+
     def remove_album(self, alid=None):
         album = None
         for i, al in enumerate(self.albums):
@@ -716,6 +730,7 @@ class Local_File(fobj.FObj):
         if not present or present['total'] == 0:
             if album is not None:
                 query("""DELETE FROM albums WHERE alid = %s""", (alid,))
+        self.set_db_keywords()
 
     def parse_artist_string(self, artists):
         artists = artists.strip()
@@ -872,6 +887,7 @@ class Local_File(fobj.FObj):
                                       (album['alid'], self.fid))
 
         self.albums.append(album)
+        self.set_db_keywords()
         return album
 
     def process_album(self):
@@ -931,6 +947,7 @@ class Local_File(fobj.FObj):
                                        (self.fid, genre['gid']))
 
         self.genres.append(genre)
+        self.set_db_keywords()
         return genre
 
     def get_artist_title(self):

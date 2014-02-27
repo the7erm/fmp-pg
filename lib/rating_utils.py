@@ -93,18 +93,47 @@ RATE_TRUESCORE_FORMULA = """
 """
 
 def calculate_true_score(fid):
-  res = get_results_assoc(
-      """UPDATE user_song_info usi
-         SET true_score =  """+CALCULATE_TRUESCORE_FORMULA+"""
-         WHERE fid = %s AND uid IN 
-                (SELECT uid FROM users WHERE listening = true)
-         RETURNING *""",
-         (fid,))
-  # print res
-  return res
+    q = pg_cur.mogrify("""UPDATE user_song_info usi
+                          SET true_score =  """+CALCULATE_TRUESCORE_FORMULA+"""
+                          WHERE fid = %s AND uid IN 
+                                (SELECT uid FROM users WHERE listening = true)
+                          RETURNING *""",
+                      (fid,))
+    # print "q:",q
+    res = get_results_assoc(q)
+    for r in res:
+        pprint.pprint(dict(r))
+        test_true_score_calculation(r)
+    return res
+
+def test_true_score_calculation(res):
+    return
+    history = get_results_assoc("""SELECT *
+                                   FROM user_history
+                                   WHERE uid = %s AND 
+                                         id = %s AND
+                                         id_type = 'f' AND
+                                         percent_played > 0
+                                   ORDER BY CASE WHEN time_played IS NULL THEN 0 ELSE 1 END,
+                                            time_played DESC
+                                   LIMIT 5""",
+                                (res['uid'], res['fid']))
+    if not history:
+        return
+    total_percent_played = 0
+    for h in history:
+        total_percent_played += h['percent_played']
+    average = float(total_percent_played) / len(history)
+    if not total_percent_played:
+        total_percent_played = 50
+    true_score = ((res['rating'] * 10 * 2) + 
+                  (res['score'] * 10) + 
+                  res['percent_played'] + 
+                  average) / 4
+    print "res['true_score']:", res['true_score'], "true_score:",true_score
 
 def calculate_true_score_for_selected(fid):
-  return get_results_assoc(
+    res = get_results_assoc(
       """UPDATE user_song_info usi
          SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
          WHERE fid = %s AND uid IN 
@@ -112,6 +141,9 @@ def calculate_true_score_for_selected(fid):
                                              selected = true)
          RETURNING *""",
          (fid,))
+    for r in res:
+        test_true_score_calculation(r)
+    return res
 
 
 def calculate_true_score_for_uid(fid, uid):
@@ -123,35 +155,36 @@ def calculate_true_score_for_uid(fid, uid):
     mog = pg_cur.mogrify(q, (fid, uid))
     # print mog
     # res = get_results_assoc(mog)
-    return get_results_assoc(mog)
+    res = get_results_assoc(mog)
+    for r in res:
+      test_true_score_calculation(r)
+    return res
 
 def caclulate_true_score_for_usid(usid):
-    return get_results_assoc(
+    res = get_results_assoc(
         """UPDATE user_song_info usi
            SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
            WHERE usid = %s
            RETURNING *""",
            (usid,))
+    for r in res:
+        test_true_score_calculation(r)
+    return res
 
 def caclulate_true_score_for_uname(uname, fid):
-    uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname,));
-    return get_results_assoc(
-        """UPDATE user_song_info usi
-           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
-           WHERE fid = %s AND uid = %s
-           RETURNING *""",
-           (fid, uinfo['uid']))
+    uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname,))
+    return calculate_true_score_for_uid(fid, uinfo['uid'])
 
 def rate_selected(fid, rating):
     updated = get_results_assoc("""UPDATE user_song_info usi
-                                 SET rating = %s, 
+                                   SET rating = %s, 
                                      true_score = """+RATE_TRUESCORE_FORMULA+"""
-                                 WHERE fid = %s AND uid IN 
+                                   WHERE fid = %s AND uid IN 
                                       (SELECT uid FROM users 
                                        WHERE listening = true AND
                                              selected = true)
-                                 RETURNING *""",
-                                 (rating, rating, fid,))
+                                   RETURNING *""",
+                               (rating, rating, fid,))
     updated_again = calculate_true_score_for_selected(fid)
     return updated_again or updated or []
 
@@ -189,9 +222,9 @@ def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
     try:
         rating = int(rating)
     except:
-        return
+        return []
     if rating < 0 or rating > 6:
-        return 
+        return []
 
     if selected is not None and selected:
         return rate_selected(fid, rating)

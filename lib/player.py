@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 # lib/player.py -- main gstreamer player
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -810,7 +810,7 @@ if __name__ == '__main__':
     shuffle = False
 
     for arg in args:
-        if os.path.exists(arg):
+        if os.path.exists(arg) or arg.startswith("rtsp://") or arg.startswith("rtmp://"):
             print "file:%s" % arg
             files.append(arg)
         elif arg in ('-s','--shuffle','-shuffle'):
