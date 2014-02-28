@@ -157,6 +157,7 @@ class Player(gobject.GObject):
         self.time_label = gtk.Label()
         self.set_style(self.time_label)
         self.time_label.modify_font(pango.FontDescription("15"))
+        self.time_label.set_property('xalign', 1.0)
         self.main_VBox.pack_start(self.time_label, False, True)
         self.time_label.show()
 
@@ -377,7 +378,7 @@ static char * invisible_xpm[] = {
         if uri == "":
             print "empty uri"
             return
-        print "playing uri:",uri
+        print "playing uri:", uri
         self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
         # self.player.set_property("volume",self.volume)
@@ -387,7 +388,7 @@ static char * invisible_xpm[] = {
         try:
             self.dur_int = self.player.query_duration(self.time_format, None)[0]
         except gst.QueryError, e:
-            print "gst.QueryError:",e
+            print "gst.QueryError:", e
             self.dur_int = 0
 
         self.update_time()
