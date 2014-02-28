@@ -25,12 +25,12 @@ import os
 import time 
 import thread 
 import signal 
-import urllib 
+import urllib
 import gc
-import gobject 
-import pygst 
-import pygtk 
-import gtk 
+import gobject
+import pygst
+import pygtk
+import gtk
 import pango
 import base64
 import hashlib
@@ -48,149 +48,169 @@ class Player(gobject.GObject):
         'error': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,str)),
         'end-of-stream': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         'show-window': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-        'time-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_INT64, gobject.TYPE_INT64, gobject.TYPE_INT64, gobject.TYPE_DOUBLE, str, str, str, str)), # pos, length, left, decimal, pos_formatted, length_formatted, left_formatted, percent_formatted
+        'time-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                        (gobject.TYPE_INT64, gobject.TYPE_INT64, 
+                         gobject.TYPE_INT64, gobject.TYPE_DOUBLE, str, str, str, 
+                         str)), # pos, length, left, decimal, pos_formatted, 
+                                # length_formatted, left_formatted, 
+                                # percent_formatted
         'state-changed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,)),
-        'tag-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str, object)),
-        'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,)),
-        'SIGUSR1-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-        'SIGUSR2-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-        'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
+        'tag-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                         (str, object)),
+        'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                           (object,)),
     }
     
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, ):
         gobject.GObject.__init__(self)
-        signal.signal(signal.SIGUSR1,self.signal_handler)
-        signal.signal(signal.SIGUSR2,self.signal_handler)
-        self.showingControls = False
+        self.showing_controls = False
         self.filename = filename
         self.playingState = STOPPED
-        self.play_thread_id = None
         self.fullscreen = False
         self.seek_locked = False
+        self.hide_timeout = None
         self.pos_data = {}
         self.dur_int = 0
         self.pos_int = 0
         self.volume = 1.0
+        self.alt_widget = gtk.Label("works")
         self.time_format = gst.Format(gst.FORMAT_TIME)
+        self.init_window()
+        self.init_main_event_box()
+        self.init_main_vbox()
+        self.init_time_label()
+        self.init_movie_window()
+        self.init_controls()
+        self.init_player()
+        self.init_connections()
+        self.hide_controls()
+        self.alt_vbox.pack_start(self.alt_widget, True, True)
+        self.set_style(self.alt_widget)
+        if filename is not None:
+            self.start()
+
+    def init_connections(self):
+        self.window.connect("destroy", gtk_main_quit)
+        self.window.connect('key-press-event', self.on_key_press)
+        self.window.connect('motion-notify-event', self.show_controls)
+        self.window.connect('button-press-event', self.pause)
+        self.window.connect("scroll-event", self.on_scroll)
+        # self.window.connect('button-press-event', self.show_controls)
+        # self.window.connect('key-press-event', self.show_controls)
+        # self.movie_window.connect('key-press-event', self.on_key_press)
+        self.main_event_box.connect('motion-notify-event', self.show_controls)
+        self.movie_window.connect('motion-notify-event', self.show_controls)
+
+        self.connect('time-status', self.on_time_status)
+        self.connect('state-changed', self.show_hide_play_pause)
+
+        # Controls
+        self.pause_button.connect('clicked', self.pause)
+        self.play_button.connect('clicked', self.pause)
+        self.fs_button.connect('clicked', self.toggle_full_screen)
+        self.unfs_button.connect('clicked', self.toggle_full_screen)
+
+    def init_window(self):
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title("Video-Player")
         
         img_path = ""
-        if os.path.exists(sys.path[0]+"/images/"):
-            img_path = sys.path[0]+"/"
-        elif os.path.exists(sys.path[0]+"/../images/"):
-            img_path = sys.path[0]+"/../"
-        elif os.path.exists("../images/"):
-            img_path = "../"
-        
-        
-        self.window.set_icon_from_file(img_path+'images/tv.png');
-            
-        self.window.connect("destroy", gtk_main_quit)
-        self.window.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
+        possible_paths = [
+            os.path.join(sys.path[0],"images"),
+            os.path.join(sys.path[0], "..", "images"),
+            os.path.join(sys.path[0], "..")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                img_path = p
+                break
+
+        self.window.set_icon_from_file(os.path.join(img_path, "tv.png"));
+
+        self.set_style(self.window)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK |
                                gtk.gdk.POINTER_MOTION_MASK |
                                gtk.gdk.BUTTON_PRESS_MASK |
                                gtk.gdk.SCROLL_MASK)
-        self.window.connect('key-press-event', self.on_key_press)
-        self.window.connect('motion-notify-event', self.show_controls)
-        # self.window.connect('button-press-event', self.show_controls)
-        self.window.connect('button-press-event', self.pause)
-        # self.window.connect('key-press-event', self.show_controls)
-        self.window.connect("scroll-event", self.on_scroll)
         
         self.window.set_title("Video-Player")
         self.window.set_default_size(600, 400)
-        self.window.connect("destroy", gtk_main_quit, "WM destroy")
-        
 
+    def init_main_event_box(self):
         #main Event Box
-        mainEb = gtk.EventBox()
-        mainEb.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
-        mainEb.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
-        mainEb.connect('motion-notify-event',self.show_controls)
-        self.window.add(mainEb)
+        self.main_event_box = gtk.EventBox()
+        self.set_style(self.main_event_box)
+        self.window.add(self.main_event_box)
 
+    def set_style(self, widget):
+        widget.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
+        widget.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
+
+    def init_main_vbox(self):
         # main box
-        self.mainVBox = gtk.VBox()
-        self.mainVBox.show()
-        mainEb.add(self.mainVBox)
+        self.main_VBox = gtk.VBox()
+        self.main_VBox.show()
+        self.main_event_box.add(self.main_VBox)
 
-        
+    def init_time_label(self):
         ## Time label ##
-                
-        self.timeLabel = gtk.Label()
-        self.timeLabel.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#FFFFFF"))
-        self.timeLabel.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("#000000"))
-        self.timeLabel.set_property('xalign',1.0)
-        self.timeLabel.modify_font(pango.FontDescription("15"))
-        self.mainVBox.pack_start(self.timeLabel,False,True)
-        self.timeLabel.show()
-        
+        self.time_label = gtk.Label()
+        self.set_style(self.time_label)
+        self.time_label.modify_font(pango.FontDescription("15"))
+        self.main_VBox.pack_start(self.time_label, False, True)
+        self.time_label.show()
+
+    def e_hb(self):
+        hb = gtk.HBox()
+        e = gtk.EventBox()
+        e.add(hb)
+        self.set_style(e)
+        return e, hb
+
+    def init_movie_window(self):
         ## movie_window
-        
         self.movie_window = gtk.DrawingArea()
-        # gtk.DrawingArea()
-        # self.movie_window.set_has_window(True)
-        self.movie_window.modify_bg(gtk.STATE_NORMAL,gtk.gdk.color_parse("#000000"))
-        self.movie_window.add_events(gtk.gdk.KEY_PRESS_MASK | gtk.gdk.POINTER_MOTION_MASK)
-        # self.movie_window.connect('key-press-event', self.on_key_press)
-        self.movie_window.connect('motion-notify-event',self.show_controls)
+        self.set_style(self.movie_window)
+        self.movie_window.add_events(gtk.gdk.KEY_PRESS_MASK | 
+                                     gtk.gdk.POINTER_MOTION_MASK)
+
         self.movie_window.show()
-        self.mainVBox.pack_start(self.movie_window, True, True)
+        self.main_VBox.pack_start(self.movie_window, True, True)
+        self.alt_vbox = gtk.VBox()
+        self.main_VBox.pack_start(self.alt_vbox, True, True)
 
-        self.connect('time-status',self.on_time_status)
-        
-        # eb = gtk.EventBox()
-        # eb.add(self.controls)
-        # eb.set_visible_window(False)
-
+    def init_controls(self):
         ### SET UP CONTROLS ###
         self.controls = gtk.HBox()
-        self.prev_button = gtk.Button('',gtk.STOCK_MEDIA_PREVIOUS)
-        self.pause_button = gtk.Button('',gtk.STOCK_MEDIA_PAUSE)
-        self.play_button = gtk.Button('',gtk.STOCK_MEDIA_PLAY)
-        self.next_button = gtk.Button('',gtk.STOCK_MEDIA_NEXT)
+        self.prev_button = gtk.Button('', gtk.STOCK_MEDIA_PREVIOUS)
+        self.pause_button = gtk.Button('', gtk.STOCK_MEDIA_PAUSE)
+        self.play_button = gtk.Button('', gtk.STOCK_MEDIA_PLAY)
+        self.next_button = gtk.Button('', gtk.STOCK_MEDIA_NEXT)
         
-        self.fs_button = gtk.Button('',gtk.STOCK_FULLSCREEN)
-        self.unfs_button = gtk.Button('',gtk.STOCK_LEAVE_FULLSCREEN)
-        
-        self.pause_button.connect('clicked', self.pause)
-        self.play_button.connect('clicked', self.pause)
-        
-        hb = gtk.HBox()
-        e = gtk.EventBox()
-        e.add(hb)
-        e.modify_bg(gtk.STATE_NORMAL,gtk.gdk.color_parse("#000000"))
-        hb.pack_start(self.prev_button,False,False)
-        hb.pack_start(self.pause_button,False,False)
-        hb.pack_start(self.play_button,False,False)
-        hb.pack_start(self.next_button,False,False)
-        
-        self.controls.pack_start(e,False,False)
+        self.fs_button = gtk.Button('', gtk.STOCK_FULLSCREEN)
+        self.unfs_button = gtk.Button('', gtk.STOCK_LEAVE_FULLSCREEN)
 
+        e, hb = self.e_hb()
+        hb.pack_start(self.prev_button, False, False)
+        hb.pack_start(self.pause_button, False, False)
+        hb.pack_start(self.play_button, False, False)
+        hb.pack_start(self.next_button, False, False)
         
+        self.controls.pack_start(e, False, False)
         
-        hb = gtk.HBox()
-        e = gtk.EventBox()
-        e.add(hb)
-        e.modify_bg(gtk.STATE_NORMAL,gtk.gdk.color_parse("#000000"))
-        hb.pack_start(self.fs_button,False,False)
-        hb.pack_start(self.unfs_button,False,False)
+        e, hb = self.e_hb()
+        hb.pack_start(self.fs_button, False, False)
+        hb.pack_start(self.unfs_button, False, False)
         
-        self.controls.pack_end(e,False,False)
-        
-        self.fs_button.connect('clicked',self.toggle_full_screen)
-        self.unfs_button.connect('clicked',self.toggle_full_screen)
-
+        self.controls.pack_end(e, False, False)
         #### END OF SETTING UP CONTROLS ## ##
 
-        self.mainVBox.pack_end(self.controls,False,True)
+        self.main_VBox.pack_end(self.controls, False, True)
 
+    def init_player(self):
         self.player = gst.element_factory_make("playbin2", "player")
-        
         vol = self.player.get_property("volume")
-        print "DEFAULT VOLUME:",vol
+        print "DEFAULT VOLUME:", vol
         bus = self.player.get_bus()
         bus.add_signal_watch()
         bus.enable_sync_message_emission()
@@ -203,21 +223,19 @@ static char * invisible_xpm[] = {
 "       c None",
 " "};"""
         color = gtk.gdk.Color()
-        pix = gtk.gdk.pixmap_create_from_data(None, pix_data, 1, 1, 1, color, color)
+        pix = gtk.gdk.pixmap_create_from_data(None, pix_data, 1, 1, 1, color, 
+                                              color)
         self.invisble_cursor = gtk.gdk.Cursor(pix, pix, color, color, 0, 0)
-        
-        self.connect('state-changed',self.show_hide_play_pause)
-        self.hide_timeout = None
-        
         
         self.window.show_all()
         self.pause_button.hide()
         self.play_button.hide()
         self.controls.hide()
         self.show_hide_play_pause()
-        self.window.hide()
+        if not self.alt_widget:
+            self.window.hide()
         
-        gobject.timeout_add(1000,self.update_time)
+        gobject.timeout_add(1000, self.update_time)
     
     def to_dict(self):
         # "tags": self.tags
@@ -246,7 +264,7 @@ static char * invisible_xpm[] = {
             return "STOPPED"
         return "ERROR"
         
-    def show_hide_play_pause(self,*args):    
+    def show_hide_play_pause(self, *args):    
         if self.playingState in (STOPPED, PAUSED):
             self.play_button.show()
             self.pause_button.hide()
@@ -274,7 +292,6 @@ static char * invisible_xpm[] = {
         
         self.show_hide_play_pause()
         self.window.emit('check-resize')
-        
     
     def on_scroll(self, widget, event):
         print "on_scroll:"
@@ -290,13 +307,11 @@ static char * invisible_xpm[] = {
             self.seek("+5")
         else:
             self.seek("-5")
-        
     
     def show_controls(self,*args):
         # print "show_controls"
-        
         self.controls.show()
-        self.timeLabel.show()
+        self.time_label.show()
         self.show_hide_play_pause()
         if self.hide_timeout:
             gobject.source_remove(self.hide_timeout)
@@ -304,17 +319,16 @@ static char * invisible_xpm[] = {
         self.hide_timeout = gobject.timeout_add(3000, self.hide_controls)
         # if self.fullscreen:
         self.movie_window.window.set_cursor(None)
-        self.showingControls = True
-        
-        
+        self.showing_controls = True
+
     def hide_controls(self):
-        self.showingControls = False
+        self.showing_controls = False
         self.controls.hide()
-        self.timeLabel.hide()
+        self.time_label.hide()
         self.hide_timeout = None
         #if self.fullscreen:
         self.movie_window.window.set_cursor(self.invisble_cursor)
-        
+
     def on_key_press(self, widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
         if keyname in ('f','F'):
@@ -327,7 +341,7 @@ static char * invisible_xpm[] = {
                 self.window.set_decorated(True)
             self.window.emit('check-resize')
                 
-        if keyname in ('Return','p','P','a','A','space'):
+        if keyname in ('Return', 'p', 'P', 'a', 'A', 'space'):
             self.show_controls()
             self.pause()
             
@@ -342,17 +356,15 @@ static char * invisible_xpm[] = {
         
         if keyname == 'Left':
             self.prev_button.emit('clicked')
-        
-            
+
     def next(self, *args, **kwargs):
         self.next_button.emit("clicked")
 
     def prev(self, *args, **kwargs):
         self.prev_button.emit('clicked')
 
-    def start(self,*args):
+    def start(self, *args, **kwargs):
         print "="*80
-        # self.play_thread_id = None
         self.tags = {}
         gc.collect()
         uri = self.filename
@@ -360,8 +372,8 @@ static char * invisible_xpm[] = {
             self.filename = os.path.realpath(self.filename)
             uri = "file://" + urllib.quote(self.filename)
             # print "QUOTED:%s" % urllib.quote(self.filename);
-        uri = uri.replace("\\'","%27")
-        uri = uri.replace("'","%27")
+            uri = uri.replace("\\'", "%27")
+            uri = uri.replace("'", "%27")
         if uri == "":
             print "empty uri"
             return
@@ -383,16 +395,31 @@ static char * invisible_xpm[] = {
 
     def should_hide_window(self):
         if self.player.get_property('n-video') > 0:
-            self.window.show()
+            if self.alt_widget:
+                self.movie_window.show()
+                self.alt_widget.hide()
+            else:
+                self.window.show()
+                try:
+                    self.window.set_size(self.width, self.height)
+                    self.window.set_position(self.x, self.y)
+                except:
+                    pass
         else:
-            self.window.hide()
+            if self.alt_widget:
+                self.alt_widget.show()
+                self.movie_window.hide()
+            else:
+                self.width, self.height = self.window.get_size()
+                self.x, self.y = self.window.get_position()
+                self.window.hide()
 
     def stop(self):
         self.player.set_state(STOPPED)
         
-    def set_volume(self,widget,value):
+    def set_volume(self, widget, value):
         self.volume = value
-        print "set_volume:",self.volume
+        print "set_volume:", self.volume
         # self.player.set_property("volume",self.volume)
         
     def convert_ns(self, time_int):
@@ -411,8 +438,6 @@ static char * invisible_xpm[] = {
             return "%d:%02d" % (_mins, _secs)
 
         return "0:%02d" % (_secs)
-
-        
 
     def update_time(self, retry=True):
         #if self.playingState != PLAYING :
@@ -446,7 +471,8 @@ static char * invisible_xpm[] = {
             # print pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent
             self.pos_int = pos_int
             self.left_int = left_int
-            self.emit('time-status', pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent)
+            self.emit('time-status', pos_int, dur_int, left_int, decimal, 
+                      pos_str, dur_str, left_str, percent)
             self.pos_data = {
                 "pos_str": pos_str, 
                 "dur_str": dur_str, 
@@ -465,10 +491,8 @@ static char * invisible_xpm[] = {
             print "TypeError:",e
         
         return True
-
-    
         
-    def pause(self, *args):
+    def pause(self, *args, **kwargs):
         self.playingState = self.player.get_state()[1]
         if self.playingState == STOPPED:
             self.start()
@@ -480,7 +504,6 @@ static char * invisible_xpm[] = {
         self.playingState = self.player.get_state()[1]
         self.emit('state-changed', self.playingState)
         self.update_time()
-
 
     def debug_message(self, gst_message):
         attribs_to_check = ['parse_clock_lost', 'parse_clock_provide',
@@ -498,29 +521,28 @@ static char * invisible_xpm[] = {
                 print "-"*40,'/',gst_message.type,"-"*40
             except:
                 pass
-
     
     def on_message(self, bus, message):
         t = message.type
-        print "on_message:",t
+        # print "on_message:",t
         # self.debug_message(message)
         if t == gst.MESSAGE_STATE_CHANGED:
-            # print "on_message parse_state_changed()", message.parse_state_changed()
+            # print "on_message parse_state_changed()", 
+            # print message.parse_state_changed()
             return
 
         if t == gst.MESSAGE_STREAM_STATUS:
-            # print "on_message parse_state_changed()", message.parse_state_changed()
+            # print "on_message parse_state_changed()", 
+            # print message.parse_state_changed()
             return
 
         if t == gst.MESSAGE_EOS:
             print "END OF STREAM"
-            # self.play_thread_id = None
             self.player.set_state(STOPPED)
             self.emit('end-of-stream')
             return 
 
         if t == gst.MESSAGE_ERROR:
-            # self.play_thread_id = None
             self.player.set_state(STOPPED)
             err, debug = message.parse_error()
             print "Error: '%s'" % err, "debug: '%s'" % debug
@@ -572,37 +594,26 @@ static char * invisible_xpm[] = {
         
         if message_name == "prepare-xwindow-id":
             print "*"*80
-            # self.window.show_now()
-            # self.window.set_decorated(True)
-            # self.clear_hide_timeout()
-            # gtk.gdk.threads_enter()
             self.window.show_all()
             self.imagesink = message.src
             self.imagesink.set_property("force-aspect-ratio", True)
             self.imagesink.set_xwindow_id(self.movie_window.window.xid)
             if self.fullscreen:
                 gobject.idle_add(self.window.fullscreen)
-            # self.window.show()
-            # gtk.gdk.threads_leave()
             gobject.idle_add(self.emit,'show-window')
         elif message_name == 'missing-plugin':
             print "MISSING PLUGGIN"
-            # self.play_thread_id = None
-            # self.player.set_state(STOPPED)
             self.emit('missing-plugin')
         if message_name == 'playbin2-stream-changed':
             print "-"*80
-
             
-    def control_seek(self,w,seek):
-        print "control_seek:",seek
+    def control_seek(self, w, seek):
+        print "control_seek:", seek
         self.seek(seek)
-        
     
-    def seek_ns(self,ns):
-        print "SEEK_NS:",ns
+    def seek_ns(self, ns):
         ns = int(ns)
-        print "SEEK_NS:",ns
+        print "SEEK_NS:", ns
         self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, ns)
         self.update_time()
     
@@ -613,8 +624,7 @@ static char * invisible_xpm[] = {
         if self.seek_locked:
             return
         self.seek_locked = True
-        
-        # print "player.seek:",string
+
         string = str(string)
         string = string.strip()
         firstChar = string[0]
@@ -633,10 +643,6 @@ static char * invisible_xpm[] = {
         else:
             seek_ns = int(string) * 1000000000
         
-        #if not seek_ns:
-        #    self.seek_locked = False
-        #    return
-        
         if seek_ns < 0:
             seek_ns = 0
         elif seek_ns > self.dur_int:
@@ -644,7 +650,8 @@ static char * invisible_xpm[] = {
             return
         
         try:
-            self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, seek_ns)
+            self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, 
+                                    seek_ns)
         except:
             print "ERROR SEEKING"
             self.seek_locked = False
@@ -652,41 +659,21 @@ static char * invisible_xpm[] = {
             
         self.pos_int = seek_ns
         print "SEEK_NS:",seek_ns
-        """
-        left_int = (self.dur_int - seek_ns)
-        pos_str = self.convert_ns(seek_ns)
-        dur_str = self.convert_ns(self.dur_int)
-        left_str = self.convert_ns(left_int)
-        decimal = float(seek_ns) / self.dur_int
-        percent = "%.2f%%" % (decimal * 100)
-        try:
-            self.emit('time-status', seek_ns, self.dur_int, left_int, decimal, pos_str, dur_str, left_str, percent)
-        except TypeError, e:
-            print "TypeError:",e
-        """
         self.seek_locked = False
 
-    def signal_handler(self, sig_id, frame):
-        # We receive different signals depend on if
-        # we have more data in the buffer to interpret
-        if sig_id == signal.SIGUSR1:
-            print "SIGUSR1"
-            self.emit('SIGUSR1-received')
-        elif sig_id == signal.SIGUSR2:
-            print "SIGUSR2"
-            self.emit('SIGUSR2-received')
-    
-    def on_time_status(self, player, pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent):
-        if not self.showingControls:
+    def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
+                       pos_str, dur_str, left_str, percent):
+        if not self.showing_controls:
             return
-        # print s
-        # gtk.gdk.threads_enter()
-        self.timeLabel.set_text(" -%s %s/%s" % (left_str, pos_str, dur_str) )
-
+        
+        self.time_label.set_text(" -%s %s/%s" % (left_str, pos_str, dur_str) )
 
 
 if __name__ == '__main__':
+
+    import random
     gobject.threads_init()
+
     def next(*args):
         print "play_files"
         if len(files) == 0:
@@ -702,7 +689,8 @@ if __name__ == '__main__':
             return
         player.filename = f
         player.start()
-        
+
+
     def prev(*args):
         if not prevFiles:
             return
@@ -712,22 +700,24 @@ if __name__ == '__main__':
         currentFile.append(f)
         player.filename = f
         player.start()
-        
+
+
     def status(w, *args):
-        # (56525313000L, 217583333333L, 161058020333L, 0.25978696131790086, '00:56', '03:37', '02:41', '25.98%')
+        """ (56525313000L, 217583333333L, 161058020333L, 0.25978696131790086, 
+             '00:56', '03:37', '02:41', '25.98%') """
         # print "status:", args
-        pass
+        return
+
     
     def error_msg(player, msg,debug):
         print "ERROR MESSAGE:", msg, ',', debug
         if not os.path.isfile(player.filename):
             player.emit('end-of-stream')
 
+
     def on_menuitem_clicked(item):
-        # CLICKED:(<gtk.ImageMenuItem object at 0x8f6bb44 (GtkImageMenuItem at 0x8bc40f8)>,) {}
         label = item.get_label()
         if label == 'Pause':
-            
             player.pause()
         elif label == 'Play':
             player.pause()
@@ -740,8 +730,8 @@ if __name__ == '__main__':
         
         print "CLICKED:%s " % (item.get_label())
 
+
     def on_playing_state_changed(p, state):
-        # (<Player object at 0x975f6bc (__main__+Player at 0x97be220)>, <enum GST_STATE_PAUSED of type GstState>)
         if state == gst.STATE_PLAYING:
             play_pause_item.set_label('Pause')
             play_pause_item.set_image(pause_img)
@@ -749,43 +739,44 @@ if __name__ == '__main__':
             play_pause_item.set_label('Play')
             play_pause_item.set_image(play_img)
 
+
     def on_button_press(icon, event, **kwargs):
         print "on_button_press:",icon, event
         if event.button == 1:
             menu.popup(None, None, None, event.button, event.get_time())
-        
 
-    import random
-    #ind = appindicator.Indicator("fmp-player-cmd-indicator",
-    #                                   gtk.STOCK_CDROM,
-    #                                   appindicator.CATEGORY_APPLICATION_STATUS)
+
     ind = gtk.StatusIcon()
     ind.set_name("player.py")
     ind.set_title("player.py")
     ind.connect("button-press-event", on_button_press)
     ind.set_from_stock(gtk.STOCK_MEDIA_PLAY)
 
-
-    pause_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON)
-    play_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PLAY, gtk.ICON_SIZE_BUTTON)
+    pause_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, 
+                                         gtk.ICON_SIZE_BUTTON)
+    play_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PLAY, 
+                                        gtk.ICON_SIZE_BUTTON)
     
     menu = gtk.Menu()
 
-    play_pause_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, gtk.ICON_SIZE_BUTTON)
+    play_pause_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PAUSE, 
+                                              gtk.ICON_SIZE_BUTTON)
     play_pause_item = gtk.ImageMenuItem("Pause")
     play_pause_item.set_image(play_pause_img)
     play_pause_item.connect("activate", on_menuitem_clicked)
     play_pause_item.show()
     menu.append(play_pause_item)
 
-    next_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON)
+    next_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_NEXT, 
+                                        gtk.ICON_SIZE_BUTTON)
     next_item = gtk.ImageMenuItem("Next")
     next_item.set_image(next_img)
     next_item.connect("activate", on_menuitem_clicked)
     next_item.show()
     menu.append(next_item)
 
-    prev_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON)
+    prev_img = gtk.image_new_from_stock(gtk.STOCK_MEDIA_PREVIOUS, 
+                                        gtk.ICON_SIZE_BUTTON)
     prev_item = gtk.ImageMenuItem("Prev")
     prev_item.set_image(prev_img)
     prev_item.connect("activate", on_menuitem_clicked)
@@ -799,9 +790,6 @@ if __name__ == '__main__':
     quit_item.show()
     menu.append(quit_item)
 
-    # ind.set_menu(menu)
-    # ind.set_status(appindicator.STATUS_ACTIVE)
-    
     prevFiles = []
     currentFile = []
     files = []
@@ -810,13 +798,14 @@ if __name__ == '__main__':
     shuffle = False
 
     for arg in args:
-        if os.path.exists(arg) or arg.startswith("rtsp://") or arg.startswith("rtmp://"):
+        if os.path.exists(arg) or arg.startswith("rtsp://") or \
+           arg.startswith("rtmp://") or arg.startswith("http://") or \
+           arg.startswith("https://"):
             print "file:%s" % arg
             files.append(arg)
-        elif arg in ('-s','--shuffle','-shuffle'):
+        elif arg in ('-s', '--shuffle', '-shuffle'):
             shuffle = True
-            
-    
+
     if shuffle:
         print "SHUFFLE"
         random.shuffle(files)
@@ -828,10 +817,9 @@ if __name__ == '__main__':
     ind.connect('scroll-event', player.on_scroll)
     player.connect('state-changed', on_playing_state_changed)
 
-    player.next_button.connect('clicked',next)
-    player.prev_button.connect('clicked',prev)
+    player.next_button.connect('clicked', next)
+    player.prev_button.connect('clicked', prev)
     gobject.idle_add(next)
-    while gtk.events_pending(): gtk.main_iteration(False)
+    while gtk.events_pending(): 
+        gtk.main_iteration(False)
     gtk.main()
-
-
