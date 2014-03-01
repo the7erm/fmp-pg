@@ -1,15 +1,8 @@
-
-import os
 import sys
+import os
 additional_path = os.path.realpath(os.path.join(sys.path[0], '..'))
 if additional_path not in sys.path:
-    print "before:", sys.path
     print "additional_path:",additional_path
     sys.path.append(additional_path)
-    print "after:", sys.path
 
-import fobj
-import local
-import location
-import netcast
-import generic
+from wait_util import *
