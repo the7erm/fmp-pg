@@ -19,6 +19,7 @@
 #
 
 from __init__ import *
+from init.__init__ import *
 from util.wait_util import wait, enter, leave
 from listeners import listeners
 import fobj
