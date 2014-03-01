@@ -60,8 +60,8 @@ What it lacks:
 
 [You'll need to set up PostgreSQL](https://wiki.postgresql.org/wiki/Detailed_installation_guides)
 
-`pgsql <db-name> < ` [sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
-
+`pgsql <db-name> < sql/create.sql`
+[sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
 
 ## Config file
 
