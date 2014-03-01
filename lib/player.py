@@ -61,7 +61,7 @@ class Player(gobject.GObject):
                            (object,)),
     }
     
-    def __init__(self, filename=None, ):
+    def __init__(self, filename=None, alt_widget=None):
         gobject.GObject.__init__(self)
         self.showing_controls = False
         self.filename = filename
@@ -73,7 +73,7 @@ class Player(gobject.GObject):
         self.dur_int = 0
         self.pos_int = 0
         self.volume = 1.0
-        self.alt_widget = gtk.Label("works")
+        self.alt_widget = alt_widget
         self.time_format = gst.Format(gst.FORMAT_TIME)
         self.init_window()
         self.init_main_event_box()
@@ -84,8 +84,8 @@ class Player(gobject.GObject):
         self.init_player()
         self.init_connections()
         self.hide_controls()
-        self.alt_vbox.pack_start(self.alt_widget, True, True)
-        self.set_style(self.alt_widget)
+        if self.alt_widget:
+            self.alt_vbox.pack_start(self.alt_widget, True, True)
         if filename is not None:
             self.start()
 
