@@ -8,6 +8,7 @@ if additional_path not in sys.path:
     sys.path.append(additional_path)
     print "after:", sys.path
 
+from init.__init__ import *
 import fobj
 import local
 import location

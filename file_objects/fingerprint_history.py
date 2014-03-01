@@ -27,7 +27,8 @@ from fingerprint_util import calculate_file_fingerprint
 
 class FingerprintHistory:
     def __init__(self, dirname, basename, flid=None, fid=None, fingerprint=None,
-                 front_fingerprint=None, middle_fingerprint=None, end_fingerprint=None):
+                 front_fingerprint=None, middle_fingerprint=None, 
+                 end_fingerprint=None):
         self.filename = os.path.realpath(os.path.expanduser(os.path.join(dirname, basename)))
         self.dirname, self.basename = os.path.split(self.filename)
         self.flid = flid
@@ -235,22 +236,6 @@ class FingerprintHistory:
                                     (fingerprint,))
 
 if __name__ == '__main__':
-    files = get_results_assoc("""SELECT * 
-                                 FROM files
-                                 ORDER BY dir, basename""")
-    for f in files:
-        spec = {
-            'fid': f['fid'],
-            'dirname': f['dir'],
-            'basename': f['basename'],
-            'fingerprint': f['fingerprint'],
-            'front_fingerprint': f['front_fingerprint'],
-            'middle_fingerprint': f['middle_fingerprint'],
-            'end_fingerprint': f['end_fingerprint']
-        }
-        fph = FingerprintHistory(**spec)
-        print 'fph.history', 
-        pprint.pprint(fph.history)
 
     files = get_results_assoc("""SELECT * 
                                  FROM file_locations
