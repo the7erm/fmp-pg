@@ -2,16 +2,16 @@
 
 if [ "$1" = "" ]
 then
-	echo "usage: pykill <script>"
-	exit
+    echo "usage: pykill <script>"
+    exit
 fi
 
 for arg in "$@"
 do
-	process=`ps -A -o pid,cmd | grep -v grep | grep -v pykill | grep "$arg" | awk '{print $1}'`
-	if [ "$process" != "" ]
-	then
-		# echo "killing $process"
+    process=`ps -A -o pid,cmd | grep -v grep | grep -v pykill | grep "$arg" | awk '{print $1}'`
+    if [ "$process" != "" ]
+    then
+        # echo "killing $process"
         for p in $process
         do
             proc_filename="/proc/$p/exe"
@@ -31,7 +31,7 @@ do
             fi
             
         done
-		# kill $process
-	fi
+        # kill $process
+    fi
 done
 
