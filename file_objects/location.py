@@ -18,6 +18,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+from __init__ import *
 import re
 import os
 import sys
@@ -29,7 +30,7 @@ import pprint
 from excemptions import CreationFailed
 from fingerprint_history import FingerprintHistory
 from fingerprint_util import calculate_file_fingerprint
-from __init__ import *
+
 
 audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
 audio_with_tags = ['.mp3','.ogg','.wma','.flac']
