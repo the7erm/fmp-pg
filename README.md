@@ -87,9 +87,13 @@ database = <db-name>
 cue = true
 ```
 
+## Add listeners
+`lib/listeners_list.py`
+
 ## Scan
 `./scan.py <folder-to-scan>`
 Once your files are scanned
+
 
 ## Run
 `./fmp-pg.py`
@@ -104,3 +108,16 @@ Once your files are scanned
 
 ## Your very own web interface
 `http://localhost:5050/` -- warning this is not secure, don't put it on the open internet
+
+
+## Adding netcasts
+Open up `lib/netcast_fobj.py` with your favorite editor.
+Add url to `feeds` variable.
+`python2 ./lib/netcast_fobj.py` to populate.  FMP will automatically download new
+netcasts.
+
+## Deleting netcasts is a little harder.
+```
+$ psql <database>
+db=# DELETE FROM netcasts WHERE rss_url = "url you want to delete";
+```

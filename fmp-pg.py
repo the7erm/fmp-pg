@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 # fmp-pg.py -- main file.
-#    Copyright (C) 2013 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -217,9 +217,6 @@ def is_running(pid_file, kill=False):
     fp = open(cmd_path,'r')
     cmd_line = fp.read()
     fp.close()
-
-    # print "cmd_line:",cmd_line
-    # print "sys.argv:",sys.argv
 
     is_fmp = re.search("(fmp\-pg\.py)", cmd_line)
     if is_fmp:
