@@ -19,7 +19,6 @@
 #
 
 from __init__ import *
-from init.__init__ import *
 from util.wait_util import wait, enter, leave
 from listeners import listeners
 import fobj
@@ -32,7 +31,6 @@ import pprint
 import datetime
 from datetime import date
 import pytz
-print sys.path
 from lib.episode_downloader import downloader
 
 from excemptions import CreationFailed
