@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-# file_location.py -- File location
+# location.py -- File location
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -352,7 +352,7 @@ class FileLocation:
 if __name__ == "__main__":
     dirs = sys.argv[1:]
     for d in dirs:
-        print "d:",d
+        print "Dir:",d
         for root, dirs, files in os.walk(os.path.realpath(os.path.expanduser(d))):
             print "root", root
             print "dirs:", dirs

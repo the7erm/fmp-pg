@@ -236,7 +236,6 @@ class FingerprintHistory:
                                     (fingerprint,))
 
 if __name__ == '__main__':
-
     files = get_results_assoc("""SELECT * 
                                  FROM file_locations
                                  ORDER BY dirname, basename""")
