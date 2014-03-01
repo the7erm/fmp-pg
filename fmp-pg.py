@@ -374,7 +374,7 @@ def set_idx(idx, retry=2):
     try:
         f = dict(history[idx])
         print "set_idx F:",f
-        tray.playing = flask_server.playing = playing = fobj.get_fobj(**f)
+        tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**f)
         print "/set_idx F:"
         tray.set_rating()
         populate_preload()
@@ -477,10 +477,10 @@ def on_scroll(widget, event):
     plugins.write({'on-scroll': direction })
 
 import flask_server
-flask_server.threads = threads
-flask_server.get_results_assoc = get_results_assoc
-flask_server.get_assoc = get_assoc
-flask_server.pg_cur = pg_cur
+flask_server.server.threads = threads
+flask_server.server.get_results_assoc = get_results_assoc
+flask_server.server.get_assoc = get_assoc
+flask_server.server.pg_cur = pg_cur
 
 global history, playing, idx, last_percent_played, last_percent_played_decimal
 
@@ -511,7 +511,7 @@ except IndexError:
         item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
         history.append(dict(item))
 
-tray.playing = flask_server.playing = playing = fobj.get_fobj(**item)
+tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**item)
 tray.set_rating()
 plr = player.Player(filename=playing.filename)
 
@@ -541,10 +541,10 @@ gobject.idle_add(create_dont_pick)
 gobject.timeout_add(15000, populate_preload, 2)
 gobject.timeout_add(1000, set_rating)
 
-flask_server.playing = playing
-flask_server.player = plr
-flask_server.tray = tray
-flask_server.start_in_thread()
+flask_server.server.playing = playing
+flask_server.server.player = plr
+flask_server.server.tray = tray
+flask_server.server.start_in_thread()
 
 print "START"
 picker.wait()
