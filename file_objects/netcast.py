@@ -19,7 +19,7 @@
 #
 
 from __init__ import *
-from wait_util import wait, enter, leave
+from util.wait_util import wait, enter, leave
 from listeners import listeners
 import fobj
 import os
@@ -32,7 +32,6 @@ import datetime
 from datetime import date
 import pytz
 from episode_downloader import downloader
-
 
 from excemptions import CreationFailed
 

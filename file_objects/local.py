@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-# local_file_fobj.py -- Netcast file obj
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+# file_objects/local.py -- Netcast file obj
+#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

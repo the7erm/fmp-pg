@@ -271,9 +271,9 @@ class FObj:
         return _dict
 
 from __init__ import *
-import netcast_fobj
-import local_file_fobj
-import generic_fobj
+import netcast
+import local
+import generic
 
 def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None, 
              nid=None, episode_url=None, local_filename=None, 
