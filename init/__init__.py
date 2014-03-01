@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# init/__init.py__ -- Initialize the database, and load config
+# init/init.py -- Initialize fmp
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -17,16 +17,10 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-
-import sys
-import os
-additional_path = os.path.realpath(os.path.join(sys.path[0], '..'))
-if additional_path not in sys.path:
-    print "additional_path:",additional_path
-    sys.path.append(additional_path)
-
 import psycopg2
 import psycopg2.extras
+import sys
+import os
 import pprint
 import ConfigParser
 import gc
@@ -34,8 +28,7 @@ import time
 import random
 import hashlib
 import cfg_wrapper
-
-from util.gtk_utils import *
+from gtk_utils import *
 
 DEFAULTS = {
     "Netcasts": {
@@ -106,16 +99,13 @@ def query(query, args=None):
     pg_conn.commit()
     return cur
 
-MAX_RATING = 6
-MAX_SCORE = 10
-
 DEFAULT_RATING = cfg.get('Defaults', 'rating', 6, int)
 DEFAULT_SCORE = cfg.get('Defaults', 'score', 5, int)
 DEFAULT_PERCENT_PLAYED = cfg.get('Defaults', 'percent_played', 50.0, float)
 DEFAULT_TRUE_SCORE = (((DEFAULT_RATING * 2 * 10.0) + (DEFAULT_SCORE * 10.0) + 
                         DEFAULT_PERCENT_PLAYED) / 3)
 
-MAX_TRUE_SCORE = (((MAX_RATING * 2 * 10.0) + (MAX_SCORE * 10.0) + 
+MAX_TRUE_SCORE = (((6 * 2 * 10.0) + (10 * 10.0) + 
                     100.0) / 3)
 
 # print "IMPORTED __init__"
