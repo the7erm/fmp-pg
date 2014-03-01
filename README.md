@@ -61,6 +61,7 @@ What it lacks:
 [You'll need to set up PostgreSQL](https://wiki.postgresql.org/wiki/Detailed_installation_guides)
 
 `pgsql <db-name> < sql/create.sql`
+
 [sql/create.sql](https://github.com/the7erm/fmp-pg/blob/master/sql/create.sql)
 
 ## Config file
@@ -86,14 +87,14 @@ database = <db-name>
 cue = true
 ```
 
-# Scan
+## Scan
 `./scan.py <folder-to-scan>`
 Once your files are scanned
 
-# Run
+## Run
 `./fmp-pg.py`
 
-# Set up your media keys
+## Set up your media keys
 ```
 /path/to/fmp-pg.py --pause # start's the player
 /path/to/fmp-pg.py --next # play next song
@@ -101,11 +102,5 @@ Once your files are scanned
 /path/to/pykill fmp.pg.py # kill it use it for stop/shutdown.
 ```
 
-# Your very own web interface
+## Your very own web interface
 `http://localhost:5050/` -- warning this is not secure, don't put it on the open internet
-
-
-
-
-
-
