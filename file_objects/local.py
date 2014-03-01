@@ -27,7 +27,7 @@ import pprint
 import re
 import os
 from excemptions import CreationFailed
-from ratings_and_scores import RatingsAndScores
+from lib.ratings_and_scores import RatingsAndScores
 from datetime import date
 from datetime import datetime
 from datetime import timedelta

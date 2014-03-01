@@ -31,6 +31,7 @@ import pprint
 import datetime
 from datetime import date
 import pytz
+print sys.path
 from lib.episode_downloader import downloader
 
 from excemptions import CreationFailed

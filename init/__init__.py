@@ -17,10 +17,16 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-import psycopg2
-import psycopg2.extras
+
 import sys
 import os
+additional_path = os.path.realpath(os.path.join(sys.path[0], '..'))
+if additional_path not in sys.path:
+    print "additional_path:",additional_path
+    sys.path.append(additional_path)
+
+import psycopg2
+import psycopg2.extras
 import pprint
 import ConfigParser
 import gc
@@ -28,7 +34,8 @@ import time
 import random
 import hashlib
 import cfg_wrapper
-from gtk_utils import *
+
+from util.gtk_utils import *
 
 DEFAULTS = {
     "Netcasts": {
