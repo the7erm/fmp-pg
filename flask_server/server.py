@@ -40,7 +40,7 @@ import StringIO
 # from bson import json_util
 import json
 
-from player import PLAYING
+from lib.player import PLAYING
 
 import threading
 import time

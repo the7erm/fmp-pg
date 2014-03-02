@@ -86,6 +86,8 @@ class Player(gobject.GObject):
         self.hide_controls()
         if self.alt_widget:
             self.alt_vbox.pack_start(self.alt_widget, True, True)
+        else:
+            self.alt_vbox.hide()
         if filename is not None:
             self.start()
 
@@ -396,10 +398,9 @@ static char * invisible_xpm[] = {
 
     def should_hide_window(self):
         if self.player.get_property('n-video') > 0:
-            if self.alt_widget:
-                self.movie_window.show()
-                self.alt_widget.hide()
-            else:
+            self.alt_vbox.hide()
+            self.movie_window.show()
+            if not self.alt_widget:
                 self.window.show()
                 try:
                     self.window.set_size(self.width, self.height)
@@ -407,10 +408,9 @@ static char * invisible_xpm[] = {
                 except:
                     pass
         else:
-            if self.alt_widget:
-                self.alt_widget.show()
-                self.movie_window.hide()
-            else:
+            self.alt_vbox.show()
+            self.movie_window.hide()
+            if not self.alt_widget:
                 self.width, self.height = self.window.get_size()
                 self.x, self.y = self.window.get_position()
                 self.window.hide()

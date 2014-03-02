@@ -50,7 +50,6 @@ DEFAULTS = {
 }
 
 pp = pprint.PrettyPrinter(depth=6)
-sys.path.append(sys.path[0]+'/lib/')
 
 home = os.path.expanduser('~')
 config_dir = home+"/.fmp"
