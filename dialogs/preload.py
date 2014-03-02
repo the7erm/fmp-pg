@@ -18,8 +18,6 @@
 #
 
 from __init__ import *
-from picker import wait
-from star_cell import CellRendererStar
 import gtk
 import gobject
 import os
@@ -27,8 +25,9 @@ import datetime
 import math
 import pytz
 from subprocess import Popen
+from lib.picker import wait, insert_missing_songs
+from star_cell import CellRendererStar
 from file_objects.rating_utils import rate_for_uid
-from picker import insert_missing_songs
 
 class Preload(gtk.ScrolledWindow):
     def __init__(self):

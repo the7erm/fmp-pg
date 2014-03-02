@@ -181,7 +181,17 @@ if __name__ == "__main__":
     w = gtk.Window()
     w.set_position(gtk.WIN_POS_CENTER)
     w.connect('delete-event', gtk_main_quit)
-    t = User_File_Info_Tree(fid=13254)
+    finfo = get_assoc("""SELECT fid 
+                         FROM user_song_info
+                         WHERE ultp IS NOT NULL
+                         ORDER BY ultp DESC
+                         LIMIT 1""")
+    if not finfo:
+        finfo = get_assoc("""SELECT fid 
+                             FROM user_song_info
+                             ORDER BY ultp DESC
+                             LIMIT 1""")
+    t = User_File_Info_Tree(fid=finfo['fid'])
     m = t.get_model()
     m.connect("row-changed", on_change)
     # t.insert('foo')

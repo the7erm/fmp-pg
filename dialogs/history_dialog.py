@@ -18,7 +18,7 @@
 #
 
 from __init__ import *
-from picker import wait
+from lib.picker import wait
 from star_cell import CellRendererStar
 import gtk
 import gobject
@@ -28,7 +28,7 @@ import datetime
 import math
 from subprocess import Popen
 from preload import convert_delta_to_str
-from listeners import listeners
+from file_objects.listeners import listeners
 import pprint
 pp = pprint.PrettyPrinter(depth=6)
 
