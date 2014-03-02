@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-# ratings_and_scores.py -- Handles file ratings and scores.
+# file_objects/ratings_and_scores.py -- Handles file ratings and scores.
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify

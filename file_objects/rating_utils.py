@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# lib/rating_utils.py -- Standard functions for rating files.
+# file_objects/rating_utils.py -- Standard functions for rating files.
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -17,12 +17,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from __init__ import *
-import time
-import math
-from listeners import listeners
-import fobj
-from datetime import date
+from init.__init__ import *
 
 # OLD, but keeping it around because what I'm doing is an experiment.
 CALCULATE_TRUESCORE_FORMULA = """(
@@ -67,8 +62,7 @@ RATE_TRUESCORE_FORMULA = """(
   ) / 3
 )"""
 
-RATE_TRUESCORE_FORMULA = """
-(((%s * 2 * 10.0) + 
+RATE_TRUESCORE_FORMULA = """(((%s * 2 * 10.0) + 
                (usi.score * 10.0) + 
                (usi.percent_played) + 
 (SELECT CASE WHEN avg(percent_played) IS NOT NULL THEN
