@@ -24,7 +24,7 @@ import math
 import gobject
 import pytz
 
-from preload import convert_delta_to_str
+from lib.preload import convert_delta_to_str
 
 """
 SELECT * FROM user_history WHERE fid = 22833;

@@ -18,7 +18,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-import os
+from __init__ import *
 import time
 import datetime
 import pprint
@@ -115,7 +115,6 @@ class FObj:
         self.mtime = None
         self.getmtime()
 
-
     def mark_as_played(self, *args, **kwargs):
         raise NotImpimented("mark_as_played")
 
@@ -194,11 +193,8 @@ class FObj:
 
     def to_dict(self):
         ratings = {}
-        sha512=""
-        if "sha512" in self.db_info:
-            sha512 = self.db_info["sha512"]
-        if hasattr(self,"ratings_and_scores") and \
-           hasattr(self.ratings_and_scores,"ratings_and_scores"):
+        if hasattr(self, "ratings_and_scores") and \
+           hasattr(self.ratings_and_scores, "ratings_and_scores"):
             for r in self.ratings_and_scores.ratings_and_scores:
                 ultp = r["ultp"]
                 if hasattr(ultp, "isoformat"):
@@ -209,10 +205,10 @@ class FObj:
                 for k, v in r.iteritems():
                     if k == "pword":
                         continue
-                    if isinstance(v,datetime.datetime):
+                    if isinstance(v, datetime.datetime):
                         v = v.isoformat()
                     ratings[r['uid']][k] = v
-                ratings[r['uid']]["sha512"] = sha512
+                # ratings[r['uid']]["sha512"] = sha512
             # print "RATINGS:",ratings
         fid = "-1"
         eid = "-1"
@@ -233,7 +229,6 @@ class FObj:
         title = ""
         if self.tags_easy and 'title' in self.tags_easy and self.tags_easy['title']:
             title = self.tags_easy['title'][0]
-        
 
         return {
             "fid": fid,
@@ -245,7 +240,7 @@ class FObj:
             "dirname": self.dirname,
             "ratings": ratings,
             "title": title,
-            "sha512": sha512
+            "sha512": ""
             # "tags": self.tags_hard or self.tags_easy or {}
         }
 
@@ -270,7 +265,6 @@ class FObj:
 
         return _dict
 
-from __init__ import *
 import netcast
 import local
 import generic
@@ -292,51 +286,59 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
     if id_type is not None and _id is not None:
         if id_type == 'f':
             try:
-                return local_file_fobj.Local_File(fid=_id, silent=silent, **kwargs)
+                return local.Local_File(fid=_id, 
+                                        silent=silent, 
+                                        **kwargs)
             except CreationFailed, e:
-                print "local_file_fobj.CreationFailed:",e
+                print "local.CreationFailed:",e
         elif id_type == 'e':
             try:
-                return netcast_fobj.Netcast_File(eid=_id, silent=silent, **kwargs)
+                return netcast.Netcast_File(eid=_id, 
+                                            silent=silent, 
+                                            **kwargs)
             except CreationFailed, e:
-                print "netcast_fobj.CreationFailed:", e
+                print "netcast.CreationFailed:", e
         elif id_type == 'g':
             try:
-                return generic_fobj.Generic_File(_id=_id, silent=silent, 
-                                                 **kwargs)
+                return generic.Generic_File(_id=_id, 
+                                            silent=silent, 
+                                            **kwargs)
             except CreationFailed, e:
-                print "generic_fobj.CreationFailed:", e
+                print "generic.CreationFailed:", e
 
     try:
-        return local_file_fobj.Local_File(dirname=dirname, basename=basename, 
-                                           fid=fid, filename=filename, 
-                                           insert=register_as_new_file, 
-                                           silent=silent, **kwargs)
+        return local.Local_File(dirname=dirname, 
+                                basename=basename, 
+                                fid=fid, 
+                                filename=filename, 
+                                insert=register_as_new_file, 
+                                silent=silent, 
+                                **kwargs)
 
     except CreationFailed, e:
-        print "local_file_fobj.CreationFailed:",e
+        print "local.CreationFailed:",e
 
     if register_as_new_file:
         raise CreationFailed('File was unable to be registered.')
 
     try:
         print "Attempting Netcast"
-        return netcast_fobj.Netcast_File(filename=filename, dirname=dirname, 
-                                          basename=basename, eid=eid, 
-                                          episode_url=episode_url, 
-                                          local_filename=local_filename, 
-                                          nid=nid, pub_date=pub_date,
-                                          insert=register_as_new_netcast,
-                                          **kwargs)
+        return netcast.Netcast_File(filename=filename, dirname=dirname, 
+                                    basename=basename, eid=eid, 
+                                    episode_url=episode_url, 
+                                    local_filename=local_filename, 
+                                    nid=nid, pub_date=pub_date,
+                                    insert=register_as_new_netcast,
+                                    **kwargs)
 
     except CreationFailed, e:
-        print "netcast_fobj.CreationFailed:", e
+        print "netcast.CreationFailed:", e
 
     if register_as_new_netcast:
         raise CreationFailed("File was not registered as a netcast.")
 
-    return generic_fobj.Generic_File(dirname=dirname, basename=basename, 
-                                     filename=filename, **kwargs)
+    return generic.Generic_File(dirname=dirname, basename=basename, 
+                                filename=filename, **kwargs)
 
 def recently_played(limit=10, uid=None):
     if uid is None:

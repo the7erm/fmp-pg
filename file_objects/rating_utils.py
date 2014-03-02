@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# file_objects/rating_utils.py -- Standard functions for rating files.
+# file_objects/rating_utils.py -- Functions for rating files.
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from init.__init__ import *
+from __init__ import *
 
 # OLD, but keeping it around because what I'm doing is an experiment.
 CALCULATE_TRUESCORE_FORMULA = """(

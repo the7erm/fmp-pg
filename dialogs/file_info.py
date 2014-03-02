@@ -21,10 +21,10 @@ from __init__ import *
 import gtk, sys, os, re, gobject
 from crumbs import Crumbs
 from user_file_info_tree import User_File_Info_Tree
-from history import History_Tree
-from file_tags import Tag_Table
+from history_tree import History_Tree
+from lib.file_tags import Tag_Table
 import mutagen
-import fobj
+from file_objects import fobj
 import subprocess
 import urllib
 

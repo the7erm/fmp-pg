@@ -22,10 +22,10 @@
 import gtk
 from __init__ import *
 from random import shuffle
-from local_file_fobj import Local_File
-from local_file_fobj import sanity_check
-from wait_util import wait
-from excemptions import CreationFailed
+from file_objects.local import Local_File
+from file_objects.local import sanity_check
+from util.wait_util import wait
+from file_objects.excemptions import CreationFailed
 
 global populate_locked, dont_pick_created
 dont_pick_created = False

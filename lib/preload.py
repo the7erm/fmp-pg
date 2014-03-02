@@ -27,7 +27,7 @@ import datetime
 import math
 import pytz
 from subprocess import Popen
-from rating_utils import rate_for_uid
+from file_objects.rating_utils import rate_for_uid
 from picker import insert_missing_songs
 
 class Preload(gtk.ScrolledWindow):
