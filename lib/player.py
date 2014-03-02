@@ -181,6 +181,7 @@ class Player(gobject.GObject):
         self.main_VBox.pack_start(self.movie_window, True, True)
         self.alt_vbox = gtk.VBox()
         self.main_VBox.pack_start(self.alt_vbox, True, True)
+        self.alt_vbox.hide()
 
     def init_controls(self):
         ### SET UP CONTROLS ###
