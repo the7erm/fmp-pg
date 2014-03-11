@@ -17,18 +17,18 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-from lib.__init__ import *
-from lib.wait_util import wait, enter, leave
-import lib.fobj as fobj
+from init.__init__ import *
+from util.wait_util import wait, enter, leave
+import file_objects.fobj as fobj
 import os
 import sys
-import lib.netcast_fobj as netcast_fobj
+import file_objects.netcast as netcast_fobj
 import pprint
 import gtk
 import gobject
 import time
-import lib.clear_cache as clear_cache
-from lib.episode_downloader import downloader
+import util.clear_cache as clear_cache
+from util.episode_downloader import downloader
 
 pp = pprint.PrettyPrinter(depth=6, indent=4)
 
@@ -96,13 +96,14 @@ def on_download_done(downloader, status):
     set_icon(ICON_NOTHING, status)
 
 
-image_path = sys.path[0]+"/images/rss/"
-if os.path.exists(sys.path[0]+"/../images/rss/"):
-    image_path = os.path.realpath(sys.path[0]+"/../images/rss/")+"/"
+image_path = os.path.join(sys.path[0], "images", "rss")
+alt_image_path = os.path.realpath(os.path.join(sys.path[0], "..", "images", "rss"))
+if os.path.exists(alt_image_path):
+    image_path = alt_image_path
 
-ICON_NOTHING = image_path + "red.png"
-ICON_DOWNLOADING = image_path + "green.png"
-ICON_UPDATING = image_path + "01_01.png"
+ICON_NOTHING = os.path.join(image_path, "red.png")
+ICON_DOWNLOADING = os.path.join(image_path, "green.png")
+ICON_UPDATING = os.path.join(image_path, "01_01.png")
 
 icon = gtk.StatusIcon()
 icon.set_has_tooltip(True)
@@ -134,7 +135,7 @@ downloader.connect("download-status", on_download_status)
 downloader.connect("download-done", on_download_done)
 
 if __name__ == "__main__":
-    import lib.pid_handler as pid_handler
+    import util.pid_handler as pid_handler
     if pid_handler.is_running():
         print "Netcast tray is already running."
         sys.exit()

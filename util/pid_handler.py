@@ -18,6 +18,7 @@
 #
 
 from __init__ import *
+from init.__init__ import *
 import os
 import sys
 
