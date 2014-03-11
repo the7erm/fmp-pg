@@ -459,11 +459,12 @@ class RatingsAndScores:
 
             if not found:
                 try:
-                    user_history = get_assoc("""INSERT INTO 
-                                                    user_history (uid, id, id_type,
-                                                                  percent_played, 
-                                                                  time_played,
-                                                                  date_played) 
+                    self.check_recently_played(uid=l['uid'])
+                    user_history = get_assoc("""INSERT INTO user_history 
+                                                  (uid, id, id_type,
+                                                   percent_played, 
+                                                   time_played,
+                                                   date_played)
                                                 VALUES (%s, %s, %s, %s, NOW(), 
                                                         current_date) 
                                                 RETURNING *""",
