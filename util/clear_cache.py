@@ -1,26 +1,27 @@
 #!/usr/bin/env python2
 
 from __init__ import *
+from init.__init__ import *
 import glob
-import netcast_fobj
-import fobj
+from file_objects.netcast import Netcast_File
+from file_objects.fobj import recently_played
 import os
-from excemptions import CreationFailed
+from file_objects.excemptions import CreationFailed
 
 def clear_cache():
-    history = fobj.recently_played(10)
+    history = recently_played(10)
     recent = []
 
     for h in history:
         if h['id_type'] == 'e':
             recent.append(h['id'])
 
-    mask = cache_dir+"/*"
+    mask = os.path.join(cache_dir, "*")
     files = glob.glob(mask)
     for f in files:
         f = os.path.realpath(f)
         try:
-            nobj = netcast_fobj.Netcast_File(filename=f, silent=True)
+            nobj = Netcast_File(filename=f, silent=True)
         except CreationFailed:
             continue
 
