@@ -17,7 +17,9 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 from __init__ import *
+from init.__init__ import *
 import gtk, re, os
+import sys
 from subprocess import Popen
 try:
     import mutagen
@@ -28,7 +30,10 @@ except ImportError, err:
 	exit(1)
 
 class Tag_Table(gtk.Table):
-    def __init__(self, tag_object=None, order=['artist','title','genre','album', 'date', 'tracknumber', 'TPE1','TPE2',"TIT2","TCON", "TALB", "TDRC", "TRCK"]):
+    def __init__(self, tag_object=None, order=['artist','title','genre','album', 
+                                               'date', 'tracknumber', 'TPE1',
+                                               'TPE2',"TIT2","TCON", "TALB", 
+                                               "TDRC", "TRCK"]):
         gtk.Table.__init__(self)
         self.tag_object = tag_object
         self.pre_order = order
@@ -165,16 +170,21 @@ class File_Tags_Tab(gtk.VBox):
             self.fid = fid
 
         if not file_info:
-            self.file_info = get_assoc("SELECT * FROM files WHERE (dir = %s AND basename = %s) OR fid = %s LIMIT 1",(self.dirname, self.basename, self.fid))
+            self.file_info = get_assoc("""SELECT * 
+                                          FROM files f, file_locations fl
+                                          WHERE (dirname = %s AND basename = %s) OR 
+                                                f.fid = %s AND f.fid = fl.fid
+                                          LIMIT 1""", (self.dirname, self.basename, 
+                                                       self.fid))
         else:
             self.file_info = file_info
 
         if self.file_info:
-            self.filename = os.path.join(self.file_info['dir'], self.file_info['basename'])
+            self.filename = os.path.join(self.file_info['dirname'], 
+                                         self.file_info['basename'])
+            self.dirname = self.file_info['dirname']
             self.basename = self.file_info['basename']
-            self.dirname = self.file_info['dir']
             self.fid = self.file_info['fid']
-
 
         self.tags_easy = mutagen.File(self.filename, easy=True)
         self.tags_hard = mutagen.File(self.filename)
@@ -205,7 +215,11 @@ if __name__ == "__main__":
             break
 
         if arg == "--latest":
-            file_info = get_assoc("SELECT * FROM user_song_info WHERE ultp IS NOT NULL ORDER BY ultp DESC LIMIT 1")
+            file_info = get_assoc("""SELECT * 
+                                     FROM user_song_info 
+                                     WHERE ultp IS NOT NULL 
+                                     ORDER BY ultp DESC 
+                                     LIMIT 1""")
             if not file_info:
                 print "couldn't find recent file."
                 sys.exit()
