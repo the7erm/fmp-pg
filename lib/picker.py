@@ -464,7 +464,7 @@ def get_random_unplayed_sample(uid):
                                      LEFT JOIN dont_pick dp ON 
                                                dp.fid = u.fid 
                                 WHERE dp.fid IS NULL AND 
-                                      u.uid = %s AND
+                                      u.uid = %s
                                 ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
                                          ultp, 
                                          random() 
