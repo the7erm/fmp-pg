@@ -95,6 +95,25 @@ def populate_dont_pick():
     associate_gernes()
     query("TRUNCATE dont_pick")
     query("INSERT INTO dont_pick (fid, reason) SELECT fid, 'already in preload' FROM preload")
+    # insert all disabled genres into dont_pick
+    query("""INSERT INTO dont_pick (fid, reason) 
+                SELECT DISTINCT(f.fid), 'disabled genre' 
+                FROM files f LEFT JOIN dont_pick dp ON dp.fid = f.fid, 
+                     genres g, 
+                     file_genres fg 
+                WHERE fg.gid = g.gid AND 
+                      g.enabled = false AND 
+                      f.fid = fg.fid AND 
+                      dp.fid IS NULL""")
+    # remove all 'enabled' genres from dont_pick
+    query("""DELETE FROM dont_pick WHERE fid IN (
+                SELECT DISTINCT (f.fid) 
+                FROM files f, genres g, file_genres fg, dont_pick dp
+                WHERE f.fid = fg.fid AND 
+                      fg.gid = g.gid AND
+                      dp.fid = f.fid AND
+                      g.enabled = true)""")
+
     insert_duplicate_files_into_dont_pick()
     listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
 
@@ -228,29 +247,26 @@ def insert_missing_songs(uid):
     query(q)
 
 def get_true_score_sample(uid, true_score):
-    return get_results_assoc("""SELECT u.fid, true_score, ultp 
-                                FROM user_song_info u, genres g, file_genres fg 
-                                     LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
-                                WHERE dp.fid IS NULL AND u.uid = %s AND 
-                                      u.fid = fg.fid AND 
-                                      g.enabled = true AND 
-                                      g.gid = fg.gid AND 
-                                      true_score >= %s 
-                                ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
-                                       ultp, random() 
-                                LIMIT 10""", (uid, true_score))
+    return get_results_assoc(
+      """SELECT u.fid, true_score, ultp 
+         FROM user_song_info u 
+              LEFT JOIN dont_pick dp ON dp.fid = u.fid 
+         WHERE dp.fid IS NULL AND u.uid = %s AND 
+               true_score >= %s
+         ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                ultp, random() 
+         LIMIT 10""", (uid, true_score))
 
 def get_single_from_true_score(uid, true_score):
-    return get_assoc("""SELECT u.fid, true_score, ultp 
-                         FROM user_song_info u, genres g, file_genres fg 
-                              LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
-                         WHERE dp.fid IS NULL AND u.uid = %s AND 
-                               u.fid = fg.fid AND g.enabled = true AND 
-                               g.gid = fg.gid AND true_score >= %s 
-                         ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
-                                  ultp, random() 
-                         LIMIT 1""", 
-                         (uid, true_score))
+    return get_assoc(
+      """SELECT u.fid, true_score, ultp 
+         FROM user_song_info u 
+              LEFT JOIN dont_pick dp ON dp.fid = u.fid 
+         WHERE dp.fid IS NULL AND u.uid = %s AND 
+               true_score >= %s
+         ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
+                ultp, random() 
+         LIMIT 1""", (uid, true_score))
 
 def make_true_scores_list():
     scores = [0,10,20,30,40,50,60,70,80,90,100]
@@ -444,13 +460,11 @@ def insert_artists_in_preload_into_dont_pick():
 
 def get_random_unplayed_sample(uid):
     return get_results_assoc("""SELECT u.fid, true_score, ultp 
-                                FROM user_song_info u, genres g, file_genres fg 
+                                FROM user_song_info u
                                      LEFT JOIN dont_pick dp ON 
-                                               dp.fid = fg.fid 
-                                WHERE dp.fid IS NULL AND u.uid = %s AND 
-                                      u.fid = fg.fid AND 
-                                      g.enabled = true AND 
-                                      g.gid = fg.gid 
+                                               dp.fid = u.fid 
+                                WHERE dp.fid IS NULL AND 
+                                      u.uid = %s AND
                                 ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
                                          ultp, 
                                          random() 
@@ -459,11 +473,10 @@ def get_random_unplayed_sample(uid):
 
 def get_single_random_unplayed(uid):
     return get_assoc("""SELECT u.fid, true_score, ultp 
-                        FROM user_song_info u, genres g, file_genres fg 
-                             LEFT JOIN dont_pick dp ON dp.fid = fg.fid 
-                        WHERE dp.fid IS NULL AND u.uid = %s AND 
-                              u.fid = fg.fid AND g.enabled = true AND 
-                              g.gid = fg.gid 
+                        FROM user_song_info u  
+                             LEFT JOIN dont_pick dp ON dp.fid = u.fid 
+                        WHERE dp.fid IS NULL AND 
+                              u.uid = %s
                         ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
                                  ultp, random() 
                         LIMIT 1""", 

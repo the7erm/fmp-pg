@@ -980,7 +980,7 @@ $(document).bind('pageinit', function(){
             this.conductor.playing.on("change:imgHash", this.onImgChange, this);
             this.conductor.on("change:imgHash", this.onImgChange, this);
             this.conductor.on("change:basename", this.updateFileInfo, this);
-
+            this.conductor.ratings.on("change", this.setPageTitle, this);
         },
         updateFileInfo:function(){
             this.setPageTitle();
@@ -1018,7 +1018,22 @@ $(document).bind('pageinit', function(){
         },
         setPageTitle: function(){
             try {
-                document.title = this.conductor.getArtistTitle();
+                console.log("set page title", this.conductor.ratings);
+                var ts = "";
+                if (this.conductor.ratings && this.conductor.ratings.length > 0) {
+                    var model = this.conductor.ratings.at(0) ? this.conductor.ratings.at(0) : null,
+                    ts = model ? model.get('true_score').toFixed(1) : "",
+                    ts = ts != 50.0 ? ts : "",
+                    parts = ['fmp'];
+                }
+
+                if (ts) {
+                    parts.push(ts);
+                }
+                parts.push(this.conductor.getArtistTitle());
+                console.log("title:",parts.join(" - "))
+                document.title = parts.join(" - ");
+                
             } catch(e) {
 
             }

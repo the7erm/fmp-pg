@@ -163,6 +163,7 @@ def index2():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+
 @app.route("/status/")
 def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
