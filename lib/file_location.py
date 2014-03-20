@@ -275,7 +275,9 @@ class FileLocation:
 
     @property
     def size(self):
-        return os.path.getsize(self.filename)
+        if self.exists:
+            return os.path.getsize(self.filename)
+        return 0
 
     @property
     def exists(self):
@@ -293,11 +295,15 @@ class FileLocation:
 
     @property
     def atime(self):
-        return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+        if self.exists:
+            return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+        return None
 
     @property
     def mtime(self):
-        return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+        if self.exists:
+            return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+        return None
 
     @property
     def filename(self):
