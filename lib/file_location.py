@@ -139,7 +139,7 @@ class FileLocation:
                                 (dirname, basename))
 
     def sync_db_info(self):
-        if self.changed:
+        if self.changed and self.exists:
             self.update_fingerprint()
 
     def update_fingerprint(self):
@@ -277,7 +277,7 @@ class FileLocation:
     def size(self):
         if self.exists:
             return os.path.getsize(self.filename)
-        return 0
+        return -1
 
     @property
     def exists(self):
