@@ -139,10 +139,12 @@ class FileLocation:
                                 (dirname, basename))
 
     def sync_db_info(self):
-        if self.changed and self.exists:
+        if self.changed:
             self.update_fingerprint()
 
     def update_fingerprint(self):
+        if not self.exists:
+            return
         main, front, end, middle = calculate_file_fingerprint(self.filename)
         self.db_info = get_assoc("""UPDATE file_locations 
                                     SET fingerprint = %s,
