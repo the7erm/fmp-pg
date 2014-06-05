@@ -2,8 +2,12 @@ import os
 import hashlib
 
 def calculate_file_fingerprint(filename):
+    print "filename:",filename
     if not os.path.isfile(filename):
         return "NOT FILE"
+    if not os.access(filename, os.R_OK):
+        return "NOT READABLE"
+
     fp = open(filename, 'r')
     main = hashlib.sha512()
     front = hashlib.sha512()

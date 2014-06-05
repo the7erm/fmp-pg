@@ -82,6 +82,7 @@ class FingerprintHistory:
     def insert_record(self):
         if not self.changed:
             return
+        print "insert_record 1"
         if (self.fingerprint and self.front_fingerprint and 
             self.middle_fingerprint and self.end_fingerprint):
                 main = self.fingerprint
@@ -89,8 +90,14 @@ class FingerprintHistory:
                 middle = self.middle_fingerprint
                 end = self.end_fingerprint
         else:
-            main, front, middle, end = calculate_file_fingerprint(self.filename)
-
+            try:
+                main, front, end, middle = calculate_file_fingerprint(self.filename)
+            except ValueError, e:
+                main = "%s" % e
+                front = "%s" % e
+                end = "%s" % e
+                middle = "%s" % e
+        print "insert_record 2"
         if self.flid is not None and self.fid is not None:
             record = get_assoc("""SELECT *
                                   FROM fingerprint_history
@@ -147,7 +154,9 @@ class FingerprintHistory:
         else:
             print "ERROR fid or flid must be set"
             sys.exit()
+        print "insert_record 3"
         if record:
+            print "there is a record"
             self.record = get_assoc("""UPDATE fingerprint_history 
                                        SET atime = %s,
                                            mtime = %s,
@@ -160,6 +169,18 @@ class FingerprintHistory:
                                     record['fphid']))
             return
         if self.flid is not None and self.fid is not None:
+            print "there is an flid and an fid"
+            print (main,
+                   'front',        front,
+                                  middle,
+                                  end,
+                                  self.dirname,
+                                  self.basename,
+                    'flid:',        self.flid,
+                    'fid:',      self.fid,
+                                  self.size,
+                                  self.atime,
+                                  self.mtime)
             record = get_assoc("""INSERT INTO fingerprint_history
                                     (fingerprint, front_fingerprint, 
                                      middle_fingerprint, end_fingerprint, 
@@ -223,6 +244,7 @@ class FingerprintHistory:
                                   self.size,
                                   self.atime,
                                   self.mtime))
+        print "insert_record 4"
         print "INSERT history:", 
         pprint.pprint(dict(record))
         if record:

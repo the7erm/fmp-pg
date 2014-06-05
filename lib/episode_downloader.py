@@ -67,13 +67,13 @@ class Downloader(gobject.GObject):
         self.emit("download-status", "%s\n%s" % (basename, status))
         bytes_sec = 0
         while True:
-            buffer = u.read(block_sz)
-            if not buffer:
+            buff = u.read(block_sz)
+            if not buff:
                 break
 
-            file_size_dl += len(buffer)
-            bytes_sec += len(buffer)
-            f.write(buffer)
+            file_size_dl += len(buff)
+            bytes_sec += len(buff)
+            f.write(buff)
             time_time = int(time.time())
 
             if time_time != last_update:

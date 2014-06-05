@@ -54,7 +54,7 @@ class myURLOpener(urllib.FancyURLopener):
         print "errmsg:",errmsg
         print "headers:",headers
         print "data:",data
-        pass
+        
 
 
 class Netcast(gobject.GObject):
@@ -221,7 +221,9 @@ class Netcast(gobject.GObject):
         unlistened_episodes = self.get_unlistened_episodes()
         for e in unlistened_episodes:
             if not os.path.exists(e['local_file']):
-                downloader.append(e['episode_url'], e['local_file'])
+                print "******"
+                print "not exists: e['local_file']:", e['local_file']
+                # downloader.append(e['episode_url'], e['local_file'])
 
 
     def get_unlistened_episodes(self):
@@ -741,7 +743,8 @@ if __name__ == "__main__":
         "http://revision3.com/tekzilla/feed/MP4-Large?subshow=false",
         "http://youarenotsosmart.libsyn.com/rss",
         "http://feeds.feedburner.com/itsathing/cCoG?format=xml",
-        "http://www.badvoltage.org/feed/"
+        "http://www.badvoltage.org/feed/",
+        "http://feeds.feedburner.com/Hanselminutes?format=xml"
     ]
 
     for url in feeds:

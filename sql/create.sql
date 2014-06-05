@@ -3,6 +3,7 @@
 --
 
 SET statement_timeout = 0;
+SET lock_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SET check_function_bodies = false;
@@ -20,6 +21,20 @@ CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 --
 
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+
+
+--
+-- Name: adminpack; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS adminpack WITH SCHEMA pg_catalog;
+
+
+--
+-- Name: EXTENSION adminpack; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION adminpack IS 'administrative functions for PostgreSQL';
 
 
 SET search_path = public, pg_catalog;
@@ -357,7 +372,7 @@ CREATE TABLE file_locations (
     basename character varying(255),
     atime timestamp with time zone,
     mtime timestamp with time zone,
-    size integer DEFAULT 0,
+    size bigint DEFAULT 0,
     fingerprint character varying(255),
     fid integer,
     fixed boolean,
@@ -454,7 +469,7 @@ CREATE TABLE fingerprint_history (
     fingerprint character varying(255),
     atime timestamp with time zone,
     mtime timestamp with time zone,
-    size integer,
+    size bigint,
     front_fingerprint character varying(255),
     middle_fingerprint character varying(255),
     end_fingerprint character varying(255)
@@ -2047,14 +2062,22 @@ CREATE UNIQUE INDEX unique_fid_gid ON file_genres USING btree (fid, gid);
 -- Name: dont_pick_on_duplicate_ignore; Type: RULE; Schema: public; Owner: -
 --
 
-CREATE RULE dont_pick_on_duplicate_ignore AS ON INSERT TO dont_pick WHERE (EXISTS (SELECT 1 FROM dont_pick WHERE (dont_pick.fid = new.fid))) DO INSTEAD NOTHING;
+CREATE RULE dont_pick_on_duplicate_ignore AS
+    ON INSERT TO dont_pick
+   WHERE (EXISTS ( SELECT 1
+           FROM dont_pick
+          WHERE (dont_pick.fid = new.fid))) DO INSTEAD NOTHING;
 
 
 --
 -- Name: preload_on_duplicate_ignore; Type: RULE; Schema: public; Owner: -
 --
 
-CREATE RULE preload_on_duplicate_ignore AS ON INSERT TO preload WHERE (EXISTS (SELECT 1 FROM preload WHERE (preload.fid = new.fid))) DO INSTEAD NOTHING;
+CREATE RULE preload_on_duplicate_ignore AS
+    ON INSERT TO preload
+   WHERE (EXISTS ( SELECT 1
+           FROM preload
+          WHERE (preload.fid = new.fid))) DO INSTEAD NOTHING;
 
 
 --

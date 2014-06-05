@@ -163,6 +163,13 @@ def index2():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+@app.route("/angular/")
+def angular():
+    global playing, player, tray
+    return render_template("angular.html", player=player, playing=playing, 
+                           PLAYING=PLAYING, volume=get_volume(), 
+                           extended=get_extended())
+
 
 @app.route("/status/")
 def status():

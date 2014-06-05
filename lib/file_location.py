@@ -145,7 +145,23 @@ class FileLocation:
     def update_fingerprint(self):
         if not self.exists:
             return
-        main, front, end, middle = calculate_file_fingerprint(self.filename)
+        try:
+            main, front, end, middle = calculate_file_fingerprint(self.filename)
+        except ValueError, e:
+            main = "%s" % e
+            front = "%s" % e
+            end = "%s" % e
+            middle = "%s" % e
+
+        print "MADE IT"
+        print (main,
+                                 front,
+                                 end,
+                                 middle, 
+                                 self.size,
+                                 self.atime,
+                                 self.mtime,
+                                 self.flid)
         self.db_info = get_assoc("""UPDATE file_locations 
                                     SET fingerprint = %s,
                                         front_fingerprint = %s,
@@ -164,6 +180,7 @@ class FileLocation:
                                  self.atime,
                                  self.mtime,
                                  self.flid))
+        print "MADE IT 2"
 
     def sync_files_info(self):
         self.associate_files_info()

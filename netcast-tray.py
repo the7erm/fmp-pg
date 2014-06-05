@@ -96,13 +96,14 @@ def on_download_done(downloader, status):
     set_icon(ICON_NOTHING, status)
 
 
-image_path = sys.path[0]+"/images/rss/"
-if os.path.exists(sys.path[0]+"/../images/rss/"):
-    image_path = os.path.realpath(sys.path[0]+"/../images/rss/")+"/"
+image_path = os.path.join(sys.path[0], "images/rss/")
+print os.path.join(sys.path[0], "../images/rss/")
+if os.path.exists(os.path.join(sys.path[0], "../images/rss/")):
+    image_path = os.path.realpath(os.path.join(sys.path[0], "../images/rss/"))+"/"
 
-ICON_NOTHING = image_path + "red.png"
-ICON_DOWNLOADING = image_path + "green.png"
-ICON_UPDATING = image_path + "01_01.png"
+ICON_NOTHING = os.path.join(image_path, "red.png")
+ICON_DOWNLOADING = os.path.join(image_path, "green.png")
+ICON_UPDATING = os.path.join(image_path, "01_01.png")
 
 icon = gtk.StatusIcon()
 icon.set_has_tooltip(True)
