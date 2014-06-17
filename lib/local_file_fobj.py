@@ -164,7 +164,7 @@ class Local_File(fobj.FObj):
             raise CreationFailed(
                 "No locations:\n" 
             )
-        filname = None
+        filename = None
         dirname = None
         basename = None
         for l in self.locations:
