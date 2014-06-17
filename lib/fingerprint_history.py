@@ -29,6 +29,7 @@ class FingerprintHistory:
     def __init__(self, dirname, basename, flid=None, fid=None, fingerprint=None,
                  front_fingerprint=None, middle_fingerprint=None, end_fingerprint=None):
         self.filename = os.path.realpath(os.path.expanduser(os.path.join(dirname, basename)))
+        print "SELF.FILENAME:", self.filename
         self.dirname, self.basename = os.path.split(self.filename)
         self.flid = flid
         self.fid = fid
@@ -42,15 +43,22 @@ class FingerprintHistory:
 
     @property
     def atime(self):
-        return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+        try:
+          return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+        except OSError:
+          return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
 
     @property
     def mtime(self):
-        return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+        try:
+          return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+        except OSError:
+          return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
 
     @property
     def size(self):
         try:
+            print "self.filename:%s" % self.filename
             return os.path.getsize(self.filename)
         except OSError:
             return -1
