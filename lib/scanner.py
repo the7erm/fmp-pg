@@ -43,10 +43,14 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     filename = os.path.realpath(filename)
     print 'scanning:', filename
     try:
-        FileLocation(filename=filename, insert=True)
-        # f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+        # FileLocation(filename=filename, insert=True)
+        f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
     except CreationFailed:
-        pass
+        FileLocation(filename=filename, insert=True)
+        try:
+            f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+        except CreationFailed:
+            pass
 
 def scan_dir(directory, hash=True):
     if "./.minecraft/" in directory:

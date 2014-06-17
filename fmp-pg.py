@@ -481,6 +481,7 @@ import flask_server
 flask_server.server.threads = threads
 flask_server.server.get_results_assoc = get_results_assoc
 flask_server.server.get_assoc = get_assoc
+flask_server.server.query = query
 flask_server.server.pg_cur = pg_cur
 
 global history, playing, idx, last_percent_played, last_percent_played_decimal

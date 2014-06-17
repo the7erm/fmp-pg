@@ -586,6 +586,7 @@ def cue():
                         FROM users WHERE listening = true
                         LIMIT 1""")
     fid = request.args.get('fid')
+    print "FID:", fid
     finfo = get_assoc("""SELECT * 
                          FROM files 
                          WHERE fid = %s 
