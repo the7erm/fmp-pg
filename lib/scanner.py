@@ -20,7 +20,7 @@
 import os
 from os.path import join, getsize
 from lib.local_file_fobj import Local_File, CreationFailed
-from file_location import FileLocation
+from file_location import FileLocation, audio_ext, video_ext, is_supported_file
 
 print "scanner.py called"
 
@@ -29,6 +29,10 @@ already_scanned = []
 def scan_file(root=None, name=None, filename=None, hash=True):
     if filename == None:
         filename = join(root, name)
+        
+    if not is_supported_file(filename):
+        print "skipping:", filename
+        return
 
     skip_dirs = ["/.minecraft/", "/resources/", "/minecraft/"]
 
@@ -53,8 +57,13 @@ def scan_file(root=None, name=None, filename=None, hash=True):
             pass
 
 def scan_dir(directory, hash=True):
-    if "./.minecraft/" in directory:
-        return
+    skip_dirs = ["/.minecraft/", "/resources/", "/minecraft/"]
+
+    for folder in skip_dirs:
+        if folder in directory:
+            print "skipping:", directory
+            return
+
     if already_scanned.count(directory) != 0:
         return
 

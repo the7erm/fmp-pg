@@ -48,6 +48,18 @@ except ImportError, err:
 BAD_PARTIALS = ['/resources/', '/resourcepacks/', '/assets/', '/.minecraft',
                 '/minecraft']
 
+def is_supported_file(filename):
+    dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))
+    base, ext = os.path.splitext(basename)
+    ext = ext.lower()
+    if ext not in audio_ext and ext not in video_ext:
+        return False
+
+    for partial in BAD_PARTIALS:
+        if partial in filename:
+            return False
+    return True
+
 class FileLocation:
 
     def __init__(self, flid=None, dirname=None, basename=None, filename=None, 
@@ -69,7 +81,7 @@ class FileLocation:
             filename = os.path.realpath(os.path.join(dirname, basename))
 
         if filename is not None:
-            if not self.is_supported_file(filename):
+            if not is_supported_file(filename):
                 print "UNSUPPORTED:", filename
                 return
             self.set_data_by_filename(filename, insert=insert)
@@ -90,17 +102,7 @@ class FileLocation:
                                                       middle_fingerprint=self.middle_fingerprint, 
                                                       end_fingerprint=self.end_fingerprint)
 
-    def is_supported_file(self, filename):
-        dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))
-        base, ext = os.path.splitext(basename)
-        ext = ext.lower()
-        if ext not in audio_ext and ext not in video_ext:
-            return False
-
-        for partial in BAD_PARTIALS:
-            if partial in filename:
-                return False
-        return True
+    
 
     def set_data_by_filename(self, filename, insert=True):
         dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))

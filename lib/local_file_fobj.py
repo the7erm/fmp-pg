@@ -147,7 +147,8 @@ class Local_File(fobj.FObj):
                 "   dirname:%s\n" % dirname +
                 "   basename:%s\n" % basename
             )
-                
+        
+        self.insert()
 
     @property
     def is_readable(self):
@@ -168,13 +169,15 @@ class Local_File(fobj.FObj):
         dirname = None
         basename = None
         for l in self.locations:
-            print "L:", dict(l.db_info)
+            print "L:", 
+            pp.pprint(dict(l.db_info))
             if l.exists and l.is_readable:
                 self.exists = l.exists
                 filename = l.filename
                 dirname = l.dirname
                 basename = l.basename
-                print "L:",dict(l.db_info)
+                print "L (exists & readable):",
+                pp.pprint(dict(l.db_info))
                 break
         return filename, dirname, basename
 
@@ -262,6 +265,9 @@ class Local_File(fobj.FObj):
 
 
     def set_db_keywords(self):
+
+        self.process_tags()
+
         keywords = []
         print "filename:", os.path.join(self.dirname, self.basename)
         root, ext = os.path.splitext(self.basename)
@@ -588,6 +594,7 @@ class Local_File(fobj.FObj):
 
     def insert(self):
         if self.db_info:
+
             return
         print "inserting:", self.filename
         print "self.dirname:", self.dirname
@@ -609,19 +616,28 @@ class Local_File(fobj.FObj):
         print "insert:", os.path.join(self.dirname, self.basename)
         pp.pprint(self.db_info)
 
-        if isinstance(self.tags_easy, dict) and self.tags_easy.has_key('artist') \
-           and self.tags_easy['artist']:
-            query("""DELETE FROM file_artists WHERE fid = %s""", (self.db_info['fid'],))
-            for a in self.tags_easy['artist']:
-                aids = self.get_aids_by_artist_string(a)
-                for aid in aids:
-                    query("""INSERT INTO file_artists(fid, aid) 
-                             VALUES(%s, %s)""", 
-                             (self.db_info['fid'], aid))
+    def process_tags(self):
+        self.get_tags()
 
         self.process_filename()
+        self.process_artist()
         self.process_genre()
         self.process_album()
+
+    def process_artist(self):
+        if self.tags_easy:
+            artists = self.tags_easy.get('artist')
+            if artists:
+                query("""DELETE FROM file_artists WHERE fid = %s""", (self.db_info['fid'],))
+                for a in artists:
+                    aids = self.get_aids_by_artist_string(a)
+                    for aid in aids:
+                        try:
+                            query("""INSERT INTO file_artists(fid, aid) 
+                                     VALUES(%s, %s)""", 
+                                     (self.db_info['fid'], aid))
+                        except psycopg2.IntegrityError:
+                            query("COMMIT")
 
     def get_aids_by_artist_string(self, artists, insert=True):
         print "get_aids_by_artist_string:",artists
@@ -631,10 +647,10 @@ class Local_File(fobj.FObj):
             artists = self.parse_artist_string(artists)
 
         print "artists:",artists
-        
-        for a in artists:
-            print "A:",a
-            self.add_artist(a)
+        if artists:
+            for a in artists:
+                print "A:",a
+                self.add_artist(a)
         
         if self.artists:
             for a in self.artists:
@@ -891,27 +907,27 @@ class Local_File(fobj.FObj):
         return album
 
     def process_album(self):
-        if self.tags_easy and self.tags_easy.has_key('album') and self.tags_easy['album']:
-            if isinstance(self.tags_easy['album'], list):
-                for al in self.tags_easy['album']:
+        if self.tags_easy:
+            albums = self.tags_easy.get('album')
+            if albums:
+                for al in albums:
                     for a in self.artists:
                         self.add_album(al, a['aid'])
-            elif self.tags_easy['album']:
-                al = self.tags_easy['album']
-                for a in self.artists:
-                    self.add_album(al, a['aid'])
 
     def process_genre(self):
-        if self.tags_easy and 'genre' in self.tags_easy and self.tags_easy['genre']:
-            if isinstance(self.tags_easy['genre'], list):
-                for g in self.tags_easy['genre']:
+        if self.tags_easy:
+            genres = self.tags_easy.get('genre')
+            if genres:
+                for g in genres:
                     self.add_genre(g)
 
             # print self.tags_hard
-        if self.tags_hard and self.tags_hard.has_key('TCON') and self.tags_hard['TCON']:
-            if isinstance(self.tags_hard['TCON'].text, list):
-                for g in self.tags_hard['TCON'].text:
+        if self.tags_hard:
+            genres = self.tags_hard.get('TCON')
+            if genres:
+                for g in genres.text:
                     self.add_genre(g)
+                
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
         for d in self.dups:
@@ -964,6 +980,9 @@ class Local_File(fobj.FObj):
             self.__class__.__name__, self.dirname, self.basename)
     
 def get_words_from_string(string):
+    if string is None:
+        return []
+
     if not string or not isinstance(string,(str, unicode)):
         print "NOT VALID:",string
         print "TYPE:",type(string)
