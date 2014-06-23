@@ -46,7 +46,7 @@ except ImportError, err:
     exit(1)
 
 BAD_PARTIALS = ['/resources/', '/resourcepacks/', '/assets/', '/.minecraft',
-                '/minecraft']
+                '/minecraft', '/.technic']
 
 def is_supported_file(filename):
     dirname, basename = os.path.split(os.path.realpath(os.path.expanduser(filename)))

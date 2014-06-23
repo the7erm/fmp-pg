@@ -141,6 +141,10 @@ class FObj:
         except mutagen.mp3.HeaderNotFoundError, e:
             print "mutagen.mp3.HeaderNotFoundError:",e
             self.tags_easy = None
+        except KeyError, e:
+            print "KeyError:", e
+            # if self.tags_easy:
+            # self.tags_easy = None
 
     def get_hard_tags(self):
         if not self.exists or not self.has_tags or self.tags_hard is not None:
