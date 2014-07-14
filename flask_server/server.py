@@ -36,6 +36,7 @@ import logging
 import re
 import base64
 import StringIO
+from copy import deepcopy
 
 # from bson import json_util
 import json
@@ -170,16 +171,107 @@ def angular():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+@app.route("/kw")
+def keywords():
+    # http://gd.geobytes.com/AutoCompleteCity?callback=jQuery17107360035724240884_1403536897337&q=che&_=1403536918779
+    # jQuery17107360035724240884_1403536897338(["Cheyenne Wells, CO, United States","Cheyenne, OK, United States","Cheyenne, WY, United States","Cheyney, PA, United States","Glen Richey, PA, United States","New Port Richey, FL, United States","Ocheyedan, IA, United States","Pechey, QL, Australia","Port Richey, FL, United States","Richey, MT, United States","Richeyville, PA, United States","Teachey, NC, United States"]);
+    print "request.args:", request.args
+    callback = request.args.get('callback')
+    words = []
+
+    q = "^%s" % request.args.get('q')
+
+    result = get_results_assoc("""SELECT artist 
+                                  FROM artists 
+                                  WHERE artist ~* %s
+                                  ORDER BY artist
+                                  LIMIT 10;""", (q,))
+
+    for w in result:
+        l = w["artist"].lower().strip()
+        if l not in words:
+            words.append(l)
+
+    limit = 10 - len(words)
+
+    if limit > 0:
+        result = get_results_assoc("""SELECT genre 
+                                      FROM genres 
+                                      WHERE genre ~* %s
+                                      ORDER BY genre 
+                                      LIMIT """+str(limit), (q,))
+
+        for w in result:
+            l = w["genre"].lower().strip()
+            if l not in words:
+               words.append(l)
+
+        limit = 10 - len(words)
+
+    if limit > 0:
+        result = get_results_assoc("""SELECT basename 
+                                      FROM file_locations 
+                                      WHERE basename ~* %s
+                                      ORDER BY basename
+                                      LIMIT """+str(limit), (request.args.get('q'),))
+
+        for w in result:
+            l = w['basename'].lower().strip()
+            if l not in words:
+                words.append(l)
+
+    words.sort()
+
+    if callback:
+        return "%s(%s)" % (callback,json.dumps(words)), 200
+    else:
+        return json.dumps(words), 200
+
+
+def file_history(_id, id_type):
+    history_res = get_results_assoc("""SELECT uh.*, uname
+                                   FROM user_history uh, users u
+                                   WHERE uh.uid = u.uid AND 
+                                         u.listening = true AND
+                                         time_played IS NOT NULL AND
+                                         uh.id = %s AND 
+                                         uh.id_type = %s
+                                   ORDER BY time_played DESC, 
+                                            admin DESC, uname""",
+                                   (_id, id_type))
+    results = []
+    for h in history_res:
+        h = dict(h)
+        h['time_played'] = h['time_played'].isoformat()
+        h['date_played'] = h['date_played'].isoformat()
+        results.append(h)
+    return results
 
 @app.route("/status/")
 def status():
+    print "STATUS"
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
     global playing, player
     # print "PLAYING",playing.to_dict()
-    extended = player.to_dict()
-    extended.update(playing.to_full_dict())
+    player_dict = player.to_dict()
+    playing_dict = playing.to_full_dict()
 
-    return jsonify(player=player.to_dict(), playing=playing.to_full_dict(),
+    extended = deepcopy(player_dict)
+    extended.update(deepcopy(playing_dict))
+
+    extended['history'] = []
+    if playing_dict.get('fid'):
+      extended['history'] = file_history(playing_dict['fid'], 'f')
+    elif playing_dict.get('eid'):
+      extended['history'] = file_history(playing_dict['eid'], 'e')
+
+    if not extended.get('artists'):
+      extended['artists'] = [{'artist':extended['artist_title']}]
+
+    if not extended.get('genres'):
+      extended['genres'] = []
+
+    return jsonify(player=player_dict, playing=playing_dict,
                    volume=get_volume(), extended=extended)
 
 def get_volume():
@@ -567,6 +659,26 @@ def search_data():
     results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
     print "end:", time.time() - start_time
     return json_dump(results)
+
+
+@app.route('/search-data-new/', methods=['GET', 'POST'])
+def search_data_new():
+    # convert_res_to_dict
+    results = None
+    q = request.args.get("q","")
+    start, limit = get_start_limit()
+    filter_by=get_filter_by()
+
+    print "LIMIT:%s" % limit
+    start_time = time.time()
+    print "start:",start_time
+    results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
+    
+    fixed_results = []
+    for r in results:
+        fixed_results.append(convert_res_to_dict(r))
+
+    return json_dump(fixed_results)
 
 
 def get_start_limit():
