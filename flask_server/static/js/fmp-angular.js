@@ -67,7 +67,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
                 // this callback will be called asynchronously
                 // when the response is available
                 // $scope.playing_data = data.extended;
-                console.log("TEST:", data);
+                // console.log("TEST:", data);
                 /*
                 fid: 18184
                 percent_played: 45.7385899900328
@@ -78,10 +78,10 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
                 ultp: 1404259200000
                 usid: 179278
                 */
-                console.log("playing_data.ratings", $rootScope.playing_data.ratings)
+                // console.log("playing_data.ratings", $rootScope.playing_data.ratings)
                 for(key in $rootScope.playing_data.ratings) {
                     var rating = $rootScope.playing_data.ratings[key];
-                    console.log("rating:", rating);
+                    // console.log("rating:", rating);
                     if (rating.usid == data.usid) {
                         $rootScope.playing_data.ratings[key].rating = data.rating;
                         $rootScope.playing_data.ratings[key].true_score = data.true_score;
@@ -144,7 +144,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
                 .success(function(data, status, headers, config) {
                     // this callback will be called asynchronously
                     // when the response is available
-                    console.log("data:", data.extended.history);
+                    // console.log("data:", data.extended.history);
                     sharedService.processStatus(data);
                 })
                 .error(function(data, status, headers, config) {
@@ -202,6 +202,10 @@ fmpApp.config(['$routeProvider',
         $routeProvider.when('/', {
             templateUrl: '/static/templates/home.html',
             controller: 'HomeCtrl'
+        })
+        .when("/search/", {
+            templateUrl: "/static/templates/search.html",
+            controller: "SearchCtrl"
         })
         .when("/search/:query", {
             templateUrl: "/static/templates/search.html",
@@ -264,14 +268,14 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
         }
     };
 
-    console.log("TOP");
+    //console.log("TOP");
     $scope.query = $routeParams.query;
     if (!$scope.start) {
         // console.log("$scope.start:", $scope.start);
         $scope.start = 0;
     }
-    console.log("$scope.start:", $scope.start);
-    console.log("query:",$scope.query);
+    ///console.log("$scope.start:", $scope.start);
+    ///console.log("query:",$scope.query);
 
     if (!$scope.results) {
         $scope.results = [];
@@ -280,13 +284,13 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
 
     $scope.loadMore = function(){
         if ($scope.done || $scope.locked) {
-            console.log("$scope.done,", $scope.done)
+            // console.log("$scope.done,", $scope.done)
             return;
         }
         $scope.locked = true;
         // $scope.results.push({"title": "start:"+$scope.start})
 
-        console.log("+scope start:", $scope.start);
+        // console.log("+scope start:", $scope.start);
         var url = "/search-data-new/?q="+encodeURIComponent($scope.query)+"&s="+$scope.start;
         $scope.start += 10;
         $http({method: 'GET', url: url})
@@ -295,7 +299,7 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
             
             if (data.length == 0) {
                 $scope.done = true;
-                console.log("DONE!");
+                // console.log("DONE!");
                 $(window).unbind("scroll");
             }
             for(var i=0;i<data.length;i++) {
