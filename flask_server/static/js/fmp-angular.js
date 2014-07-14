@@ -203,7 +203,7 @@ fmpApp.config(['$routeProvider',
             templateUrl: '/static/templates/home.html',
             controller: 'HomeCtrl'
         })
-        .when("/search/", {
+        .when("/search", {
             templateUrl: "/static/templates/search.html",
             controller: "SearchCtrl"
         })
@@ -221,7 +221,29 @@ fmpApp.controller("NavCtrl", ['$scope', '$location', 'fmpService',
     function($scope, $location){
         $scope.navClass = function (page) {
             var currentRoute = $location.path().substring(1) || 'home';
+            // var re = new RegExp("ab+c");
+            if (page == 'search') {
+                return currentRoute.indexOf(page) == 0 ? 'active' : '';
+            }
             return page === currentRoute ? 'active' : '';
+        };
+        $scope.doSearch = function() {
+            // console.log("$scope.query:",$scope.query);
+            if ($scope.timeout) {
+                clearTimeout($scope.timeout);
+            }
+            $scope.timeout = setTimeout(function(){
+                document.location = "#/search/"+encodeURIComponent($scope.query);
+                $scope.timeout = false;
+            }, 1000);
+            
+        };
+
+        $scope.doSearchNow = function() {
+            if ($scope.timeout) {
+                clearTimeout($scope.timeout);
+            }
+            document.location = "#/search/"+encodeURIComponent($scope.query);
         };
 }]);
 
@@ -288,9 +310,7 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
             return;
         }
         $scope.locked = true;
-        // $scope.results.push({"title": "start:"+$scope.start})
-
-        // console.log("+scope start:", $scope.start);
+        
         var url = "/search-data-new/?q="+encodeURIComponent($scope.query)+"&s="+$scope.start;
         $scope.start += 10;
         $http({method: 'GET', url: url})
