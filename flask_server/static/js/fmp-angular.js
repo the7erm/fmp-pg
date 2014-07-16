@@ -211,6 +211,10 @@ fmpApp.config(['$routeProvider',
             templateUrl: "/static/templates/search.html",
             controller: "SearchCtrl"
         })
+        .when("/preload", {
+            templateUrl: "/static/templates/preload.html",
+            controller: "PreloadCtrl"
+        })
         .otherwise({
             redirectTo: '/'
         });
@@ -218,7 +222,11 @@ fmpApp.config(['$routeProvider',
 
 
 fmpApp.controller("NavCtrl", ['$scope', '$location', 'fmpService', 
-    function($scope, $location){
+    function($scope, $location, fmpService){
+        $scope.next = fmpService.next;
+        $scope.pause = fmpService.pause;
+        $scope.prev = fmpService.prev;
+        
         $scope.navClass = function (page) {
             var currentRoute = $location.path().substring(1) || 'home';
             // var re = new RegExp("ab+c");
@@ -252,9 +260,8 @@ fmpApp.controller('HomeCtrl', ['$scope', '$routeParams', 'fmpService',
     
 }]);
 
-fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
+fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
     function($scope, $routeParams, fmpService, $http) {
-
     $scope.cue = function(fid) {
         for (var i=0; i<$scope.results.length; i++) {
             if ($scope.results[i].fid == fid) {
@@ -310,20 +317,114 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
             return;
         }
         $scope.locked = true;
-        
-        var url = "/search-data-new/?q="+encodeURIComponent($scope.query)+"&s="+$scope.start;
+        $("#preload-loading").show();
+        var url = "/preload";
         $scope.start += 10;
         $http({method: 'GET', url: url})
         .success(function(data, status, headers, config) {
             // console.log("-scope start:", $scope.start);
-            
+            $("#preload-loading").hide();
             if (data.length == 0) {
                 $scope.done = true;
                 // console.log("DONE!");
                 $(window).unbind("scroll");
             }
             for(var i=0;i<data.length;i++) {
-                // console.log("appending:", data[i]);
+                console.log("appending:", data[i]);
+                $scope.results.push(data[i]);
+            }
+            $scope.locked = true;
+            $scope.done = true;
+             $(window).unbind("scroll");
+        })
+        .error(function(data, status, headers, config) {
+          $scope.locked = false;
+          // called asynchronously if an error occurs
+          // or server returns response with an error status.
+        });
+    }
+    $scope.loadMore();
+}]);
+
+fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
+    function($scope, $routeParams, fmpService, $http) {
+
+    $scope.cue = function(fid) {
+        for (var i=0; i<$scope.results.length; i++) {
+            if ($scope.results[i].fid == fid) {
+                $scope.results[i].cued = fid;
+                var url = "/cue/?fid="+fid+"&cue=true"
+                $http({method: 'GET', url: url})
+                .success(function(data, status, headers, config) {
+                    
+
+                })
+                .error(function(data, status, headers, config) {
+                  // called asynchronously if an error occurs
+                  // or server returns response with an error status.
+                });
+            }
+        }
+    };
+    $scope.uncue = function(fid) {
+        for (var i=0; i<$scope.results.length; i++) {
+            if ($scope.results[i].fid == fid) {
+                $scope.results[i].cued = false;
+                var url = "/cue/?fid="+fid+"&cue=false"
+                $http({method: 'GET', url: url})
+                .success(function(data, status, headers, config) {
+                    
+
+                })
+                .error(function(data, status, headers, config) {
+                  // called asynchronously if an error occurs
+                  // or server returns response with an error status.
+                });
+            }
+        }
+    };
+
+    //console.log("TOP");
+    $scope.query = $routeParams.query;
+    if (!$scope.query) {
+        $scope.query = "";
+    }
+    if (!$scope.start) {
+        // console.log("$scope.start:", $scope.start);
+        $scope.start = 0;
+    }
+    ///console.log("$scope.start:", $scope.start);
+    ///console.log("query:",$scope.query);
+
+    if (!$scope.results) {
+        $scope.results = [];
+        $scope.locked = false;
+        $scope.done = false;
+    }
+
+    $scope.loadMore = function(){
+        if ($scope.done || $scope.locked) {
+            // console.log("$scope.done,", $scope.done);
+            // console.log("$scope.locked:", $scope.locked);
+            return;
+        }
+        $scope.locked = true;
+        $("#search-loading").show();
+        var url = "/search-data-new/?q="+encodeURIComponent($scope.query)+"&s="+$scope.start;
+        $scope.start += 10;
+        $http({method: 'GET', url: url})
+        .success(function(data, status, headers, config) {
+            // console.log("-scope start:", $scope.start);
+            $("#search-loading").hide();
+            if (data.length == 0) {
+                $scope.done = true;
+                console.log("DONE! ***************************");
+                $(window).unbind("scroll");
+                $scope.locked = false;
+                return
+            }
+            for(var i=0;i<data.length;i++) {
+                console.log("appending:", data[i]);
                 $scope.results.push(data[i]);
             }
             $scope.locked = false;
@@ -357,6 +458,7 @@ fmpApp.directive('scroller', function () {
         link: function (scope, elem, attrs) {
             $window = $(window);
             $document = $(document);
+            $(window).unbind("scroll");
             $(window).bind('scroll', function () {
                 if (scope.done) {
                     $(window).unbind("scroll");
@@ -365,6 +467,7 @@ fmpApp.directive('scroller', function () {
                 }
                 if ($window.scrollTop() + ($window.height() * 2) >= 
                     ($document.height() - $window.height())) {
+                    console.log("$apply")
                     scope.$apply(scope.loadingMethod); 
                 }
             });

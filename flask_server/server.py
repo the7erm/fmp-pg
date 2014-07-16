@@ -121,7 +121,7 @@ def index():
                            PLAYING=PLAYING, volume=get_volume(),
                            extended=get_extended())
 
-@app.route("/")
+
 def index2():
     global playing, player, tray
     print "FLASK PLAYING:", playing.filename
@@ -164,7 +164,8 @@ def index2():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
-@app.route("/angular/")
+# @app.route("/angular/")
+@app.route("/")
 def angular():
     global playing, player, tray
     return render_template("angular.html", player=player, playing=playing, 
@@ -675,7 +676,11 @@ def search_data_new():
     results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
     
     fixed_results = []
+    already_present_fids = []
     for r in results:
+        if r['fid'] in already_present_fids:
+          continue
+        already_present_fids.append(r['fid'])
         fixed_results.append(convert_res_to_dict(r))
 
     return json_dump(fixed_results)
@@ -818,6 +823,29 @@ def history_data():
     for h in history_res:
         h = dict(h)
         results.append(h)
+    return json_dump(results)
+
+@app.route("/preload", methods=['GET', 'POST'])
+def preload():
+    preload = get_results_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
+                                        sha512, artist, f.fid, p.fid AS cued,
+                                        f.fid AS id, 'f' AS id_type
+                                   FROM files f
+                                       LEFT JOIN file_artists fa ON fa.fid = f.fid
+                                       LEFT JOIN artists a ON a.aid = fa.aid,
+                                       preload p,
+                                       file_locations fl
+                                   WHERE fl.fid = f.fid AND p.fid = f.fid
+                                   ORDER BY artist, title
+                                """)
+    results = []
+    already_present_fids = []
+    for p in preload:
+        if p['fid'] in already_present_fids:
+            continue
+        already_present_fids.append(p['fid'])
+        results.append(convert_res_to_dict(p))
+
     return json_dump(results)
 
 @app.route('/login', methods=['GET', 'POST'])
