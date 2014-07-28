@@ -1,0 +1,26 @@
+<div id="home" ng-controller="HomeCtrl">
+    <div class="col-xs-12">
+        <h1>History</h1>
+    </div>
+    <div class="row">
+        <div class="col-xs-12">
+          <table class="table table-stripe" ng-hide="playing_data.history.length == 0">
+              <tr>
+                  <th><a href="" ng-click="predicate = 'uname'; reverse=!reverse">User</a></th>
+                  <th><a href="" ng-click="predicate = 'percent_played'; reverse=!reverse">Percent</a></th>
+                  <th><a href="" ng-click="predicate = 'rating'; reverse=!reverse">Rating</a></th>
+                  <th><a href="" ng-click="predicate = 'true_score'; reverse=!reverse">True Score</a></th>
+                  <th><a href="" ng-click="predicate = 'date_played'; reverse=!reverse">Date</a></th>
+              </tr>
+              <tr ng-repeat="history in playing_data.history | orderBy : predicate : reverse">
+                  <td>{{ history.uname }}</td>
+                  <td>{{ history.percent_played }}</td>
+                  <td>{{ history.rating }}</td>
+                  <td>{{ history.true_score | number : 2}}</td>
+                  <td>{{ history.time_played | date : "medium" }}</td>
+                  <td>{{ history.timeBetween }}</td>
+              </tr>
+          </table>
+        </div>
+    </div>
+</div>

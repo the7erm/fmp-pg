@@ -1,6 +1,6 @@
 
-var fmpApp = angular.module("fmpApp", ['ngRoute']),
-    timeBetween = function(historyArray, $index) {
+var fmpApp = angular.module("fmpApp", ['ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip']),
+    timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         if ($index == historyArray.length - 1) {
             return "";
         }
@@ -35,7 +35,7 @@ var fmpApp = angular.module("fmpApp", ['ngRoute']),
             return weeks+" week";
         }
         return hours+":"+minutes+":"+seconds;
-    }
+    };
 
 fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
     function($rootScope, $http, $interval){
@@ -221,12 +221,12 @@ fmpApp.config(['$routeProvider',
     }]);
 
 
-fmpApp.controller("NavCtrl", ['$scope', '$location', 'fmpService', 
-    function($scope, $location, fmpService){
+fmpApp.controller("NavCtrl", ['$scope', '$rootScope', '$location', 'fmpService', 
+    function($scope, $rootScope, $location, fmpService){
         $scope.next = fmpService.next;
-        $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
-        
+        $scope.pause = fmpService.pause;
+
         $scope.navClass = function (page) {
             var currentRoute = $location.path().substring(1) || 'home';
             // var re = new RegExp("ab+c");
@@ -258,6 +258,20 @@ fmpApp.controller("NavCtrl", ['$scope', '$location', 'fmpService',
 fmpApp.controller('HomeCtrl', ['$scope', '$routeParams', 'fmpService',
     function($scope, $routeParams) {
     
+}]);
+
+
+fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
+    function($scope, $modal, $fmpService) {
+    $scope.modal = "?"
+    var myModal = $modal({title: 'My Title', content: 'My Content', show: true});
+
+      // Pre-fetch an external template populated with a custom scope
+      var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
+      // Show when some event occurs (use $promise property to ensure the template has been loaded)
+      $scope.showModal = function() {
+        myOtherModal.$promise.then(myOtherModal.show);
+      };
 }]);
 
 fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
@@ -346,8 +360,15 @@ fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http
     $scope.loadMore();
 }]);
 
-fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
-    function($scope, $routeParams, fmpService, $http) {
+fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpService', '$http', '$modal',
+    function($scope, $rootScope, $routeParams, fmpService, $http, $modal) {
+
+    // Pre-fetch an external template populated with a custom scope
+    var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
+    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+    $scope.showModal = function() {
+        myOtherModal.$promise.then(myOtherModal.show);
+    };
 
     $scope.cue = function(fid) {
         for (var i=0; i<$scope.results.length; i++) {
@@ -384,8 +405,38 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
         }
     };
 
+    $scope.removeArtist = function(fid, aid){
+        console.log("fid:", fid);
+        console.log("aid:", aid);
+        var found = false
+        for (var i=0; i<$scope.results.length; i++) {
+            if (found) {
+                break;
+            }
+            if ($scope.results[i].fid == fid) {
+                if (!$scope.results[i]['artists']) {
+                    return;
+                }
+                for (var i2=0; i2<$scope.results[i]['artists'].length; i2++) {
+                    if ($scope.results[i]['artists'][i2]['aid'] == aid) {
+                        $scope.results[i]['artists'].splice(i2, 1);
+                        found = true;
+                        var url = "/remove-file-artist/?fid="+fid+"&aid="+aid
+                        $http({method: 'GET', url: url})
+                        .success(function(data, status, headers, config) {
+                            
+                        })
+                        .error(function(data, status, headers, config) {
+                        });
+                    }
+                }
+            }
+        }
+    };
+
     //console.log("TOP");
     $scope.query = $routeParams.query;
+    $rootScope.query = $scope.query;
     if (!$scope.query) {
         $scope.query = "";
     }
@@ -418,13 +469,13 @@ fmpApp.controller('SearchCtrl', ['$scope', '$routeParams', 'fmpService', '$http'
             $("#search-loading").hide();
             if (data.length == 0) {
                 $scope.done = true;
-                console.log("DONE! ***************************");
+                // console.log("DONE! ***************************");
                 $(window).unbind("scroll");
                 $scope.locked = false;
                 return
             }
             for(var i=0;i<data.length;i++) {
-                console.log("appending:", data[i]);
+                // console.log("appending:", data[i]);
                 $scope.results.push(data[i]);
             }
             $scope.locked = false;

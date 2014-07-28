@@ -1,0 +1,50 @@
+<div id="search" ng-controller="SearchCtrl" class="row">
+    <div class="col-xs-12">
+        <h1>Search</h1>
+    </div>
+    <div class="col-xs-12 container">
+        <div class="row">
+            <div class="col-xs-6">Artist Title/Filename</div>
+            <div class="col-xs-2">Album</div>
+            <div class="col-xs-1">Genre</div>
+            <div class="col-xs-2">Ratings</div>
+            <div class="col-xs-1">Cued</div>
+        </div>
+    </div>
+    <div id="search-loading" class="loadingbox">Loading results for {{ query }}</div>
+    <div scroller loading-method="loadMore()" class="col-xs-12 container">
+        <div class="row" ng-repeat="r in results" style="border-top:1px solid #000;" ng-hide="!r.basename" bs-popover>
+            <div class="col-xs-6" ng-hide="r.artists" ng-show="r.artists.length==0">
+                <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
+                <a href="#/search/{{r.basename}}">{{r.basename}}</a>
+            </div>
+            <div class="col-xs-6" ng-show="r.artists" ng-hide="r.artists.length == 0">
+                <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
+                <span ng-repeat="a in r.artists">
+                    <a href="#/search/{{a.artist}}">{{a.artist}}</a>
+                </span> - 
+                <a href="#/search/{{r.title}}" ng-show="r.title">{{r.title}}</a><a href="#/search/{{r.basename}}" ng-hide="r.title">{{r.basename}}</a>
+            </div>
+            <div class="col-xs-2">
+                <span ng-repeat="a in r.albums">
+                    <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a>
+                </span>
+            </div>
+            <div class="col-xs-1">
+                <span ng-repeat="g in r.genres">
+                    <a  href="#/search/{{g.genre}}">{{g.genre}}</a>
+                </span>
+            </div>
+            <div class="col-xs-2">
+                <span ng-repeat="rating in r.ratings" class="pull-left">
+                    {{rating.uname}} {{ rating.true_score | number : 2}}
+                    <div class="star-rating" star-rating rating-value="rating" data-max="5"></div>
+                </span>
+            </div>
+            <div class="col-xs-1">
+                <button ng-show="r.cued" class="btn btn-primary btn-block" ng-click="uncue(r.fid)">Uncue</button>
+                <button ng-hide="r.cued" class="btn btn-default btn-block" ng-click="cue(r.fid)">Cue</button>
+            </div>
+        </div>
+    </div>
+</div>

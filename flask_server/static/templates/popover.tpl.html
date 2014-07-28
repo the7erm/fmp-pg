@@ -1,0 +1,21 @@
+<div class="modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" ng-show="r.basename">
+        <button type="button" class="close" ng-click="$hide()">&times;</button>
+        <h4 class="modal-title" ng-bind="r.basename"></h4>
+      </div>
+      <div class="modal-body">
+        <h2>Artists</h2>
+        <span ng-repeat="a in r.artists">
+            <button class="btn btn-sm btn-default">{{a.artist}}</button>
+            <button class="btn btn-sm btn-default" ng-click="removeArtist(r.fid, a.aid)">-</button>
+        </span>
+        <button class="btn btn-sm btn-default">+</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

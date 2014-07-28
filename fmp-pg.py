@@ -157,19 +157,19 @@ try:
         if arg in ("-n","--next","-next"):
             # print server.next("", dbus_interface = 'org.mpris.MediaPlayer2')
             print "NEXT"
-            urllib.urlopen("http://localhost:5050/?cmd=next", proxies={})
+            urllib.urlopen("http://localhost:5050/player/next", proxies={})
             time.sleep(1)
             continue
 
         if arg in ("-b","--prev","-prev", "--back","-back"):
             # print server.prev("", dbus_interface = 'org.mpris.MediaPlayer2')
-            urllib.urlopen("http://localhost:5050/?cmd=prev", proxies={})
+            urllib.urlopen("http://localhost:5050/player/prev", proxies={})
             continue
 
         if arg in ("-p","--pause","-pause", "--play","-play"):
             print "PAUSE"
             # print server.pause("", dbus_interface = 'org.mpris.MediaPlayer2')
-            urllib.urlopen("http://localhost:5050/?cmd=pause", proxies={})
+            urllib.urlopen("http://localhost:5050/player/pause", proxies={})
             continue
 
         if arg in ("-k","--kill","-kill"):

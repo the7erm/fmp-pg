@@ -172,6 +172,15 @@ def angular():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+@app.route("/remove-file-artist/")
+def remove_file_artist():
+  fid = request.args.get("fid")
+  aid = request.args.get("aid")
+  print "fid:", fid
+  print "aid:", aid
+  return json_dump({"result": "success"})
+
+
 @app.route("/kw")
 def keywords():
     # http://gd.geobytes.com/AutoCompleteCity?callback=jQuery17107360035724240884_1403536897337&q=che&_=1403536918779
