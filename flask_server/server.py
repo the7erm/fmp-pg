@@ -208,6 +208,18 @@ def add_file_artist():
                       "aid": artist['aid'], 
                       "fid": fid})
 
+@app.route("/remove-file-genre/")
+def remove_file_artist():
+  fid = request.args.get("fid")
+  gid = request.args.get("gid")
+  print "fid:", fid
+  print "gid:", gid
+  return json_dump({"result": "test"})
+  query("""DELETE FROM file_genres
+               WHERE fid = %s AND gid = %s""", 
+           (fid, gid))
+  return json_dump({"result": "success"})
+
 @app.route("/kw")
 def keywords():
     # http://gd.geobytes.com/AutoCompleteCity?callback=jQuery17107360035724240884_1403536897337&q=che&_=1403536918779

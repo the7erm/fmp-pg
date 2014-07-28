@@ -418,6 +418,35 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
         }
     };
 
+    $scope.removeGenre = function(fid, gid){
+        console.log("fid:", fid);
+        console.log("gid:", gid);
+        var found = false
+        for (var i=0; i<$scope.results.length; i++) {
+            if (found) {
+                break;
+            }
+            if ($scope.results[i].fid == fid) {
+                if (!$scope.results[i]['genres']) {
+                    return;
+                }
+                for (var i2=0; i2<$scope.results[i]['genres'].length; i2++) {
+                    if ($scope.results[i]['genres'][i2]['gid'] == aid) {
+                        $scope.results[i]['genres'].splice(i2, 1);
+                        found = true;
+                        var url = "/remove-file-genre/?fid="+fid+"&gid="+gid
+                        $http({method: 'GET', url: url})
+                        .success(function(data, status, headers, config) {
+                            
+                        })
+                        .error(function(data, status, headers, config) {
+                        });
+                    }
+                }
+            }
+        }
+    };
+
     $scope.removeArtist = function(fid, aid){
         console.log("fid:", fid);
         console.log("aid:", aid);

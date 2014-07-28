@@ -6,16 +6,25 @@
         <h4 class="modal-title" ng-bind="r.basename"></h4>
       </div>
       <div class="modal-body">
-        <h2>Artists</h2>
+        <code>{{r.dirname}}</code><br>
+        <code>{{r.basename}}</code>
+        <h3>Artists</h3>
         <span ng-repeat="a in r.artists">
-            <button class="btn btn-sm btn-default">{{a.artist}}</button>
-            <button class="btn btn-sm btn-default" ng-click="removeArtist(r.fid, a.aid)">-</button>
+            <button class="btn btn-xs btn-default">{{a.artist}}</button>
+            <button class="btn btn-xs btn-default" ng-click="removeArtist(r.fid, a.aid)">-</button>
         </span>
         <span ng-show="creatingArtist" ng-hide="!creatingArtist">
             <input type="text" ng-model="new_artist" ng-options="tag for tag in getTags($viewValue)" placeholder="add an artist" ng-change="setNewArtist(new_artist)" bs-typeahead>
             <button ng-click="assignArtist(r.fid)">Add</button>
         </span>
-        <button class="btn btn-sm btn-default" ng-show="!creatingArtist" ng-hide="creatingArtist" ng-click="showCreateArtist(r.fid)">+</button>
+        <button class="btn btn-xs btn-default" ng-show="!creatingArtist" ng-hide="creatingArtist" ng-click="showCreateArtist(r.fid)">+</button>
+
+        <h3>Genres</h3>
+        <span ng-repeat="g in r.genres">
+            <button class="btn btn-xs btn-default">{{g.genre}}</button>
+            <button class="btn btn-xs btn-default" ng-click="removeGenre(r.fid, g.gid)">-</button>
+        </span>
+
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>
