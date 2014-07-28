@@ -178,8 +178,35 @@ def remove_file_artist():
   aid = request.args.get("aid")
   print "fid:", fid
   print "aid:", aid
+  query("""DELETE FROM file_artists
+               WHERE fid = %s AND aid = %s""", 
+           (fid, aid))
   return json_dump({"result": "success"})
 
+@app.route("/add-file-artist/")
+def add_file_artist():
+    fid = request.args.get("fid")
+    artist = request.args.get("artist")
+    if not artist:
+      return json_dump({"result": "success"});
+    artist = get_assoc("""SELECT * FROM artists WHERE artist = %s""",(artist, ))
+    if not artist:
+      artist = get_assoc("""INSERT INTO artists (artist)
+                            VALUES(%s) RETURNING *""",
+                        (artist,))
+    present = get_assoc("""SELECT * 
+                           FROM file_artists
+                           WHERE fid = %s and aid = %s""",
+                        (fid, artist['aid']))
+
+    if not present:
+        get_assoc("""INSERT INTO file_artists (fid, aid) 
+                     VALUES(%s, %s)
+                     RETURNING * """,
+                  (fid, artist['aid']))
+    return json_dump({"result": "success",
+                      "aid": artist['aid'], 
+                      "fid": fid})
 
 @app.route("/kw")
 def keywords():

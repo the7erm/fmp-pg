@@ -1,5 +1,5 @@
 
-var fmpApp = angular.module("fmpApp", ['ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip']),
+var fmpApp = angular.module("fmpApp", ['ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 'mgcrea.ngStrap.typeahead']),
     timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         if ($index == historyArray.length - 1) {
             return "";
@@ -40,6 +40,14 @@ var fmpApp = angular.module("fmpApp", ['ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngSt
 fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
     function($rootScope, $http, $interval){
         var sharedService = {};
+        sharedService.getTags = function(viewValue) {
+            var params = {"q": viewValue};
+            
+            return $http.get('/kw', {params: params})
+            .then(function(res) {
+              return res.data;
+            });
+        };
         sharedService.message = "";
         sharedService.prepForProadcast = function(msg){
             this.message = msg;
@@ -226,6 +234,7 @@ fmpApp.controller("NavCtrl", ['$scope', '$rootScope', '$location', 'fmpService',
         $scope.next = fmpService.next;
         $scope.prev = fmpService.prev;
         $scope.pause = fmpService.pause;
+        $scope.getTags = fmpService.getTags;
 
         $scope.navClass = function (page) {
             var currentRoute = $location.path().substring(1) || 'home';
@@ -344,7 +353,7 @@ fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http
                 $(window).unbind("scroll");
             }
             for(var i=0;i<data.length;i++) {
-                console.log("appending:", data[i]);
+                // console.log("appending:", data[i]);
                 $scope.results.push(data[i]);
             }
             $scope.locked = true;
@@ -369,6 +378,10 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
     $scope.showModal = function() {
         myOtherModal.$promise.then(myOtherModal.show);
     };
+
+    $scope.new_artist = "";
+
+    $scope.getTags = fmpService.getTags;
 
     $scope.cue = function(fid) {
         for (var i=0; i<$scope.results.length; i++) {
@@ -430,6 +443,50 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
                         });
                     }
                 }
+            }
+        }
+    };
+
+    $scope.showCreateArtist = function (fid) {
+        $scope.creatingArtist = true;
+        $scope.new_artist = "";
+    };
+
+    $scope.setNewArtist = function(val) {
+        $scope.new_artist = val;
+    }
+
+    $scope.assignArtist = function(fid) {
+        $scope.creatingArtist = false;
+        if (!$scope.new_artist) {
+            return;
+        }
+        for (r in $scope.results) {
+            console.log("r:",r);
+            console.log("$scope.new_artist",$scope.new_artist)
+            if ($scope.results[r]['fid'] != fid) {
+                continue
+            }
+            var found = false;
+            for (a in $scope.results[r]['artists']) {
+                if ($scope.results[r]['artists'][a]['artist'] == $scope.new_artist) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                $scope.results[r]['artists'].push({
+                    "aid": -1,
+                    "artist": $scope.new_artist
+                });
+                var url = "/add-file-artist/?fid="+fid+"&artist="+encodeURIComponent($scope.new_artist);
+                $http({method: 'GET', url: url})
+                .success(function(data, status, headers, config) {
+                    
+                })
+                .error(function(data, status, headers, config) {
+                });
+                // $scope.new_artist = "";
             }
         }
     };

@@ -81,6 +81,10 @@
                 max-width: 600px;
             }
 
+            .cursor-pointer {
+              cursor: pointer;
+            }
+
             .item-info {
               cursor: pointer;
             }
@@ -123,7 +127,7 @@
                       </ul> -->
                       <ul class="nav navbar-nav navbar-right">
                         <li class="dropdown">
-                          <a href="#" class="dropdown-toggle" data-toggle="dropdown"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"></a>
+                          <a class="dropdown-toggle cursor-pointer" data-toggle="dropdown"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"></a>
                           <ul class="dropdown-menu" role="menu">
                             <li><a ng-click="prev()"><img src="/static/images/media-seek-backward.png" class="nav-button-img"> Prev</a></li>
                             <li><a ng-click="pause()"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"> Pause</a></li>
@@ -133,7 +137,7 @@
                       </ul>
                       <form class="navbar-form navbar-right" role="search">
                         <div class="form-group">
-                          <input type="text" class="form-control" placeholder="Search" ng-model="query" ng-change="doSearch()" value="{{query}}">
+                          <input type="text" class="form-control" placeholder="Search" ng-model="query" ng-change="doSearch()" value="{{query}}" ng-options="tag for tag in getTags($viewValue)" placeholder="enter tags" bs-typeahead>
                         </div>
                         <button type="submit" class="btn btn-default" ng-click="doSearchNow()">Search</button>
                       </form>
