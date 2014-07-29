@@ -49,7 +49,7 @@ import time
 from flask import render_template
 import lib.fobj as fobj
 from lib.rating_utils import rate as simple_rate
-from lib.local_file_fobj import get_words_from_string
+from lib.local_file_fobj import get_words_from_string, Local_File
 
 from tornado.wsgi import WSGIContainer
 from tornado.ioloop import IOLoop
@@ -172,53 +172,125 @@ def angular():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+def reload_playing(fid):
+    global playing
+    print "-="*20
+    playing_dict = playing.to_dict()
+    print "playing_dict.get('fid'):",playing_dict.get('fid')
+
+    if str(playing_dict.get('fid', "")) == str(fid):
+        print "RELOAD PLAYING"
+        playing = Local_File(fid=fid)
+    print "-"*20
+
 @app.route("/remove-file-artist/")
 def remove_file_artist():
-  fid = request.args.get("fid")
-  aid = request.args.get("aid")
-  print "fid:", fid
-  print "aid:", aid
-  query("""DELETE FROM file_artists
-               WHERE fid = %s AND aid = %s""", 
-           (fid, aid))
-  return json_dump({"result": "success"})
+    fid = request.args.get("fid")
+    aid = request.args.get("aid")
+    print "fid:", fid
+    print "aid:", aid
+    query("""DELETE FROM file_artists
+                 WHERE fid = %s AND aid = %s""", 
+             (fid, aid))
+    
+    total = get_assoc("""SELECT count(*) as total
+                         FROM file_artists
+                         WHERE aid = %s""", (aid,))
+    if total['total'] == 0:
+      query("""DELETE FROM artists 
+               WHERE aid = %s""", (aid,))
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+
+    reload_playing(fid)
+
+    return json_dump({"result": "success"})
 
 @app.route("/add-file-artist/")
 def add_file_artist():
     fid = request.args.get("fid")
     artist = request.args.get("artist")
     if not artist:
-      return json_dump({"result": "success"});
-    artist = get_assoc("""SELECT * FROM artists WHERE artist = %s""",(artist, ))
-    if not artist:
-      artist = get_assoc("""INSERT INTO artists (artist)
-                            VALUES(%s) RETURNING *""",
-                        (artist,))
+      return json_dump({"result": "failure"});
+    artist_info = get_assoc("""SELECT * 
+                               FROM artists 
+                               WHERE artist = %s 
+                               LIMIT 1""",
+                           (artist, ))
+    if not artist_info:
+      artist_info = get_assoc("""INSERT INTO artists (artist)
+                                 VALUES(%s) RETURNING *""",
+                             (artist,))
     present = get_assoc("""SELECT * 
                            FROM file_artists
-                           WHERE fid = %s and aid = %s""",
-                        (fid, artist['aid']))
+                           WHERE fid = %s and aid = %s
+                           LIMIT 1""",
+                        (fid, artist_info['aid']))
 
     if not present:
-        get_assoc("""INSERT INTO file_artists (fid, aid) 
+        print "INSERTING"
+        artist_info  = get_assoc("""INSERT INTO file_artists (fid, aid) 
                      VALUES(%s, %s)
                      RETURNING * """,
-                  (fid, artist['aid']))
+                  (fid, artist_info['aid']))
+
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+    reload_playing(fid)
     return json_dump({"result": "success",
-                      "aid": artist['aid'], 
+                      "aid": artist_info['aid'], 
                       "fid": fid})
 
 @app.route("/remove-file-genre/")
-def remove_file_artist():
-  fid = request.args.get("fid")
-  gid = request.args.get("gid")
-  print "fid:", fid
-  print "gid:", gid
-  return json_dump({"result": "test"})
-  query("""DELETE FROM file_genres
-               WHERE fid = %s AND gid = %s""", 
-           (fid, gid))
-  return json_dump({"result": "success"})
+def remove_file_genre():
+    fid = request.args.get("fid")
+    gid = request.args.get("gid")
+    print "fid:", fid
+    print "gid:", gid
+    return json_dump({"result": "test"})
+    query("""DELETE FROM file_genres
+                 WHERE fid = %s AND gid = %s""", 
+             (fid, gid))
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+    reload_playing(fid)
+    return json_dump({"result": "success"})
+
+@app.route("/add-file-genre/")
+def add_file_genre():
+    fid = request.args.get("fid")
+    genre = request.args.get("genre")
+    if not genre:
+      return json_dump({"result": "failure"});
+    info = get_assoc("""SELECT * 
+                        FROM genres 
+                        WHERE genre = %s 
+                        LIMIT 1""",
+                    (genre, ))
+    if not info:
+      info = get_assoc("""INSERT INTO genres (genre)
+                                 VALUES(%s) RETURNING *""",
+                             (genre,))
+
+    present = get_assoc("""SELECT * 
+                           FROM file_genres
+                           WHERE fid = %s and gid = %s
+                           LIMIT 1""",
+                        (fid, info['gid']))
+
+    if not present:
+        print "INSERTING"
+        info  = get_assoc("""INSERT INTO file_genres (fid, gid) 
+                             VALUES(%s, %s)
+                             RETURNING * """,
+                         (fid, info['gid']))
+
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+    reload_playing(fid)
+    return json_dump({"result": "success",
+                      "gid": info['gid'], 
+                      "fid": fid})
 
 @app.route("/kw")
 def keywords():
@@ -276,6 +348,35 @@ def keywords():
     else:
         return json.dumps(words), 200
 
+@app.route("/kwa")
+def keywords_artists():
+    q = "%s" % request.args.get('q', "")
+
+    result = get_results_assoc("""SELECT aid, artist 
+                                  FROM artists 
+                                  WHERE artist ~* %s
+                                  ORDER BY artist
+                                  LIMIT 10""", (q,))
+    response = []
+    for r in result:
+        response.append({"aid": r['aid'], "artist": r['artist']})
+
+    return json.dumps(response)
+
+@app.route("/kwg")
+def keywords_genres():
+    q = "%s" % request.args.get('q', "")
+
+    result = get_results_assoc("""SELECT gid, genre 
+                                  FROM genres 
+                                  WHERE genre ~* %s
+                                  ORDER BY genre
+                                  LIMIT 10""", (q,))
+    response = []
+    for r in result:
+        response.append({"gid": r['gid'], "genre": r['genre']})
+
+    return json.dumps(response)
 
 def file_history(_id, id_type):
     history_res = get_results_assoc("""SELECT uh.*, uname

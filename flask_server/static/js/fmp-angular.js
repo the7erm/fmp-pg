@@ -1,5 +1,5 @@
 
-var fmpApp = angular.module("fmpApp", ['ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 'mgcrea.ngStrap.typeahead']),
+var fmpApp = angular.module("fmpApp", ['ngRoute', 'ngTagsInput', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 'mgcrea.ngStrap.typeahead']),
     timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         if ($index == historyArray.length - 1) {
             return "";
@@ -160,6 +160,65 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
                   // or server returns response with an error status.
                 });
         };
+
+        $rootScope.loadArtistTags = function(query) {
+            return $http.get('/kwa?q=' + encodeURIComponent(query));
+        };
+
+        $rootScope.loadGenreTags = function(query) {
+            return $http.get('/kwg?q=' + encodeURIComponent(query));
+        };
+
+        $rootScope.removeArtistTag = function(fid, aid) {
+            console.log("removeArtistTag", fid, aid);
+            var url = "/remove-file-artist/?fid="+fid+"&aid="+aid;
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
+
+        $rootScope.addArtistTag = function(fid, $tag) {
+            console.log("addArtistTag:", fid, $tag);
+            var url = "/add-file-artist/?fid="+fid+"&artist="+encodeURIComponent($tag.artist);
+                $http({method: 'GET', url: url})
+                .success(function(data, status, headers, config) {
+                    console.log("DATA:",data);
+                    if(data.result == "success") {
+                        $tag.aid = data.aid;
+                    }
+                })
+                .error(function(data, status, headers, config) {
+                });
+        };
+
+        $rootScope.removeGenreTag = function(fid, gid) {
+            console.log("removeGenreTag", fid, gid);
+            var url = "/remove-file-genre/?fid="+fid+"&gid="+gid;
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
+
+        $rootScope.addGenreTag = function(fid, $tag) {
+            console.log("addGenreTag:", fid, $tag);
+            var url = "/add-file-genre/?fid="+fid+"&genre="+encodeURIComponent($tag.genre);
+                $http({method: 'GET', url: url})
+                .success(function(data, status, headers, config) {
+                    console.log("DATA:",data);
+                    if(data.result == "success") {
+                        $tag.gid = data.gid;
+
+                    }
+                })
+                .error(function(data, status, headers, config) {
+                });
+        };
+
         sharedService.getStatus();
         $interval(sharedService.getStatus, 10000);
         return sharedService;
@@ -272,19 +331,23 @@ fmpApp.controller('HomeCtrl', ['$scope', '$routeParams', 'fmpService',
 
 fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
     function($scope, $modal, $fmpService) {
-    $scope.modal = "?"
+
     var myModal = $modal({title: 'My Title', content: 'My Content', show: true});
 
-      // Pre-fetch an external template populated with a custom scope
-      var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
-      // Show when some event occurs (use $promise property to ensure the template has been loaded)
-      $scope.showModal = function() {
+    // Pre-fetch an external template populated with a custom scope
+    var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
+    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+    $scope.showModal = function() {
         myOtherModal.$promise.then(myOtherModal.show);
-      };
+    };
+
+    
 }]);
 
 fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
     function($scope, $routeParams, fmpService, $http) {
+
+
     $scope.cue = function(fid) {
         for (var i=0; i<$scope.results.length; i++) {
             if ($scope.results[i].fid == fid) {
@@ -577,11 +640,16 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
 
 }]);
 
-fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService',
-    function($scope, fmpService){
+fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
+    function($scope, fmpService, $modal){
         $scope.next = fmpService.next;
         $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
+    console.log($scope.playing_data)
+
+    $scope.$watch('playing_data', function(newValue, oldValue) {
+        $scope.r = $scope.playing_data;
+    });
 }]);
 
 
@@ -611,5 +679,4 @@ fmpApp.directive('scroller', function () {
         }
     };
 });
-
 

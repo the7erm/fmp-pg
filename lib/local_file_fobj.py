@@ -66,6 +66,7 @@ class Local_File(fobj.FObj):
         self.last_percent_played = 0
         self.mark_as_played_lock = False
         self.last_time_marked_as_played = datetime.now()
+        self.edited = False
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
                           dirname=dirname, basename=basename, filename=filename, 
@@ -617,6 +618,8 @@ class Local_File(fobj.FObj):
         pp.pprint(self.db_info)
 
     def process_tags(self):
+        if self.db_info['edited']:
+            return
         self.get_tags()
 
         self.process_filename()

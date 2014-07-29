@@ -4,15 +4,19 @@
         <link rel="stylesheet" href="//rawgithub.com/mgcrea/angular-motion/master/dist/angular-motion.min.css">
         <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
 
+        <link rel="stylesheet" href="/static/bower_components/ng-tags-input/ng-tags-input.min.css">
+
         <script type="text/javascript" src="//code.jquery.com/jquery-2.1.1.js"></script>
         <script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.js"></script>
         <!-- Latest compiled and minified JavaScript -->
         <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.2.9/angular.min.js"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.2.9/angular-route.min.js"></script>
-        
         <script src="/static/bower_components/angular-strap/dist/angular-strap.js"></script> 
         <script src="/static/bower_components/angular-strap/dist/angular-strap.tpl.js"></script>
+
+        <script type="text/javascript" src="/static/bower_components/ng-tags-input/ng-tags-input.min.js"></script>
+
         <script type="text/javascript" src="/static/js/fmp-angular.js"></script>
         <script type="text/javascript">
 
@@ -89,6 +93,15 @@
               cursor: pointer;
             }
 
+            .tag-input-ctn {
+              border: 1px solid #ccc;
+              padding: 2px 3px;
+              display: inline-block;
+              width: 500px;
+              border-radius: 3px;
+              box-shadow: inset 0px 1px 1px rgba(0, 0, 0, 0.075);
+            }
+
         </style>
     </head>
     <body>
@@ -163,10 +176,11 @@
             <br clear="all">
             <br clear="all">
             <br clear="all">
-            <div ng-controller="CurrentlyPlayingCtrl">
+            <div ng-controller="CurrentlyPlayingCtrl"  >
                 <div class="container-fluid">
                   <div class="row">
                     <div class="col-xs-10">
+                        <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
                         <ul class="artists">
                             <li ng-repeat="a in playing_data.artists" class='artist' ><a class="btn btn-default" href="#/search/{{a.artist}}">{{ a.artist }}</a></li>
                         </ul>
