@@ -24,6 +24,14 @@
           <auto-complete source="loadGenreTags($query)"></auto-complete>
         </tags-input>
 
+        <h4>Albums</h4>
+        <tags-input ng-model="r.albums" display-property="album_name" min-length="1" 
+          add-on-space="false" add-on-blur="false" replace-spaces-with-dashes="false"
+          on-tag-removed="removeAlbumTag(r.fid, $tag.alid)"
+          on-tag-added="addAlbumTag(r.fid, $tag)">
+          <auto-complete source="loadAlbumTags($query)"></auto-complete>
+        </tags-input>
+
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>

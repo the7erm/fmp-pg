@@ -292,6 +292,65 @@ def add_file_genre():
                       "gid": info['gid'], 
                       "fid": fid})
 
+@app.route("/remove-file-album/")
+def remove_file_album():
+    fid = request.args.get("fid")
+    alid = request.args.get("alid")
+    print "fid:", fid
+    print "alid:", alid
+    query("""DELETE FROM album_files
+                 WHERE fid = %s AND alid = %s""", 
+             (fid, aid))
+    
+    total = get_assoc("""SELECT count(*) as total
+                         FROM album_files
+                         WHERE alid = %s""", (alid,))
+    if total['total'] == 0:
+      query("""DELETE FROM album_files 
+               WHERE alid = %s""", (alid,))
+
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+
+    reload_playing(fid)
+
+    return json_dump({"result": "success"})
+
+@app.route("/add-file-album/")
+def add_file_album():
+    fid = request.args.get("fid")
+    album_name = request.args.get("album_name")
+    if not album_name:
+      return json_dump({"result": "failure"});
+    info = get_assoc("""SELECT * 
+                        FROM albums 
+                        WHERE album_name = %s 
+                        LIMIT 1""",
+                    (album_name, ))
+    if not info:
+      info = get_assoc("""INSERT INTO albums (album_name)
+                          VALUES(%s) RETURNING *""",
+                      (album_name,))
+
+    present = get_assoc("""SELECT * 
+                           FROM album_files
+                           WHERE fid = %s and aid = %s
+                           LIMIT 1""",
+                       (fid, info['alid']))
+
+    if not present:
+        info  = get_assoc("""INSERT INTO album_files (fid, alid) 
+                             VALUES(%s, %s)
+                             RETURNING * """,
+                         (fid, info['alid']))
+
+    query("""UPDATE files SET edited = true WHERE fid = %s""", (fid,))
+    query("COMMIT")
+    reload_playing(fid)
+    return json_dump({"result": "success",
+                      "alid": info['alid'], 
+                      "fid": fid})
+
 @app.route("/kw")
 def keywords():
     # http://gd.geobytes.com/AutoCompleteCity?callback=jQuery17107360035724240884_1403536897337&q=che&_=1403536918779
@@ -375,6 +434,21 @@ def keywords_genres():
     response = []
     for r in result:
         response.append({"gid": r['gid'], "genre": r['genre']})
+
+    return json.dumps(response)
+
+@app.route("/kwal")
+def keywords_albums():
+    q = "%s" % request.args.get('q', "")
+
+    result = get_results_assoc("""SELECT alid, album_name 
+                                  FROM albums 
+                                  WHERE album_name ~* %s
+                                  ORDER BY album_name
+                                  LIMIT 10""", (q,))
+    response = []
+    for r in result:
+        response.append({"alid": r['alid'], "album_name": r['album_name']})
 
     return json.dumps(response)
 
@@ -486,7 +560,7 @@ def listeners_info_for_fid(fid):
                      f.fid = usi.fid
                ORDER BY admin DESC, uname ASC
     """
-    print "query:%s" % query
+    # print "query:%s" % query
     return convert_to_dict(get_results_assoc(query, (fid,)))
 
 def convert_to_dict(res):
@@ -502,7 +576,8 @@ def artists_for_fid(fid):
                                FROM files f, artists a, file_artists fa
                                WHERE f.fid = %s AND
                                      fa.fid = f.fid AND
-                                     a.aid = fa.aid""", (fid,))
+                                     a.aid = fa.aid
+                               ORDER BY artist""", (fid,))
     return convert_to_dict(res)
 
 def albums_for_fid(fid):
@@ -510,7 +585,8 @@ def albums_for_fid(fid):
                                 FROM files f, albums al, album_files af
                                 WHERE f.fid = %s AND
                                       af.fid = f.fid AND
-                                      al.alid = af.alid""", (fid,))
+                                      al.alid = af.alid
+                                ORDER BY album_name""", (fid,))
     return convert_to_dict(res)
 
 def genres_for_fid(fid):
@@ -518,13 +594,14 @@ def genres_for_fid(fid):
                                FROM files f, genres g, file_genres fg
                                WHERE f.fid = %s AND
                                      fg.fid = f.fid AND
-                                     fg.gid = g.gid""", (fid,))
+                                     fg.gid = g.gid
+                               ORDER BY genre""", (fid,))
     return convert_to_dict(res)
 
 def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
-    print "Q:",q
+    # print "Q:",q
     no_words_query = """SELECT DISTINCT f.fid, dirname, basename, title,
                                         sha512, artist, f.fid, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
@@ -554,24 +631,28 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                                ORDER BY artist, title"""
 
 
-    query = """SELECT DISTINCT f.fid, dirname, basename, title, sha512,
+    query = """SELECT DISTINCT f.fid, dirname, basename, artist, title, sha512,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                FROM files f
-                    LEFT JOIN preload p ON p.fid = f.fid,
+                    LEFT JOIN preload p ON p.fid = f.fid
+                    LEFT JOIN file_artists fa ON fa.fid = f.fid
+                    LEFT JOIN artists a ON a.aid = fa.aid,
                     keywords kw,
                     plainto_tsquery('english', %s) query,
                     file_locations fl
                WHERE kw.fid = f.fid AND 
                      f.fid = fl.fid AND
                      tsv @@ query
-               ORDER BY ts_rank DESC"""
+               ORDER BY ts_rank DESC, artist, title"""
 
-    rating_query = """SELECT DISTINCT f.fid, dirname, basename, title, sha512,
+    rating_query = """SELECT DISTINCT f.fid, dirname, basename, artist, title, sha512,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                       FROM files f
-                           LEFT JOIN preload p ON p.fid = f.fid,
+                           LEFT JOIN preload p ON p.fid = f.fid
+                           LEFT JOIN file_artists fa ON fa.fid = f.fid
+                           LEFT JOIN artists a ON a.aid = fa.aid,
                            keywords kw,
                            plainto_tsquery('english', %s) query,
                            user_song_info usi,
@@ -583,7 +664,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                             usi.uid IN (SELECT uid 
                                         FROM users 
                                         WHERE listening = true)
-                      ORDER BY ts_rank DESC"""
+                      ORDER BY ts_rank DESC, artist, title"""
 
     rating_re = re.compile("rating\:(\d+)")
     rating_match = rating_re.match(q)
@@ -600,7 +681,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
 
     # """+limit+""" OFFSET """+offset
     query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
-    print "QUERY:%s" % query
+    # print "QUERY:%s" % query
     results = []
     
     try:
@@ -616,7 +697,6 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
             #fd = f.to_dict()
             # fd.cued = r.cued
             rdict = dict(r)
-            
             results.append(rdict)
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
@@ -628,12 +708,12 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
 
 
 def convert_res_to_dict(r):
-    print "R:",r
+    # print "R:",r
     rdict = dict(r)
     sha512 = ""
     if r['sha512']:
         sha512 = r['sha512']
-    print "DICT:",rdict
+    # print "DICT:",rdict
     try:
         fid = r['fid']
         rdict['usi'] = rdict['ratings'] = listeners_info_for_fid(fid)
@@ -810,18 +890,26 @@ def search_data():
     print "end:", time.time() - start_time
     return json_dump(results)
 
+# 
 
-@app.route('/search-data-new/', methods=['GET', 'POST'])
-def search_data_new():
-    # convert_res_to_dict
-    results = None
-    q = request.args.get("q","")
-    start, limit = get_start_limit()
-    filter_by=get_filter_by()
+cache_data = {}
+def do_search(q, start, limit, filter_by):
+    print "DO SEARCH"
+    start_time = datetime.datetime.now()
+    cache_key = "q:%s s:%s l:%s filter_by:%s" % (q, start, limit, filter_by)
+    if cache_key in cache_data:
+        print "=c"*20
+        print "fetch time:",datetime.datetime.now() - start_time
+        cnt = 0
+        while cache_data[cache_key]['locked']:
+            print "SLEEPING", cnt
+            time.sleep(0.25)
+            cnt += 1
 
-    print "LIMIT:%s" % limit
-    start_time = time.time()
-    print "start:",start_time
+        # return cache_data[cache_key]["data"]
+    cache_data[cache_key] = {
+      "locked": True
+    }
     results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
     
     fixed_results = []
@@ -832,7 +920,49 @@ def search_data_new():
         already_present_fids.append(r['fid'])
         fixed_results.append(convert_res_to_dict(r))
 
-    return json_dump(fixed_results)
+    json_data = json_dump(fixed_results)
+    cache_data[cache_key] = {
+      "data": json_data,
+      "when": datetime.datetime.now(),
+      "locked": False
+    }
+    print "="*20
+    print "fetch time:",datetime.datetime.now() - start_time
+    return json_data
+
+def cache_some_results(q, start, limit, filter_by):
+    print "X"*100
+    print "CACHE SOME RESULTS"
+    for i in range(1, 20):
+        print "-=="*20,"search",i
+        cache_key = "q:%s s:%s l:%s filter_by:%s" % (q, start, limit, filter_by)
+        print cache_key
+        if cache_key not in cache_data:
+            res = do_search(q, start, limit, filter_by)
+        else:
+            print "cached"
+            res = True
+        if not res:
+            print "NO RES", cache_key
+            break
+        start = start+limit
+
+@app.route('/search-data-new/', methods=['GET', 'POST'])
+def search_data_new():
+    
+    # convert_res_to_dict
+    results = None
+    q = request.args.get("q","")
+    start, limit = get_start_limit()
+    filter_by=get_filter_by()
+
+    print "LIMIT:%s" % limit
+    fixed_results = do_search(q, start, limit, filter_by)
+    t = threading.Thread(target=cache_some_results, args=(q, int(start)+int(limit), 
+                                                      limit, filter_by))
+    threads.append(t)
+    t.start()
+    return fixed_results
 
 
 def get_start_limit():
@@ -976,6 +1106,9 @@ def history_data():
 
 @app.route("/preload", methods=['GET', 'POST'])
 def preload():
+    start, limit = get_start_limit()
+    offset = "%d" % start
+    limit = "%d" % limit
     preload = get_results_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
                                         sha512, artist, f.fid, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
@@ -986,7 +1119,7 @@ def preload():
                                        file_locations fl
                                    WHERE fl.fid = f.fid AND p.fid = f.fid
                                    ORDER BY artist, title
-                                """)
+                                   LIMIT """+limit+""" OFFSET """+offset)
     results = []
     already_present_fids = []
     for p in preload:

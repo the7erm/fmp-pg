@@ -1,5 +1,19 @@
 
-var fmpApp = angular.module("fmpApp", ['ngRoute', 'ngTagsInput', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 'mgcrea.ngStrap.typeahead']),
+var fmpApp = angular.module("fmpApp", [
+        'ngRoute', 'ngTagsInput', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
+        'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
+        'mgcrea.ngStrap.typeahead', 'infinite-scroll', 'angular-inview'])
+        .filter('isEmpty', function () {
+            var bar;
+            return function (obj) {
+                for (bar in obj) {
+                    if (obj.hasOwnProperty(bar)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }),
     timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         if ($index == historyArray.length - 1) {
             return "";
@@ -40,6 +54,40 @@ var fmpApp = angular.module("fmpApp", ['ngRoute', 'ngTagsInput', 'mgcrea.ngStrap
 fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
     function($rootScope, $http, $interval){
         var sharedService = {};
+        sharedService.cue = function(fid) {
+            for (var i=0; i<$scope.results.length; i++) {
+                if ($scope.results[i].fid == fid) {
+                    $scope.results[i].cued = fid;
+                    var url = "/cue/?fid="+fid+"&cue=true"
+                    $http({method: 'GET', url: url})
+                    .success(function(data, status, headers, config) {
+                        
+
+                    })
+                    .error(function(data, status, headers, config) {
+                      // called asynchronously if an error occurs
+                      // or server returns response with an error status.
+                    });
+                }
+            }
+        };
+        sharedService.uncue = function(fid) {
+            for (var i=0; i<$scope.results.length; i++) {
+                if ($scope.results[i].fid == fid) {
+                    $scope.results[i].cued = false;
+                    var url = "/cue/?fid="+fid+"&cue=false"
+                    $http({method: 'GET', url: url})
+                    .success(function(data, status, headers, config) {
+                        
+
+                    })
+                    .error(function(data, status, headers, config) {
+                      // called asynchronously if an error occurs
+                      // or server returns response with an error status.
+                    });
+                }
+            }
+        };
         sharedService.getTags = function(viewValue) {
             var params = {"q": viewValue};
             
@@ -169,6 +217,10 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
             return $http.get('/kwg?q=' + encodeURIComponent(query));
         };
 
+        $rootScope.loadAlbumTags = function(query) {
+            return $http.get('/kwal?q=' + encodeURIComponent(query));
+        };
+
         $rootScope.removeArtistTag = function(fid, aid) {
             console.log("removeArtistTag", fid, aid);
             var url = "/remove-file-artist/?fid="+fid+"&aid="+aid;
@@ -182,15 +234,15 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
         $rootScope.addArtistTag = function(fid, $tag) {
             console.log("addArtistTag:", fid, $tag);
             var url = "/add-file-artist/?fid="+fid+"&artist="+encodeURIComponent($tag.artist);
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    console.log("DATA:",data);
-                    if(data.result == "success") {
-                        $tag.aid = data.aid;
-                    }
-                })
-                .error(function(data, status, headers, config) {
-                });
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                console.log("DATA:",data);
+                if(data.result == "success") {
+                    $tag.aid = data.aid;
+                }
+            })
+            .error(function(data, status, headers, config) {
+            });
         };
 
         $rootScope.removeGenreTag = function(fid, gid) {
@@ -207,16 +259,39 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
         $rootScope.addGenreTag = function(fid, $tag) {
             console.log("addGenreTag:", fid, $tag);
             var url = "/add-file-genre/?fid="+fid+"&genre="+encodeURIComponent($tag.genre);
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    console.log("DATA:",data);
-                    if(data.result == "success") {
-                        $tag.gid = data.gid;
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                console.log("DATA:",data);
+                if(data.result == "success") {
+                    $tag.gid = data.gid;
 
-                    }
-                })
-                .error(function(data, status, headers, config) {
-                });
+                }
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
+
+        $rootScope.removeAlbumTag = function(fid, alid) {
+            console.log("removeAlbumTag", fid, alid);
+            var url = "/remove-file-album/?fid="+fid+"&alid="+alid;
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
+
+        $rootScope.addAlbumTag = function(fid, $tag) {
+            console.log("addAlbumTag:", fid, $tag);
+            var url = "/add-file-album/?fid="+fid+"&album_name="+encodeURIComponent($tag.album_name);
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                if(data.result == "success") {
+                    $tag.alid = data.alid;
+                }
+            })
+            .error(function(data, status, headers, config) {
+            });
         };
 
         sharedService.getStatus();
@@ -228,7 +303,7 @@ fmpApp.directive('starRating',['fmpService',
     function(fmpService) {
         return {
             restrict : 'A',
-            template : '<ul class="rating"> <li ng-repeat="star in stars" ng-class="star" ng-click="toggle($index)">  <i class="fa fa-star-o">\u2605</i> </li></ul>',
+            template : '<ul class="rating"> <li ng-repeat="star in stars" ng-class="star" ng-click="toggle($index)">  <a ng-show="!$index">&nbsp;\u20E0&nbsp;</a><i ng-show="$index > 0">\u2605</i></li></ul>',
             scope : {
                 ratingValue : '=',
                 max : '=',
@@ -239,26 +314,24 @@ fmpApp.directive('starRating',['fmpService',
                     scope.stars = [];
                     for ( var i = 0; i < scope.max; i++) {
                         scope.stars.push({
-                            filled : i < scope.ratingValue.rating
+                            filled : i <= scope.ratingValue.rating
                         });
                     }
                 };
              
                 scope.toggle = function(index) {
-                    scope.ratingValue.rating = index + 1;
+                    scope.ratingValue.rating = index;
                     scope.onRatingSelected({
-                        rating : index + 1
+                        rating : index
                     });
                     // /rate/<usid>/<fid>/<uid>/<rating>
                     var usi = scope.ratingValue;
-                    fmpService.rate(usi.usid, usi.fid, usi.uid, index+1);
+                    fmpService.rate(usi.usid, usi.fid, usi.uid, index);
                 };
              
                 scope.$watch('ratingValue.rating',
                     function(oldVal, newVal) {
-                        if (newVal) {
-                            updateStars();
-                        }
+                        updateStars();
                 });
             }
         };
@@ -344,96 +417,18 @@ fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
     
 }]);
 
-fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http',
-    function($scope, $routeParams, fmpService, $http) {
+fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
+    function($scope, $routeParams, fmpService, $http, Search) {
 
-
-    $scope.cue = function(fid) {
-        for (var i=0; i<$scope.results.length; i++) {
-            if ($scope.results[i].fid == fid) {
-                $scope.results[i].cued = fid;
-                var url = "/cue/?fid="+fid+"&cue=true"
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    
-
-                })
-                .error(function(data, status, headers, config) {
-                  // called asynchronously if an error occurs
-                  // or server returns response with an error status.
-                });
-            }
-        }
-    };
-    $scope.uncue = function(fid) {
-        for (var i=0; i<$scope.results.length; i++) {
-            if ($scope.results[i].fid == fid) {
-                $scope.results[i].cued = false;
-                var url = "/cue/?fid="+fid+"&cue=false"
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    
-
-                })
-                .error(function(data, status, headers, config) {
-                  // called asynchronously if an error occurs
-                  // or server returns response with an error status.
-                });
-            }
-        }
-    };
-
-    //console.log("TOP");
-    $scope.query = $routeParams.query;
-    if (!$scope.start) {
-        // console.log("$scope.start:", $scope.start);
-        $scope.start = 0;
-    }
-    ///console.log("$scope.start:", $scope.start);
-    ///console.log("query:",$scope.query);
-
-    if (!$scope.results) {
-        $scope.results = [];
-        $scope.locked = false;
-    }
-
-    $scope.loadMore = function(){
-        if ($scope.done || $scope.locked) {
-            // console.log("$scope.done,", $scope.done)
-            return;
-        }
-        $scope.locked = true;
-        $("#preload-loading").show();
-        var url = "/preload";
-        $scope.start += 10;
-        $http({method: 'GET', url: url})
-        .success(function(data, status, headers, config) {
-            // console.log("-scope start:", $scope.start);
-            $("#preload-loading").hide();
-            if (data.length == 0) {
-                $scope.done = true;
-                // console.log("DONE!");
-                $(window).unbind("scroll");
-            }
-            for(var i=0;i<data.length;i++) {
-                // console.log("appending:", data[i]);
-                $scope.results.push(data[i]);
-            }
-            $scope.locked = true;
-            $scope.done = true;
-             $(window).unbind("scroll");
-        })
-        .error(function(data, status, headers, config) {
-          $scope.locked = false;
-          // called asynchronously if an error occurs
-          // or server returns response with an error status.
-        });
-    }
-    $scope.loadMore();
+    $scope.cue = fmpService.cue;
+    $scope.uncue = fmpService.uncue;
+    
+    $scope.search = new Search("", "/preload");
+    
 }]);
 
-fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpService', '$http', '$modal',
-    function($scope, $rootScope, $routeParams, fmpService, $http, $modal) {
+fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpService', '$http', '$modal', 'Search',
+    function($scope, $rootScope, $routeParams, fmpService, $http, $modal, Search) {
 
     // Pre-fetch an external template populated with a custom scope
     var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
@@ -446,197 +441,17 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
 
     $scope.getTags = fmpService.getTags;
 
-    $scope.cue = function(fid) {
-        for (var i=0; i<$scope.results.length; i++) {
-            if ($scope.results[i].fid == fid) {
-                $scope.results[i].cued = fid;
-                var url = "/cue/?fid="+fid+"&cue=true"
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    
-
-                })
-                .error(function(data, status, headers, config) {
-                  // called asynchronously if an error occurs
-                  // or server returns response with an error status.
-                });
-            }
-        }
-    };
-    $scope.uncue = function(fid) {
-        for (var i=0; i<$scope.results.length; i++) {
-            if ($scope.results[i].fid == fid) {
-                $scope.results[i].cued = false;
-                var url = "/cue/?fid="+fid+"&cue=false"
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    
-
-                })
-                .error(function(data, status, headers, config) {
-                  // called asynchronously if an error occurs
-                  // or server returns response with an error status.
-                });
-            }
-        }
-    };
-
-    $scope.removeGenre = function(fid, gid){
-        console.log("fid:", fid);
-        console.log("gid:", gid);
-        var found = false
-        for (var i=0; i<$scope.results.length; i++) {
-            if (found) {
-                break;
-            }
-            if ($scope.results[i].fid == fid) {
-                if (!$scope.results[i]['genres']) {
-                    return;
-                }
-                for (var i2=0; i2<$scope.results[i]['genres'].length; i2++) {
-                    if ($scope.results[i]['genres'][i2]['gid'] == aid) {
-                        $scope.results[i]['genres'].splice(i2, 1);
-                        found = true;
-                        var url = "/remove-file-genre/?fid="+fid+"&gid="+gid
-                        $http({method: 'GET', url: url})
-                        .success(function(data, status, headers, config) {
-                            
-                        })
-                        .error(function(data, status, headers, config) {
-                        });
-                    }
-                }
-            }
-        }
-    };
-
-    $scope.removeArtist = function(fid, aid){
-        console.log("fid:", fid);
-        console.log("aid:", aid);
-        var found = false
-        for (var i=0; i<$scope.results.length; i++) {
-            if (found) {
-                break;
-            }
-            if ($scope.results[i].fid == fid) {
-                if (!$scope.results[i]['artists']) {
-                    return;
-                }
-                for (var i2=0; i2<$scope.results[i]['artists'].length; i2++) {
-                    if ($scope.results[i]['artists'][i2]['aid'] == aid) {
-                        $scope.results[i]['artists'].splice(i2, 1);
-                        found = true;
-                        var url = "/remove-file-artist/?fid="+fid+"&aid="+aid
-                        $http({method: 'GET', url: url})
-                        .success(function(data, status, headers, config) {
-                            
-                        })
-                        .error(function(data, status, headers, config) {
-                        });
-                    }
-                }
-            }
-        }
-    };
-
-    $scope.showCreateArtist = function (fid) {
-        $scope.creatingArtist = true;
-        $scope.new_artist = "";
-    };
-
-    $scope.setNewArtist = function(val) {
-        $scope.new_artist = val;
-    }
-
-    $scope.assignArtist = function(fid) {
-        $scope.creatingArtist = false;
-        if (!$scope.new_artist) {
-            return;
-        }
-        for (r in $scope.results) {
-            console.log("r:",r);
-            console.log("$scope.new_artist",$scope.new_artist)
-            if ($scope.results[r]['fid'] != fid) {
-                continue
-            }
-            var found = false;
-            for (a in $scope.results[r]['artists']) {
-                if ($scope.results[r]['artists'][a]['artist'] == $scope.new_artist) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                $scope.results[r]['artists'].push({
-                    "aid": -1,
-                    "artist": $scope.new_artist
-                });
-                var url = "/add-file-artist/?fid="+fid+"&artist="+encodeURIComponent($scope.new_artist);
-                $http({method: 'GET', url: url})
-                .success(function(data, status, headers, config) {
-                    
-                })
-                .error(function(data, status, headers, config) {
-                });
-                // $scope.new_artist = "";
-            }
-        }
-    };
+    $scope.cue = fmpService.cue;
+    $scope.uncue = fmpService.uncue;
+    $scope.removeGenre = fmpService.removeGenre;
 
     //console.log("TOP");
     $scope.query = $routeParams.query;
-    $rootScope.query = $scope.query;
     if (!$scope.query) {
         $scope.query = "";
     }
-    if (!$scope.start) {
-        // console.log("$scope.start:", $scope.start);
-        $scope.start = 0;
-    }
-    ///console.log("$scope.start:", $scope.start);
-    ///console.log("query:",$scope.query);
 
-    if (!$scope.results) {
-        $scope.results = [];
-        $scope.locked = false;
-        $scope.done = false;
-    }
-
-    $scope.loadMore = function(){
-        if ($scope.done || $scope.locked) {
-            // console.log("$scope.done,", $scope.done);
-            // console.log("$scope.locked:", $scope.locked);
-            return;
-        }
-        $scope.locked = true;
-        $("#search-loading").show();
-        var url = "/search-data-new/?q="+encodeURIComponent($scope.query)+"&s="+$scope.start;
-        $scope.start += 10;
-        $http({method: 'GET', url: url})
-        .success(function(data, status, headers, config) {
-            // console.log("-scope start:", $scope.start);
-            $("#search-loading").hide();
-            if (data.length == 0) {
-                $scope.done = true;
-                // console.log("DONE! ***************************");
-                $(window).unbind("scroll");
-                $scope.locked = false;
-                return
-            }
-            for(var i=0;i<data.length;i++) {
-                // console.log("appending:", data[i]);
-                $scope.results.push(data[i]);
-            }
-            $scope.locked = false;
-        })
-        .error(function(data, status, headers, config) {
-          $scope.locked = false;
-          // called asynchronously if an error occurs
-          // or server returns response with an error status.
-        });
-    }
-    $scope.loadMore();
-    // console.log("SCOPE:", $scope);
+    $scope.search = new Search($scope.query);
 
 }]);
 
@@ -652,31 +467,38 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
     });
 }]);
 
-
-fmpApp.directive('scroller', function () {
-    return {
-        restrict: 'A',
-        // new
-        scope: {
-            loadingMethod: "&"
-        },
-        link: function (scope, elem, attrs) {
-            $window = $(window);
-            $document = $(document);
-            $(window).unbind("scroll");
-            $(window).bind('scroll', function () {
-                if (scope.done) {
-                    $(window).unbind("scroll");
-                    console.log("UNBIND");
-                    return;
-                }
-                if ($window.scrollTop() + ($window.height() * 2) >= 
-                    ($document.height() - $window.height())) {
-                    console.log("$apply")
-                    scope.$apply(scope.loadingMethod); 
-                }
-            });
+// Reddit constructor function to encapsulate HTTP and pagination logic
+fmpApp.factory('Search', function($http) {
+  var Search = function(query, url) {
+    this.items = [];
+    this.busy = false;
+    this.after = '';
+    this.start = 0;
+    this.limit = 10;
+    this.url = url || "/search-data-new/";
+    this.query = encodeURIComponent(query || "");
+    this.inview = function($index, inview){
+        if (inview && !this.items[$index]['ratings']) {
+            this.items[$index] = this.cacheItems[$index];
         }
     };
-});
+  };
 
+  Search.prototype.nextPage = function() {
+    if (this.busy) return;
+    this.busy = true;
+
+    var url = this.url+"?s="+this.start+"&l="+this.limit+"&q="+this.query;
+    $http.get(url).success(function(data) {
+      var items = data;
+      for (var i = 0; i < items.length; i++) {
+        this.items.push(items[i]);
+      }
+      // this.after = "t3_" + this.items[this.items.length - 1].id;''
+      this.start = this.start + this.limit;
+      this.busy = false;
+    }.bind(this));
+  };
+
+  return Search;
+});
