@@ -173,14 +173,14 @@ def angular():
                            extended=get_extended())
 
 def reload_playing(fid):
-    global playing
+    global playing, player
     print "-="*20
     playing_dict = playing.to_dict()
     print "playing_dict.get('fid'):",playing_dict.get('fid')
 
     if str(playing_dict.get('fid', "")) == str(fid):
         print "RELOAD PLAYING"
-        playing = Local_File(fid=fid)
+        playing.__init__(fid=fid)
     print "-"*20
 
 @app.route("/remove-file-artist/")
@@ -477,6 +477,7 @@ def status():
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
     global playing, player
     # print "PLAYING",playing.to_dict()
+    
     player_dict = player.to_dict()
     playing_dict = playing.to_full_dict()
 
@@ -896,41 +897,22 @@ cache_data = {}
 def do_search(q, start, limit, filter_by):
     print "DO SEARCH"
     start_time = datetime.datetime.now()
-    cache_key = "q:%s s:%s l:%s filter_by:%s" % (q, start, limit, filter_by)
-    if cache_key in cache_data:
-        print "=c"*20
-        print "fetch time:",datetime.datetime.now() - start_time
-        cnt = 0
-        while cache_data[cache_key]['locked']:
-            print "SLEEPING", cnt
-            time.sleep(0.25)
-            cnt += 1
-
-        # return cache_data[cache_key]["data"]
-    cache_data[cache_key] = {
-      "locked": True
-    }
     results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
-    
     fixed_results = []
     already_present_fids = []
     for r in results:
         if r['fid'] in already_present_fids:
-          continue
+            continue
         already_present_fids.append(r['fid'])
         fixed_results.append(convert_res_to_dict(r))
 
     json_data = json_dump(fixed_results)
-    cache_data[cache_key] = {
-      "data": json_data,
-      "when": datetime.datetime.now(),
-      "locked": False
-    }
     print "="*20
     print "fetch time:",datetime.datetime.now() - start_time
     return json_data
 
 def cache_some_results(q, start, limit, filter_by):
+    return
     print "X"*100
     print "CACHE SOME RESULTS"
     for i in range(1, 20):
@@ -958,10 +940,10 @@ def search_data_new():
 
     print "LIMIT:%s" % limit
     fixed_results = do_search(q, start, limit, filter_by)
-    t = threading.Thread(target=cache_some_results, args=(q, int(start)+int(limit), 
-                                                      limit, filter_by))
-    threads.append(t)
-    t.start()
+    #t = threading.Thread(target=cache_some_results, args=(q, int(start)+int(limit), 
+    #                                                  limit, filter_by))
+    # threads.append(t)
+    # t.start()
     return fixed_results
 
 
@@ -1144,6 +1126,26 @@ def login():
 
 
     return render_template("login.html", playing=playing, PLAYING=PLAYING)
+
+@app.route('/set-title/', methods=['GET'])
+def set_file_title():
+    title = request.args.get('title')
+    fid = request.args.get('fid')
+
+    file_info = get_assoc("""UPDATE files 
+                             SET title = %s 
+                             WHERE fid = %s
+                             RETURNING *""", (title, fid))
+
+    if not file_info:
+        return json_dump({"result": "failure"})
+
+    reload_playing(fid)
+
+    return json_dump({
+      "result": "success",
+      "file_info": dict(file_info)
+    })
 
 def worker(*args, **kwargs):
     """thread worker function"""

@@ -142,9 +142,9 @@
                     <ul class="nav navbar-nav navbar-right">
                       <li class="dropdown">
                         <a class="dropdown-toggle cursor-pointer" data-toggle="dropdown"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"></a>
-                        <ul class="dropdown-menu" role="menu">
+                        <ul class="dropdown-menu" role="menu" src="/static/images/PLAYING.png">
                           <li><a ng-click="prev()"><img src="/static/images/media-seek-backward.png" class="nav-button-img"> Prev</a></li>
-                          <li><a ng-click="pause()"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"> Pause</a></li>
+                          <li><a ng-click="pause()"><img src="/static/images/PLAYING.png" ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"> Pause</a></li>
                           <li><a ng-click="next()"><img src="/static/images/media-seek-forward.png" class="nav-button-img"> Next</a></li>
                         </ul>
                       </li>

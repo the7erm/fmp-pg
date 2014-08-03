@@ -294,6 +294,29 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
             });
         };
 
+        $rootScope.log = function(){
+            console.log(arguments);
+        }
+
+        $rootScope.setTitleTimeout = false;
+
+        $rootScope.setTitle = function(fid, title) {
+            if ($rootScope.setTitleTimeout) {
+                clearTimeout($rootScope.setTitleTimeout);
+                $rootScope.setTitleTimeout = false;
+            }
+            console.log("setTitle", fid, title);
+            var url = "/set-title/?fid="+fid+"&title="+encodeURIComponent(title);
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                $rootScope.setTitleTimeout = false;
+                console.log("data:",data)
+            })
+            .error(function(data, status, headers, config) {
+                $rootScope.setTitleTimeout = false;
+            });
+        }
+
         sharedService.getStatus();
         $interval(sharedService.getStatus, 10000);
         return sharedService;
