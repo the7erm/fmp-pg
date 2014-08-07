@@ -178,7 +178,9 @@
           <br clear="all">
           <br clear="all">
           <div ng-controller="CurrentlyPlayingCtrl"  >
+              
               <div class="container-fluid">
+
                 <div class="row">
                   <div class="col-xs-10">
                       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
@@ -221,16 +223,15 @@
                             <td><div class="star-rating" star-rating rating-value="rating"
                                  data-max="6"></div>
                                 </div>
-                                
                             </td>
                             <td>{{ rating.true_score | number : 2}}</td>
                         </tr>
                     </table>
                   </div>
                 </div>
-                
              </div>
           </div>
+          
           <div class="container-fluid">
             <div ng-view>NG View</div>
           </div>

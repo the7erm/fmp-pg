@@ -36,6 +36,8 @@ import logging
 import re
 import base64
 import StringIO
+import psycopg2
+import os
 from copy import deepcopy
 
 # from bson import json_util
@@ -499,6 +501,8 @@ def status():
     if not extended.get('genres'):
       extended['genres'] = []
 
+    extended = convert_res_to_dict(extended)
+
     return jsonify(player=player_dict, playing=playing_dict,
                    volume=get_volume(), extended=extended)
 
@@ -606,43 +610,60 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
     # print "Q:",q
-    no_words_query = """SELECT DISTINCT f.fid, title, sha512, p.fid AS cued,
+    """
+    SELECT DISTINCT f.fid, dirname, basename, title,
+                                        sha512, artist, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
                         FROM files f 
                              LEFT JOIN preload p ON p.fid = f.fid
+                             LEFT JOIN file_artists fa ON fa.fid = f.fid
+                             LEFT JOIN artists a ON a.aid = fa.aid,
+                             file_locations fl
+                        WHERE fl.fid = f.fid
+                        ORDER BY artist, title"""
+    no_words_query = """SELECT DISTINCT f.fid, title, sha512, p.fid AS cued,
+                                        f.fid AS id, 'f' AS id_type, artist
+                        FROM files f 
+                             LEFT JOIN preload p ON p.fid = f.fid
+                             LEFT JOIN file_artists fa ON fa.fid = f.fid
+                             LEFT JOIN artists a ON a.aid = fa.aid
                         ORDER BY artist, title"""
 
     no_words_rating_query = """SELECT DISTINCT f.fid, title, sha512,  
-                                               f.fid, p.fid AS cued, 
+                                               f.fid, p.fid AS cued, artist,
                                                f.fid AS id, 'f' AS id_type
                                FROM files f 
-                                    LEFT JOIN preload p ON p.fid = f.fid,
-                                    user_song_info usi, 
-                                    file_locations fl
+                                    LEFT JOIN preload p ON p.fid = f.fid
+                                    LEFT JOIN file_artists fa ON fa.fid = f.fid
+                                    LEFT JOIN artists a ON a.aid = fa.aid,
+                                    user_song_info usi
                                WHERE rating = %s AND usi.fid = f.fid AND
                                      usi.uid IN (SELECT uid 
                                                  FROM users 
-                                                 WHERE listening = true) AND
-                                     fl.fid = f.fid
+                                                 WHERE listening = true)
                                ORDER BY artist, title"""
 
 
-    query = """SELECT DISTINCT f.fid, title, sha512,
+    query = """SELECT DISTINCT f.fid, title, sha512, artist,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                FROM files f
                     LEFT JOIN preload p ON p.fid = f.fid
+                    LEFT JOIN file_artists fa ON fa.fid = f.fid
+                    LEFT JOIN artists a ON a.aid = fa.aid,
                     keywords kw,
                     plainto_tsquery('english', %s) query,
                WHERE kw.fid = f.fid AND
                      tsv @@ query
                ORDER BY ts_rank DESC, artist, title"""
 
-    rating_query = """SELECT DISTINCT f.fid, title, sha512,
+    rating_query = """SELECT DISTINCT f.fid, title, sha512, artist,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                       FROM files f
                            LEFT JOIN preload p ON p.fid = f.fid
+                           LEFT JOIN file_artists fa ON fa.fid = f.fid
+                           LEFT JOIN artists a ON a.aid = fa.aid,
                            keywords kw,
                            plainto_tsquery('english', %s) query,
                            user_song_info usi,
@@ -698,11 +719,11 @@ def locations_for_fid(fid):
     locations = get_results_assoc("""SELECT dirname, basename
                                      FROM file_locations
                                      WHERE fid = %s
-                                     ORDER BY dirname, basename""", fid)
+                                     ORDER BY dirname, basename""", (fid,))
 
     results = []
     for l in locations:
-        path = os.path.join(l.dirname, l.basename)
+        path = os.path.join(l['dirname'], l['basename'])
         if os.path.exists(path):
             results.append({
                 "dirname": l['dirname'],
@@ -722,7 +743,7 @@ def convert_res_to_dict(r):
     # print "DICT:",rdict
     try:
         fid = r['fid']
-        rdict['usi'] = rdict['ratings'] = listeners_info_for_fid(fid)
+        rdict['ratings'] = listeners_info_for_fid(fid)
         rdict['artists'] = artists_for_fid(fid)
         rdict['albums'] = albums_for_fid(fid)
         rdict['genres'] = genres_for_fid(fid)
@@ -730,6 +751,9 @@ def convert_res_to_dict(r):
         if rdict['locations']:
             rdict['dirname'] = rdict['locations'][0]['dirname']
             rdict['basename'] = rdict['locations'][0]['basename']
+        else:
+            rdict['dirname'] = '-missing-'
+            rdict['basename'] = '-missing-'
 
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
@@ -1124,10 +1148,11 @@ def preload():
     limit = int(limit)
     end = start + limit
     preload = get_results_assoc("""SELECT DISTINCT f.fid, artist, title,
-                                        sha512, p.fid AS cued,
+                                        sha512, p.fid AS cued, artist,
                                         f.fid AS id, 'f' AS id_type
                                    FROM files f
                                         LEFT JOIN file_artists fa ON fa.fid = f.fid
+                                        LEFT JOIN artists a ON a.aid = fa.aid,
                                         preload p
                                    WHERE p.fid = f.fid
                                    ORDER BY artist, title""")

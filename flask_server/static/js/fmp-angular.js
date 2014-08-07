@@ -531,10 +531,11 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
         $scope.next = fmpService.next;
         $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
-    console.log($scope.playing_data)
+    $scope.r = {};
 
     $scope.$watch('playing_data', function(newValue, oldValue) {
-        $scope.r = $scope.playing_data;
+        // $scope.r = $scope.playing_data;
+        // $scope.r['hide_cued'] = true;
     });
 }]);
 

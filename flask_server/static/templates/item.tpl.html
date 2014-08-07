@@ -1,47 +1,6 @@
-<div infinite-scroll='search.nextPage()' infinite-scroll-disabled='search.busy' infinite-scroll-distance='2' class="col-xs-12 container" >
+            <div infinite-scroll='search.nextPage()' infinite-scroll-disabled='search.busy' infinite-scroll-distance='2' class="col-xs-12 container" >
               <div ng-repeat="r in search.items" style="border-top:1px solid #000;">
-                <div  class="row">
-                  <div class="col-xs-6" ng-hide="r.artists" ng-show="r.artists.length == 0">
-                      <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-                      <a href="#/search/{{r.basename}}">{{r.basename}}</a>
-                      &nbsp;
-                  </div>
-                  <div class="col-xs-6" ng-show="r.artists" ng-hide="r.artists.length == 0">
-                      <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-                      <span ng-repeat="a in r.artists">
-                          <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-show="!$last">, </span>
-                      </span> - 
-                      <a href="#/search/{{r.title}}" ng-show="r.title">{{r.title}}</a>
-                      <a href="#/search/{{r.basename}}" ng-hide="r.title">{{r.basename}}</a>
-                      &nbsp;
-                  </div>
-                  <div class="col-xs-2">
-                      <span ng-repeat="a in r.albums">
-                          <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a><span ng-show="!$last">, </span>
-                      </span>
-                      &nbsp;
-                  </div>
-                  <div class="col-xs-1">
-                      <span ng-repeat="g in r.genres">
-                          <a  href="#/search/{{g.genre}}">{{g.genre}}</a><span ng-show="!$last">, </span>
-                      </span>
-                      &nbsp;
-                  </div>
-                  <div class="col-xs-2">
-                      <span ng-repeat="rating in r.ratings" class="pull-left">
-                          {{rating.uname}} {{ rating.true_score | number : 2}}
-                          <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
-                      </span>
-                      &nbsp;
-                  </div>
-                  <div class="col-xs-1">
-                      <button ng-show="r.cued" class="btn btn-primary btn-block" ng-click="uncue(r.fid)">Uncue</button>
-                      <button ng-hide="r.cued" class="btn btn-default btn-block" ng-click="cue(r.fid)">Cue</button>
-                      &nbsp;
-                  </div>
-                  <div class="clearfix"></div>
-                </div> <!-- end of row -->
-
+                <div ng-include="'/static/templates/item-row.tpl.html'"></div>
               </div><!-- end of ng-repeat -->
               <div ng-show='search.busy' ng-hide="search.done">Loading data...</div>
             </div> <!-- end of infinite scroll container  -->
