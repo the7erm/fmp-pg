@@ -3710,12 +3710,15 @@ angular.module('mgcrea.ngStrap.typeahead', [
           return scope.$matches.length && angular.isString(controller.$viewValue) && controller.$viewValue.length >= options.minLength;
         };
         $typeahead.$getIndex = function (value) {
-          var l = scope.$matches.length, i = l;
+          var l = scope.$matches.length, i = l,
+              _value = value.trim();
+          
           if (!l)
             return;
           for (i = l; i--;) {
-            if (scope.$matches[i].value === value)
+            if (scope.$matches[i].value === _value) {
               break;
+            }
           }
           if (i < 0)
             return;
@@ -3858,7 +3861,7 @@ angular.module('mgcrea.ngStrap.typeahead', [
           var index = typeahead.$getIndex(controller.$modelValue);
           var selected = angular.isDefined(index) ? typeahead.$scope.$matches[index].label : controller.$viewValue;
           selected = angular.isObject(selected) ? selected.label : selected;
-          element.val(selected.replace(/<(?:.|\n)*?>/gm, '').trim());
+          element.val(selected.replace(/<(?:.|\n)*?>/gm, ''));
         };
         // Garbage collection
         scope.$on('$destroy', function () {
