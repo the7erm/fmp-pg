@@ -1,8 +1,8 @@
 
 var fmpApp = angular.module("fmpApp", [
-        'ngRoute', 'ngTagsInput', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
+        'ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
         'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
-        'mgcrea.ngStrap.typeahead', 'infinite-scroll', 'angular-inview'])
+        'mgcrea.ngStrap.typeahead', 'infinite-scroll',  'ngTagsInput'])
         .filter('isEmpty', function () {
             var bar;
             return function (obj) {
@@ -51,13 +51,14 @@ var fmpApp = angular.module("fmpApp", [
         return hours+":"+minutes+":"+seconds;
     };
 
-fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
-    function($rootScope, $http, $interval){
+fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q',
+    function($rootScope, $http, $interval, $timeout, $q){
         var sharedService = {};
-        sharedService.cue = function(fid) {
-            for (var i=0; i<$scope.results.length; i++) {
-                if ($scope.results[i].fid == fid) {
-                    $scope.results[i].cued = fid;
+        sharedService.cue = function($scope, fid) {
+            console.log("CUE");
+            for (var i=0; i<$scope.search.items.length; i++) {
+                if ($scope.search.items[i].fid == fid) {
+                    $scope.search.items[i].cued = fid;
                     var url = "/cue/?fid="+fid+"&cue=true"
                     $http({method: 'GET', url: url})
                     .success(function(data, status, headers, config) {
@@ -71,10 +72,11 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
                 }
             }
         };
-        sharedService.uncue = function(fid) {
-            for (var i=0; i<$scope.results.length; i++) {
-                if ($scope.results[i].fid == fid) {
-                    $scope.results[i].cued = false;
+        sharedService.uncue = function($scope, fid) {
+            console.log("UNCUE");
+            for (var i=0; i<$scope.search.items.length; i++) {
+                if ($scope.search.items[i].fid == fid) {
+                    $scope.search.items[i].cued = false;
                     var url = "/cue/?fid="+fid+"&cue=false"
                     $http({method: 'GET', url: url})
                     .success(function(data, status, headers, config) {
@@ -90,10 +92,9 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval',
         };
         sharedService.getTags = function(viewValue) {
             var params = {"q": viewValue};
-            
             return $http.get('/kw', {params: params})
             .then(function(res) {
-              return res.data;
+                return res.data;
             });
         };
         sharedService.message = "";
@@ -378,6 +379,10 @@ fmpApp.config(['$routeProvider',
             templateUrl: "/static/templates/preload.html",
             controller: "PreloadCtrl"
         })
+        .when("/history", {
+            templateUrl: "/static/templates/history.html",
+            controller: "HistoryCtrl"
+        })
         .otherwise({
             redirectTo: '/'
         });
@@ -385,11 +390,47 @@ fmpApp.config(['$routeProvider',
 
 
 fmpApp.controller("NavCtrl", ['$scope', '$rootScope', '$location', 'fmpService', 
-    function($scope, $rootScope, $location, fmpService){
+                              '$timeout', '$http', '$q',
+    function($scope, $rootScope, $location, fmpService, $timeout, $http, $q){
+
+        console.log("NavCtrl loaded");
         $scope.next = fmpService.next;
         $scope.prev = fmpService.prev;
         $scope.pause = fmpService.pause;
-        $scope.getTags = fmpService.getTags;
+        
+        $scope.query = "";
+        $scope.getTags = function(viewValue) {
+            if ($rootScope.navPromise) {
+                $rootScope.navPromise.abort();
+            }
+            console.log("starting:", viewValue)
+            var deferredAbort = $q.defer(),
+                params = {"q": viewValue},
+                request = $http({
+                    method: "get",
+                    url: "/kw",
+                    params: params,
+                    timeout: deferredAbort.promise
+                });
+            $rootScope.navPromise = request.then(function(res) {
+                // console.log("finished:", viewValue);
+                return res.data;
+            }, function(){
+                // console.log("ABORTED:",viewValue);
+                return( $q.reject( "Aborted" ) );
+            });
+            $rootScope.navPromise.abort = function() {
+                deferredAbort.resolve();
+            };
+            $rootScope.navPromise.finally(
+                function() {
+                    // console.log("cleaning:", viewValue);
+                    $rootScope.navPromise.abort = angular.noop;
+                    deferredAbort = request = $rootScope.navPromise = null;
+                }
+            );
+            return( $rootScope.navPromise );
+        };
 
         $scope.navClass = function (page) {
             var currentRoute = $location.path().substring(1) || 'home';
@@ -399,29 +440,30 @@ fmpApp.controller("NavCtrl", ['$scope', '$rootScope', '$location', 'fmpService',
             }
             return page === currentRoute ? 'active' : '';
         };
-        $scope.doSearch = function() {
-            // console.log("$scope.query:",$scope.query);
-            if ($scope.timeout) {
-                clearTimeout($scope.timeout);
+
+        $scope.cancelTimeout = function() {
+            if ($rootScope.searchTimeout) {
+                $timeout.cancel($rootScope.searchTimeout);
+                $rootScope.searchTimeout = false;
             }
-            $scope.timeout = setTimeout(function(){
+        };
+
+        $scope.doSearch = function() {
+            $scope.cancelTimeout();
+            $rootScope.searchTimeout = $timeout(function(){
                 document.location = "#/search/"+encodeURIComponent($scope.query);
-                $scope.timeout = false;
-            }, 1000);
-            
+            }, 750);
         };
 
         $scope.doSearchNow = function() {
-            if ($scope.timeout) {
-                clearTimeout($scope.timeout);
-            }
+            $scope.cancelTimeout();
             document.location = "#/search/"+encodeURIComponent($scope.query);
         };
 }]);
 
 fmpApp.controller('HomeCtrl', ['$scope', '$routeParams', 'fmpService',
     function($scope, $routeParams) {
-    
+    window.document.title = "fmp - home";
 }]);
 
 
@@ -442,17 +484,19 @@ fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
 
 fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
     function($scope, $routeParams, fmpService, $http, Search) {
-
-    $scope.cue = fmpService.cue;
-    $scope.uncue = fmpService.uncue;
-    
-    $scope.search = new Search("", "/preload");
-    
+    window.document.title = "fmp - Preload";
+    $scope.cue = function(fid) {
+        fmpService.cue($scope, fid);
+    };
+    $scope.uncue = function(fid) {
+        fmpService.uncue($scope, fid);
+    };
+    $scope.search = new Search("", "/preload", 0, 20);
 }]);
 
 fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpService', '$http', '$modal', 'Search',
     function($scope, $rootScope, $routeParams, fmpService, $http, $modal, Search) {
-
+    window.document.title = "fmp - Search";
     // Pre-fetch an external template populated with a custom scope
     var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
     // Show when some event occurs (use $promise property to ensure the template has been loaded)
@@ -462,13 +506,17 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
 
     $scope.new_artist = "";
 
-    $scope.getTags = fmpService.getTags;
+    // $scope.getTags = fmpService.getTags;
 
-    $scope.cue = fmpService.cue;
-    $scope.uncue = fmpService.uncue;
+    $scope.cue = function(fid) {
+        fmpService.cue($scope, fid);
+    };
+    $scope.uncue = function(fid) {
+        fmpService.uncue($scope, fid);
+    };
     $scope.removeGenre = fmpService.removeGenre;
 
-    //console.log("TOP");
+    // console.log("TOP");
     $scope.query = $routeParams.query;
     if (!$scope.query) {
         $scope.query = "";
@@ -483,28 +531,37 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
         $scope.next = fmpService.next;
         $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
-    console.log($scope.playing_data)
+    $scope.r = {};
 
     $scope.$watch('playing_data', function(newValue, oldValue) {
-        $scope.r = $scope.playing_data;
+        // $scope.r = $scope.playing_data;
+        // $scope.r['hide_cued'] = true;
     });
+}]);
+
+fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
+    function($scope, $routeParams, fmpService, $http, Search) {
+    window.document.title = "fmp - history";
+    $scope.cue = function(fid) {
+        fmpService.cue($scope, fid);
+    };
+    $scope.uncue = function(fid) {
+        fmpService.uncue($scope, fid);
+    };
+    $scope.search = new Search("", "/history-data/", 0, 20);
 }]);
 
 // Reddit constructor function to encapsulate HTTP and pagination logic
 fmpApp.factory('Search', function($http) {
-  var Search = function(query, url) {
+  var Search = function(query, url, start, limit) {
     this.items = [];
     this.busy = false;
+    this.done = false;
     this.after = '';
-    this.start = 0;
-    this.limit = 10;
+    this.start = parseInt(start) || 0;
+    this.limit = parseInt(limit) || 10;
     this.url = url || "/search-data-new/";
     this.query = encodeURIComponent(query || "");
-    this.inview = function($index, inview){
-        if (inview && !this.items[$index]['ratings']) {
-            this.items[$index] = this.cacheItems[$index];
-        }
-    };
   };
 
   Search.prototype.nextPage = function() {
@@ -514,6 +571,11 @@ fmpApp.factory('Search', function($http) {
     var url = this.url+"?s="+this.start+"&l="+this.limit+"&q="+this.query;
     $http.get(url).success(function(data) {
       var items = data;
+      if (items.length == 0) {
+        // Out of items leave as 'busy'
+        this.done = true;
+        return;
+      }
       for (var i = 0; i < items.length; i++) {
         this.items.push(items[i]);
       }

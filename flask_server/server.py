@@ -36,6 +36,8 @@ import logging
 import re
 import base64
 import StringIO
+import psycopg2
+import os
 from copy import deepcopy
 
 # from bson import json_util
@@ -359,20 +361,23 @@ def keywords():
     callback = request.args.get('callback')
     words = []
 
-    q = "^%s" % request.args.get('q')
+    q = "%s" % request.args.get('q', "")
+
+    limit = 10
+    max_results = 10
 
     result = get_results_assoc("""SELECT artist 
                                   FROM artists 
                                   WHERE artist ~* %s
                                   ORDER BY artist
-                                  LIMIT 10;""", (q,))
+                                  LIMIT """+str(limit), (q,))
 
     for w in result:
         l = w["artist"].lower().strip()
         if l not in words:
             words.append(l)
 
-    limit = 10 - len(words)
+    limit = max_results - len(words)
 
     if limit > 0:
         result = get_results_assoc("""SELECT genre 
@@ -386,7 +391,7 @@ def keywords():
             if l not in words:
                words.append(l)
 
-        limit = 10 - len(words)
+        limit = max_results - len(words)
 
     if limit > 0:
         result = get_results_assoc("""SELECT basename 
@@ -496,6 +501,8 @@ def status():
     if not extended.get('genres'):
       extended['genres'] = []
 
+    extended = convert_res_to_dict(extended)
+
     return jsonify(player=player_dict, playing=playing_dict,
                    volume=get_volume(), extended=extended)
 
@@ -603,8 +610,9 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     start = int(start)
     limit = int(limit)
     # print "Q:",q
-    no_words_query = """SELECT DISTINCT f.fid, dirname, basename, title,
-                                        sha512, artist, f.fid, p.fid AS cued,
+    """
+    SELECT DISTINCT f.fid, dirname, basename, title,
+                                        sha512, artist, p.fid AS cued,
                                         f.fid AS id, 'f' AS id_type
                         FROM files f 
                              LEFT JOIN preload p ON p.fid = f.fid
@@ -613,26 +621,30 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                              file_locations fl
                         WHERE fl.fid = f.fid
                         ORDER BY artist, title"""
+    no_words_query = """SELECT DISTINCT f.fid, title, sha512, p.fid AS cued,
+                                        f.fid AS id, 'f' AS id_type, artist
+                        FROM files f 
+                             LEFT JOIN preload p ON p.fid = f.fid
+                             LEFT JOIN file_artists fa ON fa.fid = f.fid
+                             LEFT JOIN artists a ON a.aid = fa.aid
+                        ORDER BY artist, title"""
 
-    no_words_rating_query = """SELECT DISTINCT f.fid, dirname, 
-                                               basename, title, sha512, artist, 
-                                               f.fid, p.fid AS cued, 
+    no_words_rating_query = """SELECT DISTINCT f.fid, title, sha512,  
+                                               f.fid, p.fid AS cued, artist,
                                                f.fid AS id, 'f' AS id_type
                                FROM files f 
                                     LEFT JOIN preload p ON p.fid = f.fid
                                     LEFT JOIN file_artists fa ON fa.fid = f.fid
                                     LEFT JOIN artists a ON a.aid = fa.aid,
-                                    user_song_info usi, 
-                                    file_locations fl
+                                    user_song_info usi
                                WHERE rating = %s AND usi.fid = f.fid AND
                                      usi.uid IN (SELECT uid 
                                                  FROM users 
-                                                 WHERE listening = true) AND
-                                     fl.fid = f.fid
+                                                 WHERE listening = true)
                                ORDER BY artist, title"""
 
 
-    query = """SELECT DISTINCT f.fid, dirname, basename, artist, title, sha512,
+    query = """SELECT DISTINCT f.fid, title, sha512, artist,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                FROM files f
@@ -641,13 +653,11 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                     LEFT JOIN artists a ON a.aid = fa.aid,
                     keywords kw,
                     plainto_tsquery('english', %s) query,
-                    file_locations fl
-               WHERE kw.fid = f.fid AND 
-                     f.fid = fl.fid AND
+               WHERE kw.fid = f.fid AND
                      tsv @@ query
                ORDER BY ts_rank DESC, artist, title"""
 
-    rating_query = """SELECT DISTINCT f.fid, dirname, basename, artist, title, sha512,
+    rating_query = """SELECT DISTINCT f.fid, title, sha512, artist,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
                       FROM files f
@@ -657,11 +667,9 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                            keywords kw,
                            plainto_tsquery('english', %s) query,
                            user_song_info usi,
-                           file_locations fl
                       WHERE kw.fid = f.fid AND tsv @@ query AND 
                             usi.rating = %s AND
-                            f.fid = usi.fid AND 
-                            fl.fid = fi.fid
+                            f.fid = usi.fid AND
                             usi.uid IN (SELECT uid 
                                         FROM users 
                                         WHERE listening = true)
@@ -707,6 +715,24 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
         print "(flask_server) psycopg2.InternalError:",err
     return results
 
+def locations_for_fid(fid):
+    locations = get_results_assoc("""SELECT dirname, basename
+                                     FROM file_locations
+                                     WHERE fid = %s
+                                     ORDER BY dirname, basename""", (fid,))
+
+    results = []
+    for l in locations:
+        path = os.path.join(l['dirname'], l['basename'])
+        if os.path.exists(path):
+            results.append({
+                "dirname": l['dirname'],
+                "basename": l['basename'],
+            })
+
+    return results
+
+
 
 def convert_res_to_dict(r):
     # print "R:",r
@@ -717,10 +743,18 @@ def convert_res_to_dict(r):
     # print "DICT:",rdict
     try:
         fid = r['fid']
-        rdict['usi'] = rdict['ratings'] = listeners_info_for_fid(fid)
+        rdict['ratings'] = listeners_info_for_fid(fid)
         rdict['artists'] = artists_for_fid(fid)
         rdict['albums'] = albums_for_fid(fid)
         rdict['genres'] = genres_for_fid(fid)
+        rdict['locations'] = locations_for_fid(fid)
+        if rdict['locations']:
+            rdict['dirname'] = rdict['locations'][0]['dirname']
+            rdict['basename'] = rdict['locations'][0]['basename']
+        else:
+            rdict['dirname'] = '-missing-'
+            rdict['basename'] = '-missing-'
+
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
         print "(flask_server) psycopg2.IntegrityError:",err
@@ -1073,39 +1107,64 @@ def history_data():
     offset = "%d" % start
     limit = "%d" % limit
     # LIMIT %d OFFSET %d
-    history_res = get_results_assoc("""SELECT uh.*, uname
-                                   FROM user_history uh, users u
-                                   WHERE uh.uid = u.uid AND 
-                                         u.listening = true AND
-                                         time_played IS NOT NULL 
-                                   ORDER BY time_played DESC, admin DESC, uname
-                                   LIMIT """+limit+""" OFFSET """+offset)
+
+    """
+                        SELECT DISTINCT f.fid, dirname, basename, title,
+                                        sha512, artist, p.fid AS cued,
+                                        f.fid AS id, 'f' AS id_type
+                        FROM files f 
+                             LEFT JOIN preload p ON p.fid = f.fid
+                             LEFT JOIN file_artists fa ON fa.fid = f.fid
+                             LEFT JOIN artists a ON a.aid = fa.aid,
+                             file_locations fl
+                        WHERE fl.fid = f.fid
+                        ORDER BY artist, title"""
+    history_res = get_results_assoc("""SELECT uh.*, uname,
+                                              f.fid, title,
+                                              sha512,
+                                              p.fid AS cued
+                                       FROM user_history uh,
+                                            users u,
+                                            files f
+                                            LEFT JOIN preload p ON p.fid = f.fid
+                                       WHERE uh.uid = u.uid AND 
+                                             u.listening = true AND
+                                             time_played IS NOT NULL AND 
+                                             uh.id_type = 'f' AND
+                                             uh.id = f.fid
+                                       ORDER BY uh.time_played DESC, admin DESC, uname
+                                       LIMIT """+limit+""" OFFSET """+offset)
+
     results = []
     for h in history_res:
-        h = dict(h)
-        results.append(h)
+        results.append(convert_res_to_dict(h))
+
     return json_dump(results)
 
 @app.route("/preload", methods=['GET', 'POST'])
 def preload():
     start, limit = get_start_limit()
-    offset = "%d" % start
-    limit = "%d" % limit
-    preload = get_results_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
-                                        sha512, artist, f.fid, p.fid AS cued,
+    start = int(start)
+    limit = int(limit)
+    end = start + limit
+    preload = get_results_assoc("""SELECT DISTINCT f.fid, artist, title,
+                                        sha512, p.fid AS cued, artist,
                                         f.fid AS id, 'f' AS id_type
                                    FROM files f
-                                       LEFT JOIN file_artists fa ON fa.fid = f.fid
-                                       LEFT JOIN artists a ON a.aid = fa.aid,
-                                       preload p,
-                                       file_locations fl
-                                   WHERE fl.fid = f.fid AND p.fid = f.fid
-                                   ORDER BY artist, title
-                                   LIMIT """+limit+""" OFFSET """+offset)
+                                        LEFT JOIN file_artists fa ON fa.fid = f.fid
+                                        LEFT JOIN artists a ON a.aid = fa.aid,
+                                        preload p
+                                   WHERE p.fid = f.fid
+                                   ORDER BY artist, title""")
     results = []
     already_present_fids = []
+    idx = -1;
     for p in preload:
         if p['fid'] in already_present_fids:
+            print "ALREADY PROCESSED", p['fid']
+            continue
+        idx += 1
+        if idx < start or idx > end:
             continue
         already_present_fids.append(p['fid'])
         results.append(convert_res_to_dict(p))
