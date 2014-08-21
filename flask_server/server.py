@@ -652,7 +652,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                     LEFT JOIN file_artists fa ON fa.fid = f.fid
                     LEFT JOIN artists a ON a.aid = fa.aid,
                     keywords kw,
-                    plainto_tsquery('english', %s) query,
+                    plainto_tsquery('english', %s) query
                WHERE kw.fid = f.fid AND
                      tsv @@ query
                ORDER BY ts_rank DESC, artist, title"""

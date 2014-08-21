@@ -2,7 +2,7 @@
 var fmpApp = angular.module("fmpApp", [
         'ngRoute', 'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
         'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
-        'mgcrea.ngStrap.typeahead', 'infinite-scroll',  'ngTagsInput'])
+        'mgcrea.ngStrap.typeahead', 'infinite-scroll',  'ngTagsInput', 'snap'])
         .filter('isEmpty', function () {
             var bar;
             return function (obj) {
@@ -51,6 +51,13 @@ var fmpApp = angular.module("fmpApp", [
         return hours+":"+minutes+":"+seconds;
     };
 
+fmpApp.config(function($modalProvider) {
+  angular.extend($modalProvider.defaults, {
+    animation: 'am-flip-x',
+    container: "body"
+  });
+})
+
 fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q',
     function($rootScope, $http, $interval, $timeout, $q){
         var sharedService = {};
@@ -62,7 +69,6 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
                     var url = "/cue/?fid="+fid+"&cue=true"
                     $http({method: 'GET', url: url})
                     .success(function(data, status, headers, config) {
-                        
 
                     })
                     .error(function(data, status, headers, config) {
@@ -470,13 +476,16 @@ fmpApp.controller('HomeCtrl', ['$scope', '$routeParams', 'fmpService',
 fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
     function($scope, $modal, $fmpService) {
 
-    var myModal = $modal({title: 'My Title', content: 'My Content', show: true});
-
     // Pre-fetch an external template populated with a custom scope
-    var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
+    var infoModal = $modal({
+        scope: $scope, 
+        template: '/static/templates/popover.tpl.html', 
+        show: false,
+        container: "body"
+    });
     // Show when some event occurs (use $promise property to ensure the template has been loaded)
     $scope.showModal = function() {
-        myOtherModal.$promise.then(myOtherModal.show);
+        infoModal.$promise.then(infoModal.show);
     };
 
     
@@ -498,10 +507,15 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
     function($scope, $rootScope, $routeParams, fmpService, $http, $modal, Search) {
     window.document.title = "fmp - Search";
     // Pre-fetch an external template populated with a custom scope
-    var myOtherModal = $modal({scope: $scope, template: '/static/templates/popover.tpl.html', show: false});
+    var infoModal = $modal({
+        scope: $scope, 
+        template: '/static/templates/popover.tpl.html', 
+        show: false, 
+        container: "body"
+    });
     // Show when some event occurs (use $promise property to ensure the template has been loaded)
     $scope.showModal = function() {
-        myOtherModal.$promise.then(myOtherModal.show);
+        infoModal.$promise.then(infoModal.show);
     };
 
     $scope.new_artist = "";
@@ -534,9 +548,24 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
     $scope.r = {};
 
     $scope.$watch('playing_data', function(newValue, oldValue) {
-        // $scope.r = $scope.playing_data;
+        // populate $scope.r so the modal dialog shows up.
+        $scope.r = $scope.playing_data;
         // $scope.r['hide_cued'] = true;
     });
+
+    // Pre-fetch an external template populated with a custom scope
+    var infoModal = $modal({
+        scope: $scope, 
+        template: '/static/templates/popover.tpl.html', 
+        show: false,
+        container: "body",
+        element: true
+    });
+    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+    $scope.showModal = function() {
+        infoModal.$promise.then(infoModal.show);
+    };
+
 }]);
 
 fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
