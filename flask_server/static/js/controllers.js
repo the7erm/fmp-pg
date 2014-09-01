@@ -1,9 +1,46 @@
-var fmpApp = angular.module('fmpApp', [
-	'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
-	'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
-	'mgcrea.ngStrap.typeahead',
+var fmpApp = angular.module('fmpApp', ['ui.bootstrap',
+    'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
+    'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
+    'mgcrea.ngStrap.typeahead',
     'ngRoute','infinite-scroll'
+    
 ]);
+
+
+fmpApp.config(['$routeProvider',
+    function($routeProvider) {
+        $routeProvider.when('/home', {
+            templateUrl: '/static/templates/home.html',
+            controller: 'HomeCtrl'
+        })
+        .when("/search", {
+            templateUrl: "/static/templates/search.html",
+            controller: "SearchCtrl"
+        })
+        .when("/search/:query", {
+            templateUrl: "/static/templates/search.html",
+            controller: "SearchCtrl"
+        })
+        .when("/preload", {
+            templateUrl: "/static/templates/preload.html",
+            controller: "PreloadCtrl"
+        })
+        .when("/history", {
+            templateUrl: "/static/templates/history.html",
+            controller: "HistoryCtrl"
+        })
+        .when("/podcasts", {
+            templateUrl: "/static/templates/podcasts.html",
+            controller: "PodcastCtrl"
+        })
+        .when("/podcasts/:query", {
+            templateUrl: "/static/templates/podcasts.html",
+            controller: "PodcastCtrl"
+        })
+        .otherwise({
+            redirectTo: '/home'
+        });
+}]);
 
 fmpApp.factory('Search', ['$http', '$timeout', function($http, $timeout) {
   console.log("Search factory")
@@ -534,30 +571,67 @@ fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http
     $scope.search = new Search("", "/history-data/", 0, 20);
 }]);
 
-fmpApp.config(['$routeProvider',
-    function($routeProvider) {
-        $routeProvider.when('/home', {
-            templateUrl: '/static/templates/home.html',
-            controller: 'HomeCtrl'
+
+fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', function($scope, $http, $location){
+    $scope.oneAtATime = false;
+    $scope.podcasts = [];
+    $scope.subscribers = [];
+    var url = "";
+     $http({method: 'GET', url: "/podcasts/"})
+    .success(function(data, status, headers, config) {
+        console.log("re-fetched");
+        $scope.podcasts = data;
+    })
+    .error(function(data, status, headers, config) {
+      // called asynchronously if an error occurs
+      // or server returns response with an error status.
+    });
+
+    $scope.loadEpisodes = function(nid, open) {
+        console.log("CLICKED", nid)
+        
+        $http({method: 'GET', url: "/feed-data/"+nid})
+        .success(function(data, status, headers, config) {
+            for (var i=0;i<$scope.podcasts.length;i++) {
+                if ($scope.podcasts[i].nid == nid) {
+                    for (i2=0;i2< data.length; i2++) {
+                        data[i2]['pub_date'] = new Date(data[i2]['pub_date']).toLocaleString(); 
+                    }
+                    $scope.podcasts[i].episodes = data;
+                }
+            }
         })
-        .when("/search", {
-            templateUrl: "/static/templates/search.html",
-            controller: "SearchCtrl"
-        })
-        .when("/search/:query", {
-            templateUrl: "/static/templates/search.html",
-            controller: "SearchCtrl"
-        })
-        .when("/preload", {
-            templateUrl: "/static/templates/preload.html",
-            controller: "PreloadCtrl"
-        })
-        .when("/history", {
-            templateUrl: "/static/templates/history.html",
-            controller: "HistoryCtrl"
-        })
-        .otherwise({
-            redirectTo: '/home'
+        .error(function(data, status, headers, config) {
+          // called asynchronously if an error occurs
+          // or server returns response with an error status.
         });
+    }
 }]);
 
+
+function AccordionDemoCtrl($scope) {
+  $scope.oneAtATime = true;
+
+  $scope.groups = [
+    {
+      title: 'Dynamic Group Header - 1',
+      content: 'Dynamic Group Body - 1'
+    },
+    {
+      title: 'Dynamic Group Header - 2',
+      content: 'Dynamic Group Body - 2'
+    }
+  ];
+
+  $scope.items = ['Item 1', 'Item 2', 'Item 3'];
+
+  $scope.addItem = function() {
+    var newItemNo = $scope.items.length + 1;
+    $scope.items.push('Item ' + newItemNo);
+  };
+
+  $scope.status = {
+    isFirstOpen: true,
+    isFirstDisabled: false
+  };
+}

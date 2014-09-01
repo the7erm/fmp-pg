@@ -1,0 +1,24 @@
+<h1>Podcasts</h1>
+
+<accordion close-others="oneAtATime">
+  <accordion-group is-open="podcast.open" ng-repeat="podcast in podcasts">
+      <accordion-heading>
+          <a ng-click="loadEpisodes(podcast.nid, podcast.open)">
+            {{podcast.netcast_name}} 
+            <i class="pull-right glyphicon" ng-class="{'glyphicon-chevron-down': podcast.open, 'glyphicon-chevron-right': !podcast.open}"></i>
+          </a>
+      </accordion-heading>
+      <table class="table">
+          <thead>
+            <tr>
+              <th>Episode Title</th>
+              <th>Publish Date</th>
+            </tr>
+          </thead>
+          <tr ng-repeat="episode in podcast.episodes">
+            <td>{{ episode.episode_title }}</td>
+            <td>{{ episode.pub_date }}</td>
+          </tr>
+      </table>
+  </accordion-group>
+</accordion>

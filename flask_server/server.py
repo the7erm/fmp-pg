@@ -1214,6 +1214,32 @@ def set_file_title():
       "file_info": dict(file_info)
     })
 
+@app.route('/podcasts/', methods=['GET'])
+def get_podcasts():
+    podcasts = get_results_assoc("""SELECT * 
+                                    FROM netcasts 
+                                    ORDER BY netcast_name""")
+    podcast_data = []
+    for p in podcasts:
+        podcast_data.append(dict(p))
+    return json_dump(podcast_data)
+
+@app.route("/feed-data/<nid>", methods=['GET'])
+def get_episodes(nid):
+    episodes = get_results_assoc("""SELECT *
+                                    FROM netcast_episodes
+                                    WHERE nid = %s
+                                    ORDER BY pub_date DESC
+                                    LIMIT 10""", (nid, ))
+
+    episode_data = []
+    for ep in episodes:
+      episode_data.append(dict(ep))
+
+    return json_dump(episode_data)
+
+
+
 def worker(*args, **kwargs):
     """thread worker function"""
     print 'WORKER, args:',args, kwargs
