@@ -1,297 +1,60 @@
 <!doctype html>
-    <html>
-    <head>
-        <link rel="stylesheet" href="/static/bower_components/angular-snap/angular-snap.min.css">
-        <link rel="stylesheet" href="//rawgithub.com/mgcrea/angular-motion/master/dist/angular-motion.min.css">
-        <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+<html lang="en" ng-app="fmpApp">
+<head>
+    <meta charset="utf-8">
+    <title>FMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/bower_components/ng-tags-input/ng-tags-input.min.css">
+    <link rel="stylesheet" href="/static/css/bootstrap.css">
+    <link rel="stylesheet" href="/static/css/app.css">
 
-        <link rel="stylesheet" href="/static/bower_components/ng-tags-input/ng-tags-input.min.css">
+    <script src="/static/bower_components/jquery/dist/jquery.js"></script>
+    <script src="/static/bower_components/jquery-migrate/jquery-migrate.js"></script>
 
-        <script type="text/javascript" src="//code.jquery.com/jquery-2.1.1.js"></script>
-        <script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.js"></script>
-        <!-- Latest compiled and minified JavaScript -->
-        <script type="text/javascript" src="/static/bower_components/snapjs/snap.min.js"></script>
-        <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-        <script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.2.9/angular.js"></script>
-        <script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.2.9/angular-route.min.js"></script>
-
-        <script src="/static/bower_components/angular-strap/dist/angular-strap.js"></script> 
-        <script src="/static/bower_components/angular-strap/dist/angular-strap.tpl.js"></script>
-
-        <script type="text/javascript" src="/static/bower_components/ng-tags-input/ng-tags-input.min.js"></script>
-
-        <script type="text/javascript" src="/static/bower_components/angular-snap/angular-snap.min.js"></script>
-
-        <script type="text/javascript" src="/static/js/ng-infinite-scroll.js"></script>
-        <script type="text/javascript" src="/static/js/fmp-angular.js"></script>
-        <script type="text/javascript">
-
-        </script>
-        <style>
-            .rating {
-              color: #a9a9a9;
-              margin: 0;
-              padding: 0;
-              font-size:1.70em;
-            }
-
-            ul.rating {
-              display: inline-block;
-            }
-
-            .rating li {
-              list-style-type: none;
-              display: inline-block;
-              padding: 1px;
-              text-align: center;
-              font-weight: bold;
-              cursor: pointer;
-            }
-
-            .rating li a {
-              font-size:0.76em;
-              color: red;
-            }
-
-
-            .rating .filled {
-              color: orange;
-            }
-
-            ul.artists {
-                display: inline;
-                padding:0px;
-            }
-
-            li.artist {
-                list-style-type: none;
-                padding:1px;
-                display: inline;
-            }
-
-            .float-right {
-                float:right;
-            }
-
-            .loadingbox {
-              position: fixed; 
-              bottom:0px;
-              background-color: #fff !important;
-              border: 4px dashed #000;
-              display:block;
-              z-index: 1000;
-              margin-right: 5px;
-              margin-left: 5px;
-            }
-
-            .nav-button-img {
-              height:20px; 
-              width:auto;
-            }
-
-            .dropdown-menu li a {
-                cursor: pointer;
-            }
-
-            .popover {
-                min-width: 200px;
-                max-width: 600px;
-            }
-
-            .cursor-pointer {
-              cursor: pointer;
-            }
-
-            .item-info {
-              cursor: pointer;
-            }
-
-            .snap-drawer { 
-              background:#fff; 
-              border-right:1px solid; 
-              border-left:1px solid; 
-              padding-top:60px; 
-            }
-
-
-        </style>
-    </head>
-    <body>
-        {% raw %}
-        <div ng-app="fmpApp">
-          <div id="nav-links" ng-controller="NavCtrl" >
-                <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
-                  <div class="container">
-                    <!-- Brand and toggle get grouped for better mobile display -->
-                    <div class="navbar-header">
-                      <ul class="nav navbar-nav">
-                          <li ng-class="navClass('home')"><a href="#/">Home</a></li>
-                          <li ng-class="navClass('search')"><a href="#/search" ng-click="doSearchNow()">Search</a></li>
-                          <li ng-class="navClass('preload')"><a href="#/preload">Preload</a></li>
-                          <li ng-class="navClass('history')"><a href="#/history">History</a></li>
-                      </ul>
-                    </div>
-
-                    <!-- Collect the nav links, forms, and other content for toggling -->
-                    <div class="collapse navbar-collapse">
-                      <!--
-                      <ul class="nav navbar-nav">
-                        <li class="active"><a href="#">Link</a></li>
-                        <li><a href="#">Link</a></li>
-                        <li class="dropdown">
-                          <a href="javascript.void(0);" class="dropdown-toggle" data-toggle="dropdown">Dropdown <span class="caret"></span></a>
-                          <ul class="dropdown-menu" role="menu">
-                            <li><a href="#">Action</a></li>
-                            <li><a href="#">Another action</a></li>
-                            <li><a href="#">Something else here</a></li>
-                            <li class="divider"></li>
-                            <li><a href="#">Separated link</a></li>
-                            <li class="divider"></li>
-                            <li><a href="#">One more separated link</a></li>
-                          </ul>
-                        </li>
-                      </ul> -->
-                      <ul class="nav navbar-nav navbar-right">
-                        <li class="dropdown">
-                          <a class="dropdown-toggle cursor-pointer" data-toggle="dropdown"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"></a>
-                          <ul class="dropdown-menu" role="menu" src="/static/images/PLAYING.png">
-                            <li><a ng-click="prev()"><img src="/static/images/media-seek-backward.png" class="nav-button-img"> Prev</a></li>
-                            <li><a ng-click="pause()"><img src="/static/images/PLAYING.png" ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="nav-button-img"> Pause</a></li>
-                            <li><a ng-click="next()"><img src="/static/images/media-seek-forward.png" class="nav-button-img"> Next</a></li>
-                          </ul>
-                        </li>
-                      </ul>
-                      <form class="navbar-form navbar-right" role="search">
-                        <div class="form-group">
-                          <input type="text" class="form-control" placeholder="Search" ng-model="query" ng-change="doSearch()" ng-options="tag for tag in getTags($viewValue)" data-minLength="1"  ng-trim="false"  data-trigger="focus" bs-typeahead>
-                        </div>
-                        <button type="submit" class="btn btn-default" ng-click="doSearchNow()">Search</button>
-                      </form>
-
-                      <!--
-                      <ul class="nav navbar-nav navbar-right">
-                        <li><a href="#">Link</a></li>
-                        <li class="dropdown">
-                          <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <span class="caret"></span></a>
-                          <ul class="dropdown-menu" role="menu">
-                            <li><a href="#">Action</a></li>
-                            <li><a href="#">Another action</a></li>
-                            <li><a href="#">Something else here</a></li>
-                            <li class="divider"></li>
-                            <li><a href="#">Separated link</a></li>
-                          </ul>
-                        </li>
-                      </ul> -->
-                    </div><!-- /.navbar-collapse -->
-                  </div><!-- /.container-fluid -->
-                </nav>
-          </div>
-
-          <div ng-controller="CurrentlyPlayingCtrl" style="border:1px solid;">
-            <button ng-click="prev()" class="btn btn-primary"><img src="/static/images/media-seek-backward.png"></button>
-              <button ng-click="pause()" class="btn btn-primary"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png"></button>
-              <button ng-click="next()" class="btn btn-primary"><img src="/static/images/media-seek-forward.png"></button>
-              <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-              <span ng-repeat="a in r.artists">
-                <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-show="!$last">, </span>
-              </span> - 
-              <a href="#/search/{{r.title}}" ng-show="r.title">{{r.title}}</a>
-              <a href="#/search/{{r.basename}}" ng-hide="r.title">{{r.basename}}</a>
-              <div class="col-xs-8">
-                  <span ng-repeat="rating in r.ratings" class="pull-left">
-                      {{rating.uname}} {{ rating.true_score | number : 2}}
-                      <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
-                  </span>
-                  &nbsp;
-              </div>
-          </div>
-          <div snap-drawer>
-
-              <div ng-controller="CurrentlyPlayingCtrl">
-                <button ng-click="prev()" class="btn btn-primary"><img src="/static/images/media-seek-backward.png"></button>
-                  <button ng-click="pause()" class="btn btn-primary"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png"></button>
-                  <button ng-click="next()" class="btn btn-primary"><img src="/static/images/media-seek-forward.png"></button>
-                  <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-                  <span ng-repeat="a in r.artists">
-                    <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-show="!$last">, </span>
-                  </span> - 
-                  <a href="#/search/{{r.title}}" ng-show="r.title">{{r.title}}</a>
-                  <a href="#/search/{{r.basename}}" ng-hide="r.title">{{r.basename}}</a>
-                  <div class="col-xs-8">
-                      <span ng-repeat="rating in r.ratings" class="pull-left">
-                          {{rating.uname}} {{ rating.true_score | number : 2}}
-                          <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
-                      </span>
-                      &nbsp;
-                  </div>
-              </div>
-          </div>
-          <div snap-drawer="right">
-          </div>
-          <div snap-content style="background:#fff;">
-            <br>
-            <br>
-            <br>
-            <br>
-            <div ng-controller="CurrentlyPlayingCtrl">
-                  
-                  <div class="container-fluid">
-
-                    <div class="row">
-                      <div class="col-xs-10">
-                          <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-                          <ul class="artists">
-                              <li ng-repeat="a in playing_data.artists" class='artist' ><a class="btn btn-default" href="#/search/{{a.artist}}">{{ a.artist }}</a></li>
-                          </ul>
-                          <span ng-show="playing_data.title"> - <a class="btn btn-default"  href="#/search/{{ playing_data.title }}">{{ playing_data.title }}</a></span>
-                          <span ng-hide="playing_data.title"> - <a class="btn btn-default"  href="#/search/{{ playing_data.basename }}">{{ playing_data.basename }}</a>
-                          </span>
-                      </div>
-                      <div class="col-xs-2">-{{ playing_data.pos_data.left_str }} {{ playing_data.pos_data.pos_str }}/{{ playing_data.pos_data.dur_str }}</div>
-                    </div>
-                    <div class="row">
-                      <div class="col-xs-12">
-                        <ul class="artists">
-                            <li ng-repeat="g in playing_data.genres" class='artist'><a class="btn btn-default" href="#/search/{{g.genre}}">{{ g.genre }}</a></li>
-                        </ul>
-                      </div>
-                    </div>
-                    <br>
-                    <div class="row">
-                      <div class="col-xs-12">
-                        <button ng-click="prev()" class="btn btn-primary"><img src="/static/images/media-seek-backward.png"></button>
-                        <button ng-click="pause()" class="btn btn-primary"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png"></button>
-                        <button ng-click="next()" class="btn btn-primary"><img src="/static/images/media-seek-forward.png"></button>
-                        <br>
-                        <br>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="col-xs-12">
-                        <table class="table table-stripe" ng-hide="playing_data.ratings | isEmpty">
-                            <tr>
-                                <th>User</th>
-                                <th>rating</th>
-                                <th>true score</th>
-                            </tr>
-                            <tr ng-repeat="rating in playing_data.ratings">
-                                <td>{{ rating.uname }}</td>
-                                <td><div class="star-rating" star-rating rating-value="rating"
-                                     data-max="6"></div>
-                                    </div>
-                                </td>
-                                <td>{{ rating.true_score | number : 2}}</td>
-                            </tr>
-                        </table>
-                      </div>
-                    </div>
-                 </div>
-              </div>
-            <div class="container-fluid">
-              <div ng-view>NG View</div>
-            </div>  
-          </div>
+    <script src="/static/bower_components/angular/angular.js"></script>
+    <script src="/static/bower_components/angular-route/angular-route.js"></script>
+    <script src="/static/bower_components/angular-strap/dist/angular-strap.js"></script>
+    <script src="/static/bower_components/angular-strap/dist/angular-strap.tpl.js"></script>
+    <script src="/static/js/bootstrap.js"></script>
+    <script type="text/javascript" src="/static/bower_components/ng-tags-input/ng-tags-input.min.js"></script>
+    <script type="text/javascript" src="/static/js/ng-infinite-scroll.js"></script>
+    <script src="/static/js/controllers.js"></script>
+</head>
+<body>
+    {% raw %}
+    <div class="navbar navbar-fixed-top navbar-default" bs-navbar>
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">FMP</a>
+            <button class="navbar-toggle" data-toggle="collapse" data-target=".navHeaderCollapse" >
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <div class="collapse navbar-collapse navHeaderCollapse">
+                <ul class="nav navbar-nav navbar-left">
+                    <li data-match-route="/home"><a href="#/">Home</a></li>
+                    <li data-match-route="/search.*"><a href="#/search/">Search</a></li>
+                    <li data-match-route="/history"><a href="#/history/">History</a></li>
+                    <li data-match-route="/preload"><a href="#/preload/">Preload</a></li>
+                </ul>
+            </div>
         </div>
-        {% endraw %}
-    </body>
+    </div>
+    <div class="container-fluid">
+        <div ng-include="'/static/templates/currently-playing.tpl.html'"></div>
+    </div>
+
+    <div class="container-fluid" ng-view>
+    </div>
+    <div class="container-fluid">
+        <div class="nav navbar-fixed-bottom" role="navigation" ng-controller="ControlsCtrl">
+            <div class="btn-group btn-group-justified">
+                <a ng-click="prev()" class="btn btn-primary navbar-btn"><img src="/static/images/media-seek-backward.png" class="media-btn"></a>
+                <a ng-click="pause()" class="btn btn-primary navbar-btn"><img ng-src="/static/images/{{ (playing_data && playing_data.playingState) || 'PLAYING' }}.png" class="media-btn"></a>
+                <a ng-click="next()" class="btn btn-primary navbar-btn"><img src="/static/images/media-seek-forward.png" class="media-btn"></a>
+            </div>
+        </div>
+    </div>
+    {% endraw %}
+</body>
 </html>

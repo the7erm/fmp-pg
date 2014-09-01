@@ -1778,12 +1778,9 @@ angular.module('mgcrea.ngStrap.modal', ['mgcrea.ngStrap.helpers.dimensions']).pr
         $modal.$promise = fetchTemplate(options.template);
         var scope = $modal.$scope = options.scope && options.scope.$new() || $rootScope.$new();
 
-        console.log("options.container:", options.container);
         if (!options.element && !options.container) {
           options.container = 'body';
         }
-        console.log("options.element:",options.element);
-        console.log("options.container:", options.container);
         // Support scope as string options
         forEach([
           'title',

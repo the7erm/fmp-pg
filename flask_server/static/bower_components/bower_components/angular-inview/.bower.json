@@ -1,0 +1,28 @@
+{
+  "name": "angular-inview",
+  "version": "1.3.3",
+  "main": "./angular-inview.js",
+  "dependencies": {
+    "angular": "~1.2.16"
+  },
+  "devDependencies": {
+    "jquery": "~2.0.3",
+    "angular-mocks": "~1.2.16"
+  },
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/thenikso/angular-inview.git"
+  },
+  "homepage": "https://github.com/thenikso/angular-inview",
+  "_release": "1.3.3",
+  "_resolution": {
+    "type": "version",
+    "tag": "v1.3.3",
+    "commit": "ea0c4e158d0111f7088d0d15edae5427546f042e"
+  },
+  "_source": "git://github.com/thenikso/angular-inview.git",
+  "_target": "~1.3.3",
+  "_originalSource": "angular-inview",
+  "_direct": true
+}

@@ -333,7 +333,10 @@ fmpApp.directive('starRating',['fmpService',
     function(fmpService) {
         return {
             restrict : 'A',
-            template : '<ul class="rating"> <li ng-repeat="star in stars" ng-class="star" ng-click="toggle($index)">  <a ng-show="!$index">&nbsp;\u20E0&nbsp;</a><i ng-show="$index > 0">\u2605</i></li></ul>',
+            template : '<ul class="rating"> <li ng-repeat="star in stars" ' + \
+                       'ng-class="star" ng-click="toggle($index)">  ' + \
+                       '<a ng-show="!$index">&nbsp;\u20E0&nbsp;</a>'  + \
+                       '<i ng-show="$index > 0">\u2605</i></li></ul>',
             scope : {
                 ratingValue : '=',
                 max : '=',
@@ -540,8 +543,8 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 'fmpSer
 
 }]);
 
-fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
-    function($scope, fmpService, $modal){
+fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal', '$location',
+    function($scope, fmpService, $modal, $location){
         $scope.next = fmpService.next;
         $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
@@ -566,6 +569,19 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal',
         infoModal.$promise.then(infoModal.show);
     };
 
+    $scope.navClass = function (page) {
+        var currentRoute = $location.path().substring(1) || 'home';
+        // var re = new RegExp("ab+c");
+        if (page == 'search') {
+            return currentRoute.indexOf(page) == 0 ? 'active' : '';
+        }
+        return page === currentRoute ? 'active' : '';
+    };
+
+    $scope.doSearchNow = function() {
+        $scope.cancelTimeout();
+        document.location = "#/search/"+encodeURIComponent($scope.query);
+    };
 }]);
 
 fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
@@ -580,8 +596,8 @@ fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http
     $scope.search = new Search("", "/history-data/", 0, 20);
 }]);
 
-// Reddit constructor function to encapsulate HTTP and pagination logic
 fmpApp.factory('Search', function($http) {
+  console.log("SEARCH");
   var Search = function(query, url, start, limit) {
     this.items = [];
     this.busy = false;
@@ -614,5 +630,12 @@ fmpApp.factory('Search', function($http) {
     }.bind(this));
   };
 
+  console.log("registering search")
+
+    $(".snap-content").on("scroll", function(){
+        $(window).scroll();
+    });
+
   return Search;
 });
+

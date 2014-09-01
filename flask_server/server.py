@@ -174,6 +174,13 @@ def angular():
                            PLAYING=PLAYING, volume=get_volume(), 
                            extended=get_extended())
 
+@app.route("/angular/")
+def angluar_new():
+    global playing, player, tray
+    return render_template("angular_new.html", player=player, playing=playing, 
+                           PLAYING=PLAYING, volume=get_volume(), 
+                           extended=get_extended())
+
 def reload_playing(fid):
     global playing, player
     print "-="*20
@@ -965,7 +972,7 @@ def cache_some_results(q, start, limit, filter_by):
 
 @app.route('/search-data-new/', methods=['GET', 'POST'])
 def search_data_new():
-    
+    start_time = datetime.datetime.now()
     # convert_res_to_dict
     results = None
     q = request.args.get("q","")
@@ -978,6 +985,7 @@ def search_data_new():
     #                                                  limit, filter_by))
     # threads.append(t)
     # t.start()
+    print "RUNNING TIME:", datetime.datetime.now() - start_time
     return fixed_results
 
 
