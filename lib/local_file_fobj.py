@@ -67,6 +67,7 @@ class Local_File(fobj.FObj):
         self.mark_as_played_lock = False
         self.last_time_marked_as_played = datetime.now()
         self.edited = False
+        self.rating_callback = None
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
                           dirname=dirname, basename=basename, filename=filename, 
@@ -937,8 +938,13 @@ class Local_File(fobj.FObj):
             d.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
                                       selected=selected)
 
-        return self.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
-                                            selected=selected)
+        res = self.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
+                                           selected=selected)
+
+        if self.rating_callback:
+            self.rating_callback(res)
+
+        return res
 
     def add_genre(self, genre_name):
         for g in self.genres:

@@ -258,10 +258,15 @@ def mark_as_played(percent_played=0):
     if updated:
         for r in updated:
             res.append(dict(r))
-    plugins.write({
+
+    update_data = {
         "mark-as-played": percent_played,
         "res": res
-    })
+    }
+
+    plugins.write(update_data)
+
+    flask_server.server.emit_mark_as_played(update_data)
 
 
 def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str, 
@@ -444,10 +449,14 @@ def start_playing(direction="inc"):
         else:
             inc_index()
 
+    playing.rating_callback = flask_server.server.emit_status
+
     plr.filename = playing.filename
     plr.start()
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
+    flask_server.server.player = plr
+    flask_server.server.emit_status(playing)
 
 def on_state_change(*args, **kwargs):
     gtk.gdk.threads_leave()

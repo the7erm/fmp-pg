@@ -1,0 +1,21 @@
+<div class="modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" ng-click="$hide()">&times;</button>
+        <h4 class="modal-title">Add feed</h5>
+      </div>
+      <div class="modal-body">
+          <h5>Url</h5>
+          <input type="text" ng-model="newFeedUrl"
+                 class="form-control" placeholder="RSS url">
+          <div class="error">{{feedError}}</div>
+          {{ newFeedUrl }}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" ng-click="addFeed(newFeedUrl);"><span class="glyphicon glyphicon-plus"></span> Add Feed</button>
+        <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

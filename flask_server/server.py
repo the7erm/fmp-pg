@@ -17,6 +17,9 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+from gevent import monkey
+monkey.patch_all()
+
 from __init__ import *
 from flask import Flask
 from flask import request
@@ -24,6 +27,12 @@ from flask import redirect
 from flask import session
 from flask import jsonify
 from flask import send_file
+
+
+from threading import Thread
+from flask import Flask, render_template, session, request
+from flask.ext.socketio import SocketIO, emit, join_room, leave_room
+
 
 import datetime
 import random
@@ -38,6 +47,7 @@ import base64
 import StringIO
 import psycopg2
 import os
+from lib.netcast_fobj import Netcast
 from copy import deepcopy
 
 # from bson import json_util
@@ -64,14 +74,26 @@ class MainHandler(RequestHandler):
     self.write("This message comes from Tornado ^_^")
 
 app = Flask(__name__)
-app.debug = True
+app.debug = False
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
+thread = None
 
-tr = WSGIContainer(app)
+import gtk
+import gobject
 
-application = Application([
-    (r"/tornado", MainHandler),
-    (r".*", FallbackHandler, dict(fallback=tr)),
-])
+import gevent
+
+def _trigger_loop():
+    gobject.timeout_add(10, gevent_loop, priority=gobject.PRIORITY_HIGH)
+
+def gevent_loop():
+    gevent.sleep(0.001)
+    _trigger_loop()
+    return False
+
+def emit_time_status(*args, **kwargs):
+    return
 
 def get_extended():
     global player, playing
@@ -485,7 +507,7 @@ def file_history(_id, id_type):
 
 @app.route("/status/")
 def status():
-    print "STATUS"
+    # print "STATUS"
     # -{{player.pos_data["left_str"]}} {{player.pos_data["pos_str"]}}/{{player.pos_data["dur_str"]}}
     global playing, player
     # print "PLAYING",playing.to_dict()
@@ -1224,6 +1246,14 @@ def get_podcasts():
         podcast_data.append(dict(p))
     return json_dump(podcast_data)
 
+@app.route("/add-rss-feed/", methods=['GET'])
+def add_rss_feed():
+    url = request.args.get("url")
+    if not url:
+      return json_dump({})
+    netcast = Netcast(rss_url=url, insert=True)
+    return get_episodes(netcast.nid)
+
 @app.route("/feed-data/<nid>", methods=['GET'])
 def get_episodes(nid):
     episodes = get_results_assoc("""SELECT *
@@ -1232,13 +1262,80 @@ def get_episodes(nid):
                                     ORDER BY pub_date DESC
                                     LIMIT 10""", (nid, ))
 
-    episode_data = []
+    subscribers = get_results_assoc("""SELECT u.uid, u.uname, ns.uid AS subscribed
+                                       FROM users u
+                                            LEFT JOIN netcast_subscribers ns ON
+                                                      ns.uid = u.uid AND ns.nid = %s
+                                       WHERE listening = true
+                                       ORDER BY admin DESC, uname""", 
+                                       (nid, ))
+
+    res_data = {
+        "episodes": [],
+        "subscribers": [],
+    }
+
+    for s in subscribers:
+      _s = dict(s)
+      _s['subscribed'] = bool(s['subscribed'])
+      res_data['subscribers'].append(_s)
+
     for ep in episodes:
-      episode_data.append(dict(ep))
+      episode = dict(ep)
+      heard_by = get_results_assoc("""SELECT DISTINCT nle.uid, u.uname
+                                      FROM netcast_listend_episodes nle,
+                                           users u
+                                      WHERE u.uid = nle.uid AND
+                                            nle.eid = %s
+      """, (ep['eid'],))
+      episode['heard_by'] = []
+      for h in heard_by:
+          episode['heard_by'].append(dict(h))
+      res_data['episodes'].append(episode)
 
-    return json_dump(episode_data)
+    return json_dump(res_data)
 
 
+
+@app.route("/subscribe/<nid>/<uid>/<subscribed>", methods=['GET'])
+def subscribe(nid, uid, subscribed):
+    nid = int(nid)
+    uid = int(uid)
+    subscribed = subscribed == 'true'
+
+    print "nid:", nid
+    print "uid:", uid
+    print "subscribed:", subscribed
+
+    if subscribed:
+        q = """INSERT INTO netcast_listend_episodes (uid, eid)
+                             SELECT '"""+str(uid)+"""', ne.eid
+                             FROM netcast_episodes ne
+                                  LEFT JOIN netcast_listend_episodes nle ON
+                                            nle.eid = ne.eid AND nle.uid = %s
+                             WHERE ne.nid = %s AND
+                                   nle.eid IS NULL"""
+        query(q, (uid, nid))
+        query("""INSERT INTO netcast_subscribers (nid, uid) 
+                 VALUES(%s, %s)""",
+              (nid, uid))
+    else:
+        query("""DELETE FROM netcast_subscribers WHERE nid = %s AND uid = %s""",
+              (nid, uid))
+    query("COMMIT")
+
+    return get_episodes(nid)
+    return json_dump({
+        "works": "ok",
+        "nid": nid,
+        "uid": uid,
+        "subscribed": subscribed
+    })
+
+
+def start_worker(*args):
+    print "STARTING WORKER"
+    socketio.run(app, port=5050, host="0.0.0.0")
 
 def worker(*args, **kwargs):
     """thread worker function"""
@@ -1257,16 +1354,87 @@ def worker(*args, **kwargs):
             time.sleep(10)
     return
 
+last_time_response = {}
+
+def on_time_status(player, pos_int, dur_int, left_int, decimal, 
+                   pos_str, dur_str, left_str, percent):
+    global last_time_response
+    # <Player object at 0x7fcc41d8fe60 (player+Player at 0x2c34b00)>, 51219185000, 199365000000, 148145815000, 0.2569116193915682, '0:51', '3:19', '2:28', '25.69%'
+    response = {
+        "pos_int": pos_int,
+        "dur_int": dur_int,
+        "dur_str": dur_str,
+        "left_str": left_str,
+        "percent": percent,
+        "decimal": decimal,
+        "left_int": left_int,
+        "pos_str": pos_str,
+        "dur_str": dur_str,
+    }
+    if response == last_time_response:
+        return
+    last_time_response = response
+    # print "on_time_status"
+    socketio.emit('time-status', response, namespace="/fmp")
+
+def emit_mark_as_played(update_data):
+    """
+    {
+        "mark-as-played": percent_played,
+        "res": res
+    }"""
+    socketio.emit('mark-as-played', update_data, namespace="/fmp")
+
+
+def on_state_change(_player, state):
+    response = "PAUSED"
+    if state == PLAYING:
+        response = "PLAYING"
+    socketio.emit('state-changed', response,  namespace="/fmp")
+
+def emit_status(_playing=None):
+    print "emit_status:", _playing
+    global playing, player
+    # print "PLAYING",playing.to_dict()
+    
+    player_dict = player.to_dict()
+    playing_dict = playing.to_full_dict()
+
+    extended = deepcopy(player_dict)
+    extended.update(deepcopy(playing_dict))
+
+    extended['history'] = []
+    if playing_dict.get('fid'):
+      extended['history'] = file_history(playing_dict['fid'], 'f')
+    elif playing_dict.get('eid'):
+      extended['history'] = file_history(playing_dict['eid'], 'e')
+
+    if not extended.get('artists'):
+      extended['artists'] = [{'artist':extended['artist_title']}]
+
+    if not extended.get('genres'):
+      extended['genres'] = []
+
+    extended = convert_res_to_dict(extended)
+    socketio.emit('status', extended,  namespace="/fmp")
+
+@socketio.on('status', namespace='/fmp')
+def socket_status(*args, **kwargs):
+    print "socket_status"
+    emit_status()
 
 def start_in_thread():
     print "START CALLED!"
-    t = threading.Thread(target=worker, args=(0,))
+    t = threading.Thread(target=start_worker, args=(0,))
     threads.append(t)
     t.start()
+    _trigger_loop()
+    player.connect("time-status", on_time_status)
+    player.connect("state-changed", on_state_change)
 
 def start():
     print "START()"
-    worker()
+    start_worker()
 
 def call_test():
     print "CALL TEST COMPLETED"

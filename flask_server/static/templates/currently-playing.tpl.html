@@ -1,4 +1,10 @@
-<h3>Currently Playing</h3>
+<div class="clear-fix" style="height:45px;"></div>
+
+
+<h3>Currently Playing <span class="visible-xs-block pull-right badge">xs</span>
+<span class="visible-sm-block pull-right badge">sm</span>
+<span class="visible-md-block pull-right badge">md</span>
+<span class="visible-lg-block pull-right badge">lg</span></h3>
 <div ng-controller="CurrentlyPlayingCtrl">
     <div class='artist-title'>
         <span ng-repeat="a in playing_data.artists" ng-hide="!playing_data.artists">
@@ -7,9 +13,10 @@
         <a href="#/search/{{ playing_data.title }}" ng-hide="!playing_data.title">{{ playing_data.title }}</a>
         <a href="#/search/{{ playing_data.basename }}" ng-hide="playing_data.title || playing_data.basename == '-missing-'">{{ playing_data.basename }}</a>
         <span ng-show="playing_data.basename == '-missing-'">{{ playing_data.artist_title }}</span>
-        <small>
+        <small ng-hide="!playing_data.pos_data.left_str">
             -{{ playing_data.pos_data.left_str }} {{ playing_data.pos_data.pos_str }}/{{ playing_data.pos_data.dur_str }}
         </small>
+        <div ng-show="!playing_data.pos_data.left_str">Initializing ...</div>
     </div>
     <div class='ratings-box'>
         <span ng-repeat="rating in playing_data.ratings">

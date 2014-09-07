@@ -1,5 +1,15 @@
 <h1>Podcasts</h1>
 
+<button class="btn btn-default pull-right" ng-click="showAddFeedModal()"><span class="glyphicon glyphicon-plus"></span> Add Feed</button>
+
+
+<button type="button" class="btn btn-default" ng-model="selectedIcons" data-html="1" data-multiple="1" data-animation="am-flip-x" ng-options="listener.value as listener.label for listener in listeners" bs-select>
+                  Action <span class="caret"></span>
+                </button>
+
+                
+<br clear="all">
+<br clear="all">
 <accordion close-others="oneAtATime">
   <accordion-group is-open="podcast.open" ng-repeat="podcast in podcasts">
       <accordion-heading>
@@ -11,14 +21,34 @@
       <table class="table">
           <thead>
             <tr>
+              <th>User</th>
+              <th>Subscribed</th>
+            </tr>
+          </thead>
+          <tr ng-repeat="user in podcast.subscribers">
+            <td>{{ user.uname }}</td>
+            <td><input type="checkbox" ng-change="subscribe(podcast.nid, user.uid, user.subscribed)" ng-model="user.subscribed"  ></td>
+          </tr>
+      </table>
+      <table class="table">
+          <thead>
+            <tr>
               <th>Episode Title</th>
               <th>Publish Date</th>
+              <th>Heard By</th>
             </tr>
           </thead>
           <tr ng-repeat="episode in podcast.episodes">
             <td>{{ episode.episode_title }}</td>
             <td>{{ episode.pub_date }}</td>
+            <td>
+                <span ng-repeat="user in episode.heard_by">{{user.uname}} </span>
+                
+            </td>
           </tr>
       </table>
   </accordion-group>
 </accordion>
+
+<button class="btn btn-default pull-right" ng-click="showAddFeedModal()"><span class="glyphicon glyphicon-plus"></span> Add Feed</button>
+<br clear="all">

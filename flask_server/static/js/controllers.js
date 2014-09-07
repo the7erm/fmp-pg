@@ -1,9 +1,12 @@
-var fmpApp = angular.module('fmpApp', ['ui.bootstrap',
-    'mgcrea.ngStrap', 'mgcrea.ngStrap.modal', 
-    'mgcrea.ngStrap.aside', 'mgcrea.ngStrap.tooltip', 
+var fmpApp = angular.module('fmpApp', [
+    'ui.bootstrap',
+    'mgcrea.ngStrap', 
+    'mgcrea.ngStrap.modal', 
+    'mgcrea.ngStrap.aside', 
+    'mgcrea.ngStrap.tooltip', 
     'mgcrea.ngStrap.typeahead',
-    'ngRoute','infinite-scroll'
-    
+    'ngRoute', 
+    'infinite-scroll'
 ]);
 
 
@@ -41,6 +44,32 @@ fmpApp.config(['$routeProvider',
             redirectTo: '/home'
         });
 }]);
+
+fmpApp.factory('socket', ['$rootScope', function ($rootScope) {
+    console.log("FACTORY SOCKET CALLED")
+    var socket = io.connect('http://' + document.domain + ':' + location.port +"/fmp");
+    return {
+        on: function (eventName, callback) {
+          socket.on(eventName, function () {
+            var args = arguments;
+            $rootScope.$apply(function () {
+              callback.apply(socket, args);
+            });
+          });
+        },
+        emit: function (eventName, data, callback) {
+          socket.emit(eventName, data, function () {
+            var args = arguments;
+            $rootScope.$apply(function () {
+              if (callback) {
+                callback.apply(socket, args);
+              }
+            });
+          })
+        }
+    };
+}]);
+
 
 fmpApp.factory('Search', ['$http', '$timeout', function($http, $timeout) {
   console.log("Search factory")
@@ -88,17 +117,19 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         seconds_in_a_day = 24 * seconds_in_an_hour,
         seconds_in_a_month = Math.floor((365 * seconds_in_a_day) / 12),
         seconds_in_a_week = 7 * seconds_in_a_day,
-        current = new Date(historyArray[$index]['date_played']), 
-        next = new Date (historyArray[$index+1]['date_played']),
+        current = new Date(historyArray[$index]['time_played']), 
+        next = new Date (historyArray[$index+1]['time_played']),
         ms = current.valueOf() - next.valueOf(),
         seconds = Math.floor(ms / 1000),
         months = Math.floor(seconds / seconds_in_a_month),
         seconds = seconds - (months * seconds_in_a_month),
         weeks = Math.floor(seconds / seconds_in_a_week),
         seconds = Math.floor(seconds - (weeks * seconds_in_a_week)),
+        days = Math.floor(seconds / seconds_in_a_day),
+        seconds = Math.floor(seconds - (days * seconds_in_a_day)),
         hours = Math.floor(seconds / seconds_in_an_hour),
         seconds = Math.floor(seconds - (hours * seconds_in_an_hour)),
-        minutes = seconds / 60,
+        minutes = Math.floor(seconds / 60),
         seconds = Math.floor(seconds - (minutes * 60));
 
     if (months) {
@@ -114,11 +145,27 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         }
         return weeks+" week";
     }
+
+    if (minutes < 10) {
+        minutes = "0"+ minutes;
+    }
+    if (seconds < 10) {
+        seconds = "0"+seconds;
+    }
+
+    if (days) {
+        if (days > 1) {
+            return days+" days";
+        }
+        return days+" day";
+    }
     return hours+":"+minutes+":"+seconds;
 };
 
-fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q',
-    function($rootScope, $http, $interval, $timeout, $q){
+fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q', 'socket',
+    function($rootScope, $http, $interval, $timeout, $q, socket){
+        var now = new Date();
+        $rootScope.cacheFix = now.valueOf();
         var sharedService = {};
         sharedService.cue = function($scope, fid) {
             console.log("CUE");
@@ -264,17 +311,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         }
 
         sharedService.getStatus = function(){
-            $http({method: 'GET', url: '/status/'})
-                .success(function(data, status, headers, config) {
-                    // this callback will be called asynchronously
-                    // when the response is available
-                    // console.log("data:", data.extended.history);
-                    sharedService.processStatus(data);
-                })
-                .error(function(data, status, headers, config) {
-                  // called asynchronously if an error occurs
-                  // or server returns response with an error status.
-                });
+            socket.emit('status');
         };
 
         $rootScope.loadArtistTags = function(query) {
@@ -385,16 +422,50 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
             });
         }
 
+        socket.on("time-status", function(data){
+            $rootScope.playing_data.pos_data = data;
+        });
+
+        socket.on("state-changed", function(data){
+            // console.log("state-changed:", data)
+            $rootScope.playing_data.playingState = data;
+        });
+
+        socket.on("mark-as-played", function(update_data){
+            if (update_data.res.length > 0) {
+                var keys = ['rating', 'score', 'true_score', 'percent_played',
+                            'ultp'];
+                for (var i=0;i<update_data.res.length;i++) {
+                    for (var i2=0;i2<$rootScope.playing_data.ratings.length;i2++) {
+                        if ($rootScope.playing_data.ratings[i2].usid == update_data.res[i].usid) {
+                            for (var i3=0;i3<keys.length;i3++) {
+                                var key = keys[i3];
+                                $rootScope.playing_data.ratings[i2][key] = update_data.res[i][key];
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        socket.on("status", function(playing_data){
+            console.log("status:", playing_data);
+            var process = {"extended": playing_data};
+            sharedService.processStatus(process);
+        });
+
         sharedService.getStatus();
         $interval(sharedService.getStatus, 10000);
         return sharedService;
 }]);
 
 
-fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', function($scope, fmpService){
-	$scope.next = fmpService.next;
-	$scope.pause = fmpService.pause;
-	$scope.prev = fmpService.prev;
+fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', 
+    function($scope, fmpService){
+        $scope.next = fmpService.next;
+        $scope.pause = fmpService.pause;
+        $scope.prev = fmpService.prev;
 }]);
 
 fmpApp.controller('ControlsCtrl',['$scope', 'fmpService', function($scope, fmpService){
@@ -572,7 +643,8 @@ fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http
 }]);
 
 
-fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', function($scope, $http, $location){
+fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', '$modal', 
+  function($scope, $http, $location, $modal){
     $scope.oneAtATime = false;
     $scope.podcasts = [];
     $scope.subscribers = [];
@@ -588,16 +660,16 @@ fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', function($scope
     });
 
     $scope.loadEpisodes = function(nid, open) {
-        console.log("CLICKED", nid)
         
         $http({method: 'GET', url: "/feed-data/"+nid})
         .success(function(data, status, headers, config) {
             for (var i=0;i<$scope.podcasts.length;i++) {
                 if ($scope.podcasts[i].nid == nid) {
-                    for (i2=0;i2< data.length; i2++) {
-                        data[i2]['pub_date'] = new Date(data[i2]['pub_date']).toLocaleString(); 
+                    for (i2=0;i2< data['episodes'].length; i2++) {
+                        data['episodes'][i2]['pub_date'] = new Date(data['episodes'][i2]['pub_date']).toLocaleString(); 
                     }
-                    $scope.podcasts[i].episodes = data;
+                    $scope.podcasts[i].episodes = data['episodes'];
+                    $scope.podcasts[i].subscribers = data['subscribers'];
                 }
             }
         })
@@ -605,7 +677,67 @@ fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', function($scope
           // called asynchronously if an error occurs
           // or server returns response with an error status.
         });
-    }
+    };
+
+    $scope.selectedIcons = ['Globe', 'Heart'];
+    $scope.listeners = [
+        {value: 'Gear', label: 'Gear'},
+        {value: 'Globe', label: 'Globe'},
+        {value: 'Heart', label: 'Heart'},
+        {value: 'Camera', label: 'Camera'}
+    ];
+
+    $scope.subscribe = function(nid, uid, subscribe){
+        console.log("nid:", nid);
+        console.log("uid:", uid);
+        console.log("subscribe:", subscribe);
+        $http({method: 'GET', url: "/subscribe/"+nid+"/"+uid+"/"+subscribe})
+        .success(function(data, status, headers, config) {
+            for (var i=0;i<$scope.podcasts.length;i++) {
+                if ($scope.podcasts[i].nid == nid) {
+                    for (i2=0;i2< data['episodes'].length; i2++) {
+                        data['episodes'][i2]['pub_date'] = new Date(data['episodes'][i2]['pub_date']).toLocaleString(); 
+                    }
+                    $scope.podcasts[i].episodes = data['episodes'];
+                    $scope.podcasts[i].subscribers = data['subscribers'];
+                }
+            }
+        })
+        .error(function(data, status, headers, config) {
+          // called asynchronously if an error occurs
+          // or server returns response with an error status.
+        });
+    };
+
+    var infoModal = $modal({
+        scope: $scope,
+        template: '/static/templates/add-feed.tpl.html', 
+        show: false, 
+        container: "body"
+    });
+    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+    $scope.showAddFeedModal = function() {
+        $scope.newFeedUrl = "";
+        infoModal.$promise.then(infoModal.show);
+    };
+
+    $scope.addFeed = function (newFeedUrl) {
+        $scope.feedError = "Fetching feeds ...";
+        $http({method: 'GET', url:"/add-rss-feed/?url="+encodeURIComponent(newFeedUrl)})
+        .success(function(data, status, headers, config) {
+            $scope.feedError = "";
+            infoModal.hide();
+            var d = new Date();
+            document.location = "#/podcasts?_="+ d.valueOf();
+        })
+        .error(function(data, status, headers, config) {
+          // called asynchronously if an error occurs
+          // or server returns response with an error status.
+          $scope.feedError = "Error Fetching feed";
+        });
+    };
+
+
 }]);
 
 

@@ -1,6 +1,6 @@
             <div infinite-scroll='search.nextPage()' infinite-scroll-disabled='search.busy' infinite-scroll-distance='2' class="col-xs-12 container" >
               <div ng-repeat="r in search.items" style="border-top:1px solid #000;">
-                <div ng-include="'/static/templates/item-row.tpl.html'"></div>
+                <div ng-include="'/static/templates/item-row.tpl.html?_='+cacheFix"></div>
               </div><!-- end of ng-repeat -->
               <div ng-show='search.busy' ng-hide="search.done">Loading data...</div>
             </div> <!-- end of infinite scroll container  -->

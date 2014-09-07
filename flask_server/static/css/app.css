@@ -6,8 +6,6 @@
     src: url('/static/css/FreeSansBold.ttf');
 }
 
-
-
 body {
     font-family: FreeSans;
     font-size: 1.75em;
@@ -88,3 +86,6 @@ ul.rating {
     width: 22px;
 }
 
+.accordion-toggle {
+    cursor:pointer;
+}
