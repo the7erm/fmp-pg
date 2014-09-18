@@ -336,7 +336,8 @@ fmpApp.directive('starRating',['fmpService',
             template : '<ul class="rating"> <li ng-repeat="star in stars" ' + \
                        'ng-class="star" ng-click="toggle($index)">  ' + \
                        '<a ng-show="!$index">&nbsp;\u20E0&nbsp;</a>'  + \
-                       '<i ng-show="$index > 0">\u2605</i></li></ul>',
+                       '<i ng-show="$index > 0">\u2605</i></li> ' + \
+                       '<a ng-show="$index > 2">rate me</a></ul>',
             scope : {
                 ratingValue : '=',
                 max : '=',

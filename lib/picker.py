@@ -371,6 +371,7 @@ def get_next_file_in_genre_series(gid, uid):
                     ultp DESC, dirname, basename
            LIMIT 1"""
     last_file = get_assoc(q, (gid, uid))
+    print "last_file:", last_file
 
     print "g2",pg_cur.mogrify(q, (gid, uid))
     if last_file:

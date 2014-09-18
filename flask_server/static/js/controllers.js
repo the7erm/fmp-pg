@@ -117,10 +117,13 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         seconds_in_a_day = 24 * seconds_in_an_hour,
         seconds_in_a_month = Math.floor((365 * seconds_in_a_day) / 12),
         seconds_in_a_week = 7 * seconds_in_a_day,
+        seconds_in_a_year = 365 * seconds_in_a_day,
         current = new Date(historyArray[$index]['time_played']), 
         next = new Date (historyArray[$index+1]['time_played']),
         ms = current.valueOf() - next.valueOf(),
         seconds = Math.floor(ms / 1000),
+        years = Math.floor(seconds / seconds_in_a_year),
+        seconds = seconds - (years * seconds_in_a_year),
         months = Math.floor(seconds / seconds_in_a_month),
         seconds = seconds - (months * seconds_in_a_month),
         weeks = Math.floor(seconds / seconds_in_a_week),
@@ -131,6 +134,21 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         seconds = Math.floor(seconds - (hours * seconds_in_an_hour)),
         minutes = Math.floor(seconds / 60),
         seconds = Math.floor(seconds - (minutes * 60));
+
+    if (years) {
+        var txt = "year";
+        if (years > 1) {
+            txt += "s";
+        }
+        txt = years+ " " + txt;
+        if (months) {
+            txt += " "+months+" month";
+            if (months > 1) {
+                txt += "s";
+            }
+        }
+        return txt;
+    }
 
     if (months) {
         if (months > 1) {
@@ -487,7 +505,8 @@ fmpApp.directive('starRating',['fmpService',
             template : '<ul class="rating"> <li ng-repeat="star in stars" ' + 
                        'ng-class="star" ng-click="toggle($index)">  ' + 
                        '<a ng-show="!$index"><img src="/static/images/raty/no.star.png" class="small-no"></a>'  + 
-                       '<span ng-show="$index > 0">\u2605</span></li></ul>',
+                       '<span ng-show="$index > 0">\u2605</span>' + 
+                       '</li></ul>'+' <span ng-show="ratingValue.rating > 5" class="rate-me"><b>Rate me</b></span>',
             scope : {
                 ratingValue : '=',
                 max : '=',

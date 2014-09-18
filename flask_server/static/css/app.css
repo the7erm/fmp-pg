@@ -89,3 +89,9 @@ ul.rating {
 .accordion-toggle {
     cursor:pointer;
 }
+
+.rate-me {
+  color:red;
+  font-weight: bold;
+  font-size: 0.75em;
+}
