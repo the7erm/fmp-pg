@@ -372,32 +372,55 @@ class RatingsAndScores:
                         print "(artist) psycopg2.IntegrityError:",err
                         listeners.refresh()
 
+    def get_most_recently_played(self):
+        query = """SELECT * 
+                   FROM user_history uh 
+                   WHERE uh.uid IN (
+                      SELECT DISTINCT uid 
+                      FROM users 
+                      WHERE listening = true
+                   )
+                   ORDER BY time_played DESC
+                   LIMIT 1"""
+
+        return get_assoc(query)
+
     def check_recently_played(self, recently_played=None, uid=None):
         # print "****************************"
         # print "RatingsAndScores:check_recently_played()"
         if not recently_played:
-            recently_played = fobj.recently_played(1, uid)
+            recently_played = self.get_most_recently_played()
+
         if not recently_played:
             return
-        f = dict(recently_played[0])
-        if not 'id_type' not in f.keys() or not 'id' not in f.keys() or \
-           f['id_type'] != 'f' or f['id'] != self.fid:
+        print "*"*30
+        f = dict(recently_played)
+        print "recently_played:", 
+        pprint.pprint(f)
+        id_type = f.get('id_type')
+        _id = f.get('id')
+        if id_type != 'f' or _id != self.fid:
+            print "%s != 'f' or %s != self.fid" %  (id_type, _id)
             return
         # print "INITAL F:",f
         today = date.today()
         if today.isoformat() == f['date_played'].isoformat():
-            # print today.isoformat(),"==",f['date_played'].isoformat()
+            print today.isoformat(),"==",f['date_played'].isoformat()
             return
         print "******* DELETEING OLD RECORD DATE CHANGED *******"
         if uid is None:
             query("""DELETE FROM user_history 
                      WHERE uid IN (SELECT uid FROM users WHERE listening = true) AND
-                           id_type = 'f' AND id = %s AND date_played = %s""", 
+                           id_type = 'f' AND 
+                           id = %s AND 
+                           date_played = %s""", 
                      (self.fid, f['date_played'].isoformat()))
         else:
             query("""DELETE FROM user_history 
                      WHERE uid = %s AND
-                           id_type = 'f' AND id = %s AND date_played = %s""", 
+                           id_type = 'f' AND 
+                           id = %s AND 
+                           date_played = %s""", 
                      (uid, self.fid, f['date_played'].isoformat()))
 
     def update_history_for_uid(self, uid=None, percent_played=0):
