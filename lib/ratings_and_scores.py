@@ -27,7 +27,7 @@ from datetime import date
 from rating_utils import *
 
 class RatingsAndScores:
-    def __init__(self, fid=None, listening=None, uids=None):
+    def __init__(self, fid=None, listening=None, uids=None, plid=None):
         self.ratings_and_scores = None
         self.fid = fid
         self.listening = listening
@@ -35,6 +35,7 @@ class RatingsAndScores:
         self.expires = 0
         self.last_percent_played = -1
         self.artists = []
+        self.plid = plid
 
         if uids is not None:
             self.uids = uids
@@ -110,6 +111,7 @@ class RatingsAndScores:
     def update(self, updated):
         if not updated:
             return
+
         for u in updated:
             if not u:
                 continue
@@ -470,6 +472,18 @@ class RatingsAndScores:
                                             uh.id = %s 
                                        RETURNING uh.*""",
                                        (self.fid,))
+
+        if self.plid:
+            uhids = []
+            for u in updated:
+                uhids.append(u['uhid'])
+            print "-="*20
+            query("""UPDATE preload_history
+                     SET date_played = NOW(), uhids = %s
+                     WHERE plid = %s""",
+                 (uhids, self.plid))
+
+
         self.process_updated_history(updated, listeners.listeners, percent_played)
         self.update(updated)
 
@@ -518,6 +532,8 @@ class RatingsAndScores:
                     query("COMMIT;")
                     print "(file) psycopg2.IntegrityError:",err
                     listeners.refresh()
+
+
 
     def get_selected(self):
         self.check_for_rating_info()

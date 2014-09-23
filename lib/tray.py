@@ -201,6 +201,7 @@ def on_activate_favorites(item, *args):
 def on_activate_clear_preload(item, *args):
     gtk.gdk.threads_leave()
     query("""DELETE FROM preload""")
+    query("""DELETE FROM preload_history WHERE date_played IS NULL""")
 
 
 def on_activate_never_played(item, *args):

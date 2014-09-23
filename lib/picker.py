@@ -286,12 +286,48 @@ def make_true_scores_list():
 
     return true_scores
 
+def insert_preload_history_data(preload_data):
+    print "PRELOAD DATA:", preload_data
+    """
+                                              Table "public.preload_history"
+           Column    |           Type           |                            Modifiers                             
+        -------------+--------------------------+------------------------------------------------------------------
+         phid        | integer                  | not null default nextval('preload_history_phid_seq'::regclass)
+         fid         | integer                  | not null default nextval('preload_history_fid_seq'::regclass)
+         uid         | integer                  | not null default nextval('preload_history_uid_seq'::regclass)
+         reason      | integer                  | not null default nextval('preload_history_reason_seq'::regclass)
+         date_qued   | timestamp with time zone | 
+         date_played | timestamp with time zone | 
+         uhids       | bigint[]                 | 
+         plid        | integer                  | not null default nextval('preload_history_plid_seq'::regclass)
+
+    """
+    preload_history_data = get_assoc("""INSERT INTO 
+                                        preload_history (fid, uid, reason, plid, date_qued)
+                                        VALUES          (%s,  %s,  %s,     %s,   NOW())
+                                        RETURNING *""",
+                                        (preload_data['fid'], preload_data['uid'], 
+                                         preload_data['reason'], preload_data['plid']))
+    print "preload_history_data:",
+    pprint.pprint(preload_history_data)
+
+
+def insert_into_preload(msg, fid, uid, reason):
+    print msg, get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
+    print "fid:%s uid:%s reason:%s"  % (fid, uid, reason)
+    query("""INSERT INTO preload (fid, uid, reason)
+             VALUES (%s, %s, %s)""",
+           (fid, uid, reason))
+    preload_data = get_assoc("""SELECT *
+                                FROM preload
+                                WHERE fid = %s AND uid = %s AND reason = %s""", 
+                            (fid, uid, reason))
+    insert_preload_history_data(preload_data)
+
 def insert_fid_into_preload(fid, uid, reason):
     seq_info = is_sequential(fid)
     if seq_info is None:
-        print "adding:", get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
-        query("""INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)""",
-                 (fid, uid, reason))
+        insert_into_preload("adding:", fid, uid, reason)
         return
 
     if 'aid' in seq_info:
@@ -305,9 +341,7 @@ def insert_fid_into_preload(fid, uid, reason):
         if next_file:
           fid = next_file['fid']
           reason += " is sequential genre"
-    print "adding sequential:", get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
-    query("""INSERT INTO preload(fid,uid,reason) VALUES(%s,%s,%s)""",
-             (fid, uid, reason))
+    insert_into_preload("adding sequential:", fid, uid, reason)
 
 def get_next_file_in_artist_series(aid, uid):
     next_file = None

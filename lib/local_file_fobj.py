@@ -43,7 +43,7 @@ numeric = re.compile("^[0-9]+$")
 class Local_File(fobj.FObj):
     def __init__(self, dirname=None, basename=None, fid=None, filename=None, 
                  insert=False, silent=False, sha512=None, must_match=False, 
-                 get_dups=True, fingerprint=None, **kwargs):
+                 get_dups=True, fingerprint=None, plid=None, **kwargs):
         if 'dir' in kwargs and dirname is None:
             dirname = kwargs['dir']
         print "FID:", fid
@@ -68,6 +68,7 @@ class Local_File(fobj.FObj):
         self.last_time_marked_as_played = datetime.now()
         self.edited = False
         self.rating_callback = None
+        self.plid = plid
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
                           dirname=dirname, basename=basename, filename=filename, 
@@ -83,7 +84,8 @@ class Local_File(fobj.FObj):
         self.set_attribs()
         self.can_rate = True
         self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
-                                                   listening=True)
+                                                   listening=True, 
+                                                   plid=self.plid)
 
         ok_to_hash = kwargs.get('hash', True)
 

@@ -381,6 +381,7 @@ def set_idx(idx, retry=2):
         f = dict(history[idx])
         print "set_idx F:",f
         tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**f)
+
         print "/set_idx F:"
         tray.set_rating()
         populate_preload()

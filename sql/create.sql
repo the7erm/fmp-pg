@@ -433,7 +433,8 @@ CREATE TABLE files (
     fingerprint character varying(255),
     front_fingerprint character varying(255),
     middle_fingerprint character varying(255),
-    end_fingerprint character varying(255)
+    end_fingerprint character varying(255),
+    edited boolean DEFAULT false
 );
 
 
@@ -895,6 +896,117 @@ CREATE SEQUENCE preload_fid_seq
 --
 
 ALTER SEQUENCE preload_fid_seq OWNED BY preload.fid;
+
+
+--
+-- Name: preload_history; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE preload_history (
+    phid integer NOT NULL,
+    fid integer NOT NULL,
+    uid integer NOT NULL,
+    reason text NOT NULL,
+    date_qued timestamp with time zone,
+    date_played timestamp with time zone,
+    uhids bigint[],
+    plid integer NOT NULL
+);
+
+
+--
+-- Name: preload_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_history_fid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_history_fid_seq OWNED BY preload_history.fid;
+
+
+--
+-- Name: preload_history_phid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_history_phid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_history_phid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_history_phid_seq OWNED BY preload_history.phid;
+
+
+--
+-- Name: preload_history_plid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_history_plid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_history_plid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_history_plid_seq OWNED BY preload_history.plid;
+
+
+--
+-- Name: preload_history_reason_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_history_reason_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_history_reason_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_history_reason_seq OWNED BY preload_history.reason;
+
+
+--
+-- Name: preload_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_history_uid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_history_uid_seq OWNED BY preload_history.uid;
 
 
 --
@@ -1535,6 +1647,41 @@ ALTER TABLE ONLY preload ALTER COLUMN plid SET DEFAULT nextval('preload_plid_seq
 
 
 --
+-- Name: phid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_history ALTER COLUMN phid SET DEFAULT nextval('preload_history_phid_seq'::regclass);
+
+
+--
+-- Name: fid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_history ALTER COLUMN fid SET DEFAULT nextval('preload_history_fid_seq'::regclass);
+
+
+--
+-- Name: uid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_history ALTER COLUMN uid SET DEFAULT nextval('preload_history_uid_seq'::regclass);
+
+
+--
+-- Name: reason; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_history ALTER COLUMN reason SET DEFAULT nextval('preload_history_reason_seq'::regclass);
+
+
+--
+-- Name: plid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_history ALTER COLUMN plid SET DEFAULT nextval('preload_history_plid_seq'::regclass);
+
+
+--
 -- Name: tid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1702,6 +1849,14 @@ ALTER TABLE ONLY netcasts
 
 
 --
+-- Name: preload_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY preload_history
+    ADD CONSTRAINT preload_history_pkey PRIMARY KEY (phid);
+
+
+--
 -- Name: tags_binary_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1804,6 +1959,13 @@ CREATE INDEX dirname_idx ON file_locations USING btree (dirname);
 --
 
 CREATE UNIQUE INDEX dont_pick_fid_index ON dont_pick USING btree (fid);
+
+
+--
+-- Name: edited_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX edited_idx ON files USING btree (edited);
 
 
 --
