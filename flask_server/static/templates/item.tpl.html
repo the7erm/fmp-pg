@@ -1,6 +1,33 @@
-            <div infinite-scroll='search.nextPage()' infinite-scroll-disabled='search.busy' infinite-scroll-distance='2' class="col-xs-12 container" >
-              <div ng-repeat="r in search.items" style="border-top:1px solid #000;">
-                <div ng-include="'/static/templates/item-row.tpl.html?_='+cacheFix"></div>
-              </div><!-- end of ng-repeat -->
-              <div ng-show='search.busy' ng-hide="search.done">Loading data...</div>
-            </div> <!-- end of infinite scroll container  -->
+            <div  class="col-xs-12 container" >
+                <div class="form-group" ng-hide="ctrler != 'SearchCtrl'">
+                    <label for="queryInput">Search Term</label>
+                    <input type="text" id="queryInput" class="form-control" ng-model="query" placeholder="Enter artist title or rating">
+                    <button class="btn btn-default" ng-click="doSearch(query)">Search</button>
+                    
+                </div>
+                <bgf-pagination
+                    page="page"
+                    per-page="perPage"
+                    client-limit="clientLimit"
+                    url="queryUrl"
+                    link-group-size="2"
+                    collection="search_items"
+                    template-url="/static/bower_components/angular-paginate-anything/tpl/paginate-anything.html">
+                </bgf-pagination>
+                <div>
+                  <div ng-repeat="r in search_items" >
+                    <div ng-include="'/static/templates/item-row.tpl.html?_='+cacheFix"></div>
+                  </div><!-- end of ng-repeat -->
+                </div>
+                <bgf-pagination
+                    page="page"
+                    per-page="perPage"
+                    client-limit="clientLimit"
+                    url="queryUrl"
+                    link-group-size="2"
+                    collection="search_items"
+                    template-url="/static/bower_components/angular-paginate-anything/tpl/paginate-anything.html">
+                </bgf-pagination>
+            </div>
+
+            <div class="loading" ng-show="loading">Loading...</div>

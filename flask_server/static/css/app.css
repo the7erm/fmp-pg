@@ -95,3 +95,13 @@ ul.rating {
   font-weight: bold;
   font-size: 0.75em;
 }
+
+.loading {
+    right: 0;
+    bottom: 40px;
+    border: 5px solid #000;
+    background: #fff;
+    z-index: 1000;
+    padding:5px;
+    position: fixed;
+}

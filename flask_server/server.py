@@ -21,19 +21,12 @@ from gevent import monkey
 monkey.patch_all()
 
 from __init__ import *
-from flask import Flask
-from flask import request
-from flask import redirect
-from flask import session
-from flask import jsonify
-from flask import send_file
-
+from flask import Flask, request, redirect, session, jsonify, send_file, \
+                  Response, render_template
 
 from threading import Thread
-from flask import Flask, render_template, session, request
 from flask.ext.socketio import SocketIO, emit, join_room, leave_room
-
-
+from werkzeug.datastructures import Headers
 import datetime
 import random
 import time
@@ -635,7 +628,7 @@ def genres_for_fid(fid):
                                ORDER BY genre""", (fid,))
     return convert_to_dict(res)
 
-def get_search_results(q="", start=0, limit=20, filter_by="all"):
+def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=False):
     start = int(start)
     limit = int(limit)
     # print "Q:",q
@@ -658,6 +651,10 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                              LEFT JOIN artists a ON a.aid = fa.aid
                         ORDER BY artist, title"""
 
+    no_words_query_count = """SELECT count(*) AS total 
+                              FROM files f 
+                              LEFT JOIN file_artists fa ON fa.fid = f.fid"""
+
     no_words_rating_query = """SELECT DISTINCT f.fid, title, sha512,  
                                                f.fid, p.fid AS cued, artist,
                                                f.fid AS id, 'f' AS id_type
@@ -671,6 +668,14 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                                                  FROM users 
                                                  WHERE listening = true)
                                ORDER BY artist, title"""
+
+    no_words_rating_query_count = """SELECT count(*) AS total
+                                     FROM files f,
+                                          user_song_info usi
+                                     WHERE rating = %s AND usi.fid = f.fid AND
+                                           usi.uid IN (SELECT uid 
+                                                       FROM users 
+                                                       WHERE listening = true)"""
 
 
     query = """SELECT DISTINCT f.fid, title, sha512, artist,
@@ -686,6 +691,13 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                      tsv @@ query
                ORDER BY ts_rank DESC, artist, title"""
 
+    query_count = """SELECT count(*) AS total
+                     FROM files f,
+                          keywords kw,
+                          plainto_tsquery('english', %s) query
+                     WHERE kw.fid = f.fid AND
+                           tsv @@ query"""
+
     rating_query = """SELECT DISTINCT f.fid, title, sha512, artist,
                                p.fid AS cued, ts_rank(tsv, query),
                                f.fid AS id, 'f' AS id_type
@@ -695,7 +707,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                            LEFT JOIN artists a ON a.aid = fa.aid,
                            keywords kw,
                            plainto_tsquery('english', %s) query,
-                           user_song_info usi,
+                           user_song_info usi
                       WHERE kw.fid = f.fid AND tsv @@ query AND 
                             usi.rating = %s AND
                             f.fid = usi.fid AND
@@ -704,32 +716,49 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
                                         WHERE listening = true)
                       ORDER BY ts_rank DESC, artist, title"""
 
+    rating_query_count = """SELECT count(*) AS total
+                            FROM files f,
+                                 keywords kw,
+                                 plainto_tsquery('english', %s) query,
+                                 user_song_info usi
+                            WHERE kw.fid = f.fid AND tsv @@ query AND 
+                                  usi.rating = %s AND
+                                  f.fid = usi.fid AND
+                                  usi.uid IN (SELECT uid 
+                                              FROM users 
+                                              WHERE listening = true)"""
+
     rating_re = re.compile("rating\:(\d+)")
-    rating_match = rating_re.match(q)
+    rating_match = rating_re.search(q)
     rating = -1
     if rating_match:
+        print "rating_match"
         rating = rating_match.group(1)
         q = q.replace("rating:%s" % rating, "").strip()
 
-
     if not q:
         query = no_words_query
+        query_count = no_words_query_count
         if rating != -1:
             query = no_words_rating_query
+            query_count = no_words_rating_query_count
 
     # """+limit+""" OFFSET """+offset
-    query = "%s LIMIT %d OFFSET %d" % (query, limit, start)
+    query_offset = "LIMIT %d OFFSET %d" % (limit, start)
     # print "QUERY:%s" % query
     results = []
-    
+
+    args = (q,)
+    if rating != -1:
+        if q:
+            args = (q, rating)
+            query = rating_query
+            query_count = rating_query_count
+        else:
+            args = (rating,)
+    query = "%s %s" % (query, query_offset)
     try:
-        args = (q,)
-        if rating != -1:
-            if q:
-                args = (q, rating)
-                query = rating_query
-            else:
-                args = (rating,)
+        print "query:",query, args
         for r in get_results_assoc(query, args):
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
@@ -742,7 +771,12 @@ def get_search_results(q="", start=0, limit=20, filter_by="all"):
     except psycopg2.InternalError, err:
         query("COMMIT;")
         print "(flask_server) psycopg2.InternalError:",err
-    return results
+
+    if not return_total:
+        return results
+    print "query_count:", query_count
+    total = get_assoc(query_count, args)
+    return results, total['total']
 
 def locations_for_fid(fid):
     locations = get_results_assoc("""SELECT dirname, basename
@@ -957,10 +991,19 @@ def search_data():
 # 
 
 cache_data = {}
-def do_search(q, start, limit, filter_by):
+def do_search(q, start, limit, filter_by, return_total=False):
     print "DO SEARCH"
     start_time = datetime.datetime.now()
-    results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
+
+    if not return_total:
+        results = get_search_results(q, start=start, limit=limit, 
+                                     filter_by=filter_by,
+                                     return_total=return_total)
+        total = len(results)
+    else:
+        results, total = get_search_results(q, start=start, limit=limit, 
+                                            filter_by=filter_by,
+                                            return_total=return_total)
     fixed_results = []
     already_present_fids = []
     for r in results:
@@ -972,7 +1015,9 @@ def do_search(q, start, limit, filter_by):
     json_data = json_dump(fixed_results)
     print "="*20
     print "fetch time:",datetime.datetime.now() - start_time
-    return json_data
+    if not return_total:
+        return json_data
+    return json_data, total
 
 def cache_some_results(q, start, limit, filter_by):
     return
@@ -994,33 +1039,71 @@ def cache_some_results(q, start, limit, filter_by):
 
 @app.route('/search-data-new/', methods=['GET', 'POST'])
 def search_data_new():
+    headers = Headers()
     start_time = datetime.datetime.now()
     # convert_res_to_dict
+    """
+    HTTP/1.1 206 Partial Content
+    Accept-Ranges: items
+    Content-Range: 0-24/100
+    Range-Unit: items
+    Content-Type: application/json"""
     results = None
     q = request.args.get("q","")
-    start, limit = get_start_limit()
+    start, limit, end = get_start_limit(True)
+    print "start:%s limit:%s end:%s" % (start, limit, end)
     filter_by=get_filter_by()
+    status = 206
+    mimetype = "application/json"
+    cachetimout = 60
 
     print "LIMIT:%s" % limit
-    fixed_results = do_search(q, start, limit, filter_by)
-    #t = threading.Thread(target=cache_some_results, args=(q, int(start)+int(limit), 
-    #                                                  limit, filter_by))
-    # threads.append(t)
-    # t.start()
+    fixed_results, total = do_search(q, start, limit, filter_by, return_total=True)
     print "RUNNING TIME:", datetime.datetime.now() - start_time
-    return fixed_results
+    print "total:", total
+
+    headers.add("Accept-Ranges", "items")
+    headers.add('Content-Range','%s-%s/%s' % (str(start), str(end), str(total)) )
+    headers.add("Range-Unit", "items")
+    headers.add("Content-Type", mimetype)
+
+    response = Response(fixed_results, status=status, 
+                        mimetype=mimetype, headers=headers, 
+                        direct_passthrough=True)
+    response.cache_control.public = True
+    response.cache_control.max_age = 0
+    response.last_modified = int(time.time())
+    response.expires=int( time.time() )
+    response.make_conditional(request)
+
+    return response
 
 
-def get_start_limit():
+def get_start_limit(return_end=False):
     start = "%s" % request.args.get("s", "0")
     limit = "%s" % request.args.get("l", "10")
+
+    if request.headers.has_key("Range"):
+        ranges = re.findall(r"\d+", request.headers["Range"])
+        start = int( ranges[0] )
+        if len(ranges) > 1:
+            end = int( ranges[1] )
+            if end and end > start:
+                limit = end - start + 1
     start = int(start)
     limit = int(limit)
+    
+    
     if not start:
         start = 0
     if not limit:
         limit = 10
-    return start, limit
+    end = start + limit + 1
+
+    if not return_end:
+      return start, limit
+
+    return start, limit, end
 
 @app.route('/cue/', methods=['GET', 'POST'])
 def cue():
@@ -1133,6 +1216,93 @@ def history():
 
 @app.route('/history-data/', methods=['GET'])
 def history_data():
+
+    headers = Headers()
+    start_time = datetime.datetime.now()
+    # convert_res_to_dict
+    """
+    HTTP/1.1 206 Partial Content
+    Accept-Ranges: items
+    Content-Range: 0-24/100
+    Range-Unit: items
+    Content-Type: application/json"""
+    results = None
+    q = request.args.get("q","")
+    start, limit, end = get_start_limit(True)
+    print "start:%s limit:%s end:%s" % (start, limit, end)
+    filter_by=get_filter_by()
+    status = 206
+    mimetype = "application/json"
+    cachetimout = 60
+
+    print "LIMIT:%s" % limit
+
+    q = """SELECT uh.*, uname,
+                  f.fid, title,
+                  sha512,
+                  p.fid AS cued
+           FROM user_history uh,
+                users u,
+                files f
+                LEFT JOIN preload p ON p.fid = f.fid
+           WHERE uh.uid = u.uid AND 
+                 u.listening = true AND
+                 time_played IS NOT NULL AND 
+                 uh.id_type = 'f' AND
+                 uh.id = f.fid
+           ORDER BY uh.time_played DESC, admin DESC, uname
+           LIMIT """+str(limit)+""" OFFSET """+str(start)
+    print "Q:<<<%s>>>" % q
+
+    history_res = get_results_assoc(q)
+
+
+    total = get_assoc("""SELECT count(*) AS total
+           FROM user_history uh,
+                users u,
+                files f
+                LEFT JOIN preload p ON p.fid = f.fid
+           WHERE uh.uid = u.uid AND 
+                 u.listening = true AND
+                 time_played IS NOT NULL AND 
+                 uh.id_type = 'f' AND
+                 uh.id = f.fid""")
+    total = total['total']
+
+    if history_res:
+        results = []
+
+    already_present_fids = []
+    for p in history_res:
+        print "P:", p
+        results.append(convert_res_to_dict(p))
+
+
+    # fixed_results, total = do_search(q, start, limit, filter_by, return_total=True)
+    print "RUNNING TIME:", datetime.datetime.now() - start_time
+    print "total:", total
+    print  'Content-Range','%s-%s/%s' % (start, end, total)
+    headers.add("Accept-Ranges", "items")
+    headers.add('Content-Range','%s-%s/%s' % (start, end, total) )
+    headers.add("Range-Unit", "items")
+    headers.add("Content-Type", mimetype)
+
+    results_json = json_dump(results)
+
+    response = Response(results_json, status=status, 
+                        mimetype=mimetype, headers=headers, 
+                        direct_passthrough=True)
+    response.cache_control.public = True
+    response.cache_control.max_age = 0
+    response.last_modified = int(time.time())
+    response.expires=int( time.time() )
+    response.make_conditional(request)
+    print "MADE IT", 
+    print "results:", results
+    print "results_json:",results_json
+
+    return response
+
     start, limit = get_start_limit()
     offset = "%d" % start
     limit = "%d" % limit
@@ -1149,21 +1319,23 @@ def history_data():
                              file_locations fl
                         WHERE fl.fid = f.fid
                         ORDER BY artist, title"""
-    history_res = get_results_assoc("""SELECT uh.*, uname,
-                                              f.fid, title,
-                                              sha512,
-                                              p.fid AS cued
-                                       FROM user_history uh,
-                                            users u,
-                                            files f
-                                            LEFT JOIN preload p ON p.fid = f.fid
-                                       WHERE uh.uid = u.uid AND 
-                                             u.listening = true AND
-                                             time_played IS NOT NULL AND 
-                                             uh.id_type = 'f' AND
-                                             uh.id = f.fid
-                                       ORDER BY uh.time_played DESC, admin DESC, uname
-                                       LIMIT """+limit+""" OFFSET """+offset)
+    q = """SELECT uh.*, uname,
+                  f.fid, title,
+                  sha512,
+                  p.fid AS cued
+           FROM user_history uh,
+                users u,
+                files f
+                LEFT JOIN preload p ON p.fid = f.fid
+           WHERE uh.uid = u.uid AND 
+                 u.listening = true AND
+                 time_played IS NOT NULL AND 
+                 uh.id_type = 'f' AND
+                 uh.id = f.fid
+           ORDER BY uh.time_played DESC, admin DESC, uname
+           LIMIT """+limit+""" OFFSET """+offset
+
+    history_res = get_results_assoc(q)
 
     results = []
     for h in history_res:
@@ -1173,33 +1345,82 @@ def history_data():
 
 @app.route("/preload", methods=['GET', 'POST'])
 def preload():
-    start, limit = get_start_limit()
-    start = int(start)
-    limit = int(limit)
-    end = start + limit
-    preload = get_results_assoc("""SELECT DISTINCT f.fid, artist, title,
-                                        sha512, p.fid AS cued, artist,
-                                        f.fid AS id, 'f' AS id_type
-                                   FROM files f
-                                        LEFT JOIN file_artists fa ON fa.fid = f.fid
-                                        LEFT JOIN artists a ON a.aid = fa.aid,
-                                        preload p
-                                   WHERE p.fid = f.fid
-                                   ORDER BY artist, title""")
-    results = []
+    headers = Headers()
+    start_time = datetime.datetime.now()
+    # convert_res_to_dict
+    """
+    HTTP/1.1 206 Partial Content
+    Accept-Ranges: items
+    Content-Range: 0-24/100
+    Range-Unit: items
+    Content-Type: application/json"""
+    results = None
+    q = request.args.get("q","")
+    start, limit, end = get_start_limit(True)
+    print "start:%s limit:%s end:%s" % (start, limit, end)
+    filter_by=get_filter_by()
+    status = 206
+    mimetype = "application/json"
+    cachetimout = 60
+
+    print "LIMIT:%s" % limit
+
+    q = """SELECT DISTINCT f.fid, artist, title, sha512,
+                           p.fid AS cued, artist,
+                           f.fid AS id, 'f' AS id_type
+           FROM files f
+                LEFT JOIN file_artists fa ON fa.fid = f.fid
+                LEFT JOIN artists a ON a.aid = fa.aid,
+                preload p
+           WHERE p.fid = f.fid
+           ORDER BY artist, title 
+           LIMIT """+str(limit)+""" OFFSET """+str(start)
+
+    print "Q:<<<%s>>>" % q
+
+    preload = get_results_assoc(q)
+
+    total = get_assoc("""SELECT count(*) AS total
+                         FROM files f
+                              LEFT JOIN file_artists fa ON fa.fid = f.fid
+                              LEFT JOIN artists a ON a.aid = fa.aid,
+                              preload p
+                         WHERE p.fid = f.fid""")
+    total = total['total']
+
+    if preload:
+        results = []
+
     already_present_fids = []
-    idx = -1;
     for p in preload:
-        if p['fid'] in already_present_fids:
-            print "ALREADY PROCESSED", p['fid']
-            continue
-        idx += 1
-        if idx < start or idx > end:
-            continue
-        already_present_fids.append(p['fid'])
+        print "P:", p
         results.append(convert_res_to_dict(p))
 
-    return json_dump(results)
+
+    # fixed_results, total = do_search(q, start, limit, filter_by, return_total=True)
+    print "RUNNING TIME:", datetime.datetime.now() - start_time
+    print "total:", total
+    print  'Content-Range','%s-%s/%s' % (start, end, total)
+    headers.add("Accept-Ranges", "items")
+    headers.add('Content-Range','%s-%s/%s' % (start, end, total) )
+    headers.add("Range-Unit", "items")
+    headers.add("Content-Type", mimetype)
+
+    results_json = json_dump(results)
+
+    response = Response(results_json, status=status, 
+                        mimetype=mimetype, headers=headers, 
+                        direct_passthrough=True)
+    response.cache_control.public = True
+    response.cache_control.max_age = 0
+    response.last_modified = int(time.time())
+    response.expires=int( time.time() )
+    response.make_conditional(request)
+    print "MADE IT", 
+    print "results:", results
+    print "results_json:",results_json
+
+    return response
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

@@ -2,14 +2,6 @@
     <div class="col-xs-12">
         <h1>Search</h1>
     </div>
-    <div class="col-xs-12 container show-desktop">
-        <div class="row">
-            <div class="col-xs-6">Artist Title/Filename</div>
-            <div class="col-xs-2">Album</div>
-            <div class="col-xs-1">Genre</div>
-            <div class="col-xs-2">Ratings</div>
-            <div class="col-xs-1">Cued</div>
-        </div>
-    </div>
-    <div ng-include="'/static/templates/item.tpl.html'"></div>
+    <div ng-include="'/static/templates/item.tpl.html?_='+cacheFix"></div>
+    
 </div>

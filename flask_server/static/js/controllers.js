@@ -6,7 +6,9 @@ var fmpApp = angular.module('fmpApp', [
     'mgcrea.ngStrap.tooltip', 
     'mgcrea.ngStrap.typeahead',
     'ngRoute', 
-    'infinite-scroll'
+    'infinite-scroll',
+    'ngTagsInput',
+    'bgf.paginateAnything'
 ]);
 
 
@@ -18,11 +20,13 @@ fmpApp.config(['$routeProvider',
         })
         .when("/search", {
             templateUrl: "/static/templates/search.html",
-            controller: "SearchCtrl"
+            controller: "SearchCtrl",
+            reloadOnSearch: false
         })
         .when("/search/:query", {
             templateUrl: "/static/templates/search.html",
-            controller: "SearchCtrl"
+            controller: "SearchCtrl",
+            reloadOnSearch: false
         })
         .when("/preload", {
             templateUrl: "/static/templates/preload.html",
@@ -88,6 +92,7 @@ fmpApp.factory('Search', ['$http', '$timeout', function($http, $timeout) {
     if (this.busy) return;
     this.busy = true;
     console.log("Next page");
+    // /search-data-new/
     var url = this.url+"?s="+this.start+"&l="+this.limit+"&q="+this.query;
     $http.get(url).success(function(data) {
       var items = data,
@@ -99,7 +104,7 @@ fmpApp.factory('Search', ['$http', '$timeout', function($http, $timeout) {
       }
       for (var i = 0; i < items.length; i++) {
         //this.items.push(items[i]);
-        _this.items.push(items[i]);
+        this.items.push(items[i]);
       }
       // this.after = "t3_" + this.items[this.items.length - 1].id;''
       this.start = this.start + this.limit;
@@ -187,9 +192,9 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         var sharedService = {};
         sharedService.cue = function($scope, fid) {
             console.log("CUE");
-            for (var i=0; i<$scope.search.items.length; i++) {
-                if ($scope.search.items[i].fid == fid) {
-                    $scope.search.items[i].cued = fid;
+            for (var i=0; i<$scope.search_items.length; i++) {
+                if ($scope.search_items[i].fid == fid) {
+                    $scope.search_items[i].cued = fid;
                     var url = "/cue/?fid="+fid+"&cue=true"
                     $http({method: 'GET', url: url})
                     .success(function(data, status, headers, config) {
@@ -204,9 +209,9 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         };
         sharedService.uncue = function($scope, fid) {
             console.log("UNCUE");
-            for (var i=0; i<$scope.search.items.length; i++) {
-                if ($scope.search.items[i].fid == fid) {
-                    $scope.search.items[i].cued = false;
+            for (var i=0; i<$scope.search_items.length; i++) {
+                if ($scope.search_items[i].fid == fid) {
+                    $scope.search_items[i].cued = false;
                     var url = "/cue/?fid="+fid+"&cue=false"
                     $http({method: 'GET', url: url})
                     .success(function(data, status, headers, config) {
@@ -558,8 +563,8 @@ fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
     
 }]);
 
-fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
-    function($scope, $routeParams, fmpService, $http, Search) {
+fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$location',
+    function($scope, $routeParams, fmpService, $location) {
     window.document.title = "fmp - Preload";
     $scope.cue = function(fid) {
         fmpService.cue($scope, fid);
@@ -567,26 +572,59 @@ fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$http
     $scope.uncue = function(fid) {
         fmpService.uncue($scope, fid);
     };
-    $scope.search = new Search("", "/preload", 0, 20);
+
+    $scope.query = $routeParams.query || "";
+    $scope.queryUrl = '/preload';
+    $scope.perPage = parseInt($location.search().perPage, 10) || 5;
+    $scope.page = parseInt($location.search().page, 10) || 0;
+    $scope.clientLimit = 20;
+
+    $scope.$watch('page', function(page) { 
+        $location.search('page', page); 
+        console.log("page:", page);
+    });
+    $scope.$watch('perPage', function(page) { $location.search('perPage', page); });
+    $scope.$on('$locationChangeSuccess', function() {
+        var page = +$location.search().page,
+          perPage = +$location.search().perPage;
+        if(page >= 0 && page != $scope.page) { 
+            $scope.page = page; 
+        };
+        if(perPage >= 0 && $scope.perPage != perPage) { 
+            $scope.perPage = perPage; 
+        };
+    });
+    $scope.$on("pagination:loadPage", function(evt, status, config){
+        console.log("evt:", evt);
+        console.log("status:", status);
+        console.log("config:", config);
+        $location.search('page', evt.targetScope.page);
+        $location.search('perPage', evt.targetScope.perPage);
+    });
 }]);
 
 fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 
-                                 'fmpService', '$http', '$modal', 'Search',
-    function($scope, $rootScope, $routeParams, fmpService, $http, $modal, Search) {
+                                 'fmpService', '$modal', '$location',
+    function($scope, $rootScope, $routeParams, fmpService, $modal, $location) {
     window.document.title = "fmp - Search";
     // Pre-fetch an external template populated with a custom scope
     var infoModal = $modal({
-        scope: $scope, 
-        template: '/static/templates/popover.tpl.html', 
-        show: false, 
-        container: "body"
-    });
-    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+            scope: $scope, 
+            template: '/static/templates/popover.tpl.html', 
+            show: false, 
+            container: "body"
+        });
+    $scope.ctrler = "SearchCtrl";
     $scope.showModal = function() {
         infoModal.$promise.then(infoModal.show);
     };
 
-    $scope.new_artist = "";
+    $scope.doSearch = function(query) {
+        console.log("doSearch query:", query);
+        document.location = "#/search/"+encodeURIComponent(query);
+    };
+
+    console.log("SearchCtrl initialized")
 
     // $scope.getTags = fmpService.getTags;
 
@@ -596,15 +634,34 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
     $scope.uncue = function(fid) {
         fmpService.uncue($scope, fid);
     };
-    $scope.removeGenre = fmpService.removeGenre;
+    $scope.query = $routeParams.query || "";
+    $scope.queryUrl = '/search-data-new/?q='+encodeURIComponent($scope.query);
+    $scope.perPage = parseInt($location.search().perPage, 10) || 5;
+    $scope.page = parseInt($location.search().page, 10) || 0;
+    $scope.clientLimit = 20;
 
-    console.log("TOP");
-    $scope.query = $routeParams.query;
-    if (!$scope.query) {
-        $scope.query = "";
-    }
-
-    $scope.search = new Search($scope.query);
+    $scope.$watch('page', function(page) { 
+        $location.search('page', page); 
+        console.log("page:", page);
+    });
+    $scope.$watch('perPage', function(page) { $location.search('perPage', page); });
+    $scope.$on('$locationChangeSuccess', function() {
+        var page = +$location.search().page,
+          perPage = +$location.search().perPage;
+        if(page >= 0 && page != $scope.page) { 
+            $scope.page = page; 
+        };
+        if(perPage >= 0 && $scope.perPage != perPage) { 
+            $scope.perPage = perPage; 
+        };
+    });
+    $scope.$on("pagination:loadPage", function(evt, status, config){
+        console.log("evt:", evt);
+        console.log("status:", status);
+        console.log("config:", config);
+        $location.search('page', evt.targetScope.page);
+        $location.search('perPage', evt.targetScope.perPage);
+    });
 
 }]);
 
@@ -649,16 +706,45 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal', '$lo
     };
 }]);
 
-fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$http', 'Search',
-    function($scope, $routeParams, fmpService, $http, Search) {
-    window.document.title = "fmp - history";
+
+fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', '$location',
+    function($scope, $routeParams, fmpService, $location) {
+    window.document.title = "fmp - History";
     $scope.cue = function(fid) {
         fmpService.cue($scope, fid);
     };
     $scope.uncue = function(fid) {
         fmpService.uncue($scope, fid);
     };
-    $scope.search = new Search("", "/history-data/", 0, 20);
+
+    $scope.query = $routeParams.query || "";
+    $scope.queryUrl = '/history-data/';
+    $scope.perPage = parseInt($location.search().perPage, 10) || 5;
+    $scope.page = parseInt($location.search().page, 10) || 0;
+    $scope.clientLimit = 20;
+
+    $scope.$watch('page', function(page) { 
+        $location.search('page', page); 
+        console.log("page:", page);
+    });
+    $scope.$watch('perPage', function(page) { $location.search('perPage', page); });
+    $scope.$on('$locationChangeSuccess', function() {
+        var page = +$location.search().page,
+          perPage = +$location.search().perPage;
+        if(page >= 0 && page != $scope.page) { 
+            $scope.page = page; 
+        };
+        if(perPage >= 0 && $scope.perPage != perPage) { 
+            $scope.perPage = perPage; 
+        };
+    });
+    $scope.$on("pagination:loadPage", function(evt, status, config){
+        console.log("evt:", evt);
+        console.log("status:", status);
+        console.log("config:", config);
+        $location.search('page', evt.targetScope.page);
+        $location.search('perPage', evt.targetScope.perPage);
+    });
 }]);
 
 
