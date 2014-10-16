@@ -491,10 +491,32 @@ def file_history(_id, id_type):
                                             admin DESC, uname""",
                                    (_id, id_type))
     results = []
+    previous_date = None
+    previous_uid = None
     for h in history_res:
         h = dict(h)
         h['time_played'] = h['time_played'].isoformat()
+        if previous_uid != h['uid']:
+            previous_date = None
+        previous_uid = h['uid']
+        h['gap'] = None
+        if previous_date:
+            q = """SELECT count(*) AS total
+                                  FROM user_history 
+                                  WHERE id != %s AND 
+                                        time_played >= %s AND
+                                        time_played <= %s AND 
+                                        uid = %s""";
+            args = (_id,
+                    h['time_played'],
+                    previous_date,
+                    h['uid'])
+            # print "QUERY:", pg_cur.mogrify(q, args)
+            played = get_assoc(q, args)
+            results[len(results) - 1]['gap'] = played['total']
+        previous_date = h['time_played']
         h['date_played'] = h['date_played'].isoformat()
+
         results.append(h)
     return results
 

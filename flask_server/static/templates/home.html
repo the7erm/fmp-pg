@@ -14,6 +14,7 @@
                   <th><a href="" ng-click="predicate = 'true_score'; reverse=!reverse">True Score</a></th>
                   <th><a href="" ng-click="predicate = 'date_played'; reverse=!reverse">Date</a></th>
                   <th class="hidden-xs"><a href="" ng-click="predicate = 'timeBetween'; reverse=!reverse">Time Between</a></th>
+                  <th class="hidden-xs"><a href="" ng-click="predicate = 'gap'; reverse=!reverse">Gap</a></th>
               </tr>
               <tr ng-repeat="history in playing_data.history | orderBy : predicate : reverse">
                   <td>{{ history.uname }}</td>
@@ -23,6 +24,7 @@
                   <td>{{ history.true_score | number : 2}}</td>
                   <td><span class="hidden-sm hidden-xs">{{ history.time_played | date : "medium" }}</span><span class="hidden-md hidden-lg">{{ history.time_played | date : "mediumDate" }}</span></td>
                   <td class="hidden-xs">{{ history.timeBetween }}</td>
+                  <td class="hidden-xs">{{ history.gap }}</td>
               </tr>
           </table>
         </div>
