@@ -1,4 +1,11 @@
-<div style="border-top: 1px solid #000;">
+<div class="search-item">
+  <div ng-hide="r.hide_cued">
+      <button ng-show="r.cued" class="btn btn-primary glyphicon glyphicon-minus" ng-click="uncue(r)"></button>
+      <button ng-hide="r.cued" class="btn btn-default glyphicon glyphicon-plus" ng-click="cue(r)"></button>
+      <button class="btn btn-default" ng-hide="r.moreInfo.history" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
+      <button class="btn btn-primary" ng-show="r.moreInfo.history" ng-click="r.moreInfo.history=null"><span class="glyphicon glyphicon-time"></span> </button>
+  </div>
+  <br clear="all">
   <div ng-hide="r.artists" ng-show="r.artists.length == 0">
       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
       <a href="#/search/{{r.basename}}">{{r.basename}}</a>
@@ -19,7 +26,7 @@
       </span>
       &nbsp;
   </div>
-  <div  ng-hide="r.genres.length == 0">
+  <div ng-hide="r.genres.length == 0">
       <span ng-repeat="g in r.genres">
           <a  href="#/search/{{g.genre}}">{{g.genre}}</a><span ng-show="!$last">, </span>
       </span>
@@ -33,10 +40,29 @@
       &nbsp;
   </div>
   <div class="clearfix"></div>
-  <div ng-hide="r.hide_cued">
-      <button ng-show="r.cued" class="btn btn-primary" ng-click="uncue(r)">Uncue</button>
-      <button ng-hide="r.cued" class="btn btn-default" ng-click="cue(r)">Cue</button>
-      &nbsp;
+  
+  <div ng-show="r.moreInfo.history">
+      <h2>History</h2>
+      <table class="table table-stripe">
+          <tr>
+              <th><a href="" ng-click="predicate = 'uname'; reverse=!reverse">User</a></th>
+              <th class="hidden-xs"><a href="" ng-click="predicate = 'percent_played'; reverse=!reverse">Percent Played</a></th>
+              <th class="hidden-xs"><a href="" ng-click="predicate = 'rating'; reverse=!reverse">Rating</a></th>
+              <th class="hidden-sm hidden-xs"><a href="" ng-click="predicate = 'score'; reverse=!reverse">Skip Score</a></th>
+              <th><a href="" ng-click="predicate = 'true_score'; reverse=!reverse">True Score</a></th>
+              <th><a href="" ng-click="predicate = 'date_played'; reverse=!reverse">Date</a></th>
+              <th class="hidden-xs"><a href="" ng-click="predicate = 'timeBetween'; reverse=!reverse">Time Between</a></th>
+          </tr>
+          <tr ng-repeat="history in r.moreInfo.history | orderBy : predicate : reverse">
+              <td>{{ history.uname }}</td>
+              <td class="hidden-xs">{{ history.percent_played }}</td>
+              <td class="hidden-xs">{{ history.rating }}</td>
+              <td class="hidden-sm hidden-xs">{{ history.score }}</td>
+              <td>{{ history.true_score | number : 2}}</td>
+              <td><span class="hidden-sm hidden-xs">{{ history.time_played | date : "medium" }}</span><span class="hidden-md hidden-lg">{{ history.time_played | date : "mediumDate" }}</span></td>
+              <td class="hidden-xs">{{ history.timeBetween }}</td>
+          </tr>
+      </table>
   </div>
   <div class="clearfix"></div>
 </div>

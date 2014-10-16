@@ -838,18 +838,7 @@ def file_info(fid, methods=["GET"]):
                            fl.fid = f.fid""", 
                      (fid, ))
     rdict = convert_res_to_dict(r)
-    rdict['dups'] = []
-    if r['sha512']:
-        dups = get_results_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
-                                     sha512, p.fid AS cued
-                                    FROM files f 
-                                         LEFT JOIN preload p ON p.fid = f.fid,
-                                         file_locations fl
-                                    WHERE f.sha512 = %s AND f.fid != %s AND
-                                          fl.fid = f.fid""", 
-                                    (r['sha512'], fid))
-        for d in dups:
-            rdict['dups'].append(convert_res_to_dict(d))
+    rdict['history'] = file_history(r['fid'], 'f')
 
     return json_dump(rdict)
 

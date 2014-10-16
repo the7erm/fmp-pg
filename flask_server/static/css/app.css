@@ -105,3 +105,11 @@ ul.rating {
     padding:5px;
     position: fixed;
 }
+
+.search-item {
+  border-top: 1px solid #000; 
+  padding-bottom:5px; 
+  padding-top:5px;
+  margin-top: 3px;
+}
+

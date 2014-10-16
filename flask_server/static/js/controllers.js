@@ -6,7 +6,6 @@ var fmpApp = angular.module('fmpApp', [
     'mgcrea.ngStrap.tooltip', 
     'mgcrea.ngStrap.typeahead',
     'ngRoute', 
-    'infinite-scroll',
     'ngTagsInput',
     'bgf.paginateAnything'
 ]);
@@ -473,6 +472,21 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
             sharedService.processStatus(process);
         });
 
+        sharedService.moreInfo = function(item) {
+            console.log("item:", item);
+            // /file-info/<fid>/
+            var url = "/file-info/"+item.fid+"/";
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                for (var i=0; i < data.history.length; i++) {
+                    data.history[i]["timeBetween"] = timeBetween(data.history, i);
+                }
+                item.moreInfo = data;
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
+
         sharedService.initPagination = function($scope, $routeParams, $location, 
                                                 $modal) {
 
@@ -520,7 +534,11 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
                 $location.search('page', evt.targetScope.page);
                 $location.search('perPage', evt.targetScope.perPage);
             });
+
+            $scope.moreInfo = sharedService.moreInfo;
         };
+
+
 
         sharedService.getStatus();
         $interval(sharedService.getStatus, 10000);
