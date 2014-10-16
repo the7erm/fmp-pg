@@ -241,7 +241,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
             $rootScope.playing_data = data.extended;
         };
 
-        sharedService.rate = function(usid, fid, uid, rating){
+        sharedService.rate = function(usid, fid, uid, rating, usi){
             var url = "/rate/"+usid+"/"+fid+"/"+uid+"/"+rating;
 
             $http({method: 'GET', url: url})
@@ -273,7 +273,12 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
                     }
                 }
                 // $rootScope.playing_data.rating = data.extended;
-
+                console.log("usi:",usi);
+                if (usi) {
+                    usi.rating = data.rating;
+                    usi.true_score = data.true_score;
+                    usi.score = data.score;
+                }
             })
             .error(function(data, status, headers, config) {
               // called asynchronously if an error occurs
@@ -573,7 +578,7 @@ fmpApp.directive('starRating',['fmpService',
                     });
                     // /rate/<usid>/<fid>/<uid>/<rating>
                     var usi = scope.ratingValue;
-                    fmpService.rate(usi.usid, usi.fid, usi.uid, index);
+                    fmpService.rate(usi.usid, usi.fid, usi.uid, index, usi);
                 };
              
                 scope.$watch('ratingValue.rating',
