@@ -23,7 +23,7 @@ from gtk_utils import gtk_main_quit
 import sys 
 import os 
 import time 
-import thread 
+import threading 
 import signal 
 import urllib
 import gc
@@ -40,8 +40,6 @@ from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
 import gst
-
-import thread
 
 STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
@@ -67,6 +65,7 @@ class Player(gobject.GObject):
     
     def __init__(self, filename=None, alt_widget=None):
         gobject.GObject.__init__(self)
+        self.files = {}
         self.showing_controls = False
         self.filename = filename
         self.playingState = STOPPED
@@ -95,6 +94,7 @@ class Player(gobject.GObject):
             self.alt_vbox.hide()
         if filename is not None:
             self.start()
+        # gobject.timeout_add(1000, self.calculate_level)
 
     def init_connections(self):
         self.window.connect("destroy", gtk_main_quit)
@@ -381,9 +381,10 @@ static char * invisible_xpm[] = {
         if os.path.isfile(self.filename):
             self.filename = os.path.realpath(self.filename)
             if self.calculate_thread:
-                print "self.calculate_thread:", self.calculate_thread
-            else:
-                self.calculate_thread = thread.start_new_thread(self.calculate_level)
+                self.calculate_thread._Thread__stop()
+
+            self.calculate_thread = threading.Thread(target=self.calculate_level)
+            self.calculate_thread.start()
             uri = "file://" + urllib.quote(self.filename)
             # print "QUOTED:%s" % urllib.quote(self.filename);
             uri = uri.replace("\\'", "%27")
@@ -409,6 +410,16 @@ static char * invisible_xpm[] = {
         self.should_hide_window()
 
     def calculate_level(self):
+        gtk.gdk.threads_leave()
+        if not self.filename:
+            self.calculate_thread = None
+            return
+        if self.filename in self.files:
+            self.player.set_property("volume", self.files[self.filename])
+            print "set volume:", self.files[self.filename]
+            self.calculate_thread = None
+            return
+        self.files[self.filename] = self.volume
         # gst-launch-1.0 -t filesrc location=/home/erm/dwhelper/test.mp4 ! decodebin ! audioconvert ! audioresample ! rganalysis ! fakesink
         cmd = [
             'gst-launch-1.0',
@@ -446,13 +457,18 @@ static char * invisible_xpm[] = {
         reference_level = float(match.group(1))
 
         target_volume = reference_level + gain
+        one_point_o = target_volume / 100.0
 
         print "target_volume:", target_volume
 
-        print "based on 1.0:", target_volume / 100.0
+        print "based on 1.0:", one_point_o
+        print 'self.player.get_property("volume"):', self.player.get_property("volume")
+        self.volume = one_point_o
         self.player.set_property("volume", self.volume)
+        print '/self.player.get_property("volume"):', self.player.get_property("volume")
         # self.set_volume(target_volume)
         self.calculate_thread = None
+        self.files[self.filename] = one_point_o
 
     def should_hide_window(self):
         if self.player.get_property('n-video') > 0:
