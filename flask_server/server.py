@@ -504,6 +504,7 @@ def file_history(_id, id_type):
             q = """SELECT count(*) AS total
                                   FROM user_history 
                                   WHERE id != %s AND 
+                                        id_type = 'f' AND
                                         time_played >= %s AND
                                         time_played <= %s AND 
                                         uid = %s""";
@@ -513,7 +514,11 @@ def file_history(_id, id_type):
                     h['uid'])
             # print "QUERY:", pg_cur.mogrify(q, args)
             played = get_assoc(q, args)
-            results[len(results) - 1]['gap'] = played['total']
+            results_len = len(results)
+            if results_len >= 1:
+              results[len(results) - 1]['gap'] = played['total']
+            else:
+              h['gap'] = played['total']
         previous_date = h['time_played']
         h['date_played'] = h['date_played'].isoformat()
 

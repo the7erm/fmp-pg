@@ -34,10 +34,14 @@ import gtk
 import pango
 import base64
 import hashlib
+import subprocess
+import re
 from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
 import gst
+
+import thread
 
 STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
@@ -84,6 +88,7 @@ class Player(gobject.GObject):
         self.init_player()
         self.init_connections()
         self.hide_controls()
+        self.calculate_thread = None
         if self.alt_widget:
             self.alt_vbox.pack_start(self.alt_widget, True, True)
         else:
@@ -214,6 +219,7 @@ class Player(gobject.GObject):
     def init_player(self):
         self.player = gst.element_factory_make("playbin2", "player")
         vol = self.player.get_property("volume")
+        print "Xx"*20
         print "DEFAULT VOLUME:", vol
         bus = self.player.get_bus()
         bus.add_signal_watch()
@@ -374,6 +380,10 @@ static char * invisible_xpm[] = {
         uri = self.filename
         if os.path.isfile(self.filename):
             self.filename = os.path.realpath(self.filename)
+            if self.calculate_thread:
+                print "self.calculate_thread:", self.calculate_thread
+            else:
+                self.calculate_thread = thread.start_new_thread(self.calculate_level)
             uri = "file://" + urllib.quote(self.filename)
             # print "QUOTED:%s" % urllib.quote(self.filename);
             uri = uri.replace("\\'", "%27")
@@ -384,6 +394,7 @@ static char * invisible_xpm[] = {
         print "playing uri:", uri
         self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
+
         # self.player.set_property("volume",self.volume)
         self.player.set_state(PLAYING)
         self.emit('state-changed', PLAYING)
@@ -396,6 +407,52 @@ static char * invisible_xpm[] = {
 
         self.update_time()
         self.should_hide_window()
+
+    def calculate_level(self):
+        # gst-launch-1.0 -t filesrc location=/home/erm/dwhelper/test.mp4 ! decodebin ! audioconvert ! audioresample ! rganalysis ! fakesink
+        cmd = [
+            'gst-launch-1.0',
+            '-t',
+            'filesrc',
+            'location=%s' % self.filename,
+            '!',
+            'decodebin',
+            '!',
+            'audioconvert',
+            '!',
+            'audioresample',
+            '!',
+            'rganalysis',
+            '!',
+            'fakesink'
+        ]
+
+        print "cmd:", cmd
+        output = subprocess.check_output(cmd)
+        """
+        replaygain track peak: 1.000000
+        replaygain track gain: -8.410000
+        replaygain reference level: 89.000000"""
+        print "output:", output
+
+        match = re.search("replaygain\ track\ gain\:\ ([0-9\-\.]+)", output)
+        print "match:", match
+        print match.groups()
+        gain = float(match.group(1))
+
+        match = re.search("replaygain\ reference\ level:\ ([0-9\-\.]+)", output)
+        print "match:", match
+        print match.groups()
+        reference_level = float(match.group(1))
+
+        target_volume = reference_level + gain
+
+        print "target_volume:", target_volume
+
+        print "based on 1.0:", target_volume / 100.0
+        self.player.set_property("volume", self.volume)
+        # self.set_volume(target_volume)
+        self.calculate_thread = None
 
     def should_hide_window(self):
         if self.player.get_property('n-video') > 0:
@@ -422,7 +479,7 @@ static char * invisible_xpm[] = {
     def set_volume(self, widget, value):
         self.volume = value
         print "set_volume:", self.volume
-        # self.player.set_property("volume",self.volume)
+        self.player.set_property("volume", self.volume)
         
     def convert_ns(self, time_int):
         time_int = time_int / 1000000000

@@ -3,8 +3,8 @@
 
       <button ng-show="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
       <button ng-hide="r.cued" class="btn btn-default glyphicon glyphicon-list" ng-click="cue(r)"> <span class="glyphicon glyphicon-plus"></span></button>
-      <button class="btn btn-default" ng-hide="r.moreInfo.history" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
-      <button class="btn btn-primary" ng-show="r.moreInfo.history" ng-click="r.moreInfo.history=null"><span class="glyphicon glyphicon-time"></span> </button>
+      <button class="btn btn-default" ng-hide="r.moreInfo" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
+      <button class="btn btn-primary" ng-show="r.moreInfo" ng-click="r.moreInfo=null"><span class="glyphicon glyphicon-time"></span> </button>
   </div>
   <br clear="all">
   <div ng-hide="r.artists" ng-show="r.artists.length == 0">
@@ -42,7 +42,10 @@
   </div>
   <div class="clearfix"></div>
   
-  <div ng-show="r.moreInfo.history">
+  <div ng-show="r.moreInfo">
+      <code>{{ r.dirname }}</code><br>
+      <code>{{ r.basename }}</code><br>
+
       <h2>History</h2>
       <table class="table table-stripe">
           <tr>
