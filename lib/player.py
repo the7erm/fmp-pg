@@ -383,7 +383,8 @@ static char * invisible_xpm[] = {
             if self.calculate_thread:
                 self.calculate_thread._Thread__stop()
 
-            self.calculate_thread = threading.Thread(target=self.calculate_level)
+            self.calculate_thread = threading.Thread(
+                target=self.calculate_level)
             self.calculate_thread.start()
             uri = "file://" + urllib.quote(self.filename)
             # print "QUOTED:%s" % urllib.quote(self.filename);
