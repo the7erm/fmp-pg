@@ -38,6 +38,7 @@ from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
 import gst
+import pprint
 
 STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
@@ -214,6 +215,8 @@ class Player(gobject.GObject):
     def init_player(self):
         self.player = gst.element_factory_make("playbin2", "player")
         vol = self.player.get_property("volume")
+
+        # self.player.set_property('sink_set_max_lateness', -1)
         print "DEFAULT VOLUME:", vol
         bus = self.player.get_bus()
         bus.add_signal_watch()
@@ -600,9 +603,22 @@ static char * invisible_xpm[] = {
             self.imagesink = message.src
             self.imagesink.set_property("force-aspect-ratio", True)
             self.imagesink.set_xwindow_id(self.movie_window.window.xid)
+            # self.imagesink.set_property('drop', True)
             if self.fullscreen:
                 gobject.idle_add(self.window.fullscreen)
             gobject.idle_add(self.emit,'show-window')
+
+            video_sink = self.player.get_property("video-sink")
+            # video_sink.set_property('drop', True)
+            pprint.pprint(dir(video_sink))
+            # print ("Properties")
+            print("props:")
+            pprint.pprint(dir(video_sink.props))
+            for k in video_sink.props:
+                print ("k:",k, "%s" % k)
+            # import pdb; pdb.set_trace()
+
+            # gst_base_sink_set_max_lateness(video_sink, -1)
         elif message_name == 'missing-plugin':
             print "MISSING PLUGGIN"
             self.emit('missing-plugin')

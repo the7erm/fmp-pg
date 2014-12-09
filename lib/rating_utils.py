@@ -23,6 +23,7 @@ import math
 from listeners import listeners
 import fobj
 from datetime import date
+import pprint
 
 # OLD, but keeping it around because what I'm doing is an experiment.
 CALCULATE_TRUESCORE_FORMULA = """(
@@ -92,19 +93,63 @@ RATE_TRUESCORE_FORMULA = """
 ) / 4)
 """
 
-def calculate_true_score(fid):
-    q = pg_cur.mogrify("""UPDATE user_song_info usi
-                          SET true_score =  """+CALCULATE_TRUESCORE_FORMULA+"""
-                          WHERE fid = %s AND uid IN 
-                                (SELECT uid FROM users WHERE listening = true)
-                          RETURNING *""",
-                      (fid,))
-    # print "q:",q
-    res = get_results_assoc(q)
-    for r in res:
-        pprint.pprint(dict(r))
-        test_true_score_calculation(r)
+def calculate_true_score_for_fid_uid(fid, uid):
+    # Get the last 5 plays
+    averages = get_results_assoc("""SELECT percent_played
+                                  FROM user_history
+                                  WHERE id = %s AND uid = %s AND 
+                                        id_type = 'f' AND percent_played > 0
+                                  ORDER BY time_played DESC
+                                  LIMIT 5""",
+                              (fid, uid))
+
+    if not averages:
+        average = 50
+    else:
+        total = 0
+        cnt = 0
+        for a in averages:
+          total += float(a['percent_played'])
+          cnt += 1
+
+        average = (total / cnt)
+
+    q = """UPDATE user_song_info 
+           SET true_score = ((
+              (rating * 2 * 10.0) + 
+              (score * 10.0) +
+              (percent_played) +
+              """+str(average)+"""
+           ) / 4) 
+           WHERE uid = %s AND fid = %s
+           RETURNING *"""
+
+    res = get_assoc(q, (uid, fid))
+    title = "%s%s%s" % ("-"*10,"--[true score]--","-"*10)
+    print title
+    print "averages:", averages
+    print "average:", average
+    print "true score:",
+    pprint.pprint(dict(res))
+    print "-"*len(title)
+
     return res
+
+
+def calculate_true_score(fid):
+    # Get all the listeners.
+    listeners = get_results_assoc("""SELECT uid 
+                                     FROM users 
+                                     WHERE listening = true""")
+
+    results = []
+    for l in listeners:
+        res = calculate_true_score_for_fid_uid(fid, l['uid'])
+        if res:
+          results.append(res)
+
+    return results
+
 
 def test_true_score_calculation(res):
     return
@@ -132,79 +177,70 @@ def test_true_score_calculation(res):
                   average) / 4
     print "res['true_score']:", res['true_score'], "true_score:",true_score
 
+
+def get_selected_listener():
+    q = """SELECT uid 
+           FROM users 
+           WHERE listening = true AND selected = true
+           LIMIT 1"""
+    listener = get_assoc(q)
+    if not listener:
+        q = """SELECT uid
+               FROM users 
+               WHERE listening = true LIMIT 1"""
+        listener = get_assoc(q)
+
+    return listener
+
 def calculate_true_score_for_selected(fid):
-    res = get_results_assoc(
-      """UPDATE user_song_info usi
-         SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
-         WHERE fid = %s AND uid IN 
-                (SELECT uid FROM users WHERE listening = true AND
-                                             selected = true)
-         RETURNING *""",
-         (fid,))
-    for r in res:
-        test_true_score_calculation(r)
-    return res
+    listener = get_selected_listener()
+    if not listener:
+        return
+
+    return calculate_true_score_for_uid(fid, uid)
 
 
 def calculate_true_score_for_uid(fid, uid):
-    q = """UPDATE user_song_info usi
-           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+""" 
-           WHERE fid = %s AND uid = %s
-           RETURNING *"""
-    
-    mog = pg_cur.mogrify(q, (fid, uid))
-    # print mog
-    # res = get_results_assoc(mog)
-    res = get_results_assoc(mog)
-    for r in res:
-      test_true_score_calculation(r)
-    return res
+    return calculate_true_score_for_fid_uid(fid, uid)
 
-def caclulate_true_score_for_usid(usid):
-    res = get_results_assoc(
-        """UPDATE user_song_info usi
-           SET true_score = """+CALCULATE_TRUESCORE_FORMULA+"""
-           WHERE usid = %s
-           RETURNING *""",
-           (usid,))
-    for r in res:
-        test_true_score_calculation(r)
-    return res
+def calculate_true_score_for_usid(usid):
+    q = """SELECT fid, uid FROM user_song_info WHERE usid = %s"""
+    usi = get_assoc(q)
+    return calculate_true_score_for_uid(usi['fid'], usi['uid'])
 
-def caclulate_true_score_for_uname(uname, fid):
+def calculate_true_score_for_uname(uname, fid):
     uinfo = get_assoc("""SELECT uid FROM users WHERE uname = %s""", (uname,))
     return calculate_true_score_for_uid(fid, uinfo['uid'])
 
 def rate_selected(fid, rating):
+    listener = get_selected_listener()
+    if not listener:
+        return
+
     updated = get_results_assoc("""UPDATE user_song_info usi
-                                   SET rating = %s, 
-                                     true_score = """+RATE_TRUESCORE_FORMULA+"""
-                                   WHERE fid = %s AND uid IN 
-                                      (SELECT uid FROM users 
-                                       WHERE listening = true AND
-                                             selected = true)
+                                   SET rating = %s
+                                   WHERE fid = %s AND uid = %s
                                    RETURNING *""",
-                               (rating, rating, fid,))
-    updated_again = calculate_true_score_for_selected(fid)
+                               (rating, fid, listener['uid']))
+    updated_again = calculate_true_score_for_uid(fid, listener['uid'])
     return updated_again or updated or []
 
 def rate_for_uid(fid, uid, rating):
     updated = get_results_assoc("""UPDATE user_song_info usi
-                                   SET rating = %s,
-                                       true_score = """+RATE_TRUESCORE_FORMULA+"""
+                                   SET rating = %s
                                    WHERE fid = %s AND 
-                                         uid = %s RETURNING *""", 
-                                   (rating, rating, fid, uid))
+                                         uid = %s 
+                                   RETURNING *""", 
+                                   (rating, fid, uid))
     updated_again = calculate_true_score_for_uid(fid, uid)
     return updated_again or updated or []
 
 def rate_for_usid(usid, rating):
     updated = get_results_assoc("""UPDATE user_song_info usi
-                                   SET rating = %s,
-                                       true_score = """+RATE_TRUESCORE_FORMULA+"""
+                                   SET rating = %s
                                    WHERE usid = %s RETURNING *""", 
                                    (rating, rating, usid))
-    updated_again = caclulate_true_score_for_usid(usid)
+    updated_again = calculate_true_score_for_usid(usid)
     return updated_again or updated or []
 
 
