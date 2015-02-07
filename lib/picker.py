@@ -388,6 +388,9 @@ def get_next_file_in_artist_series(aid, uid):
 
 
 def get_next_file_in_genre_series(gid, uid):
+    print "="*20,"=============================", "="*20
+    print "="*20,"GET NEXT FILE IN GENRE SERIES", "="*20
+    print "="*20,"=============================", "="*20
     next_file = None
     # Get the last file played in that genre
     print "g1"
@@ -406,6 +409,8 @@ def get_next_file_in_genre_series(gid, uid):
            LIMIT 1"""
     last_file = get_assoc(q, (gid, uid))
     print "last_file:", last_file
+    if last_file is None:
+        return None
 
     print "g2",pg_cur.mogrify(q, (gid, uid))
     if last_file:
@@ -729,6 +734,20 @@ def get_song_from_preload():
         remove_fid_from_preload(f['fid'])
 
     return f
+
+
+if __name__ == "__main__":
+    print("DELETE FROM PRELOAD")
+    query("""DELETE FROM preload""")
+    query("""DELETE FROM dont_pick""")
+    genres = get_results_assoc("""SELECT * 
+                                  FROM genres 
+                                  WHERE seq_genre = true""")
+
+    # insert_fid_into_preload()
+    for g in genres:
+        f = get_next_file_in_genre_series(g['gid'], 1)
+        pprint.pprint(f)
 
 
 
