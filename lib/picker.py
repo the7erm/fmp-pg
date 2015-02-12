@@ -294,6 +294,8 @@ def make_true_scores_list():
 
 def insert_preload_history_data(preload_data):
     print "PRELOAD DATA:", preload_data
+    if preload_data is None:
+        return
     """
                                               Table "public.preload_history"
            Column    |           Type           |                            Modifiers                             
@@ -312,8 +314,10 @@ def insert_preload_history_data(preload_data):
                                         preload_history (fid, uid, reason, plid, date_qued)
                                         VALUES          (%s,  %s,  %s,     %s,   NOW())
                                         RETURNING *""",
-                                        (preload_data['fid'], preload_data['uid'], 
-                                         preload_data['reason'], preload_data['plid']))
+                                        (preload_data['fid'], 
+                                         preload_data['uid'], 
+                                         preload_data['reason'], 
+                                         preload_data['plid']))
     print "preload_history_data:",
     pprint.pprint(preload_history_data)
 
@@ -350,20 +354,10 @@ def insert_fid_into_preload(fid, uid, reason):
           fid = next_file['fid']
           reason += " is sequential genre"
         print "NEXT_FILE:", next_file
-        if next_file['basename'] == 'MP3 Bible - 44 Acts 04.mp3':
-          insert_into_preload("adding sequential:", fid, uid, reason)
-          attrs = dict(next_file)
-          obj = Local_File(**attrs)
-          pprint.pprint(obj.ratings_and_scores.ratings_and_scores)
-          for user in obj.ratings_and_scores.ratings_and_scores:
-              pprint.pprint(dict(user))
-          # sys.exit()
-        # insert_into_preload("adding sequential:", fid, uid, reason)
-        # sys.exit()
     insert_into_preload("adding sequential:", fid, uid, reason)
 
 def get_next_file_in_artist_series(aid, uid):
-    next_file = None
+    next_file = None  
     # Get the last file played by that artist
     q = """SELECT dirname, basename, ultp
            FROM file_locations fl,
@@ -373,7 +367,7 @@ def get_next_file_in_artist_series(aid, uid):
                  fa.fid = fl.fid AND
                  fa.aid = %s AND
                  usi.uid = %s
-           ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
+           ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END,
                     ultp DESC
            LIMIT 1"""
     last_file = get_assoc(q, (aid, uid))
@@ -407,6 +401,7 @@ def get_next_file_in_artist_series(aid, uid):
 
 
 def get_next_file_in_genre_series(gid, uid):
+    insert_artists_in_preload_into_dont_pick()
     print "="*20,"=============================", "="*20
     print "="*20,"GET NEXT FILE IN GENRE SERIES", "="*20
     print "="*20,"=============================", "="*20
@@ -414,27 +409,30 @@ def get_next_file_in_genre_series(gid, uid):
     # Get the last file played in that genre
     print "g1"
     q = """SELECT dirname, basename, ultp
-           FROM file_locations fl
-                LEFT JOIN dont_pick dp ON dp.fid = fl.fid, 
+           FROM file_locations fl,
                 file_genres fg,
                 user_song_info usi
            WHERE usi.fid = fl.fid AND
                  fg.fid = fl.fid AND
                  fg.gid = %(gid)s AND
                  usi.uid = %(uid)s AND
-                 dp.fid IS NULL
+                 usi.fid = fg.fid
            ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
-                    ultp DESC
+                    ultp DESC, dirname, basename 
            LIMIT 1"""
     last_file = get_assoc(q, {"gid": gid, "uid": uid})
     print "last_file:", 
-    pprint.pprint(dict(last_file))
+    try:
+      pprint.pprint(dict(last_file))
+    except:
+      print last_file
+
     if last_file is None:
         return None
 
     print "g2", pg_cur.mogrify(q, {"gid": gid, "uid": uid})
     if last_file:
-        print "g2.1 LAST_FILE:", last_file
+        print "g2.1 LAST_FILE:", pprint.pprint(last_file)
         # Get the next artist in the series
         q = """SELECT dirname, basename, fl.fid
                FROM file_locations fl,
@@ -762,15 +760,24 @@ if __name__ == "__main__":
     query("""DELETE FROM preload""")
     query("""DELETE FROM dont_pick""")
 
-    populate_preload()
-    sys.exit()
+    #populate_preload()
+    #sys.exit()
     genres = get_results_assoc("""SELECT * 
                                   FROM genres 
                                   WHERE seq_genre = true""")
 
     # insert_fid_into_preload()
+    uid = 1
     for g in genres:
-        f = get_next_file_in_genre_series(g['gid'], 1)
+        f = get_next_file_in_genre_series(g['gid'], uid)
+        if not f:
+          continue
+        pprint.pprint(f)
+        insert_fid_into_preload(f['fid'], uid, "test")
+        f = get_next_file_in_genre_series(g['gid'], uid)
+        if not f:
+          continue
+        insert_fid_into_preload(f['fid'], uid, "test")
         pprint.pprint(f)
 
 
