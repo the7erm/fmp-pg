@@ -71,8 +71,8 @@ class Local_File(fobj.FObj):
         self.plid = plid
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
-                          dirname=dirname, basename=basename, filename=filename, 
-                          insert=insert)
+                          dirname=dirname, basename=basename, 
+                          filename=filename, insert=insert)
         
         self.set_paths_from_locations()
 

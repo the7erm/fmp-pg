@@ -26,6 +26,9 @@ from local_file_fobj import Local_File
 from local_file_fobj import sanity_check
 from wait_util import wait
 from excemptions import CreationFailed
+import sys
+import time
+import traceback
 
 global populate_locked, dont_pick_created
 dont_pick_created = False
@@ -197,17 +200,20 @@ def populate_preload(uid=None, min_amount=0):
     remove_duplicates_from_preload()
     remove_missing_files_from_preload()
     if not uid or uid is None:
-        listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
+        sql = """SELECT uid FROM users WHERE listening = true"""
+        listeners = get_results_assoc(sql, ())
         for l in listeners:
             populate_preload(l['uid'], min_amount)
         return
-    populate_preload_for_uid(uid, min_amount)
+    # populate_preload_for_uid(uid, min_amount)
     try:
         populate_preload_for_uid(uid, min_amount)
-    except:
+    except Exception as err:
         print "ERROR!!!! COULD NOT POPULATE PRELOAD"
+        print err
         global populate_locked
         populate_locked = False
+        traceback.print_exc()
         # populate_preload_for_uid(uid, min_amount)
 
 def fix_bad_scores(uid):
@@ -314,7 +320,7 @@ def insert_preload_history_data(preload_data):
 
 def insert_into_preload(msg, fid, uid, reason):
     print msg, get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
-    print "fid:%s uid:%s reason:%s"  % (fid, uid, reason)
+    print "INSERT INTO PRELOAD fid:%s uid:%s reason:%s"  % (fid, uid, reason)
     query("""INSERT INTO preload (fid, uid, reason)
              VALUES (%s, %s, %s)""",
            (fid, uid, reason))
@@ -337,10 +343,23 @@ def insert_fid_into_preload(fid, uid, reason):
             reason += " is sequential artist"
 
     if 'gid' in seq_info:
+        print("*****"*20, "GID")
         next_file = get_next_file_in_genre_series(seq_info['gid'], uid)
         if next_file:
+          print "NEXT FILE DETECTED"
           fid = next_file['fid']
           reason += " is sequential genre"
+        print "NEXT_FILE:", next_file
+        if next_file['basename'] == 'MP3 Bible - 44 Acts 04.mp3':
+          insert_into_preload("adding sequential:", fid, uid, reason)
+          attrs = dict(next_file)
+          obj = Local_File(**attrs)
+          pprint.pprint(obj.ratings_and_scores.ratings_and_scores)
+          for user in obj.ratings_and_scores.ratings_and_scores:
+              pprint.pprint(dict(user))
+          # sys.exit()
+        # insert_into_preload("adding sequential:", fid, uid, reason)
+        # sys.exit()
     insert_into_preload("adding sequential:", fid, uid, reason)
 
 def get_next_file_in_artist_series(aid, uid):
@@ -355,7 +374,7 @@ def get_next_file_in_artist_series(aid, uid):
                  fa.aid = %s AND
                  usi.uid = %s
            ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
-                    ultp DESC, dirname, basename
+                    ultp DESC
            LIMIT 1"""
     last_file = get_assoc(q, (aid, uid))
     if last_file:
@@ -401,18 +420,19 @@ def get_next_file_in_genre_series(gid, uid):
                 user_song_info usi
            WHERE usi.fid = fl.fid AND
                  fg.fid = fl.fid AND
-                 fg.gid = %s AND
-                 usi.uid = %s AND
+                 fg.gid = %(gid)s AND
+                 usi.uid = %(uid)s AND
                  dp.fid IS NULL
            ORDER BY CASE WHEN ultp IS NULL THEN 1 ELSE 0 END,
-                    ultp DESC, dirname, basename
+                    ultp DESC
            LIMIT 1"""
-    last_file = get_assoc(q, (gid, uid))
-    print "last_file:", last_file
+    last_file = get_assoc(q, {"gid": gid, "uid": uid})
+    print "last_file:", 
+    pprint.pprint(dict(last_file))
     if last_file is None:
         return None
 
-    print "g2",pg_cur.mogrify(q, (gid, uid))
+    print "g2", pg_cur.mogrify(q, {"gid": gid, "uid": uid})
     if last_file:
         print "g2.1 LAST_FILE:", last_file
         # Get the next artist in the series
@@ -567,7 +587,8 @@ def populate_preload_for_uid(uid, min_amount=0):
     print "populate_preload_for_uid 1"
     total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s", (uid,))
     if total['total'] > min_amount:
-        print "uid: %s preload total: %s>%s :min_amount" % (uid, total['total'], min_amount)
+        print "uid: %s preload total: %s>%s :min_amount" % (
+          uid, total['total'], min_amount)
         return
     print "populate_preload_for_uid 2"
     global populate_locked
@@ -740,6 +761,9 @@ if __name__ == "__main__":
     print("DELETE FROM PRELOAD")
     query("""DELETE FROM preload""")
     query("""DELETE FROM dont_pick""")
+
+    populate_preload()
+    sys.exit()
     genres = get_results_assoc("""SELECT * 
                                   FROM genres 
                                   WHERE seq_genre = true""")

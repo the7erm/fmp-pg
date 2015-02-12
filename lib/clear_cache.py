@@ -8,35 +8,37 @@ import os
 from excemptions import CreationFailed
 
 def clear_cache():
-    history = fobj.recently_played(10)
+    history = fobj.recently_played(50)
     recent = []
 
     for h in history:
         if h['id_type'] == 'e':
             recent.append(h['id'])
 
-    mask = cache_dir+"/*"
+    mask = os.path.join(cache_dir, "*")
     files = glob.glob(mask)
-    for f in files:
-        f = os.path.realpath(f)
+    for filename in files:
+        filename = os.path.realpath(filename)
         try:
-            nobj = netcast_fobj.Netcast_File(filename=f, silent=True)
+            nobj = netcast_fobj.Netcast_File(filename=filename, silent=True)
         except CreationFailed:
             continue
 
-        if nobj.is_unlistened():
-            print "keeping (unplayed):",f
+        if nobj.eid in recent:
+            print "keeping (recently played):",filename
             continue
 
-        if nobj.eid in recent:
-            print "keeping (recently played):",f
+        if nobj.is_unlistened():
+            print "keeping (unplayed):",filename
             continue
+
+       
 
         
         if os.remove(f):
-            print "removed:",f
+            print "removed:",filename
         else:
-            print "unable to remove:",f
+            print "unable to remove:",filename
 
 if __name__ == "__main__":
     clear_cache()

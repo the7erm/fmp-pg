@@ -223,7 +223,7 @@ class Netcast(gobject.GObject):
             if not os.path.exists(e['local_file']):
                 print "******"
                 print "not exists: e['local_file']:", e['local_file']
-                # downloader.append(e['episode_url'], e['local_file'])
+                downloader.append(e['episode_url'], e['local_file'])
 
 
     def get_unlistened_episodes(self):
@@ -642,16 +642,24 @@ class Netcast_File(fobj.FObj):
             self.pub_date = self.db_info['pub_date']
 
     def is_unlistened (self):
-        return get_results_assoc("""SELECT n.*, ne.*, nl.*, u.* 
-                                    FROM netcasts n, netcast_episodes ne 
-                                         LEFT JOIN netcast_listend_episodes nl ON 
-                                                   nl.eid = ne.eid, users u, 
-                                                   netcast_subscribers ns
-                                    WHERE ne.nid = n.nid AND listening = true AND 
-                                          ns.uid = u.uid AND ns.nid = n.nid AND 
-                                          nl.uid IS NULL AND ns.nid = %s AND
-                                          ne.eid = %s
-                                    ORDER BY pub_date""", (self.nid, self.eid))
+        res = get_results_assoc("""SELECT n.*, ne.*, nl.*, u.* 
+                                   FROM netcasts n, netcast_episodes ne 
+                                        LEFT JOIN netcast_listend_episodes nl
+                                            ON nl.eid = ne.eid, 
+                                        users u, 
+                                        netcast_subscribers ns
+                                   WHERE ne.nid = n.nid AND 
+                                         listening = true AND 
+                                         ns.uid = u.uid AND 
+                                         ns.nid = n.nid AND 
+                                         nl.uid IS NULL AND 
+                                         ns.nid = %s AND
+                                         ne.eid = %s
+                                   ORDER BY pub_date""", (self.nid, self.eid))
+
+        print ("is_unlistened:", bool(res))
+        return res
+
 
     def get_artist_title(self):
         try:

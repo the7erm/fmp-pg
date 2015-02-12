@@ -29,6 +29,7 @@ import random
 import hashlib
 import cfg_wrapper
 from gtk_utils import *
+from collections import namedtuple
 
 DEFAULTS = {
     "Netcasts": {
@@ -73,10 +74,12 @@ pg_conn = psycopg2.connect("dbname=%s user=%s password=%s host=%s" % (
                             cfg.get('postgres','database', 'fmp', str), 
                             cfg.get('postgres','username', '', str), 
                             cfg.get('postgres','password', '', str), 
-                            cfg.get('postgres','host', '127.0.0.1', str)))
+                            cfg.get('postgres','host', '127.0.0.1', str)),
+                            cursor_factory=psycopg2.extras.DictCursor)
 salt = cfg.get('password_salt', 'salt', create_salt(), str)
 
 pg_cur = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
 
 def get_results_assoc(query, args=None):
     cur = pg_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
