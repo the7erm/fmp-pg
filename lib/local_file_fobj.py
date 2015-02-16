@@ -114,7 +114,7 @@ class Local_File(fobj.FObj):
 
     def init_db_info(self, fid=None, sha512=None, fingerprint=None, dirname=None,
                     basename=None, filename=None, insert=False):
-        if fid is not None :
+        if fid is not None:
             self.db_info = self.get_db_info_from_fid(fid)
             if self.db_info:
                 print "FROM FID:", dict(self.db_info)
@@ -822,7 +822,7 @@ class Local_File(fobj.FObj):
         if self.mtime != self.db_info['mtime']:
             return True
 
-        #  print "self.mtime:",self.mtime,"==",self.db_info['mtime']
+        print "self.mtime:",self.mtime,"==",self.db_info['mtime']
         return False
 
     def update_tags(self, fid=None):

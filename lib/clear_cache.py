@@ -35,7 +35,7 @@ def clear_cache():
        
 
         
-        if os.remove(f):
+        if os.remove(filename):
             print "removed:",filename
         else:
             print "unable to remove:",filename

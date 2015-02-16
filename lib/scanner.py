@@ -52,7 +52,8 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     except CreationFailed:
         FileLocation(filename=filename, insert=True)
         try:
-            f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+            f = Local_File(filename=filename, hash=hash, insert=True, 
+                           silent=True)
         except CreationFailed:
             pass
 

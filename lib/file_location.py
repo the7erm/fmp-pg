@@ -86,7 +86,6 @@ class FileLocation:
                 return
             self.set_data_by_filename(filename, insert=insert)
 
-
         self.sync_db_info()
         self.sync_files_info()
         print "self.db_info:", 
@@ -120,16 +119,12 @@ class FileLocation:
                     "   filename:%s\n" % filename
                 )
             self.add_file_to_db(dirname, basename)
-        
-        
 
     def set_data_by_flid(self, flid):
         self.db_info = get_assoc("""SELECT * 
                                     FROM file_locations 
                                     WHERE flid = %s 
                                     LIMIT 1""", (flid,))
-
-
 
     def add_file_to_db(self, dirname, basename):
         self.db_info = {}
@@ -147,6 +142,7 @@ class FileLocation:
     def update_fingerprint(self):
         if not self.exists:
             return
+        print "--updating fingerprint"
         try:
             main, front, end, middle = calculate_file_fingerprint(self.filename)
         except ValueError, e:
@@ -289,7 +285,6 @@ class FileLocation:
             not self.db_info['middle_fingerprint'] or
             not self.db_info['end_fingerprint'] or
             self.db_info['size'] != self.size or 
-            self.db_info['atime'] != self.atime or 
             self.db_info['mtime'] != self.mtime):
             return True
         return False

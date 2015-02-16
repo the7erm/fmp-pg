@@ -26,9 +26,11 @@ import pprint
 from fingerprint_util import calculate_file_fingerprint
 
 class FingerprintHistory:
-    def __init__(self, dirname, basename, flid=None, fid=None, fingerprint=None,
-                 front_fingerprint=None, middle_fingerprint=None, end_fingerprint=None):
-        self.filename = os.path.realpath(os.path.expanduser(os.path.join(dirname, basename)))
+    def __init__(self, dirname, basename, flid=None, fid=None, 
+                 fingerprint=None, front_fingerprint=None, 
+                 middle_fingerprint=None, end_fingerprint=None):
+        self.filename = os.path.realpath(
+            os.path.expanduser(os.path.join(dirname, basename)))
         print "SELF.FILENAME:", self.filename
         self.dirname, self.basename = os.path.split(self.filename)
         self.flid = flid
@@ -39,21 +41,24 @@ class FingerprintHistory:
         self.middle_fingerprint = middle_fingerprint
         self.end_fingerprint = end_fingerprint
         self.insert_record()
-        self.history = self.get_files_for_fingerprint(self.record['fingerprint'])
+        self.history = self.get_files_for_fingerprint(
+            self.record['fingerprint'])
 
     @property
     def atime(self):
         try:
-          return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(os.path.getatime(
+                self.filename)).replace(tzinfo=pytz.UTC)
         except OSError:
-          return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
 
     @property
     def mtime(self):
         try:
-          return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(
+                os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
         except OSError:
-          return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(0).replace(tzinfo=pytz.UTC)
 
     @property
     def size(self):
@@ -184,7 +189,7 @@ class FingerprintHistory:
                                   end,
                                   self.dirname,
                                   self.basename,
-                    'flid:',        self.flid,
+                    'flid:',      self.flid,
                     'fid:',      self.fid,
                                   self.size,
                                   self.atime,

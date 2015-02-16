@@ -10,10 +10,12 @@
 <accordion close-others="oneAtATime">
   <accordion-group is-open="podcast.open" ng-repeat="podcast in podcasts">
       <accordion-heading>
-          <a ng-click="loadEpisodes(podcast.nid, podcast.open)">
+          <div ng-click="loadEpisodes(podcast.nid, podcast.open)">
+          <a>
             {{podcast.netcast_name}} 
             <i class="pull-right glyphicon" ng-class="{'glyphicon-chevron-down': podcast.open, 'glyphicon-chevron-right': !podcast.open}"></i>
           </a>
+          </div>
       </accordion-heading>
       <table class="table">
           <thead>
@@ -23,8 +25,8 @@
             </tr>
           </thead>
           <tr ng-repeat="user in podcast.subscribers">
-            <td>{{ user.uname }}</td>
-            <td><input type="checkbox" ng-change="subscribe(podcast.nid, user.uid, user.subscribed)" ng-model="user.subscribed"  ></td>
+            <td><label for="label-{{podcast.nid}}-{{user.uid}}">{{ user.uname }}</label></td>
+            <td><input type="checkbox" ng-change="subscribe(podcast.nid, user.uid, user.subscribed)" ng-model="user.subscribed" id="label-{{podcast.nid}}-{{user.uid}}" ></td>
           </tr>
       </table>
       <table class="table">
