@@ -30,6 +30,9 @@ from subprocess import Popen
 from rating_utils import rate_for_uid
 from picker import insert_missing_songs
 
+gobject.threads_init()
+gtk.gdk.threads_init()
+
 class Preload(gtk.ScrolledWindow):
     def __init__(self):
         gtk.ScrolledWindow.__init__(self)
@@ -37,7 +40,8 @@ class Preload(gtk.ScrolledWindow):
         self.change_locked = False
         self.tv = None
         self.create_treeview()
-        gobject.timeout_add(10000, self.refresh_data)
+        self.stop = False
+        gobject.timeout_add(1000, self.refresh_data)
 
 
     def create_treeview(self):
@@ -214,9 +218,16 @@ class Preload(gtk.ScrolledWindow):
             if cnt % 10 == 0:
                 wait()
 
+    def quit_on_stop(self):
+        if self.stop:
+            print "STOP"
+            gtk.main_quit()
+
     def refresh_data(self):
+        self.quit_on_stop()
         if self.reload_lock:
             print "reload_lock"
+
             return True
         self.reload_lock = True
         wait()
@@ -258,6 +269,8 @@ class Preload(gtk.ScrolledWindow):
         for i, f in enumerate(files):
             if i % 15 == 0:
                 wait()
+                self.quit_on_stop()
+            
             row = self.create_row(f, cols)
             if not row:
                 continue
@@ -272,6 +285,7 @@ class Preload(gtk.ScrolledWindow):
                     continue
                 self.liststore.append(row)
 
+        print "done looping through files"
         self.change_locked = False
 
         for r in self.liststore:
@@ -279,6 +293,7 @@ class Preload(gtk.ScrolledWindow):
             for f in files:
                 if r[0] == f['fid']:
                     wait()
+                    self.quit_on_stop()
                     found = True
                     break
             if not found:
@@ -352,6 +367,11 @@ class Preload(gtk.ScrolledWindow):
         for u in self.listeners:
             insert_missing_songs(u['uid'])
 
+    def quit(self, *args, **kwargs):
+        self.stop = True
+        self.connect('event-after', gtk.main_quit)
+        sys.exit()
+
 
 def convert_delta_to_str(delta):
     c = ""
@@ -418,6 +438,8 @@ def convert_delta_to_str(delta):
 
     return " ".join(parts)
 
+
+
 if __name__ == "__main__":
     
     preload = Preload()
@@ -427,7 +449,7 @@ if __name__ == "__main__":
     w.set_position(gtk.WIN_POS_CENTER)
     w.add(preload)
     w.show_all()
-    w.connect("destroy", gtk_main_quit)
+    w.connect("destroy", preload.quit)
     preload.refresh_data()
     # w.maximize()
     gtk.main()

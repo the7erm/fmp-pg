@@ -275,7 +275,7 @@ def get_single_from_true_score(uid, true_score):
          LIMIT 1""", (uid, true_score))
 
 def make_true_scores_list():
-    scores = [0,10,20,30,40,50,60,70,80,90,100]
+    scores = [0,10,20,30,40,50,60,70,80,90,95,100]
 
     shuffle(scores)
 
