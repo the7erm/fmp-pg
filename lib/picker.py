@@ -97,7 +97,9 @@ def insert_duplicate_files_into_dont_pick():
 def populate_dont_pick():
     associate_gernes()
     query("TRUNCATE dont_pick")
-    query("INSERT INTO dont_pick (fid, reason) SELECT fid, 'already in preload' FROM preload")
+    query("""INSERT INTO dont_pick (fid, reason) 
+                SELECT fid, 'already in preload' 
+                FROM preload""")
     # insert all disabled genres into dont_pick
     query("""INSERT INTO dont_pick (fid, reason) 
                 SELECT DISTINCT(f.fid), 'disabled genre' 
@@ -118,7 +120,10 @@ def populate_dont_pick():
                       g.enabled = true)""")
 
     insert_duplicate_files_into_dont_pick()
-    listeners = get_results_assoc("SELECT uid FROM users WHERE listening = true", ())
+    sql = """SELECT uid 
+             FROM users 
+             WHERE listening = true"""
+    listeners = get_results_assoc(sql, ())
 
     if listeners:
         total_to_remove = get_assoc(
@@ -355,6 +360,8 @@ def insert_fid_into_preload(fid, uid, reason):
           reason += " is sequential genre"
         print "NEXT_FILE:", next_file
     insert_into_preload("adding sequential:", fid, uid, reason)
+    insert_artists_in_preload_into_dont_pick()
+    insert_duplicate_files_into_dont_pick()
 
 def get_next_file_in_artist_series(aid, uid):
     next_file = None  
@@ -583,7 +590,10 @@ def get_existing_file(uid, true_score):
 def populate_preload_for_uid(uid, min_amount=0):
     gtk.gdk.threads_leave()
     print "populate_preload_for_uid 1"
-    total = get_assoc("SELECT COUNT(*) as total FROM preload WHERE uid = %s", (uid,))
+    sql = """SELECT COUNT(*) as total 
+             FROM preload 
+             WHERE uid = %s"""
+    total = get_assoc(sql, (uid,))
     if total['total'] > min_amount:
         print "uid: %s preload total: %s>%s :min_amount" % (
           uid, total['total'], min_amount)
@@ -634,30 +644,27 @@ def populate_preload_for_uid(uid, min_amount=0):
             continue
         wait()
 
-        insert_fid_into_preload(f['fid'], uid, "true_score >= %s" % (true_score, ))
-        insert_artists_in_preload_into_dont_pick()
-        insert_duplicate_files_into_dont_pick()
-
-    for i in range(0,10):
-        sample = get_random_unplayed_sample(uid)
-
-        if not sample:
-            break;
-        for f in sample:
-            print "sample2:", f
-
+        insert_fid_into_preload(
+          f['fid'], uid, "true_score >= %s" % (true_score, ))
+        
         f = get_single_random_unplayed(uid)
+        if not f:
+          continue
+        wait()
 
         insert_fid_into_preload(f['fid'], uid, "random unplayed")
-        insert_artists_in_preload_into_dont_pick()
-        insert_duplicate_files_into_dont_pick()
+
+    sql = """SELECT count(*) as total 
+             FROM preload 
+             WHERE uid = %s"""
 
     preload = get_preload()
 
     for p in preload:
-        print "p:",p
+        print "p:", p
 
     populate_locked = False
+
 
 def get_preload():
     return get_results_assoc("""SELECT uid, basename 
@@ -700,32 +707,30 @@ def set_last_time_cued(uid):
              (uid,))
 
 def get_single_from_preload(uid=None):
-    if uid:
-        f = get_assoc("""SELECT * 
-                            FROM preload p, files f 
-                            WHERE f.fid = p.fid AND 
-                                  reason = 'From search'
-                            ORDER BY plid LIMIT 1""")
-        if f:
-          return f
-        return get_assoc("""SELECT * 
-                            FROM preload p, files f 
-                            WHERE f.fid = p.fid AND uid = %s 
-                            ORDER BY random() LIMIT 1""", 
-                            (uid,))
-
-    f = get_assoc("""SELECT * 
-                     FROM preload p, files f 
-                     WHERE f.fid = p.fid AND reason = 'From search'
-                     ORDER BY plid
-                     LIMIT 1""")
+    sql = """SELECT * 
+                 FROM preload p, files f 
+                 WHERE f.fid = p.fid AND 
+                       reason = 'From search'
+                 ORDER BY plid 
+                 LIMIT 1"""
+    f = get_assoc(sql)
     if f:
       return f
+
+    if uid:
+        sql = """SELECT * 
+                 FROM preload p, files f 
+                 WHERE f.fid = p.fid AND uid = %s 
+                 ORDER BY plid 
+                 LIMIT 1"""
+        f = get_assoc(sql, (uid,))
+        if f:
+          return f
 
     return get_assoc("""SELECT * 
                         FROM preload p, files f 
                         WHERE f.fid = p.fid 
-                        ORDER BY random() 
+                        ORDER BY plid
                         LIMIT 1""")
 
 def remove_fid_from_preload(fid):
