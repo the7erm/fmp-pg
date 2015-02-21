@@ -41,7 +41,7 @@ class Preload(gtk.ScrolledWindow):
         self.tv = None
         self.create_treeview()
         self.stop = False
-        gobject.timeout_add(1000, self.refresh_data)
+        gobject.timeout_add(10000, self.refresh_data)
 
 
     def create_treeview(self):
