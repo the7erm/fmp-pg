@@ -33,6 +33,7 @@ class LocationTreeview:
     # close the window and quit
     def delete_event(self, widget, event, data=None):
         gtk.main_quit()
+        sys.exit()
         return False
 
     def __init__(self, locations):
