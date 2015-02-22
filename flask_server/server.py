@@ -42,6 +42,7 @@ import psycopg2
 import os
 from lib.netcast_fobj import Netcast
 from copy import deepcopy
+from pprint import pprint, pformat
 
 # from bson import json_util
 import json
@@ -975,6 +976,19 @@ def search():
                            filter_by=filter_by, player=player,
                            extended=extended, volume=get_volume())
     
+@app.route('/sync/', methods=['GET', 'POST'])
+def sync(*args, **kw):
+    playlist = request.get_json()
+    pprint(playlist)
+    sql = """DELETE FROM preload WHERE plid = %s"""
+    for p in playlist['preload']:
+        if p.get('played', False) and not p.get('playing', False):
+            # TODO mark as played, and update rating.
+            print sql, p['plid']
+            query(sql, (p['plid'],))
+
+    return json_dump({"Result": "OK"})
+
     
 def get_filter_by():
     filter_by = "%s" % request.args.get("f", "all")
@@ -1374,9 +1388,15 @@ def preload():
     mimetype = "application/json"
     cachetimout = 60
 
+    order_by = "artist, title"
+
+    if request.args.get("o") == "plid":
+        order_by = "plid"
+
     print "LIMIT:%s" % limit
 
-    q = """SELECT DISTINCT f.fid, artist, title, sha512,
+
+    q = """SELECT DISTINCT p.plid, f.fid, artist, title, sha512,
                            p.fid AS cued, artist,
                            f.fid AS id, 'f' AS id_type
            FROM files f
@@ -1384,7 +1404,7 @@ def preload():
                 LEFT JOIN artists a ON a.aid = fa.aid,
                 preload p
            WHERE p.fid = f.fid
-           ORDER BY artist, title 
+           ORDER BY """+order_by+"""
            LIMIT """+str(limit)+""" OFFSET """+str(start)
 
     print "Q:<<<%s>>>" % q
@@ -1527,7 +1547,48 @@ def get_episodes(nid):
 
     return json_dump(res_data)
 
+@app.route("/stream/<fid>/")
+@app.route("/stream/<fid>\.mp4")
+def stream(fid):
+    print("STREAM:", fid)
+    locations = []
+    if "." not in fid:
+        locations = get_results_assoc("""SELECT dirname, basename
+                                         FROM file_locations 
+                                         WHERE fid = %s""", (fid, ))
 
+    print "LOCATIONS:",locations
+
+    location = ""
+    mimetype = "x-download"
+    for l in locations:
+        print "L:",l
+        path = os.path.join(l['dirname'], l['basename'])
+        print "path:", path
+        root, ext = os.path.split(l['basename'])
+        if os.path.exists(path):
+            print "exists"
+            location = path
+            lext = ext.lower()
+            if lext == '.mp3':
+                mimetype = "audio/mpeg"
+            break
+
+    return send_file(location, mimetype=mimetype, as_attachment=False,
+                     attachment_filename=None, add_etags=False, 
+                     cache_timeout=1, conditional=False)
+
+@app.route("/stream-mp4/<fid>.mp4")
+def stream_mp4(fid):
+    print ("STERAM MP4", fid)
+    location = "/home/erm/tmp/test-video/out.mp4"
+    mimetype = "video/mp4"
+
+    print ("HEADERS:", request.headers)
+
+    return send_file(location, mimetype=mimetype, as_attachment=False,
+                     attachment_filename=None, add_etags=False, 
+                     cache_timeout=1, conditional=False)
 
 @app.route("/subscribe/<nid>/<uid>/<subscribed>", methods=['GET'])
 def subscribe(nid, uid, subscribed):
