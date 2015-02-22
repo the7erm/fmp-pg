@@ -54,7 +54,10 @@ import time
 
 from flask import render_template
 import lib.fobj as fobj
-from lib.rating_utils import rate as simple_rate
+from lib.rating_utils import rate as simple_rate, mark_as_played, \
+                             calculate_true_score_for_fid_uid,\
+                             set_score_for_uid
+
 from lib.local_file_fobj import get_words_from_string, Local_File
 
 from tornado.wsgi import WSGIContainer
@@ -979,13 +982,27 @@ def search():
 @app.route('/sync/', methods=['GET', 'POST'])
 def sync(*args, **kw):
     playlist = request.get_json()
-    pprint(playlist)
+    # pprint(playlist)
     sql = """DELETE FROM preload WHERE plid = %s"""
     for p in playlist['preload']:
         if p.get('played', False) and not p.get('playing', False):
             # TODO mark as played, and update rating.
             print sql, p['plid']
             query(sql, (p['plid'],))
+        for r in p['ratings']:
+            updated = r.get('updated',[])
+            if 'score' in updated:
+                print "update score"
+                pprint(r)
+                try:
+                  set_score_for_uid(r['fid'], r['uid'], r['score'])
+                except Error, err:
+                  print "ERR:",err
+
+            if 'percent_played' in updated:
+                print "update percent_played"
+                mark_as_played(r['fid'], r['uid'], r['ultp'], 
+                               r['percent_played'])
 
     return json_dump({"Result": "OK"})
 

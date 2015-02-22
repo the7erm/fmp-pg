@@ -7,6 +7,7 @@ import select
 import shutil
 import gtk
 import gobject
+import time
 from lib import player
 from pprint import pprint, pformat
 gobject.threads_init()
@@ -236,7 +237,9 @@ class Playlist(object):
     def set_percent_played(self, percent_played):
         for r in self.playing['ratings']:
             r['percent_played'] = percent_played
+            r['ultp'] = time.time()
             self.dirty_rating(r, 'percent_played')
+            self.dirty_rating(r, 'ultp')
 
     def next(self):
         self.update_skip_score(-1) # de-inc the score
@@ -271,9 +274,6 @@ class Playlist(object):
         response = urllib2.urlopen(req)
         the_page = response.read()
         print "the_page", the_page
-        
-
-        
 
 playlist = Playlist()
 

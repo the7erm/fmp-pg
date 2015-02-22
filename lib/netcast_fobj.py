@@ -500,7 +500,7 @@ class Netcast_File(fobj.FObj):
            self.mark_as_played_when_time > now:
             return
 
-        print "TODO: Necast_file::mark_as_played()"
+        # print "TODO: Necast_file::mark_as_played()"
         """nlid, uid, eid, percent_played"""
         print "percent_played:",percent_played
 
