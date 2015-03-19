@@ -85,9 +85,9 @@ class FObj:
             self.basename = os.path.basename(filename)
         else:
             raise CreationFailed(
-                "Unabled to allocate filename:%s\n" % filename + 
-                "Unabled to allocate dirname:%s\n" % dirname + 
-                "Unabled to allocate basename:%s" % basename
+                "Unabled to allocate filename:%s\n" % (filename,) + 
+                "Unabled to allocate dirname:%s\n" % (dirname,) + 
+                "Unabled to allocate basename:%s" % (basename, )
             )
         
         if self.filename and (

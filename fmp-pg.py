@@ -49,6 +49,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 from subprocess import Popen, PIPE
 
 from ConfigParser import NoSectionError
+from lib.excemptions import CreationFailed, NotImpimented
 
 # setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
 
@@ -523,7 +524,20 @@ except IndexError:
         item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
         history.append(dict(item))
 
-tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**item)
+
+item_fobj = None
+while item_fobj is None:
+    try:
+        item_fobj = fobj.get_fobj(**item)
+    except CreationFailed as err:
+        print "CreationFailed:", err
+        item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
+        history.append(dict(item))
+        item_fobj = None
+        time.sleep(1)
+
+tray.playing = flask_server.server.playing = playing = item_fobj
+
 tray.set_rating()
 plr = player.Player(filename=playing.filename)
 
