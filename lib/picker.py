@@ -194,11 +194,23 @@ def remove_missing_files_from_preload():
                                FROM preload p, file_locations fl
                                WHERE fl.fid = p.fid""")
 
+  found_fids = []
+  missing_fids = []
+
   for f in files:
       if not os.path.exists(os.path.join(f['dirname'], f['basename'])):
+          # print "!"*20,"MISSING","!"*20
+          # print "MISSING:", f['fid']
+          # query("""DELETE FROM preload WHERE fid = %s""", (f['fid'],))
+          missing_fids.append(f['fid'])
+      else:
+        found_fids.append(f['fid'])
+
+  for fid in missing_fids:
+      if fid not in found_fids:
           print "!"*20,"MISSING","!"*20
-          print "MISSING:", f['fid']
-          query("""DELETE FROM preload WHERE fid = %s""", (f['fid'],))
+          print "MISSING:", fid
+          query("""DELETE FROM preload WHERE fid = %s""", (fid,))
 
 
 def populate_preload(uid=None, min_amount=0):
