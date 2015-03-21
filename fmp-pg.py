@@ -366,11 +366,20 @@ def append_file():
     if f:
         print "APPEND:",f
         history.append(f)
+        if 'fid' in f:
+            delete_fid_from_preload(f['fid'])
         return f
     else:
         print "NO FILE:"
         return None
 
+
+def delete_fid_from_preload(fid):
+    if not fid:
+        return
+    sql = """DELETE FROM preload WHERE fid = %s"""
+    print pg_cur.mogrify(sql, (fid,))
+    query(sql, (fid,))
 
 def set_idx(idx, retry=2):
     global playing, history
@@ -381,8 +390,9 @@ def set_idx(idx, retry=2):
     try:
         f = dict(history[idx])
         print "set_idx F:",f
+        if 'fid' in f:
+            delete_fid_from_preload(f['fid'])
         tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**f)
-
         print "/set_idx F:"
         tray.set_rating()
         populate_preload()
@@ -393,7 +403,12 @@ def set_idx(idx, retry=2):
             if not f:
                 break;
             history_len = len(history)
+
         f = append_file()
+        if 'fid' in f:
+            sql = """DELETE FROM preload WHERE fid = %s"""
+            print pg_cur.mogrify(sql, (f['fid'],))
+            query(sql, (f['fid'],))
         if retry > 0:
             print "RETRYING:",retry
             set_idx(idx, retry-1)

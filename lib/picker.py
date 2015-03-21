@@ -292,7 +292,7 @@ def get_single_from_true_score(uid, true_score):
          LIMIT 1""", (uid, true_score))
 
 def make_true_scores_list():
-    scores = [0,10,20,30,40,50,60,70,80,90,95,100]
+    scores = [0,10,20,30,40,50,60,70,80,90,95]
 
     # shuffle(scores)
 
@@ -528,12 +528,19 @@ def is_sequential(fid):
 
 
 def insert_artists_in_preload_into_dont_pick():
-    query("""INSERT INTO dont_pick (fid, reason) 
+    sql = """INSERT INTO dont_pick (fid, reason) 
              SELECT DISTINCT fid, 'artist in preload' 
-             FROM file_artists WHERE aid IN (SELECT DISTINCT aid 
-                                             FROM file_artists fa 
-                                             WHERE fid IN (SELECT DISTINCT fid 
-                                                           FROM preload))""")
+             FROM file_artists 
+             WHERE aid IN (SELECT DISTINCT aid 
+                           FROM file_artists fa 
+                           WHERE fid IN (SELECT DISTINCT p.fid 
+                                         FROM preload p 
+                                              LEFT JOIN dont_pick dp ON 
+                                                        dp.fid = p.fid
+                                         WHERE dp.fid IS NULL
+                                        )
+                          )"""
+    query(sql)
 
 
 def get_random_unplayed_sample(uid):
@@ -602,9 +609,93 @@ def get_existing_file(uid, true_score):
     return file_info
 
 def insert_into_dont_pick(fid):
-    sql =  """INSERT INTO dont_pick (fid, reason) 
-              VALUES(%s, 'fid inserted into preload')"""
-    query(sql, (fid, ))
+    sql = """INSERT INTO dont_pick (fid, reason) 
+             VALUES(%s, 'fid in preload')"""
+    query(sql, (fid, ))  # this must be done every time because sometimes
+                         # files don't have artists, and the filename
+                         # is not Artist - Title.ext
+    sql = """SELECT fa.fid, fa.aid 
+             FROM file_artists fa LEFT JOIN dont_pick dp ON dp.fid = fa.fid
+             WHERE fa.fid = %s AND dp.fid IS NULL"""
+
+    artists = get_results_assoc(sql, (fid, ))
+    already_processed_artist = []
+    already_processed_basename = []
+    alread_processed_fid = []
+    insert_location_into_dont_pick(fid, already_processed_basename)
+    for a in artists:
+        sql = """SELECT fa.fid, fa.aid 
+                 FROM file_artists fa
+                      LEFT JOIN dont_pick dp ON dp.fid = fa.fid
+                 WHERE aid = %s AND dp.fid IS NULL"""
+        if a['aid'] in already_processed_artist:
+            continue
+        already_processed_artist.append(a['aid'])
+        files = get_results_assoc(sql, (a['aid'],))
+        for f in files:
+            print "file for aid:", a['aid'], f['fid']
+            sql = """INSERT INTO dont_pick (fid, reason)
+                     VALUES (%s, 'artist already inserted')"""
+
+            if f['fid'] not in alread_processed_fid:
+                query(sql, (f['fid'],))
+
+            alread_processed_fid.append(f['fid'],)
+            insert_location_into_dont_pick(f['fid'], 
+                                           already_processed_basename)
+
+def insert_location_into_dont_pick(fid, already_processed_basename):
+    sql = """SELECT fid, basename
+             FROM file_locations
+             WHERE fid = %s"""
+    locations = get_results_assoc(sql, (fid,))
+    for l in locations:
+        if '-' not in l['basename']:
+            continue
+        artist, title = l['basename'].split('-', 1)
+        artist = artist.strip()
+        print "basename:", l['basename']
+        
+        dont_pick_artist_basename(artist, already_processed_basename)
+
+        underscore_artist = artist.replace(" ", "_")
+        dont_pick_artist_basename(underscore_artist, 
+                                  already_processed_basename)
+
+        space_artist = artist.replace("_", " ")
+        dont_pick_artist_basename(space_artist, 
+                                  already_processed_basename)
+
+def dont_pick_artist_basename(artist, already_processed_basename):
+    insert_basename_into_dont_pick(artist, already_processed_basename)
+    
+
+def insert_basename_into_dont_pick(artist, already_processed_basename):
+    artist = artist.lower()
+    if not artist or artist in already_processed_basename:
+        return
+    already_processed_basename.append(artist)
+    _artist = "%s%%-%%" % artist
+    sql = """INSERT INTO dont_pick 
+             SELECT DISTINCT fl.fid, 
+                             'basename matches',
+                             ''
+             FROM file_locations fl LEFT JOIN dont_pick dp ON 
+                                              dp.fid = fl.fid
+             WHERE basename ILIKE %s AND 
+                   dp.fid IS NULL"""
+    print "SQL:", pg_cur.mogrify(sql, (_artist, ))
+
+    query(sql,(_artist,))
+    _artist = "%% %s%%-%%" % artist
+    print "SQL:", pg_cur.mogrify(sql, (_artist, ))
+    query(sql,(_artist,))
+
+    _artist = "%%{_}%s%%-%%" % artist
+    sql = pg_cur.mogrify(sql, (_artist, ))
+    sql = sql.format(_="\_")
+    print "SQL:", sql
+    query(sql)
 
 def populate_preload_for_uid(uid, min_amount=0):
     gtk.gdk.threads_leave()
@@ -793,8 +884,8 @@ if __name__ == "__main__":
     query("""DELETE FROM preload""")
     query("""DELETE FROM dont_pick""")
 
-    #populate_preload()
-    #sys.exit()
+    populate_preload()
+    sys.exit()
     genres = get_results_assoc("""SELECT * 
                                   FROM genres 
                                   WHERE seq_genre = true""")
