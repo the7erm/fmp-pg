@@ -982,13 +982,13 @@ def search():
 @app.route('/sync/', methods=['GET', 'POST'])
 def sync(*args, **kw):
     playlist = request.get_json()
-    # pprint(playlist)
-    sql = """DELETE FROM preload WHERE plid = %s"""
+    pprint(playlist)
+    delete_sql = """DELETE FROM preload WHERE plid = %s"""
     for p in playlist['preload']:
         if p.get('played', False) and not p.get('playing', False):
             # TODO mark as played, and update rating.
-            print sql, p['plid']
-            query(sql, (p['plid'],))
+            print delete_sql, p['plid']
+            query(delete_sql, (p['plid'],))
         for r in p['ratings']:
             updated = r.get('updated',[])
             if 'score' in updated:
@@ -1405,7 +1405,7 @@ def preload():
     mimetype = "application/json"
     cachetimout = 60
 
-    order_by = "artist, title"
+    order_by = "plid, artist, title"
 
     if request.args.get("o") == "plid":
         order_by = "plid"

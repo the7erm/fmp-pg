@@ -33,7 +33,7 @@ class Playlist(object):
         self.time_to_update = 0
         self.player = player.Player()
         self.load_playlist()
-        self.download()
+        self.download_files()
         self.sync()
         self.init_player()
         self.init_window()
@@ -131,7 +131,8 @@ class Playlist(object):
             self.prev()
 
     def on_mouse_move(self, *args, **kwargs):
-        print "self.on_mouse_move:", args, kwargs
+        # print "self.on_mouse_move:", args, kwargs
+        return
 
     def on_mouse_click(self, *args, **kwargs):
         print "self.on_mouse_click:", args, kwargs
@@ -146,7 +147,7 @@ class Playlist(object):
             self.player.seek("-5")
         print "/on_scroll"
 
-    def download(self):
+    def download_files(self):
         for p in self.preload:
             # pprint(p)
             root, ext = os.path.splitext(p['locations'][0]['basename'])
@@ -178,17 +179,53 @@ class Playlist(object):
             self.playlist = json.loads(contents)
             if 'idx' not in self.playlist:
                 self.idx = 0
+
             # TODO post preload data to server, and download the new preload
-        else:
-            self.download_preload()
-        self.download()
+        self.download_preload()
+        self.download_files()
 
     def download_preload(self):
         response = urllib2.urlopen(
             'http://erm:5050/preload?s=0&l=300&o=plid')
         contents = response.read()
-        self.preload = json.loads(contents)
-        print "SET PRELOAD",contents
+        server_preload = json.loads(contents)
+        if not self.preload:
+            self.preload = server_preload
+        else:
+            self_preload_fids = []
+            server_preload_fids = []
+            for p in self.preload:
+                self_preload_fids.append(int(p['plid']))
+            for p in server_preload:
+                server_preload_fids.append(int(p['plid']))
+
+            keep = [val for val in self_preload_fids if val in server_preload_fids]
+            append = set(server_preload_fids) - set(self_preload_fids)
+            print "keep:", keep
+            print "append:", append
+
+            new_preload = []
+            for p in self.playlist['preload']:
+                if (p['plid'] in keep or 
+                    p['plid'] in append or 
+                    p.get('playing')):
+                        new_preload.append(p)
+                else:
+                    root, ext = os.path.splitext(p['locations'][0]['basename'])
+                    filename = "{fid}{ext}".format(fid=p['fid'], ext=ext)
+                    cache_filename = os.path.join(cache_dir, filename)
+                    if os.path.exists(cache_filename):
+                        print "remove:", cache_filename
+                        os.unlink(cache_filename)
+
+            print "********"
+            self.preload = new_preload
+            for p in server_preload:
+                if p['plid'] not in keep:
+                    self.preload.append(p)
+            # print "self.preload:", pformat(self.playlist['preload'])
+
+        # print "SET PRELOAD",contents
         self.idx = 0
         self.write_playlist()
 

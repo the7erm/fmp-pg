@@ -1,35 +1,34 @@
 <div class="search-item">
   <div ng-hide="r.hide_cued">
-
-      <button ng-show="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
-      <button ng-hide="r.cued" class="btn btn-default glyphicon glyphicon-list" ng-click="cue(r)"> <span class="glyphicon glyphicon-plus"></span></button>
-      <button class="btn btn-default" ng-hide="r.moreInfo.history" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
-      <button class="btn btn-primary" ng-show="r.moreInfo.history" ng-click="r.moreInfo.history=null"><span class="glyphicon glyphicon-time"></span> </button>
+      <button ng-if="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
+      <button ng-if="!r.cued" class="btn btn-default glyphicon glyphicon-list" ng-click="cue(r)"> <span class="glyphicon glyphicon-plus"></span></button>
+      <button class="btn btn-default" ng-if="!r.moreInfo.history" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
+      <button class="btn btn-primary" ng-if="r.moreInfo.history" ng-click="r.moreInfo.history=null"><span class="glyphicon glyphicon-time"></span></button>
   </div>
   <br clear="all">
-  <div ng-hide="r.artists" ng-show="r.artists.length == 0">
+  <div ng-if="!r.artists || r.artists.length == 0">
       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
       <a href="#/search/{{r.basename}}">{{r.basename}}</a>
       &nbsp;
   </div>
-  <div ng-show="r.artists" ng-hide="r.artists.length == 0">
+  <div ng-if="r.artists">
       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
       <span ng-repeat="a in r.artists">
-          <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-show="!$last">, </span>
+          <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-if="!$last">, </span>
       </span> - 
-      <a href="#/search/{{r.title}}" ng-show="r.title">{{r.title}}</a>
-      <a href="#/search/{{r.basename}}" ng-hide="r.title">{{r.basename}}</a>
+      <a href="#/search/{{r.title}}" ng-if="r.title">{{r.title}}</a>
+      <a href="#/search/{{r.basename}}" ng-if="!r.title">{{r.basename}}</a>
       &nbsp;
   </div>
-  <div ng-hide="r.albums.length == 0">
+  <div ng-if="r.albums.length > 0">
       <span ng-repeat="a in r.albums">
-          <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a><span ng-show="!$last">, </span>
+          <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a><span ng-if="!$last">, </span>
       </span>
       &nbsp;
   </div>
-  <div ng-hide="r.genres.length == 0">
+  <div ng-if="r.genres.length > 0">
       <span ng-repeat="g in r.genres">
-          <a  href="#/search/{{g.genre}}">{{g.genre}}</a><span ng-show="!$last">, </span>
+          <a  href="#/search/{{g.genre}}">{{g.genre}}</a><span ng-if="!$last">, </span>
       </span>
       &nbsp;
   </div>
@@ -42,7 +41,7 @@
   </div>
   <div class="clearfix"></div>
   
-  <div ng-show="r.moreInfo.history">
+  <div ng-if="r.moreInfo.history">
       <h2>History</h2>
       <table class="table table-stripe">
           <tr>

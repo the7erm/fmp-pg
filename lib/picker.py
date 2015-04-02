@@ -29,6 +29,7 @@ from excemptions import CreationFailed
 import sys
 import time
 import traceback
+from math import ceil, floor
 
 global populate_locked, dont_pick_created
 dont_pick_created = False
@@ -292,16 +293,18 @@ def get_single_from_true_score(uid, true_score):
          LIMIT 1""", (uid, true_score))
 
 def make_true_scores_list():
-    scores = [0,10,20,30,40,50,60,70,80,90,95]
+    scores = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,85,90,90,
+              95,95]
 
     # shuffle(scores)
 
     true_scores = []
 
     for true_score in scores:
-        iter_count = int(true_score * 0.1)
+        iter_count = int(ceil((true_score * 0.1) * .5 ))
         if iter_count <= 0:
             iter_count = 1
+        print "true_score:", true_score, "iter_count:", iter_count
         for i in range(0, iter_count):
             true_scores.append(true_score)
 
@@ -330,7 +333,7 @@ def insert_preload_history_data(preload_data):
     """
     preload_history_data = get_assoc("""INSERT INTO 
                                         preload_history (fid, uid, reason, plid, date_qued)
-                                        VALUES          (%s,  %s,  %s,     %s,   NOW())
+                                        VALUES          (%s,  %s,  %s,   %s,   NOW())
                                         RETURNING *""",
                                         (preload_data['fid'], 
                                          preload_data['uid'], 
@@ -524,9 +527,6 @@ def is_sequential(fid):
     print "is_sequential 3"
     return None
 
-
-
-
 def insert_artists_in_preload_into_dont_pick():
     sql = """INSERT INTO dont_pick (fid, reason) 
              SELECT DISTINCT fid, 'artist in preload' 
@@ -691,8 +691,19 @@ def insert_basename_into_dont_pick(artist, already_processed_basename):
     print "SQL:", pg_cur.mogrify(sql, (_artist, ))
     query(sql,(_artist,))
 
+    sql = """INSERT INTO dont_pick 
+             SELECT DISTINCT fl.fid, 
+                             'basename matches',
+                             ''
+             FROM file_locations fl LEFT JOIN dont_pick dp ON 
+                                              dp.fid = fl.fid
+             WHERE basename ILIKE %s AND 
+                   basename NOT ILIKE %s AND
+                   dp.fid IS NULL"""
+
     _artist = "%%{_}%s%%-%%" % artist
-    sql = pg_cur.mogrify(sql, (_artist, ))
+    __artist = "%%-%%%s%%-%%" % artist
+    sql = pg_cur.mogrify(sql, (_artist, __artist))
     sql = sql.format(_="\_")
     print "SQL:", sql
     query(sql)

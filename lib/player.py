@@ -92,6 +92,7 @@ class Player(gobject.GObject):
         if filename is not None:
             self.start()
 
+
     def init_connections(self):
         self.window.connect("destroy", gtk_main_quit)
         self.window.connect('key-press-event', self.on_key_press)
@@ -681,6 +682,7 @@ static char * invisible_xpm[] = {
 
     def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
                        pos_str, dur_str, left_str, percent):
+        
         if not self.showing_controls:
             return
         

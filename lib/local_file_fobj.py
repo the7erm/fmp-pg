@@ -497,6 +497,11 @@ class Local_File(fobj.FObj):
                  WHERE fid = %s""", 
                  (self.db_info['fid'],))
 
+        sql = """DELETE FROM preload 
+                 WHERE fid = %s AND reason NOT ILIKE '%%search%%'
+              """
+        query(sql, (self.db_info['fid'], ))
+
         self.print_locations()
         
         updated = self.ratings_and_scores.mark_as_played(percent_played)
