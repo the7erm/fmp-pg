@@ -139,6 +139,10 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
         minutes = Math.floor(seconds / 60),
         seconds = Math.floor(seconds - (minutes * 60));
 
+    if (ms <= 0) {
+        return "";
+    }
+
     if (years) {
         var txt = "year";
         if (years > 1) {

@@ -491,8 +491,9 @@ def file_history(_id, id_type):
                                          time_played IS NOT NULL AND
                                          uh.id = %s AND 
                                          uh.id_type = %s
-                                   ORDER BY time_played DESC, 
-                                            admin DESC, uname""",
+                                   ORDER BY u.uname, 
+                                            time_played DESC, 
+                                            admin DESC""",
                                    (_id, id_type))
     results = []
     previous_date = None
@@ -1415,7 +1416,8 @@ def preload():
 
     q = """SELECT DISTINCT p.plid, f.fid, artist, title, sha512,
                            p.fid AS cued, artist,
-                           f.fid AS id, 'f' AS id_type
+                           f.fid AS id, 'f' AS id_type,
+                           p.reason
            FROM files f
                 LEFT JOIN file_artists fa ON fa.fid = f.fid
                 LEFT JOIN artists a ON a.aid = fa.aid,

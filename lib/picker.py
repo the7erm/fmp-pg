@@ -789,7 +789,7 @@ def populate_preload_for_uid(uid, min_amount=0):
             continue
         wait()
 
-        insert_fid_into_preload(f['fid'], uid, "random unplayed")
+        insert_fid_into_preload(f['fid'], uid, "random unplayed for %s" % (uname,))
         insert_into_dont_pick(f['fid'])
 
     sql = """SELECT count(*) as total 
