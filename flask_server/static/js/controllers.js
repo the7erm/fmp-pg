@@ -628,9 +628,9 @@ fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
 fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$location', 
                                   '$modal',
     function($scope, $routeParams, fmpService, $location, $modal) {
-    window.document.title = "fmp - Preload";
-    $scope.queryUrl = '/preload';
-    fmpService.initPagination($scope, $routeParams, $location, $modal);
+        window.document.title = "fmp - Preload";
+        $scope.queryUrl = '/preload';
+        fmpService.initPagination($scope, $routeParams, $location, $modal);
 }]);
 
 fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams', 

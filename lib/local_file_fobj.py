@@ -85,7 +85,8 @@ class Local_File(fobj.FObj):
         self.can_rate = True
         self.ratings_and_scores = RatingsAndScores(fid=self.db_info['fid'], 
                                                    listening=True, 
-                                                   plid=self.plid)
+                                                   plid=self.plid,
+                                                   **kwargs)
 
         ok_to_hash = kwargs.get('hash', True)
 

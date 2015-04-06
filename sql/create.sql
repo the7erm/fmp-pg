@@ -23,20 +23,6 @@ CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
 
 
---
--- Name: adminpack; Type: EXTENSION; Schema: -; Owner: -
---
-
-CREATE EXTENSION IF NOT EXISTS adminpack WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION adminpack; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON EXTENSION adminpack IS 'administrative functions for PostgreSQL';
-
-
 SET search_path = public, pg_catalog;
 
 SET default_tablespace = '';
@@ -1268,7 +1254,8 @@ CREATE TABLE user_history (
     id_type character varying(2),
     true_score double precision DEFAULT 0 NOT NULL,
     score integer DEFAULT 0 NOT NULL,
-    rating integer DEFAULT 0 NOT NULL
+    rating integer DEFAULT 0 NOT NULL,
+    reason text
 );
 
 

@@ -557,13 +557,13 @@ def get_random_unplayed_sample(uid):
                                 (uid,))
 
 def get_single_random_unplayed(uid):
-    return get_assoc("""SELECT u.fid, true_score, ultp 
+    return get_assoc("""SELECT u.fid, u.true_score, ultp 
                         FROM user_song_info u  
-                             LEFT JOIN dont_pick dp ON dp.fid = u.fid 
+                             LEFT JOIN dont_pick dp ON dp.fid = u.fid
                         WHERE dp.fid IS NULL AND 
-                              u.uid = %s
-                        ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
-                                 ultp, random() 
+                              u.uid = %s AND
+                              u.ultp IS NULL
+                        ORDER BY random() 
                         LIMIT 1""", 
                         (uid,))
 
@@ -741,6 +741,12 @@ def populate_preload_for_uid(uid, min_amount=0):
 
     empty_scores = []
 
+    sql = """SELECT uname FROM users WHERE uid = %s"""
+    user = get_assoc(sql, (uid,))
+    uname = user['uname']
+
+    out_of_random_unplayed = False
+
     for true_score in true_scores:
         wait()
         print "empty_scores:", empty_scores
@@ -768,7 +774,7 @@ def populate_preload_for_uid(uid, min_amount=0):
         wait()
 
         insert_fid_into_preload(
-          f['fid'], uid, "true_score >= %s" % (true_score, ))
+          f['fid'], uid, "%s true_score >= %s" % (uname, true_score, ))
         insert_into_dont_pick(f['fid'])
 
         preload = get_preload()
@@ -776,9 +782,11 @@ def populate_preload_for_uid(uid, min_amount=0):
         for p in preload:
             print "p:", p
         
-        f = get_single_random_unplayed(uid)
-        if not f:
-          continue
+        if not out_of_random_unplayed:
+          f = get_single_random_unplayed(uid)
+          if not f:
+            out_of_random_unplayed = True
+            continue
         wait()
 
         insert_fid_into_preload(f['fid'], uid, "random unplayed")
@@ -872,6 +880,7 @@ def get_song_from_preload():
     if cue_for:
         set_last_time_cued(cue_for['uid'])
         f = get_single_from_preload(cue_for['uid'])
+        print "get_single_from_preload:", f
         if not f:
             populate_preload(cue_for['uid'])
             f = get_single_from_preload(cue_for['uid'])

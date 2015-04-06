@@ -97,7 +97,8 @@ class DbusWatcher(dbus.service.Object):
         f = fobj.get_fobj(filename=filename)
         if f.is_audio or f.is_video or f.exists or f.is_stream:
             print "CUEING:",f.filename
-            history.append({"filename":f.filename})
+            history.append({"filename":f.filename, 
+                            "reason": "Cued from command line"})
             pp.pprint(history)
             return "CUED:%s" % filename
         return "FAILED TO CUE:%s" % filename

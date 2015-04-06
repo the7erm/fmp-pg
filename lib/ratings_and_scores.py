@@ -27,7 +27,8 @@ from datetime import date
 from rating_utils import *
 
 class RatingsAndScores:
-    def __init__(self, fid=None, listening=None, uids=None, plid=None):
+    def __init__(self, fid=None, listening=None, uids=None, plid=None, 
+                 reason="", **kwargs):
         self.ratings_and_scores = None
         self.fid = fid
         self.listening = listening
@@ -36,6 +37,7 @@ class RatingsAndScores:
         self.last_percent_played = -1
         self.artists = []
         self.plid = plid
+        self.reason = reason
 
         if uids is not None:
             self.uids = uids
@@ -501,12 +503,13 @@ class RatingsAndScores:
                                                   (uid, id, id_type,
                                                    percent_played, 
                                                    time_played,
-                                                   date_played)
+                                                   date_played,
+                                                   reason)
                                                 VALUES (%s, %s, %s, %s, NOW(), 
-                                                        current_date) 
+                                                        current_date, %s) 
                                                 RETURNING *""",
                                                 (l['uid'], self.fid, 'f', 
-                                                 percent_played))
+                                                 percent_played, self.reason))
 
                     updated_user = get_assoc("""UPDATE user_history uh
                                                 SET true_score = ufi.true_score,

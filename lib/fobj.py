@@ -63,11 +63,15 @@ class FObj:
         self.uri = None
         self.tags_easy = None
         self.tags_hard = None
+        self.reason = ""
+
+        if 'reason' not in kwargs:
+            kwargs['reason'] = ''
 
         if kwargs:
             for k, v in kwargs.iteritems():
                 setattr(self, k, v)
-
+        print "fobj.reason:", self.reason
         if filename is not None and filename.startswith("file://"):
             self.uri = filename
             filename = urllib.url2pathname(filename).replace("file://", '', 1)
@@ -345,8 +349,10 @@ def get_fobj(dirname=None, basename=None, fid=None, filename=None, eid=None,
 def recently_played(limit=10, uid=None):
     if uid is None:
         return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, 
-                                                    percent_played, time_played, 
-                                                    date_played
+                                                    percent_played,
+                                                    time_played,
+                                                    date_played,
+                                                    reason
                                     FROM user_history uh, users u
                                     WHERE u.uid = uh.uid AND u.uid IN (
                                         SELECT uid FROM users 
@@ -354,8 +360,10 @@ def recently_played(limit=10, uid=None):
                                     ORDER BY time_played DESC
                                     LIMIT %d""" % limit)
     uid = int(uid)
-    return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, percent_played,
-                                                time_played, date_played
+    return get_results_assoc("""SELECT DISTINCT uhid, id, id_type, 
+                                                percent_played,
+                                                time_played, date_played,
+                                                reason
                                 FROM user_history uh, users u
                                 WHERE u.uid = uh.uid AND u.uid = %s
                                 ORDER BY time_played DESC
