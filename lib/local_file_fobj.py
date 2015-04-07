@@ -942,15 +942,19 @@ class Local_File(fobj.FObj):
                 
 
     def rate(self, uid=None, rating=None, uname=None, selected=None):
+        print "lfobj:","1"*100
         for d in self.dups:
             d.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
                                       selected=selected)
-
-        res = self.ratings_and_scores.rate(uid=uid, rating=rating, uname=uname, 
+        print "lfobj:","2"*100
+        res = self.ratings_and_scores.rate(uid=uid, rating=rating, 
+                                           uname=uname, 
                                            selected=selected)
-
+        print "lfobj:","3"*100
         if self.rating_callback:
             self.rating_callback(res)
+
+        print "lfobj:","4"*100
 
         return res
 

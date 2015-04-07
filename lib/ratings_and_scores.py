@@ -84,9 +84,9 @@ class RatingsAndScores:
     def rate(self, uid=None, rating=None, uname=None, selected=None):
         updated = rate(fid=self.fid, uid=uid, rating=rating, uname=uname, 
                        selected=selected)
-        print "UPDATED:",updated
+        print "UPDATED:", updated
         if updated:
-            self.update(updated)
+            self.update([updated])
             more_updates = self.calculate_true_score(True)
             print "MORE UPDATES:", more_updates
             self.update(more_updates)
@@ -111,6 +111,7 @@ class RatingsAndScores:
 
 
     def update(self, updated):
+        print "ratings_and_scores.update updated:", updated
         if not updated:
             return
 

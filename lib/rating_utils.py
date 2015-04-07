@@ -96,6 +96,8 @@ RATE_TRUESCORE_FORMULA = """
 
 def calculate_true_score_for_fid_uid(fid, uid):
     # Get the last 5 plays
+    print "calculate_true_score_for_fid_uid", fid, uid
+    print "1"*100
     averages = get_results_assoc("""SELECT percent_played
                                   FROM user_history
                                   WHERE id = %s AND uid = %s AND 
@@ -114,7 +116,7 @@ def calculate_true_score_for_fid_uid(fid, uid):
           cnt += 1
 
         average = (total / cnt)
-
+    print "2"*100
     q = """UPDATE user_song_info 
            SET true_score = ((
               (rating * 2 * 10.0) + 
@@ -133,7 +135,7 @@ def calculate_true_score_for_fid_uid(fid, uid):
     print "true score:",
     pprint.pprint(dict(res))
     print "-"*len(title)
-
+    print "3"*100
     return res
 
 
@@ -206,7 +208,7 @@ def calculate_true_score_for_uid(fid, uid):
 
 def calculate_true_score_for_usid(usid):
     q = """SELECT fid, uid FROM user_song_info WHERE usid = %s"""
-    usi = get_assoc(q)
+    usi = get_assoc(q, (usid,))
     return calculate_true_score_for_uid(usi['fid'], usi['uid'])
 
 def calculate_true_score_for_uname(uname, fid):
@@ -237,11 +239,16 @@ def rate_for_uid(fid, uid, rating):
     return updated_again or updated or []
 
 def rate_for_usid(usid, rating):
+    print "rate_for_usid:", usid, rating
     updated = get_results_assoc("""UPDATE user_song_info usi
                                    SET rating = %s
                                    WHERE usid = %s RETURNING *""", 
-                                   (rating, rating, usid))
+                                   (rating, usid))
+    print "updated:", updated
     updated_again = calculate_true_score_for_usid(usid)
+    print "4"*100
+    print "updated_again:", updated_again
+    print "--made it."
     return updated_again or updated or []
 
 

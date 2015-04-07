@@ -621,10 +621,12 @@ def listeners_info_for_fid(fid):
     return convert_to_dict(get_results_assoc(query, (fid,)))
 
 def convert_to_dict(res):
+    print "CONVERT TO DICT 1"
     if not res:
         return []
     results = []
     for r in res:
+        print "CONVERT TO DICT 2",r
         results.append(dict(r))
     return results
 
@@ -706,7 +708,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
 
 
     query = """SELECT DISTINCT f.fid, title, sha512, artist,
-                               p.fid AS cued, ts_rank(tsv, query),
+                               p.fid AS cued, ts_rank(tsv, query) as rank,
                                f.fid AS id, 'f' AS id_type
                FROM files f
                     LEFT JOIN preload p ON p.fid = f.fid
@@ -716,7 +718,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
                     plainto_tsquery('english', %s) query
                WHERE kw.fid = f.fid AND
                      tsv @@ query
-               ORDER BY ts_rank DESC, artist, title"""
+               ORDER BY rank DESC, artist, title"""
 
     query_count = """SELECT count(*) AS total
                      FROM files f,
@@ -726,7 +728,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
                            tsv @@ query"""
 
     rating_query = """SELECT DISTINCT f.fid, title, sha512, artist,
-                               p.fid AS cued, ts_rank(tsv, query),
+                               p.fid AS cued, ts_rank(tsv, query) as rank,
                                f.fid AS id, 'f' AS id_type
                       FROM files f
                            LEFT JOIN preload p ON p.fid = f.fid
@@ -741,7 +743,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
                             usi.uid IN (SELECT uid 
                                         FROM users 
                                         WHERE listening = true)
-                      ORDER BY ts_rank DESC, artist, title"""
+                      ORDER BY rank DESC, artist, title"""
 
     rating_query_count = """SELECT count(*) AS total
                             FROM files f,
@@ -803,6 +805,8 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
         return results
     print "query_count:", query_count
     total = get_assoc(query_count, args)
+    for r in results:
+      print dict(r)
     return results, total['total']
 
 def locations_for_fid(fid):
@@ -967,7 +971,10 @@ def json_obj_handler(obj):
     
 
 def json_dump(obj):
-    return json.dumps(obj, default=json_obj_handler) or "{};"
+    print "CONVERTING TO JSON"
+    _json = json.dumps(obj, default=json_obj_handler) or "{};"
+    print "JSON:",_json
+    return _json
 
 @app.route('/search/', methods=['GET', 'POST'])
 def search():
@@ -1179,22 +1186,26 @@ def json_first(dta):
         return json_dump(None)
 
     dta = convert_to_dict(dta)
-    print "dta:",dta
+    print "CONVERTED TO DICT:",dta
     return json_dump(dta[0])
 
 
 @app.route("/rate/<usid>/<fid>/<uid>/<rating>", methods=['GET', 'POST', 'PUT'])
 def rate(usid, fid, uid, rating):
     global playing
-    print "RATE:", usid, fid, uid, rating
+    print "RATE: usid:", usid, 'fid:', fid, 'uid', uid,'rating:', rating
     # playing.rate(uid=uid, rating=rafidting)
     if hasattr(playing, 'fid') and int(playing.fid) == int(fid):
         print "**************** RATING PLAYING FILE **************"
         dta = playing.rate(uid=uid, rating=rating)
-        return json_first(dta)
+        print "8"*100
+        print "DTA:", dta
+        return json_first([dta])
         
     dta = simple_rate(usid=usid, fid=fid, uid=uid, rating=rating)
-    return json_first(dta)
+    print "5"*100
+    print "DTA:",dta
+    return json_first([dta])
 
 @app.route('/player/<cmd>', methods=['GET', 'POST', 'PUT'])
 def player_command(cmd):
