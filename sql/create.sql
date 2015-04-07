@@ -1400,7 +1400,8 @@ CREATE TABLE users (
     last_time_cued timestamp with time zone,
     listening boolean,
     selected boolean,
-    admin boolean DEFAULT false
+    admin boolean DEFAULT false,
+    preload_true_scores text
 );
 
 

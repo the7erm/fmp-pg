@@ -189,6 +189,14 @@ def populate_dont_pick():
     # for r in dont_pick:
     #    print "don't pick:",r
 
+    sql = """SELECT fid FROM preload"""
+    fids = get_results_assoc(sql)
+    for fid in fids:
+        print "INSERTING"
+        insert_into_dont_pick(fid['fid'])
+
+    time.sleep(2)
+
 
 def remove_missing_files_from_preload():
   files = get_results_assoc("""SELECT p.fid, dirname, basename, p.uid
@@ -306,7 +314,7 @@ def make_true_scores_list():
             iter_count = 1
         print "true_score:", true_score, "iter_count:", iter_count
         for i in range(0, iter_count):
-            true_scores.append(true_score)
+            true_scores.append(str(true_score))
 
     print "true_scores:", true_scores
     shuffle(true_scores)
@@ -460,15 +468,14 @@ def get_next_file_in_genre_series(gid, uid):
         q = """SELECT dirname, basename, fl.fid
                FROM file_locations fl,
                     file_genres fg
-               WHERE dirname >= %s AND
-                     basename > %s AND
+               WHERE basename > %s AND
                      fl.fid = fg.fid AND
                      fg.gid = %s
                ORDER BY dirname, basename
                LIMIT 1"""
-        next_file = get_assoc(q, (last_file['dirname'], last_file['basename'], gid))
+        next_file = get_assoc(q, (last_file['basename'], gid))
         print "g2.2"
-        print pg_cur.mogrify(q, (last_file['dirname'], last_file['basename'], gid))
+        print pg_cur.mogrify(q, (last_file['basename'], gid))
         if next_file:
             print "NEXT FILE:",next_file
             return next_file
@@ -736,19 +743,29 @@ def populate_preload_for_uid(uid, min_amount=0):
     fix_bad_scores(uid)
     print "populate_preload_for_uid 5"
     insert_missing_songs(uid)
-
-    true_scores = make_true_scores_list()
-
     empty_scores = []
 
-    sql = """SELECT uname FROM users WHERE uid = %s"""
+    sql = """SELECT uname, preload_true_scores FROM users WHERE uid = %s"""
     user = get_assoc(sql, (uid,))
     uname = user['uname']
+    true_scores_str = user['preload_true_scores']
+    if not true_scores_str:
+        true_scores = make_true_scores_list()
+    else:
+        true_scores = true_scores_str.split(",")
+
+    print "TRUE_SCORES BEFORE:", len(true_scores)
 
     out_of_random_unplayed = False
 
-    for true_score in true_scores:
+    start_time = time.time()
+
+    while time.time() - start_time < 10:
         wait()
+        if not true_scores or len(true_scores) == 0:
+            print "making true score list"
+            true_scores = make_true_scores_list()
+        true_score = true_scores.pop()
         print "empty_scores:", empty_scores
         print "true_scores:", true_scores
         if true_score in empty_scores:
@@ -801,6 +818,14 @@ def populate_preload_for_uid(uid, min_amount=0):
     for p in preload:
         print "p:", p
 
+    sql = """UPDATE users 
+             SET preload_true_scores = %s 
+             WHERE uid = %s
+             RETURNING *"""
+
+    user = get_assoc(sql, (",".join(true_scores), uid))
+    print "TRUE_SCORES:",user['preload_true_scores']
+    print "TRUE_SCORES AFTER:", len(true_scores)
     populate_locked = False
 
 
@@ -903,7 +928,6 @@ if __name__ == "__main__":
     print("DELETE FROM PRELOAD")
     query("""DELETE FROM preload""")
     query("""DELETE FROM dont_pick""")
-
     populate_preload()
     sys.exit()
     genres = get_results_assoc("""SELECT * 
