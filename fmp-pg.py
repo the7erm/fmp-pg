@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 # fmp-pg.py -- main file.
 #    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
 #
@@ -341,6 +342,174 @@ def get_bedtime_mode():
     print "BEDTIME_MODE:", bedtime_mode
     return bedtime_mode
 
+def get_bible_chapters(episode_title):
+    print "*"*20, "get_bible_chapters", "*"*20
+    print "episode_title:", episode_title
+    multiple_books = False
+    books = [
+        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+        "Joshua", "Judges", "Ruth", "1Samuel", "2Samuel", "1Kings",
+        "2Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
+        "Esther", "Job", "Psalms", "Psalm", "Proverbs", "Ecclesiastes",
+        "Song of Solomon", "Isaiah", "Jeremiah", "Lamentations", "Ezekiel",
+        "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah",
+        "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah",
+        "Malachi", "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", "James",
+        "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude",
+        "Revelation"
+    ]
+
+    episode_title = episode_title.replace("—",'-')
+    book_matches = []
+    files = []
+    chapters = []
+    for book in books:
+        if episode_title.lower().startswith(book.lower()):
+            if book == 'Psalm' and 'Psalms' in episode_title:
+                book_matches.append('Psalms')
+                continue
+            book_matches.append(book)
+
+
+    # 2:1-5
+    re_chapter_verse_to_verse = re.compile(r"(\d+)\:(\d+)\-(\d+)")
+    # 2:16—3:11
+    re_chapter_verse_to_chapter_verse = re.compile(r"(\d+)\:(\d+)\-(\d+)\:(\d+)")
+
+    # 1:1, 2
+    re_chapter_verse_to_chapter_chapter = re.compile(r"(\d+)\:(\d+),(\d+)")
+
+    # 1:2
+    re_chapter_verse = re.compile(r"(\d+)\:(\d+)")
+    
+    for match in book_matches:
+        # Remove the book so we just have the verses
+        if match == 'Philemon':
+            chapters = ['1']
+        verses = episode_title.lower().replace(match.lower(), "").strip()
+        verses = verses.replace(" ", "")
+        verses = verses.replace("intro-", "")
+        verses = verses.replace("-intro", "")
+        verses = verses.replace("intro", "")
+        if ':' not in verses and '-' not in verses and ',' not in verses:
+            # it's just 1 chapter
+            if verses != '':
+                chapters.append(verses)
+            continue
+
+        if ':' not in verses:
+            if '-' in verses and ',' not in verses:
+                # format is <chapter>-<chapter>
+                start, end = verses.split("-")
+                start = int(start)
+                end = int(end)
+                while start <= end:
+                    chapters.append(str(start))
+                    start += 1
+                continue
+
+            if ',' in verses:
+                # format is <chapter>,<chapter>
+                _chapters = verses.split(",")
+                for chapter in _chapters:
+                    chapters.append(chapter)
+                continue
+
+        chapter_match = re_chapter_verse_to_chapter_verse.search(verses)
+        if chapter_match:
+            print "re_chapter_verse_to_chapter_verse.groups():", chapter_match.groups()
+            start = int(chapter_match.group(1))
+            end = int(chapter_match.group(3))
+            while start <= end:
+                chapters.append(str(start))
+                start += 1
+            continue
+
+        chapter_match = re_chapter_verse_to_chapter_chapter.search(verses)
+        if chapter_match:
+            print "re_chapter_verse_to_chapter_chapter.groups():", chapter_match.groups()
+            start = int(chapter_match.group(1))
+            end = int(chapter_match.group(3))
+            if end > start:
+                while start <= end:
+                    chapters.append(str(start))
+                    start += 1
+            else:
+                chapters.append(str(start))
+
+            continue
+
+        chapter_match = re_chapter_verse_to_verse.search(verses)
+        if chapter_match:
+            print "re_chapter_verse_to_verse.groups():", chapter_match.groups()
+            chapters.append(chapter_match.group(1))
+            continue
+
+        chapter_match = re_chapter_verse.search(verses)
+        if chapter_match:
+            print "re_chapter_verse.groups():", chapter_match.groups()
+            chapters.append(chapter_match.group(1))
+            continue
+
+    print "chapters:", chapters
+    if not chapters:
+        print "-="*300
+        return []
+
+    recently_played = fobj.recently_played(limit=100)
+    for book in book_matches:
+        # Hosea
+        sql = """SELECT fid, dirname, basename 
+                 FROM file_locations 
+                 WHERE dirname LIKE '%%/MP3 Bible/%%' AND 
+                       basename LIKE %s"""
+        _book = book
+        if _book == "Psalms":
+            _book = "Psalm"
+
+        if _book.startswith("1"):
+            _book = "I %s" % (_book[2:])
+
+        if _book.startswith("2"):
+            _book = "II %s" % (_book[2:])
+
+        if _book.startswith("3"):
+            _book = "III %s" % (_book[2:])
+
+        for chapter in chapters:
+            picker.wait()
+            print "chapter:", chapter
+            try:
+                chp = int(chapter)
+            except ValueError:
+                continue
+
+            for i in range(3, 0, -1):
+                fmt = "%%0%sd" % i
+                like = "%{book} {chapter}.mp3".format(book=_book, 
+                                                    chapter=fmt % chp)
+                # print pg_cur.mogrify(sql, (like, ))
+                _files = get_results_assoc(sql, (like, ))
+                if _files:
+                    for f in _files:
+                        _f = dict(f)
+                        _f['reason'] = "Thru the Bible - pre-roll"
+                        played = False
+                        for r in recently_played:
+                            print "R:", r
+                            if r['id'] == _f['fid'] and r['id_type'] == 'f':
+                                played = True
+                                break
+                        if not played:
+                            files.append(_f)
+                            print "_f:", pp.pformat(_f)
+                    break
+
+    print "FILES:",pp.pformat(files)
+    return files
 
 def append_file():
     global history
@@ -360,8 +529,13 @@ def append_file():
             f = picker.get_song_from_preload()
         else:
             f = fobj.netcast_fobj.get_one_unlistened_episode()
+            if f and 'thru the bible' in f['netcast_name'].lower():
+                files = get_bible_chapters(f['episode_title'])
+                for _f in files:
+                    history.append(_f)
             if not f:
                 f = picker.get_song_from_preload()
+
     else:
         f = picker.get_song_from_preload()
     if f:
@@ -369,6 +543,8 @@ def append_file():
         history.append(f)
         if 'fid' in f:
             delete_fid_from_preload(f['fid'])
+        if 'id' in f and 'id_type' in 'f':
+            delete_fid_from_preload(f['id'])
         return f
     else:
         print "NO FILE:"
@@ -580,7 +756,7 @@ tray.quit.connect("activate", quit)
 tray.icon.connect('scroll-event', on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(15000, populate_preload, 2)
+gobject.timeout_add(15000, populate_preload, 5)
 gobject.timeout_add(1000, set_rating)
 
 flask_server.server.playing = playing
@@ -600,6 +776,7 @@ try:
         print "TST:",dict(tst) 
     print "is_netcast:",is_netcast(tst)
     """
+    
     gtk.gdk.threads_leave()
     gtk.main()
 except KeyboardInterrupt:

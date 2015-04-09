@@ -222,18 +222,20 @@ def remove_missing_files_from_preload():
           query("""DELETE FROM preload WHERE fid = %s""", (fid,))
 
 
-def populate_preload(uid=None, min_amount=0):
+def populate_preload(uid=None, min_amount=0, max_cue_time=10):
     remove_duplicates_from_preload()
     remove_missing_files_from_preload()
     if not uid or uid is None:
         sql = """SELECT uid FROM users WHERE listening = true"""
         listeners = get_results_assoc(sql, ())
+        len_listeners = len(listeners)
+        max_cue_time = 10 / len_listeners
         for l in listeners:
-            populate_preload(l['uid'], min_amount)
+            populate_preload(l['uid'], min_amount, max_cue_time)
         return
     # populate_preload_for_uid(uid, min_amount)
     try:
-        populate_preload_for_uid(uid, min_amount)
+        populate_preload_for_uid(uid, min_amount, max_cue_time)
     except Exception as err:
         print "ERROR!!!! COULD NOT POPULATE PRELOAD"
         print err
@@ -364,7 +366,9 @@ def insert_into_preload(msg, fid, uid, reason):
     insert_preload_history_data(preload_data)
 
 def insert_fid_into_preload(fid, uid, reason):
-    seq_info = is_sequential(fid)
+    # seq_info = is_sequential(fid)
+    wait()
+    seq_info = None
     if seq_info is None:
         insert_into_preload("adding:", fid, uid, reason)
         return
@@ -548,20 +552,19 @@ def insert_artists_in_preload_into_dont_pick():
                                         )
                           )"""
     query(sql)
+    wait()
 
 
 def get_random_unplayed_sample(uid):
-    return get_results_assoc("""SELECT u.fid, true_score, ultp 
-                                FROM user_song_info u
-                                     LEFT JOIN dont_pick dp ON 
-                                               dp.fid = u.fid 
-                                WHERE dp.fid IS NULL AND 
-                                      u.uid = %s
-                                ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
-                                         ultp, 
-                                         random() 
-                                LIMIT 10""", 
-                                (uid,))
+    sql = """SELECT u.fid, u.true_score, ultp 
+             FROM user_song_info u  
+                  LEFT JOIN dont_pick dp ON dp.fid = u.fid
+             WHERE dp.fid IS NULL AND 
+                   u.uid = %s AND
+                   u.ultp IS NULL
+             ORDER BY random() 
+             LIMIT 10"""
+    return get_results_assoc(sql, (uid,))
 
 def get_single_random_unplayed(uid):
     return get_assoc("""SELECT u.fid, u.true_score, ultp 
@@ -678,6 +681,7 @@ def dont_pick_artist_basename(artist, already_processed_basename):
     
 
 def insert_basename_into_dont_pick(artist, already_processed_basename):
+    wait()
     artist = artist.lower()
     if not artist or artist in already_processed_basename:
         return
@@ -694,10 +698,11 @@ def insert_basename_into_dont_pick(artist, already_processed_basename):
     print "SQL:", pg_cur.mogrify(sql, (_artist, ))
 
     query(sql,(_artist,))
+    wait()
     _artist = "%% %s%%-%%" % artist
     print "SQL:", pg_cur.mogrify(sql, (_artist, ))
     query(sql,(_artist,))
-
+    wait()
     sql = """INSERT INTO dont_pick 
              SELECT DISTINCT fl.fid, 
                              'basename matches',
@@ -714,8 +719,96 @@ def insert_basename_into_dont_pick(artist, already_processed_basename):
     sql = sql.format(_="\_")
     print "SQL:", sql
     query(sql)
+    wait()
 
-def populate_preload_for_uid(uid, min_amount=0):
+def get_something_for_everyone(users, true_score):
+    # Goal
+    sql = """SELECT usi1.uid AS usi1_uid, 
+                    usi1.ultp AS usi1_ultp,
+                    usi1.true_score AS usi1_true_score,
+                    usi2.uid AS usi2_uid, 
+                    usi2.ultp AS usi2_ultp,
+                    usi2.true_score AS usi2_true_score
+              FROM user_song_info usi1
+                   LEFT JOIN dont_pick dp ON dp.fid = usi1.fid, 
+                   user_song_info usi2 
+              WHERE usi1.true_score >= 85 AND 
+                    usi2.true_score >= 85 AND 
+                    usi1.fid = usi2.fid AND
+                    usi1.uid = 1 AND
+                    usi2.uid = 2 AND
+                    dp.fid IS NULL
+              ORDER BY CASE WHEN usi1.ultp IS NULL THEN 0 ELSE 1 END,
+                       usi1.ultp,
+                       CASE WHEN usi2.ultp IS NULL THEN 0 ELSE 1 END,
+                       usi2.ultp,
+                       random()
+              LIMIT 10"""
+
+
+    selects = []
+    froms = []
+    wheres = ["dp.fid IS NULL"]
+    orders = []
+    uids = []
+    for user in users:
+        uids.append(user['uid'])
+
+    for user in users:
+        _user = dict(user)
+        _user['true_score'] = true_score
+        fmt = """usi{uid}.uid AS usi{uid}_uid,
+                 usi{uid}.ultp AS usi{uid}_ultp,
+                 usi{uid}.true_score AS usi{uid}_true_score"""
+        if user['uid'] == uids[0]:
+            fmt += """,
+                      usi{uid}.fid"""
+        selects.append(fmt.format(**_user))
+
+        if user['uid'] == uids[0]:
+            fmt = """user_song_info usi{uid}
+                        LEFT JOIN dont_pick dp ON dp.fid = usi{uid}.fid"""
+        else:
+            fmt = """user_song_info usi{uid}"""
+
+        froms.append(fmt.format(**_user))
+
+        fmt = """usi{uid}.true_score >= {true_score} AND
+                 usi{uid}.uid = {uid}"""
+        wheres.append(fmt.format(**_user))
+
+        for uid in uids:
+            if uid == user['uid']:
+                continue
+            fmt = """usi{uid1}.fid = usi{uid2}.fid"""
+            wheres.append(fmt.format(
+                uid1=uid,
+                uid2=user['uid']
+            ))
+
+        fmt = """CASE WHEN usi{uid}.ultp IS NULL THEN 0 ELSE 1 END,
+                       usi{uid}.ultp"""
+        orders.append(fmt.format(**_user))
+
+    orders.append("random()")
+
+    sql = """SELECT {selects}
+              FROM {froms}
+              WHERE {wheres}
+              ORDER BY {orders}
+              LIMIT 1"""
+
+    sql = sql.format(selects=",\n                    ".join(selects),
+                     froms=",\n                   ".join(froms),
+                     wheres=" AND\n                    ".join(wheres),
+                     orders=",\n                       ".join(orders))
+
+    print "EVERYONE SQL:", sql
+
+    return get_assoc(sql)
+
+
+def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10):
     gtk.gdk.threads_leave()
     print "populate_preload_for_uid 1"
     sql = """SELECT COUNT(*) as total 
@@ -744,6 +837,7 @@ def populate_preload_for_uid(uid, min_amount=0):
     print "populate_preload_for_uid 5"
     insert_missing_songs(uid)
     empty_scores = []
+    empty_for_everyone = []
 
     sql = """SELECT uname, preload_true_scores FROM users WHERE uid = %s"""
     user = get_assoc(sql, (uid,))
@@ -757,10 +851,18 @@ def populate_preload_for_uid(uid, min_amount=0):
     print "TRUE_SCORES BEFORE:", len(true_scores)
 
     out_of_random_unplayed = False
-
+    max_cue_time = int(ceil(max_cue_time))
+    if max_cue_time < 5:
+        max_cue_time = 5
     start_time = time.time()
+    print "max_cue_time:", max_cue_time
 
-    while time.time() - start_time < 10:
+    users = get_results_assoc("""SELECT uid 
+                                 FROM users 
+                                 WHERE listening = true""")
+    print "USERS:", users
+    user_len = len(users)
+    while time.time() - start_time < max_cue_time:
         wait()
         if not true_scores or len(true_scores) == 0:
             print "making true score list"
@@ -781,6 +883,18 @@ def populate_preload_for_uid(uid, min_amount=0):
 
         for f in sample:
             print "sample :",true_score, f
+
+        if user_len > 1 and true_score not in empty_for_everyone and \
+           int(true_score) >= 70:
+            f = get_something_for_everyone(users, true_score)
+            if not f:
+                print "EMPTY FOR EVERYONE", true_score
+                empty_for_everyone.append(true_score)
+            else:
+                insert_fid_into_preload(
+                    f['fid'], uid, 
+                    "everyone true_score >= %s" % (true_score, ))
+
 
         f = get_existing_file(uid, true_score)
 

@@ -621,12 +621,10 @@ def listeners_info_for_fid(fid):
     return convert_to_dict(get_results_assoc(query, (fid,)))
 
 def convert_to_dict(res):
-    print "CONVERT TO DICT 1"
     if not res:
         return []
     results = []
     for r in res:
-        print "CONVERT TO DICT 2",r
         results.append(dict(r))
     return results
 
@@ -971,9 +969,8 @@ def json_obj_handler(obj):
     
 
 def json_dump(obj):
-    print "CONVERTING TO JSON"
     _json = json.dumps(obj, default=json_obj_handler) or "{};"
-    print "JSON:",_json
+    # print "JSON:",_json
     return _json
 
 @app.route('/search/', methods=['GET', 'POST'])
@@ -1655,6 +1652,33 @@ def subscribe(nid, uid, subscribed):
         "subscribed": subscribed
     })
 
+
+# users
+@app.route("/users/", methods=['GET'])
+def users():
+    sql = """SELECT uid, uname, listening, selected, admin 
+             FROM users
+             ORDER BY admin DESC, uname"""
+    users = get_results_assoc(sql)
+    results = []
+    for user in users:
+       results.append(dict(user))
+    return json_dump(results)
+
+@app.route("/listening/<uid>/<state>/", methods=["GET"])
+@app.route("/listening/<uid>/<state>", methods=["GET"])
+def listening(uid, state):
+    listening = False
+    if state.lower() == 'true':
+        listening = True
+
+    uid = int(uid)
+    sql = """UPDATE users SET listening = %s WHERE uid = %s"""
+    query(sql, (listening, uid))
+    if not listening:
+        sql = """DELETE FROM preload WHERE uid = %s"""
+        query(sql, (uid,))
+    return users()
 
 def start_worker(*args):
     print "STARTING WORKER"

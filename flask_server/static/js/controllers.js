@@ -43,6 +43,10 @@ fmpApp.config(['$routeProvider',
             templateUrl: "/static/templates/podcasts.html",
             controller: "PodcastCtrl"
         })
+        .when("/listeners", {
+            templateUrl: "/static/templates/listeners.html",
+            controller: "ListenersCtrl"
+        })
         .otherwise({
             redirectTo: '/home'
         });
@@ -706,6 +710,31 @@ fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService',
     fmpService.initPagination($scope, $routeParams, $location, $modal);
 }]);
 
+fmpApp.controller("ListenersCtrl", ['$scope', '$http', function($scope, $http){
+    $http({method: 'GET', url: "/users/"})
+    .success(function(data, status, headers, config) {
+        $scope.users = data;
+    })
+    .error(function(data, status, headers, config) {
+      // called asynchronously if an error occurs
+      // or server returns response with an error status.
+    });
+    $scope.setListening = function(uid, listening) {
+        console.log("setListening:", uid, listening);
+        $http({method: 'GET', url: "/listening/"+uid+"/"+listening})
+        .success(function(data, status, headers, config) {
+            for (var i=0;i<$scope.users.length;i++) {
+                if ($scope.users[i]['uid'] == uid) {
+                    $scope.users[i]['listening'] = listening;
+                }
+            }
+        })
+        .error(function(data, status, headers, config) {
+          // called asynchronously if an error occurs
+          // or server returns response with an error status.
+        });
+    };
+}]);
 
 fmpApp.controller("PodcastCtrl", ['$scope','$http', '$location', '$modal', 
   function($scope, $http, $location, $modal){
