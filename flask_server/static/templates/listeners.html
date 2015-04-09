@@ -1,16 +1,18 @@
-<div class="row">
-    <div class="col-md-1">Username</div>
-    <div class="col-md-1">Listening</div>
-</div>
-<div ng-repeat="u in users">
+<div class="container-fluid">
     <div class="row">
-        <div class="col-md-1"><label for="listener-{{u.uid}}">{{u.uname}}</label></div>
-        <div class="col-md-1">
-            <input type="checkbox"
-                   ng-model="u.listening"
-                   ng-change="setListening({{u.uid}}, {{!u.listening}})"
-                   id="listener-{{u.uid}}"
-                   value="{{u.uid}">
+        <div class="col-lg-1  col-md-2  col-xs-4 col-sm-2">Username</div>
+        <div class="col-lg-11 col-md-10 col-xs-8 col-sm-10">Listening</div>
+    </div>
+    <div ng-repeat="u in users">
+        <div class="row">
+            <div class="col-lg-1  col-md-2 col-xs-4 col-sm-2"><label for="listener-{{u.uid}}">{{u.uname}}</label></div>
+            <div class="col-lg-11 col-md-10 col-xs-8 col-sm-10">
+                <input type="checkbox"
+                       ng-model="u.listening"
+                       ng-change="setListening({{u.uid}}, {{!u.listening}})"
+                       id="listener-{{u.uid}}"
+                       value="{{u.uid}">
+            </div>
         </div>
     </div>
 </div>
