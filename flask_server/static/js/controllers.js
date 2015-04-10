@@ -654,6 +654,11 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
     // $scope.getTags = fmpService.getTags;
     $scope.query = $routeParams.query || "";
     $scope.queryUrl = '/search-data-new/?q='+encodeURIComponent($scope.query);
+    $scope.keyup = function(evt){
+        if (evt.keyCode == 13) {
+            document.location = "#/search/"+encodeURIComponent(evt.currentTarget.value);
+        }
+    };
     fmpService.initPagination($scope, $routeParams, $location, $modal);
 
 }]);
