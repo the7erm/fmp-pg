@@ -384,6 +384,13 @@ def get_bible_chapters(episode_title):
 
     # 1:2
     re_chapter_verse = re.compile(r"(\d+)\:(\d+)")
+
+    # 1:1-3, 7:13-16
+    re_chapter_verse_to_verse_comma_chapter_verse_to_verse = re.compile(
+        r"(\d+)\:(\d+)\-(\d+)\,(\d+)\:(\d+)\-(\d+)")
+
+    re_chapter_verse_to_verse_comma_chapter_verse = re.compile(
+        r"(\d+)\:(\d+)\-(\d+)\,(\d+)\:(\d+)")
     
     for match in book_matches:
         # Remove the book so we just have the verses
@@ -418,6 +425,22 @@ def get_bible_chapters(episode_title):
                     chapters.append(chapter)
                 continue
 
+        chapter_match = re_chapter_verse_to_verse_comma_chapter_verse_to_verse\
+                        .search(verses)
+        if chapter_match:
+            print "re_chapter_verse_to_verse_comma_chapter_verse_to_verse.groups():", chapter_match.groups()
+            chapters.append(chapter_match.group(1))
+            chapters.append(chapter_match.group(4))
+            continue
+
+        chapter_match = re_chapter_verse_to_verse_comma_chapter_verse\
+                        .search(verses)
+        if chapter_match:
+            print "re_chapter_verse_to_verse_comma_chapter_verse.groups():", chapter_match.groups()
+            chapters.append(chapter_match.group(1))
+            chapters.append(chapter_match.group(4))
+            continue
+
         chapter_match = re_chapter_verse_to_chapter_verse.search(verses)
         if chapter_match:
             print "re_chapter_verse_to_chapter_verse.groups():", chapter_match.groups()
@@ -431,15 +454,8 @@ def get_bible_chapters(episode_title):
         chapter_match = re_chapter_verse_to_chapter_chapter.search(verses)
         if chapter_match:
             print "re_chapter_verse_to_chapter_chapter.groups():", chapter_match.groups()
-            start = int(chapter_match.group(1))
-            end = int(chapter_match.group(3))
-            if end > start:
-                while start <= end:
-                    chapters.append(str(start))
-                    start += 1
-            else:
-                chapters.append(str(start))
-
+            chapters.append(chapter_match.group(1))
+            chapters.append(chapter_match.group(3))
             continue
 
         chapter_match = re_chapter_verse_to_verse.search(verses)
@@ -453,6 +469,8 @@ def get_bible_chapters(episode_title):
             print "re_chapter_verse.groups():", chapter_match.groups()
             chapters.append(chapter_match.group(1))
             continue
+
+
 
     print "chapters:", chapters
     if not chapters:
@@ -481,7 +499,7 @@ def get_bible_chapters(episode_title):
 
         for chapter in chapters:
             picker.wait()
-            print "chapter:", chapter
+            # print "chapter:", chapter
             try:
                 chp = int(chapter)
             except ValueError:
@@ -489,7 +507,7 @@ def get_bible_chapters(episode_title):
 
             for i in range(3, 0, -1):
                 fmt = "%%0%sd" % i
-                like = "%{book} {chapter}.mp3".format(book=_book, 
+                like = "% {book} {chapter}.mp3".format(book=_book, 
                                                     chapter=fmt % chp)
                 # print pg_cur.mogrify(sql, (like, ))
                 _files = get_results_assoc(sql, (like, ))
@@ -499,16 +517,16 @@ def get_bible_chapters(episode_title):
                         _f['reason'] = "Thru the Bible - pre-roll"
                         played = False
                         for r in recently_played:
-                            print "R:", r
+                            # print "R:", r
                             if r['id'] == _f['fid'] and r['id_type'] == 'f':
                                 played = True
                                 break
                         if not played:
                             files.append(_f)
-                            print "_f:", pp.pformat(_f)
+                            # print "_f:", pp.pformat(_f)
                     break
 
-    print "FILES:",pp.pformat(files)
+    print "FILES:", pp.pformat(files)
     return files
 
 def append_file():
@@ -776,7 +794,14 @@ try:
         print "TST:",dict(tst) 
     print "is_netcast:",is_netcast(tst)
     """
-    
+    sql = """SELECT episode_title 
+             FROM netcast_episodes 
+             WHERE nid = 10
+             ORDER BY pub_date DESC
+             LIMIT 10"""
+    # episodes = get_results_assoc(sql)
+    #for e in episodes:
+    #    print "chapters:", get_bible_chapters(e['episode_title'])
     gtk.gdk.threads_leave()
     gtk.main()
 except KeyboardInterrupt:

@@ -37,10 +37,10 @@ except ImportError, err:
 
 pp = pprint.PrettyPrinter(depth=6)
 
-audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
-audio_with_tags = ['.mp3','.ogg','.wma','.flac']
+audio_ext = ['.mp3','.wav','.ogg','.wma','.flac', '.m4a']
+audio_with_tags = ['.mp3','.ogg','.wma','.flac', '.m4a']
 video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
-             '.mp4', '.m4a', '.mov', '.m4v']
+             '.mp4', '.mov', '.m4v']
 
 def is_video(ext=None):
     return ext.lower() in video_ext
@@ -63,6 +63,7 @@ class FObj:
         self.uri = None
         self.tags_easy = None
         self.tags_hard = None
+        self.tags_combined = {}
         self.reason = ""
 
         if 'reason' not in kwargs:
@@ -140,8 +141,10 @@ class FObj:
             return
         try:
             self.tags_easy = mutagen.File(self.filename, easy=True)
-            print "GET_TAGS"
-            pp.pprint(self.tags_easy)
+            print "GET_TAGS EASY"
+            if self.tags_easy:
+                self.combine_tags(self.tags_easy)
+                    
         except mutagen.mp3.HeaderNotFoundError, e:
             print "mutagen.mp3.HeaderNotFoundError:",e
             self.tags_easy = None
@@ -150,22 +153,65 @@ class FObj:
             # if self.tags_easy:
             # self.tags_easy = None
 
+    def combine_tags(self, tags):
+        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist')
+        title_keys = ('title', )
+        album_keys = ('album', 'wm/albumtitle', 'albumtitle')
+        year_keys = ('year', 'wm/year')
+        genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
+                      'TCON')
+        track_keys = ('wm/tracknumber', 'track')
+        for k in tags:
+            print "k:",k,":",tags[k]
+            self.add_to_combined(k, tags[k])
+            k_lower = k.lower()
+            if k_lower in artist_keys:
+                self.add_to_combined('artist', tags[k])
+            if k_lower in title_keys:
+                self.add_to_combined('title', tags[k])
+            if k_lower in album_keys:
+                self.add_to_combined('album', tags[k])
+            if k_lower in year_keys:
+                self.add_to_combined('year', tags[k])
+            if k_lower in genre_keys:
+                self.add_to_combined('genre', tags[k])
+            if k_lower in track_keys:
+                self.add_to_combined('track', tags[k])
+
+    def add_to_combined(self, tag, value):
+        if tag not in self.tags_combined:
+            self.tags_combined[tag] = []
+        if value not in self.tags_combined[tag]:
+            if isinstance(value, list):
+                for v in value:
+                    if isinstance(v, list):
+                        for _v in value:
+                            if _v not in self.tags_combined[tag]:
+                                self.tags_combined[tag].append("%s" % _v)
+                    elif v not in self.tags_combined[tag]:
+                        self.tags_combined[tag].append("%s" % v)
+                return
+            self.tags_combined[tag].append("%s" % value)
+
     def get_hard_tags(self):
         if not self.exists or not self.has_tags or self.tags_hard is not None:
             return
         try:
             self.tags_hard = mutagen.File(self.filename, easy=True)
-            print "GET_TAGS"
-            pp.pprint(self.tags_hard)
+            print "GET_TAGS HARD"
+            if self.tags_hard:
+                self.combine_tags(self.tags_hard)
         except mutagen.mp3.HeaderNotFoundError, e:
             print "mutagen.mp3.HeaderNotFoundError:",e
             self.tags_hard = None
 
-    def get_tags(self, easy=True, hard=False):
+    def get_tags(self, easy=True, hard=True):
         if easy:
             self.get_easy_tags()
         if hard:
             self.get_hard_tags()
+        print "tags_combined:"
+        pp.pprint(self.tags_combined)
 
     def getmtime(self):
         if self.exists:
@@ -194,6 +240,11 @@ class FObj:
 
     def get_artist_title(self):
         self.get_tags()
+
+        if self.tags_easy is not None:
+            print "self.tags_easy:", self.tags_easy
+        if self.tags_hard is not None:
+            print "self.tags_hard:", self.tags_hard
 
         if self.tags_easy and 'artist' in self.tags_easy and 'title' in self.tags_easy:
             if self.tags_easy['artist'] and self.tags_easy['title']:

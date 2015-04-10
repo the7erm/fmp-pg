@@ -639,11 +639,11 @@ def artists_for_fid(fid):
 
 def albums_for_fid(fid):
     res = get_results_assoc("""SELECT al.* 
-                                FROM files f, albums al, album_files af
-                                WHERE f.fid = %s AND
-                                      af.fid = f.fid AND
-                                      al.alid = af.alid
-                                ORDER BY album_name""", (fid,))
+                               FROM files f, albums al, album_files af
+                               WHERE f.fid = %s AND
+                                     af.fid = f.fid AND
+                                     al.alid = af.alid
+                               ORDER BY album_name""", (fid,))
     return convert_to_dict(res)
 
 def genres_for_fid(fid):
@@ -655,7 +655,8 @@ def genres_for_fid(fid):
                                ORDER BY genre""", (fid,))
     return convert_to_dict(res)
 
-def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=False):
+def get_search_results(q="", start=0, limit=20, filter_by="all", 
+                      return_total=False):
     start = int(start)
     limit = int(limit)
     # print "Q:",q
@@ -670,31 +671,37 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
                              file_locations fl
                         WHERE fl.fid = f.fid
                         ORDER BY artist, title"""
-    no_words_query = """SELECT DISTINCT f.fid, title, sha512, p.fid AS cued,
-                                        f.fid AS id, 'f' AS id_type, artist
+    no_words_query = """SELECT f.fid, title, sha512, p.fid AS cued,
+                               f.fid AS id, 'f' AS id_type, 
+                               string_agg(DISTINCT a.artist, ',') AS artists
                         FROM files f 
                              LEFT JOIN preload p ON p.fid = f.fid
                              LEFT JOIN file_artists fa ON fa.fid = f.fid
                              LEFT JOIN artists a ON a.aid = fa.aid
-                        ORDER BY artist, title"""
+                        GROUP BY f.fid, f.title, f.sha512, p.fid, id, id_type
+                        ORDER BY artists, title"""
 
-    no_words_query_count = """SELECT count(*) AS total 
-                              FROM files f 
-                              LEFT JOIN file_artists fa ON fa.fid = f.fid"""
+    no_words_query_count = """SELECT count(*) AS total
+                              FROM files f"""
 
-    no_words_rating_query = """SELECT DISTINCT f.fid, title, sha512,  
-                                               f.fid, p.fid AS cued, artist,
-                                               f.fid AS id, 'f' AS id_type
-                               FROM files f 
+    no_words_rating_query = """SELECT f.fid, title, sha512, 
+                                      string_agg(DISTINCT a.artist, ',') 
+                                        AS artists,
+                                      p.fid AS cued,
+                                      f.fid AS id, 'f' AS id_type
+                               FROM files f
                                     LEFT JOIN preload p ON p.fid = f.fid
                                     LEFT JOIN file_artists fa ON fa.fid = f.fid
                                     LEFT JOIN artists a ON a.aid = fa.aid,
                                     user_song_info usi
-                               WHERE rating = %s AND usi.fid = f.fid AND
+                               WHERE usi.rating = %s AND
+                                     f.fid = usi.fid AND
                                      usi.uid IN (SELECT uid 
                                                  FROM users 
                                                  WHERE listening = true)
-                               ORDER BY artist, title"""
+                               GROUP BY f.fid, f.title, f.sha512, p.fid, id,
+                                        id_type
+                               ORDER BY artists, title"""
 
     no_words_rating_query_count = """SELECT count(*) AS total
                                      FROM files f,
@@ -705,18 +712,24 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
                                                        WHERE listening = true)"""
 
 
-    query = """SELECT DISTINCT f.fid, title, sha512, artist,
-                               p.fid AS cued, ts_rank(tsv, query) as rank,
-                               f.fid AS id, 'f' AS id_type
+    query = """SELECT f.fid, title, sha512, 
+                      string_agg(DISTINCT a.artist, ',') AS artists,
+                      p.fid AS cued, ts_rank(tsv, query) as rank,
+                      f.fid AS id, 'f' AS id_type
                FROM files f
                     LEFT JOIN preload p ON p.fid = f.fid
                     LEFT JOIN file_artists fa ON fa.fid = f.fid
                     LEFT JOIN artists a ON a.aid = fa.aid,
                     keywords kw,
-                    plainto_tsquery('english', %s) query
-               WHERE kw.fid = f.fid AND
-                     tsv @@ query
-               ORDER BY rank DESC, artist, title"""
+                    plainto_tsquery('english', %s) query,
+                    user_song_info usi
+               WHERE kw.fid = f.fid AND tsv @@ query AND 
+                     f.fid = usi.fid AND
+                     usi.uid IN (SELECT uid 
+                                FROM users 
+                                WHERE listening = true)
+              GROUP BY f.fid, f.title, f.sha512, p.fid, rank, id, id_type
+              ORDER BY rank DESC, artists, title"""
 
     query_count = """SELECT count(*) AS total
                      FROM files f,
@@ -785,15 +798,22 @@ def get_search_results(q="", start=0, limit=20, filter_by="all", return_total=Fa
             args = (rating,)
     query = "%s %s" % (query, query_offset)
     try:
-        print "query:",query, args
-        for r in get_results_assoc(query, args):
+        print "query:", pg_cur.mogrify(query, args)
+        try:
+          res = get_results_assoc(query, args)
+        except Exception, err:
+          print "ERR", err
+        print "RES:", res
+        for r in res:
             # f = fobj.get_fobj(**r)
             #fd = f.to_dict()
             # fd.cued = r.cued
             rdict = dict(r)
+            print "rdict:", rdict
             results.append(rdict)
     except psycopg2.IntegrityError, err:
         query("COMMIT;")
+        print "*****ERROR"
         print "(flask_server) psycopg2.IntegrityError:",err
     except psycopg2.InternalError, err:
         query("COMMIT;")
@@ -1031,7 +1051,8 @@ def search_data():
     print "LIMIT:%s" % limit
     start_time = time.time()
     print "start:",start_time
-    results = get_search_results(q, start=start, limit=limit, filter_by=filter_by)
+    results = get_search_results(q, start=start, limit=limit, 
+                                 filter_by=filter_by)
     print "end:", time.time() - start_time
     return json_dump(results)
 

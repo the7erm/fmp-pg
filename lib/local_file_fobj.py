@@ -434,20 +434,21 @@ class Local_File(fobj.FObj):
         return results
 
     def get_title(self):
-        if not self.tags_easy:
+        if not self.tags_combined:
             try:
                 self.get_tags()
             except KeyError, e:
                 print "KeyError:",e
 
-        if self.tags_easy:
-            if 'title' in self.tags_easy and self.tags_easy['title']:
+        if self.tags_combined:
+            if 'title' in self.tags_combined and self.tags_combined['title']:
                 self.db_info = get_assoc("""UPDATE files SET title = %s
                                             WHERE fid = %s 
                                             RETURNING *;""",
-                                            (self.tags_easy['title'][0], 
+                                            (self.tags_combined['title'][0], 
                                              self.db_info['fid'],))
-                print "SET TITLE:%s" % self.tags_easy['title'][0]
+                print "SET TITLE:%s" % self.tags_combined['title'][0]
+
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
 
@@ -638,7 +639,7 @@ class Local_File(fobj.FObj):
 
     def process_artist(self):
         if self.tags_easy:
-            artists = self.tags_easy.get('artist')
+            artists = self.tags_combined.get('artist')
             if artists:
                 query("""DELETE FROM file_artists WHERE fid = %s""", (self.db_info['fid'],))
                 for a in artists:
@@ -919,25 +920,18 @@ class Local_File(fobj.FObj):
         return album
 
     def process_album(self):
-        if self.tags_easy:
-            albums = self.tags_easy.get('album')
+        if self.tags_combined:
+            albums = self.tags_combined.get('album')
             if albums:
                 for al in albums:
                     for a in self.artists:
                         self.add_album(al, a['aid'])
 
     def process_genre(self):
-        if self.tags_easy:
-            genres = self.tags_easy.get('genre')
+        if self.tags_combined:
+            genres = self.tags_combined.get('genre')
             if genres:
                 for g in genres:
-                    self.add_genre(g)
-
-            # print self.tags_hard
-        if self.tags_hard:
-            genres = self.tags_hard.get('TCON')
-            if genres:
-                for g in genres.text:
                     self.add_genre(g)
                 
 
@@ -988,11 +982,11 @@ class Local_File(fobj.FObj):
         return genre
 
     def get_artist_title(self):
-        self.get_tags(easy=True)
-        if self.tags_easy:
-            if 'artist' in self.tags_easy and self.tags_easy['artist'] and \
-               'title' in self.tags_easy and self.tags_easy['title']:
-                return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
+        self.get_tags()
+        artist = self.tags_combined.get('artist')
+        title = self.tags_combined.get('title')
+        if artist and title:
+            return "%s - %s" % (artist[0], title[0])
 
         return self.db_info['title'] or self.basename
 
