@@ -61,9 +61,19 @@ if "--no-hash" in args:
     do_hash = False
 
 if "--folders" in args:
-    folders = get_results_assoc("SELECT DISTINCT dirname FROM file_locations ORDER BY dirname")
+    sql = """SELECT DISTINCT dirname 
+             FROM file_locations
+             WHERE last_scan != current_date OR last_scan IS NULL
+             ORDER BY dirname"""
+    folders = get_results_assoc(sql)
+    len_folders = float(len(folders))
+    cnt = 0
     for f in folders:
+        cnt += 1
+        print "FOLDER PROGRESS: %s%% %s:%s" % ((cnt / len_folders) * 100, 
+                                               cnt, int(len_folders ))
         scanner.scan_dir(f['dirname'], hash=do_hash)
+
 
 for arg in args:
     if arg in ("--no-hash","--folders"):

@@ -154,15 +154,17 @@ class FObj:
             # self.tags_easy = None
 
     def combine_tags(self, tags):
-        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist')
-        title_keys = ('title', )
-        album_keys = ('album', 'wm/albumtitle', 'albumtitle')
-        year_keys = ('year', 'wm/year')
+        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist',
+                       'tpe1', 'tpe2', 'tpe3')
+        title_keys = ('title', 'tit2')
+        album_keys = ('album', 'wm/albumtitle', 'albumtitle', 'talb')
+        year_keys = ('year', 'wm/year', 'date', 'tdrc', 'tdat', 'tory', 'tdor',
+                     'tyer')
         genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
-                      'TCON')
-        track_keys = ('wm/tracknumber', 'track')
+                      'tcon')
+        track_keys = ('wm/tracknumber', 'track', 'trck')
         for k in tags:
-            print "k:",k,":",tags[k]
+            # print "k:",k,":",tags[k]
             self.add_to_combined(k, tags[k])
             k_lower = k.lower()
             if k_lower in artist_keys:
@@ -187,9 +189,17 @@ class FObj:
                     if isinstance(v, list):
                         for _v in value:
                             if _v not in self.tags_combined[tag]:
-                                self.tags_combined[tag].append("%s" % _v)
+                                print "_v:", _v
+                                vs = "%s" % _v
+                                vs = vs.replace("\x00", "")
+                                self.tags_combined[tag].append(vs)
                     elif v not in self.tags_combined[tag]:
-                        self.tags_combined[tag].append("%s" % v)
+                        try:
+                            vs = "%s" % v
+                            vs = vs.replace("\x00", "")
+                            self.tags_combined[tag].append(vs)
+                        except TypeError:
+                            continue
                 return
             self.tags_combined[tag].append("%s" % value)
 
@@ -197,7 +207,7 @@ class FObj:
         if not self.exists or not self.has_tags or self.tags_hard is not None:
             return
         try:
-            self.tags_hard = mutagen.File(self.filename, easy=True)
+            self.tags_hard = mutagen.File(self.filename)
             print "GET_TAGS HARD"
             if self.tags_hard:
                 self.combine_tags(self.tags_hard)
@@ -210,8 +220,11 @@ class FObj:
             self.get_easy_tags()
         if hard:
             self.get_hard_tags()
-        print "tags_combined:"
-        pp.pprint(self.tags_combined)
+        # print "tags_combined:"
+        #if 'APIC' not in self.tags_combined:
+        #    pp.pprint(self.tags_combined)
+
+
 
     def getmtime(self):
         if self.exists:

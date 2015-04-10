@@ -21,46 +21,64 @@ import os
 from os.path import join, getsize
 from lib.local_file_fobj import Local_File, CreationFailed
 from file_location import FileLocation, audio_ext, video_ext, is_supported_file
+from __init__ import get_assoc, query
+from datetime import date
 
 print "scanner.py called"
 
 already_scanned = []
+SKIP_DIRS = ["/.minecraft", "/resources/", "/minecraft/", '/.crazycraft/',
+             "/.electriciansjourney/", "/.fellowship/", '/.technic',]
 
 def scan_file(root=None, name=None, filename=None, hash=True):
-    if filename == None:
+    if filename is None:
         filename = join(root, name)
         
     if not is_supported_file(filename):
         print "skipping:", filename
         return
 
-    skip_dirs = ["/.minecraft/", "/resources/", "/minecraft/"]
+    if root is None:
+        root, name = os.path.split(filename)
+    filename = os.path.realpath(filename)
 
-    for folder in skip_dirs:
+    for folder in SKIP_DIRS:
         if folder in filename:
             print "skipping:", filename
             return
-
-    if "/.minecraft/" in filename:
+    
+    sql = """SELECT dirname, basename FROM file_locations 
+             WHERE last_scan = current_date AND
+                   dirname = %s AND
+                   basename = %s"""
+    already_scanned = get_assoc(sql, (root, name))
+    if already_scanned:
+        print "already_scanned today %s" % filename
         return
 
-    filename = os.path.realpath(filename)
+    
+
     print 'scanning:', filename
     try:
         # FileLocation(filename=filename, insert=True)
         f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
+        sql = """UPDATE file_locations SET last_scan = current_date 
+                 WHERE dirname = %s AND basename = %s"""
+        query(sql, (root, name))
     except CreationFailed:
         FileLocation(filename=filename, insert=True)
         try:
             f = Local_File(filename=filename, hash=hash, insert=True, 
                            silent=True)
+            sql = """UPDATE file_locations SET last_scan = current_date 
+                     WHERE dirname = %s AND basename = %s"""
+            query(sql, (root, name))
         except CreationFailed:
             pass
 
 def scan_dir(directory, hash=True):
-    skip_dirs = ["/.minecraft/", "/resources/", "/minecraft/"]
 
-    for folder in skip_dirs:
+    for folder in SKIP_DIRS:
         if folder in directory:
             print "skipping:", directory
             return
@@ -68,10 +86,36 @@ def scan_dir(directory, hash=True):
     if already_scanned.count(directory) != 0:
         return
 
+    _files = {}
     for root, dirs, files in os.walk(directory):
-        if already_scanned.count(root) != 0:
+        if root in already_scanned:
             continue
         already_scanned.append(root)
+        skip = False
+        for folder in SKIP_DIRS:
+            if folder in root:
+                skip = True
+                break
+        if skip:
+            print "skipping:", root
+            continue
+        print "scanning:", root
         for f in files:
-            scan_file(root=root, name=f, hash=hash)
+            filename = os.path.join(root, f)
+            _files[filename] = {
+                "root": root, 
+                "name": f,
+                "hash": hash
+            }
+    
+    
+    len_files = float(len(_files.keys()))
+    i = 0
+    keys = sorted(_files.keys())
+    for filename in keys:
+        f = _files[filename]
+        print "PROGRESS: %s %.02f%% %s:%s %s %s" % (directory, (i / len_files) * 100, i, int(len_files), (i / len_files), filename)
+        scan_file(**f)
+        i += 1
+
     already_scanned.append(directory)

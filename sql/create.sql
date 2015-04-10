@@ -364,7 +364,8 @@ CREATE TABLE file_locations (
     fixed boolean,
     front_fingerprint character varying(255),
     middle_fingerprint character varying(255),
-    end_fingerprint character varying(255)
+    end_fingerprint character varying(255),
+    last_scan date
 );
 
 

@@ -653,6 +653,8 @@ class Local_File(fobj.FObj):
                             query("COMMIT")
 
     def get_aids_by_artist_string(self, artists, insert=True):
+        if not artists:
+            return []
         print "get_aids_by_artist_string:",artists
         aids = []
         print "type:",type(artists)
@@ -673,11 +675,11 @@ class Local_File(fobj.FObj):
         return None
 
     def add_artist(self, artist_name):
-        if artist_name is None:
+        if artist_name is None or not artist_name:
             return
         artist_name = artist_name.strip()
-        
-        if artist_name == "":
+        artist_name = artist_name.replace("\x00", "")
+        if not artist_name:
             return
 
         for a in self.artists:
@@ -763,6 +765,10 @@ class Local_File(fobj.FObj):
 
     def parse_artist_string(self, artists):
         artists = artists.strip()
+        artists = artists.replace("\x00", "")
+        print "parse_artist_string:", artists
+        if not artists:
+            return []
         combos = []
         combos.append(artists)
         lines = artists.splitlines()
@@ -874,10 +880,13 @@ class Local_File(fobj.FObj):
         if len(combos) > 1:
             print "combos:",combos
         for c in combos:
+            print "C:",c
             self.add_artist(c)
 
     def add_album(self, album_name, aid=None):
-        if album_name is None:
+        album_name = album_name.replace("\x00", "")
+        album_name = album_name.strip()
+        if not album_name:
             return
         if aid is None:
             for a in self.artists:
@@ -953,6 +962,10 @@ class Local_File(fobj.FObj):
         return res
 
     def add_genre(self, genre_name):
+        genre_name = genre_name.replace("\x00", "")
+        genre_name = genre_name.strip()
+        if not genre_name:
+            return
         for g in self.genres:
             if g['genre'] == genre_name:
                 return
