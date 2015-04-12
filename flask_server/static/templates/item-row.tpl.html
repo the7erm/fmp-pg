@@ -41,6 +41,9 @@
   </div>
   <div class="clearfix"></div>
   <div ng-if="r.reason">Reason: {{ r.reason }}</div>
+  <div>
+      <a ng-repeat="l in r.locations" class="btn btn-primary" title="{{l.dirname}}">{{l.label}}</a>
+  </div>
 
   <div ng-if="r.moreInfo.history">
       <h2>History</h2>

@@ -828,10 +828,12 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
     return results, total['total']
 
 def locations_for_fid(fid):
-    locations = get_results_assoc("""SELECT dirname, basename
-                                     FROM file_locations
-                                     WHERE fid = %s
-                                     ORDER BY dirname, basename""", (fid,))
+    sql = """SELECT label, dirname, basename
+             FROM file_locations fl
+                  LEFT JOIN devices d ON d.device_id = fl.device_id
+             WHERE fid = %s
+             ORDER BY dirname, basename, label"""
+    locations = get_results_assoc(sql, (fid,))
 
     results = []
     for l in locations:
@@ -840,6 +842,7 @@ def locations_for_fid(fid):
             results.append({
                 "dirname": l['dirname'],
                 "basename": l['basename'],
+                "label": l['label']
             })
 
     return results
@@ -1435,7 +1438,7 @@ def preload():
     mimetype = "application/json"
     cachetimout = 60
 
-    order_by = "plid, artist, title"
+    order_by = "plid, artists, title"
 
     if request.args.get("o") == "plid":
         order_by = "plid"
@@ -1443,8 +1446,10 @@ def preload():
     print "LIMIT:%s" % limit
 
 
-    q = """SELECT DISTINCT p.plid, f.fid, artist, title, sha512,
-                           p.fid AS cued, artist,
+    q = """SELECT DISTINCT p.plid, f.fid, title, sha512,
+                           p.fid AS cued,
+                           string_agg(DISTINCT a.artist, ',') 
+                                        AS artists,
                            f.fid AS id, 'f' AS id_type,
                            p.reason
            FROM files f
@@ -1452,6 +1457,7 @@ def preload():
                 LEFT JOIN artists a ON a.aid = fa.aid,
                 preload p
            WHERE p.fid = f.fid
+           GROUP BY p.plid, f.fid, title, sha512, cued, id, id_type, reason
            ORDER BY """+order_by+"""
            LIMIT """+str(limit)+""" OFFSET """+str(start)
 
@@ -1459,12 +1465,10 @@ def preload():
 
     preload = get_results_assoc(q)
 
+    print "made it 1"
+
     total = get_assoc("""SELECT count(*) AS total
-                         FROM files f
-                              LEFT JOIN file_artists fa ON fa.fid = f.fid
-                              LEFT JOIN artists a ON a.aid = fa.aid,
-                              preload p
-                         WHERE p.fid = f.fid""")
+                         FROM preload p""")
     total = total['total']
 
     if preload:
@@ -1601,8 +1605,10 @@ def stream(fid):
     print("STREAM:", fid)
     locations = []
     if "." not in fid:
-        locations = get_results_assoc("""SELECT dirname, basename
-                                         FROM file_locations 
+        locations = get_results_assoc("""SELECT device_id, label, 
+                                                dirname, basename
+                                         FROM file_locations fl
+                                              LEFT JOIN devices d ON d. 
                                          WHERE fid = %s""", (fid, ))
 
     print "LOCATIONS:",locations

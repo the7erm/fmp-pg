@@ -181,6 +181,44 @@ ALTER SEQUENCE artists_aid_seq OWNED BY artists.aid;
 SET default_with_oids = false;
 
 --
+-- Name: devices; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE devices (
+    device_id integer NOT NULL,
+    filesystem character varying(255),
+    type character varying(32),
+    "1k-blocks" bigint DEFAULT 0,
+    used bigint DEFAULT 0,
+    available bigint DEFAULT 0,
+    use integer DEFAULT 0,
+    mounted_on character varying(255),
+    uuid character varying(37),
+    root character varying(255),
+    label character varying(100)
+);
+
+
+--
+-- Name: devices_device_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE devices_device_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: devices_device_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE devices_device_id_seq OWNED BY devices.device_id;
+
+
+--
 -- Name: dont_pick; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -886,117 +924,6 @@ ALTER SEQUENCE preload_fid_seq OWNED BY preload.fid;
 
 
 --
--- Name: preload_history; Type: TABLE; Schema: public; Owner: -; Tablespace: 
---
-
-CREATE TABLE preload_history (
-    phid integer NOT NULL,
-    fid integer NOT NULL,
-    uid integer NOT NULL,
-    reason text NOT NULL,
-    date_qued timestamp with time zone,
-    date_played timestamp with time zone,
-    uhids bigint[],
-    plid integer NOT NULL
-);
-
-
---
--- Name: preload_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE preload_history_fid_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: preload_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE preload_history_fid_seq OWNED BY preload_history.fid;
-
-
---
--- Name: preload_history_phid_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE preload_history_phid_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: preload_history_phid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE preload_history_phid_seq OWNED BY preload_history.phid;
-
-
---
--- Name: preload_history_plid_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE preload_history_plid_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: preload_history_plid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE preload_history_plid_seq OWNED BY preload_history.plid;
-
-
---
--- Name: preload_history_reason_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE preload_history_reason_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: preload_history_reason_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE preload_history_reason_seq OWNED BY preload_history.reason;
-
-
---
--- Name: preload_history_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE preload_history_uid_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: preload_history_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE preload_history_uid_seq OWNED BY preload_history.uid;
-
-
---
 -- Name: preload_plid_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1468,6 +1395,13 @@ ALTER TABLE ONLY artists ALTER COLUMN aid SET DEFAULT nextval('artists_aid_seq':
 
 
 --
+-- Name: device_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY devices ALTER COLUMN device_id SET DEFAULT nextval('devices_device_id_seq'::regclass);
+
+
+--
 -- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1636,41 +1570,6 @@ ALTER TABLE ONLY preload ALTER COLUMN plid SET DEFAULT nextval('preload_plid_seq
 
 
 --
--- Name: phid; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY preload_history ALTER COLUMN phid SET DEFAULT nextval('preload_history_phid_seq'::regclass);
-
-
---
--- Name: fid; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY preload_history ALTER COLUMN fid SET DEFAULT nextval('preload_history_fid_seq'::regclass);
-
-
---
--- Name: uid; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY preload_history ALTER COLUMN uid SET DEFAULT nextval('preload_history_uid_seq'::regclass);
-
-
---
--- Name: reason; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY preload_history ALTER COLUMN reason SET DEFAULT nextval('preload_history_reason_seq'::regclass);
-
-
---
--- Name: plid; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY preload_history ALTER COLUMN plid SET DEFAULT nextval('preload_history_plid_seq'::regclass);
-
-
---
 -- Name: tid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1758,6 +1657,14 @@ ALTER TABLE ONLY artists
 
 
 --
+-- Name: devices_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY devices
+    ADD CONSTRAINT devices_pkey PRIMARY KEY (device_id);
+
+
+--
 -- Name: file_artists_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1835,14 +1742,6 @@ ALTER TABLE ONLY netcast_subscribers
 
 ALTER TABLE ONLY netcasts
     ADD CONSTRAINT netcasts_pkey PRIMARY KEY (nid);
-
-
---
--- Name: preload_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
---
-
-ALTER TABLE ONLY preload_history
-    ADD CONSTRAINT preload_history_pkey PRIMARY KEY (phid);
 
 
 --
@@ -2067,6 +1966,13 @@ CREATE INDEX fph_mtime_idx ON fingerprint_history USING btree (mtime);
 --
 
 CREATE INDEX fph_size_idx ON fingerprint_history USING btree (size);
+
+
+--
+-- Name: idx_filesystem; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_filesystem ON devices USING btree (filesystem);
 
 
 --

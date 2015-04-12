@@ -476,17 +476,6 @@ class RatingsAndScores:
                                        RETURNING uh.*""",
                                        (self.fid,))
 
-        if self.plid:
-            uhids = []
-            for u in updated:
-                uhids.append(u['uhid'])
-            print "-="*20
-            query("""UPDATE preload_history
-                     SET date_played = NOW(), uhids = %s
-                     WHERE plid = %s""",
-                 (uhids, self.plid))
-
-
         self.process_updated_history(updated, listeners.listeners, percent_played)
         self.update(updated)
 

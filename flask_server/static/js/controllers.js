@@ -712,6 +712,7 @@ fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService',
     function($scope, $routeParams, fmpService, $location, $modal) {
     window.document.title = "fmp - History";
     $scope.queryUrl = '/history-data/';
+    $scope.ctrler = "";
     fmpService.initPagination($scope, $routeParams, $location, $modal);
 }]);
 
