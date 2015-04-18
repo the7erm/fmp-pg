@@ -23,6 +23,7 @@ from lib.local_file_fobj import Local_File, CreationFailed
 from file_location import FileLocation, audio_ext, video_ext, is_supported_file
 from __init__ import get_assoc, query
 from datetime import date
+from parse_df import associate_devices
 
 print "scanner.py called"
 
@@ -56,8 +57,6 @@ def scan_file(root=None, name=None, filename=None, hash=True):
         print "already_scanned today %s" % filename
         return
 
-    
-
     print 'scanning:', filename
     try:
         # FileLocation(filename=filename, insert=True)
@@ -75,6 +74,8 @@ def scan_file(root=None, name=None, filename=None, hash=True):
             query(sql, (root, name))
         except CreationFailed:
             pass
+
+    associate_devices()
 
 def scan_dir(directory, hash=True):
 

@@ -42,7 +42,13 @@
   <div class="clearfix"></div>
   <div ng-if="r.reason">Reason: {{ r.reason }}</div>
   <div>
-      <a ng-repeat="l in r.locations" class="btn btn-primary" title="{{l.dirname}}">{{l.label}}</a>
+      <span class="badge location"
+            ng-repeat="loc in r.locations"
+            title="{{loc.dirname}}" 
+            data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
+            data-auto-close="1"
+            data-content="TEST"
+            bs-popover="popover">{{loc.label}}</span>
   </div>
 
   <div ng-if="r.moreInfo.history">

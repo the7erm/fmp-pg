@@ -43,6 +43,8 @@ import os
 from lib.netcast_fobj import Netcast
 from copy import deepcopy
 from pprint import pprint, pformat
+from lib.parse_df import update_devices
+import shutil
 
 # from bson import json_util
 import json
@@ -59,6 +61,7 @@ from lib.rating_utils import rate as simple_rate, mark_as_played, \
                              set_score_for_uid
 
 from lib.local_file_fobj import get_words_from_string, Local_File
+from lib.scanner import scan_file
 
 from tornado.wsgi import WSGIContainer
 from tornado.ioloop import IOLoop
@@ -828,22 +831,20 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
     return results, total['total']
 
 def locations_for_fid(fid):
-    sql = """SELECT label, dirname, basename
+    sql = """SELECT fl.device_id, flid, label, dirname, basename
              FROM file_locations fl
                   LEFT JOIN devices d ON d.device_id = fl.device_id
              WHERE fid = %s
-             ORDER BY dirname, basename, label"""
+             ORDER BY label"""
     locations = get_results_assoc(sql, (fid,))
 
     results = []
     for l in locations:
-        path = os.path.join(l['dirname'], l['basename'])
-        if os.path.exists(path):
-            results.append({
-                "dirname": l['dirname'],
-                "basename": l['basename'],
-                "label": l['label']
-            })
+        obj = dict(l)
+        full_path = os.path.join(l['dirname'], l['basename'])
+        obj['exists'] = os.path.exists(full_path)
+        obj['writable'] = os.access(full_path, os.W_OK)
+        results.append(obj)
 
     return results
 
@@ -1706,6 +1707,67 @@ def listening(uid, state):
         sql = """DELETE FROM preload WHERE uid = %s"""
         query(sql, (uid,))
     return users()
+
+@app.route("/devices/", methods=["GET"])
+@app.route("/devices", methods=["GET"])
+def devices():
+    update_devices()
+    sql = """SELECT * 
+             FROM devices 
+             WHERE mounted = true 
+             ORDER BY mounted_on"""
+
+    devices = get_results_assoc(sql)
+    results = []
+    for device in devices:
+        _device = dict(device)
+        _device['writable'] = os.access(device['mounted_on'], os.W_OK)
+        results.append(_device)
+    return json_dump(results)
+
+@app.route("/copy-to/<flid>/<device_id>/", methods=["GET"])
+@app.route("/copy-to/<flid>/<device_id>", methods=["GET"])
+def copy_to(flid, device_id):
+    print "1"
+    sql = """SELECT *
+             FROM file_locations
+             WHERE flid = %s"""
+    location = get_assoc(sql, (flid, ))
+
+    sql = """SELECT * 
+             FROM devices
+             WHERE device_id = %s"""
+
+    device = get_assoc(sql, (device_id, ))
+    if int(device_id) == int(location['device_id']):
+        return json_dump({"result":"FAIL",
+                          "error": "File already exists on %s" % (
+                                    device['label'],)})
+
+
+    dst_dir = device['mounted_on']
+    if not os.access(dst_dir, os.W_OK):
+        return json_dump({"result":"FAIL",
+                          "error": "Unable to write to folder %s" % (
+                                    dst_dir,)})
+
+    src = os.path.join(location['dirname'], location['basename'])
+    dst = os.path.join(dst_dir, location['basename'])
+    print "dst:", dst
+    print "%s => %s" % (src, dst)
+
+    if os.path.exists(dst):
+        print "3"
+        locations = locations_for_fid(location['fid'])
+        return json_dump({"result": "OK",
+                          "locations": locations })
+
+    shutil.copy2(src, dst)
+    scan_file(filename=dst)
+    locations = locations_for_fid(location['fid'])
+    print "4"
+    return json_dump({"result": "OK",
+                      "locations": locations })
 
 def start_worker(*args):
     print "STARTING WORKER"

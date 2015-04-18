@@ -7,21 +7,31 @@
 <span class="visible-lg-block pull-right badge">lg</span></h3>
 <div ng-controller="CurrentlyPlayingCtrl">
     <div class='artist-title'>
-        <span ng-repeat="a in playing_data.artists" ng-hide="!playing_data.artists">
+        <span ng-repeat="a in playing_data.artists" ng-if="playing_data.artists">
             <a href="#/search/{{ a.artist }}">{{ a.artist }}</a><span ng-show="!$last">, </span>
         </span> <span ng-show="playing_data.artists.length > 0">-</span>
-        <a href="#/search/{{ playing_data.title }}" ng-hide="!playing_data.title">{{ playing_data.title }}</a>
-        <a href="#/search/{{ playing_data.basename }}" ng-hide="playing_data.title || playing_data.basename == '-missing-'">{{ playing_data.basename }}</a>
-        <span ng-show="playing_data.basename == '-missing-'">{{ playing_data.artist_title }}</span>
-        <small ng-hide="!playing_data.pos_data.left_str">
+        <a href="#/search/{{ playing_data.title }}" ng-if="playing_data.title">{{ playing_data.title }}</a>
+        <a href="#/search/{{ playing_data.basename }}" ng-if="!playing_data.title && playing_data.basename != '-missing-'">{{ playing_data.basename }}</a>
+        <span ng-if="playing_data.basename == '-missing-'">{{ playing_data.artist_title }} </span>
+        <small ng-if="playing_data.pos_data.left_str">
             -{{ playing_data.pos_data.left_str }} {{ playing_data.pos_data.pos_str }}/{{ playing_data.pos_data.dur_str }}
         </small>
-        <div ng-show="!playing_data.pos_data.left_str">Initializing ...</div>
+        <div ng-if="!playing_data.pos_data.left_str">Initializing ...</div>
     </div>
-    <div class='ratings-box'>
+    <div class='ratings-box' ng-if="playing_data.ratings">
         <span ng-repeat="rating in playing_data.ratings">
           {{rating.uname}} {{ rating.true_score | number : 2}}
           <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
         </span>
+    </div>
+    <div>
+        <span class="badge"
+            ng-repeat="loc in playing_data.locations"
+            class="btn btn-sm btn-primary" 
+            title="{{loc.dirname}}" 
+            data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
+            data-auto-close="1"
+            data-content="TEST"
+            bs-popover="popover">{{loc.label}}</span>
     </div>
 </div>

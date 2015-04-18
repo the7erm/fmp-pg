@@ -116,3 +116,7 @@ ul.rating {
 .item-info {
   cursor: pointer;
 }
+
+.location {
+  cursor: pointer;
+}

@@ -1,10 +1,12 @@
 var fmpApp = angular.module('fmpApp', [
     'ui.bootstrap',
-    'mgcrea.ngStrap', 
+    'mgcrea.ngStrap',
+    'mgcrea.ngStrap.helpers.dimensions',
     'mgcrea.ngStrap.modal', 
     'mgcrea.ngStrap.aside', 
     'mgcrea.ngStrap.tooltip', 
     'mgcrea.ngStrap.typeahead',
+    'mgcrea.ngStrap.popover',
     'ngRoute', 
     'ngTagsInput',
     'bgf.paginateAnything'
@@ -196,6 +198,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
     function($rootScope, $http, $interval, $timeout, $q, socket){
         var now = new Date();
         $rootScope.cacheFix = now.valueOf();
+        $rootScope.devices = [];
         var sharedService = {};
         sharedService.doCue = function(item, state) {
             var fid = item.fid;
@@ -241,6 +244,10 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
 
 
         sharedService.processStatus = function(data) {
+            if ($rootScope.abortStatus) {
+                console.log("abortStatus");
+                return;
+            }
             for (var i=0; i < data.extended.history.length; i++) {
                 data.extended.history[i]["timeBetween"] = timeBetween(
                     data.extended.history, i);
@@ -475,6 +482,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         });
 
         socket.on("status", function(playing_data){
+            
             console.log("status:", playing_data);
             var process = {"extended": playing_data};
             sharedService.processStatus(process);
@@ -497,7 +505,13 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
 
         sharedService.initPagination = function($scope, $routeParams, $location, 
                                                 $modal) {
-
+            var url = "/devices/";
+            $http({method: 'GET', url: url})
+            .success(function(data, status, headers, config) {
+                $rootScope.devices = data;
+            })
+            .error(function(data, status, headers, config) {
+            });
             var infoModal = $modal({
                     scope: $scope, 
                     template: '/static/templates/popover.tpl.html', 
@@ -546,7 +560,31 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
             $scope.moreInfo = sharedService.moreInfo;
         };
 
+        $rootScope.supressStatus = function(state) {
+            console.log("supressStatus:", state)
+            $rootScope.abortStatus = true;
+        }
 
+        var url = "/devices/";
+        $http({method: 'GET', url: url})
+        .success(function(data, status, headers, config) {
+            $rootScope.devices = data;
+        })
+        .error(function(data, status, headers, config) {
+        });
+
+        sharedService.copyTo = function(flid, device_id, $hide) {
+            $hide();
+            console.log("copy flid:", flid, " => ", device_id);
+            var url = "/copy-to/"+flid+"/"+device_id;
+            $http({method: 'GET', url: url})
+            .success(function(locations, status, headers, config) {
+                
+            
+            })
+            .error(function(data, status, headers, config) {
+            });
+        };
 
         sharedService.getStatus();
         $interval(sharedService.getStatus, 10000);
@@ -559,6 +597,8 @@ fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService',
         $scope.next = fmpService.next;
         $scope.pause = fmpService.pause;
         $scope.prev = fmpService.prev;
+        $scope.copyTo = fmpService.copyTo;
+
 }]);
 
 fmpApp.controller('ControlsCtrl',['$scope', 'fmpService', function($scope, fmpService){
@@ -636,6 +676,7 @@ fmpApp.controller('popoverCtrl', ['$scope', '$modal', 'fmpService',
 fmpApp.controller('PreloadCtrl', ['$scope', '$routeParams', 'fmpService', '$location', 
                                   '$modal',
     function($scope, $routeParams, fmpService, $location, $modal) {
+        $scope.copyTo = fmpService.copyTo;
         window.document.title = "fmp - Preload";
         $scope.queryUrl = '/preload';
         fmpService.initPagination($scope, $routeParams, $location, $modal);
@@ -646,6 +687,7 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
     function($scope, $rootScope, $routeParams, fmpService, $modal, $location) {
     window.document.title = "fmp - Search";
     $scope.ctrler = "SearchCtrl";
+    $scope.copyTo = fmpService.copyTo;
 
     // Pre-fetch an external template populated with a custom scope
 
@@ -660,52 +702,8 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
         }
     };
     fmpService.initPagination($scope, $routeParams, $location, $modal);
-
+    $scope.copyTo = fmpService.copyTo;
 }]);
-
-fmpApp.controller('CurrentlyPlayingCtrl',['$scope', 'fmpService', '$modal', '$location',
-    function($scope, fmpService, $modal, $location){
-        $scope.next = fmpService.next;
-        $scope.pause = fmpService.pause;
-        $scope.prev = fmpService.prev;
-    $scope.r = {};
-
-    $scope.$watch('playing_data', function(newValue, oldValue) {
-        // populate $scope.r so the modal dialog shows up.
-        $scope.r = $scope.playing_data;
-        // $scope.r['hide_cued'] = true;
-    });
-
-    // Pre-fetch an external template populated with a custom scope
-    var infoModal = $modal({
-        scope: $scope, 
-        template: '/static/templates/popover.tpl.html', 
-        show: false,
-        container: "body",
-        element: true
-    });
-    // Show when some event occurs (use $promise property to ensure the template has been loaded)
-    $scope.showModal = function() {
-        infoModal.$promise.then(infoModal.show);
-    };
-
-    $scope.navClass = function (page) {
-        var currentRoute = $location.path().substring(1) || 'home';
-        // var re = new RegExp("ab+c");
-        if (page == 'search') {
-            return currentRoute.indexOf(page) == 0 ? 'active' : '';
-        }
-        return page === currentRoute ? 'active' : '';
-    };
-
-    $scope.doSearchNow = function() {
-        $scope.cancelTimeout();
-        document.location = "#/search/"+encodeURIComponent($scope.query);
-    };
-}]);
-
-
-
 
 fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', 
                                   '$location', '$modal',
