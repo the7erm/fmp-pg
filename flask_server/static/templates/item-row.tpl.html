@@ -1,5 +1,15 @@
 <div class="search-item">
-  <div ng-hide="r.hide_cued">
+  <div class='pull-right'>
+      <span class="label location label-primary"
+            ng-repeat="loc in r.locations"
+            title="{{loc.dirname}}" 
+            data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
+            data-auto-close="1"
+            data-content="TEST"
+            data-placement="left"
+            bs-popover="popover">{{loc.label}}</span>
+  </div>
+  <div ng-if="!r.hide_cued">
       <button ng-if="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
       <button ng-if="!r.cued" class="btn btn-default glyphicon glyphicon-list" ng-click="cue(r)"> <span class="glyphicon glyphicon-plus"></span></button>
       <button class="btn btn-default" ng-if="!r.moreInfo.history" ng-click="moreInfo(r)"><span class="glyphicon glyphicon-time"></span> </button>
@@ -41,15 +51,7 @@
   </div>
   <div class="clearfix"></div>
   <div ng-if="r.reason">Reason: {{ r.reason }}</div>
-  <div>
-      <span class="badge location"
-            ng-repeat="loc in r.locations"
-            title="{{loc.dirname}}" 
-            data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
-            data-auto-close="1"
-            data-content="TEST"
-            bs-popover="popover">{{loc.label}}</span>
-  </div>
+  
 
   <div ng-if="r.moreInfo.history">
       <h2>History</h2>
