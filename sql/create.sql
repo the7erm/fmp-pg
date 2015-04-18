@@ -188,14 +188,15 @@ CREATE TABLE devices (
     device_id integer NOT NULL,
     filesystem character varying(255),
     type character varying(32),
-    "1k-blocks" bigint DEFAULT 0,
+    size bigint DEFAULT 0,
     used bigint DEFAULT 0,
     available bigint DEFAULT 0,
-    use integer DEFAULT 0,
+    use character varying(5) DEFAULT 0,
     mounted_on character varying(255),
     uuid character varying(37),
     root character varying(255),
-    label character varying(100)
+    label character varying(100),
+    mounted boolean
 );
 
 
@@ -403,8 +404,28 @@ CREATE TABLE file_locations (
     front_fingerprint character varying(255),
     middle_fingerprint character varying(255),
     end_fingerprint character varying(255),
-    last_scan date
+    last_scan date,
+    device_id integer NOT NULL
 );
+
+
+--
+-- Name: file_locations_device_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE file_locations_device_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: file_locations_device_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE file_locations_device_id_seq OWNED BY file_locations.device_id;
 
 
 --
@@ -1465,6 +1486,13 @@ ALTER TABLE ONLY file_locations ALTER COLUMN fid SET DEFAULT nextval('file_locat
 
 
 --
+-- Name: device_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY file_locations ALTER COLUMN device_id SET DEFAULT nextval('file_locations_device_id_seq'::regclass);
+
+
+--
 -- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1966,6 +1994,13 @@ CREATE INDEX fph_mtime_idx ON fingerprint_history USING btree (mtime);
 --
 
 CREATE INDEX fph_size_idx ON fingerprint_history USING btree (size);
+
+
+--
+-- Name: idx_device_id; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_device_id ON file_locations USING btree (device_id);
 
 
 --
