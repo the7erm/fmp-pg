@@ -1,13 +1,17 @@
 <div class="search-item">
   <div class='pull-right'>
-      <span class="label location label-primary"
-            ng-repeat="loc in r.locations"
-            title="{{loc.dirname}}" 
-            data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
-            data-auto-close="1"
-            data-content="TEST"
-            data-placement="left"
-            bs-popover="popover">{{loc.label}}</span>
+      <div ng-if="r.reason" class="badge">Reason: {{ r.reason }}</div>
+      <br clear="right">
+      <span ng-repeat="loc in r.locations track by loc.dirname" class='pull-right'>
+        <span class="label location label-primary"
+              title="{{loc.dirname}}" 
+              data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
+              data-auto-close="1"
+              data-content="TEST"
+              data-placement="left"
+              bs-popover="popover">{{loc.label}}</span>
+      </span>
+
   </div>
   <div ng-if="!r.hide_cued">
       <button ng-if="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
@@ -23,7 +27,7 @@
   </div>
   <div ng-if="r.artists">
       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-      <span ng-repeat="a in r.artists">
+      <span ng-repeat="a in r.artists track by a.artist">
           <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-if="!$last">, </span>
       </span> - 
       <a href="#/search/{{r.title}}" ng-if="r.title">{{r.title}}</a>
@@ -31,7 +35,7 @@
       &nbsp;
   </div>
   <div ng-if="r.albums.length > 0">
-      <span ng-repeat="a in r.albums">
+      <span ng-repeat="a in r.albums track by a.album_name">
           <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a><span ng-if="!$last">, </span>
       </span>
       &nbsp;
@@ -43,14 +47,13 @@
       &nbsp;
   </div>
   <div>
-      <span ng-repeat="rating in r.ratings" class="pull-left">
+      <span ng-repeat="rating in r.ratings track by rating.true_score" class="pull-left">
           {{rating.uname}} {{ rating.true_score | number : 2}}
           <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
       </span>
       &nbsp;
   </div>
   <div class="clearfix"></div>
-  <div ng-if="r.reason">Reason: {{ r.reason }}</div>
   
 
   <div ng-if="r.moreInfo.history">
