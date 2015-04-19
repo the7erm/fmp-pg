@@ -45,6 +45,7 @@ from copy import deepcopy
 from pprint import pprint, pformat
 from lib.parse_df import update_devices
 import shutil
+import math
 
 # from bson import json_util
 import json
@@ -721,7 +722,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
                                                       FROM users 
                                                       WHERE listening = true)""")
         low_true_score = math.floor(true_score / 10) * 10
-        high_true_score = math.ceil(true_score / 10) * 10
+        high_true_score = low_true_score + 10
         query_spec["WHERE"].append("""true_score >= %(low_true_score)s AND
                                       true_score <= %(high_true_score)s""")
         query_args['low_true_score'] = low_true_score
