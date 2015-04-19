@@ -1272,37 +1272,38 @@ def history_data():
     cachetimout = 60
 
     print "LIMIT:%s" % limit
-
-    q = """SELECT uh.*, uname,
-                  f.fid, title,
-                  sha512,
-                  p.fid AS cued
-           FROM user_history uh,
-                users u,
-                files f
-                LEFT JOIN preload p ON p.fid = f.fid
+    # string_agg(DISTINCT a.artist, ',') AS artists
+    q = """SELECT f.fid, title, sha512, p.fid AS cued,
+                  string_agg(
+                      to_char(uh.time_played, 'YYYY-MM-DD HH24:MI:SS'), ','
+                  ) AS uh_time_played2
+           FROM files f 
+                LEFT JOIN preload p ON p.fid = f.fid,
+                user_history uh,
+                users u
            WHERE uh.uid = u.uid AND 
-                 u.listening = true AND
-                 time_played IS NOT NULL AND 
-                 uh.id_type = 'f' AND
-                 uh.id = f.fid
-           ORDER BY uh.time_played DESC, admin DESC, uname
+                u.listening = true AND
+                time_played IS NOT NULL AND 
+                uh.id_type = 'f' AND
+                uh.id = f.fid
+           GROUP BY f.fid, title, sha512, cued, uh.time_played
+           ORDER BY uh_time_played2 DESC
            LIMIT """+str(limit)+""" OFFSET """+str(start)
     print "Q:<<<%s>>>" % q
 
     history_res = get_results_assoc(q)
 
+    sql = """SELECT count(DISTINCT uh.time_played) AS total
+             FROM user_history uh,
+                  users u,
+                  files f
+             WHERE uh.uid = u.uid AND 
+                   u.listening = true AND
+                   time_played IS NOT NULL AND 
+                   uh.id_type = 'f' AND
+                   uh.id = f.fid"""
 
-    total = get_assoc("""SELECT count(*) AS total
-           FROM user_history uh,
-                users u,
-                files f
-                LEFT JOIN preload p ON p.fid = f.fid
-           WHERE uh.uid = u.uid AND 
-                 u.listening = true AND
-                 time_played IS NOT NULL AND 
-                 uh.id_type = 'f' AND
-                 uh.id = f.fid""")
+    total = get_assoc(sql)
     total = total['total']
 
     if history_res:
