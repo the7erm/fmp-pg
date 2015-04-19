@@ -1,8 +1,8 @@
 <div class="search-item">
   <div class='pull-right'>
       <div ng-if="r.reason" class="badge">Reason: {{ r.reason }}</div>
-      <br clear="right">
-      <span ng-repeat="loc in r.locations track by loc.dirname" class='pull-right'>
+      <br clear="right" ng-if="r.reason">
+      <span ng-repeat="loc in r.locations track by loc.dirname" class='pull-right' ng-if="r.locations">
         <span class="label location label-primary"
               title="{{loc.dirname}}" 
               data-template="/static/templates/file-action.tpl.html?_={{cacheFix}}"
@@ -11,7 +11,6 @@
               data-placement="left"
               bs-popover="popover">{{loc.label}}</span>
       </span>
-
   </div>
   <div ng-if="!r.hide_cued">
       <button ng-if="r.cued" class="btn btn-primary glyphicon glyphicon-list" ng-click="uncue(r)"> <span class="glyphicon glyphicon-minus"></span></button>
@@ -47,7 +46,7 @@
       &nbsp;
   </div>
   <div>
-      <span ng-repeat="rating in r.ratings track by rating.true_score" class="pull-left">
+      <span ng-repeat="rating in r.ratings" class="pull-left">
           {{rating.uname}} {{ rating.true_score | number : 2}}
           <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
       </span>
@@ -82,6 +81,7 @@
               <td class="hidden-xs">{{ history.gap }}</td>
           </tr>
       </table>
+      {{r}}
   </div>
   <div class="clearfix"></div>
 </div>

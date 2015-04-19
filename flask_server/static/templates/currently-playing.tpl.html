@@ -32,7 +32,7 @@
         <div ng-if="!playing_data.pos_data.left_str">Initializing ...</div>
     </div>
     <div class='ratings-box' ng-if="playing_data.ratings">
-        <span ng-repeat="rating in playing_data.ratings track by rating.true_score">
+        <span ng-repeat="rating in playing_data.ratings">
           {{rating.uname}} {{ rating.true_score | number : 2}}
           <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
         </span>

@@ -662,148 +662,109 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
                       return_total=False):
     start = int(start)
     limit = int(limit)
+    query_offset = "LIMIT %d OFFSET %d" % (limit, start)
     # print "Q:",q
-    """
-    SELECT DISTINCT f.fid, dirname, basename, title,
-                                        sha512, artist, p.fid AS cued,
-                                        f.fid AS id, 'f' AS id_type
-                        FROM files f 
-                             LEFT JOIN preload p ON p.fid = f.fid
-                             LEFT JOIN file_artists fa ON fa.fid = f.fid
-                             LEFT JOIN artists a ON a.aid = fa.aid,
-                             file_locations fl
-                        WHERE fl.fid = f.fid
-                        ORDER BY artist, title"""
-    no_words_query = """SELECT f.fid, title, sha512, p.fid AS cued,
-                               f.fid AS id, 'f' AS id_type, 
-                               string_agg(DISTINCT a.artist, ',') AS artists
-                        FROM files f 
-                             LEFT JOIN preload p ON p.fid = f.fid
-                             LEFT JOIN file_artists fa ON fa.fid = f.fid
-                             LEFT JOIN artists a ON a.aid = fa.aid
-                        GROUP BY f.fid, f.title, f.sha512, p.fid, id, id_type
-                        ORDER BY artists, title"""
+    print "get_search_results<<<<<<<<<<<<<<<<<<<<<<<<"
+    query_args = {}
+    query_spec = {
+      "SELECT": ["""DISTINCT f.fid, 
+                    string_agg(DISTINCT a.artist, ',') AS artists, 
+                    title, sha512, p.fid AS cued, f.fid AS id, 
+                    'f' AS id_type"""],
+      "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid
+                          LEFT JOIN file_artists fa ON fa.fid = f.fid
+                          LEFT JOIN artists a ON a.aid = fa.aid"""],
+      "COUNT_FROM": ["files f"],
+      "ORDER_BY": [],
+      "WHERE": ["f.fid = f.fid"],
+      "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
+    }
 
-    no_words_query_count = """SELECT count(*) AS total
-                              FROM files f"""
+    query_base = """SELECT {SELECT}
+                    FROM {FROM}
+                    WHERE {WHERE}
+                    GROUP BY {GROUP_BY}
+                    ORDER BY {ORDER_BY}
+                    {query_offset}"""
 
-    no_words_rating_query = """SELECT f.fid, title, sha512, 
-                                      string_agg(DISTINCT a.artist, ',') 
-                                        AS artists,
-                                      p.fid AS cued,
-                                      f.fid AS id, 'f' AS id_type
-                               FROM files f
-                                    LEFT JOIN preload p ON p.fid = f.fid
-                                    LEFT JOIN file_artists fa ON fa.fid = f.fid
-                                    LEFT JOIN artists a ON a.aid = fa.aid,
-                                    user_song_info usi
-                               WHERE usi.rating = %s AND
-                                     f.fid = usi.fid AND
-                                     usi.uid IN (SELECT uid 
-                                                 FROM users 
-                                                 WHERE listening = true)
-                               GROUP BY f.fid, f.title, f.sha512, p.fid, id,
-                                        id_type
-                               ORDER BY artists, title"""
-
-    no_words_rating_query_count = """SELECT count(*) AS total
-                                     FROM files f,
-                                          user_song_info usi
-                                     WHERE rating = %s AND usi.fid = f.fid AND
-                                           usi.uid IN (SELECT uid 
-                                                       FROM users 
-                                                       WHERE listening = true)"""
-
-
-    query = """SELECT f.fid, title, sha512, 
-                      string_agg(DISTINCT a.artist, ',') AS artists,
-                      p.fid AS cued, ts_rank(tsv, query) as rank,
-                      f.fid AS id, 'f' AS id_type
-               FROM files f
-                    LEFT JOIN preload p ON p.fid = f.fid
-                    LEFT JOIN file_artists fa ON fa.fid = f.fid
-                    LEFT JOIN artists a ON a.aid = fa.aid,
-                    keywords kw,
-                    plainto_tsquery('english', %s) query,
-                    user_song_info usi
-               WHERE kw.fid = f.fid AND tsv @@ query AND 
-                     f.fid = usi.fid AND
-                     usi.uid IN (SELECT uid 
-                                FROM users 
-                                WHERE listening = true)
-              GROUP BY f.fid, f.title, f.sha512, p.fid, rank, id, id_type
-              ORDER BY rank DESC, artists, title"""
-
-    query_count = """SELECT count(*) AS total
-                     FROM files f,
-                          keywords kw,
-                          plainto_tsquery('english', %s) query
-                     WHERE kw.fid = f.fid AND
-                           tsv @@ query"""
-
-    rating_query = """SELECT DISTINCT f.fid, title, sha512, artist,
-                               p.fid AS cued, ts_rank(tsv, query) as rank,
-                               f.fid AS id, 'f' AS id_type
-                      FROM files f
-                           LEFT JOIN preload p ON p.fid = f.fid
-                           LEFT JOIN file_artists fa ON fa.fid = f.fid
-                           LEFT JOIN artists a ON a.aid = fa.aid,
-                           keywords kw,
-                           plainto_tsquery('english', %s) query,
-                           user_song_info usi
-                      WHERE kw.fid = f.fid AND tsv @@ query AND 
-                            usi.rating = %s AND
-                            f.fid = usi.fid AND
-                            usi.uid IN (SELECT uid 
-                                        FROM users 
-                                        WHERE listening = true)
-                      ORDER BY rank DESC, artist, title"""
-
-    rating_query_count = """SELECT count(*) AS total
-                            FROM files f,
-                                 keywords kw,
-                                 plainto_tsquery('english', %s) query,
-                                 user_song_info usi
-                            WHERE kw.fid = f.fid AND tsv @@ query AND 
-                                  usi.rating = %s AND
-                                  f.fid = usi.fid AND
-                                  usi.uid IN (SELECT uid 
-                                              FROM users 
-                                              WHERE listening = true)"""
+    query_base_count = """SELECT count(DISTINCT f.fid) AS total
+                          FROM {COUNT_FROM}
+                          WHERE {WHERE}"""
 
     rating_re = re.compile("rating\:(\d+)")
     rating_match = rating_re.search(q)
     rating = -1
     if rating_match:
-        print "rating_match"
         rating = rating_match.group(1)
         q = q.replace("rating:%s" % rating, "").strip()
+        query_spec['FROM'].append("user_song_info usi")
+        query_spec['COUNT_FROM'].append("user_song_info usi")
+        query_spec['WHERE'].append("""usi.rating = %(rating)s AND
+                                      f.fid = usi.fid AND
+                                      usi.uid IN (SELECT uid 
+                                                  FROM users 
+                                                  WHERE listening = true)""")
+        query_args['rating'] = rating
 
-    if not q:
-        query = no_words_query
-        query_count = no_words_query_count
-        if rating != -1:
-            query = no_words_rating_query
-            query_count = no_words_rating_query_count
 
-    # """+limit+""" OFFSET """+offset
-    query_offset = "LIMIT %d OFFSET %d" % (limit, start)
-    # print "QUERY:%s" % query
+    true_score_re = re.compile("true_score\:(\d+)")
+    true_score_match = true_score_re.search(q)
+    if true_score_match:
+        true_score = true_score_match.group(1)
+        q = q.replace("true_score:%s" % true_score, "").strip()
+        true_score = int(true_score)
+        if not rating_match:
+            query_spec['FROM'].append("user_song_info usi")
+            query_spec['COUNT_FROM'].append("user_song_info usi")
+            query_spec['WHERE'].append("""f.fid = usi.fid AND
+                                          usi.uid IN (SELECT uid 
+                                                      FROM users 
+                                                      WHERE listening = true)""")
+        low_true_score = math.floor(true_score / 10) * 10
+        high_true_score = math.ceil(true_score / 10) * 10
+        query_spec["WHERE"].append("""true_score >= %(low_true_score)s AND
+                                      true_score <= %(high_true_score)s""")
+        query_args['low_true_score'] = low_true_score
+        query_args['high_true_score'] = high_true_score
+
+    if q is not None:
+        q = q.strip()
+    if q:
+        query_spec["SELECT"].append("ts_rank(tsv, query) AS rank")
+        count_from = """keywords kw,
+                        plainto_tsquery('english', %(q)s) query"""
+        query_spec["FROM"].append(count_from)
+        query_spec["COUNT_FROM"].append(count_from)
+        query_spec["WHERE"].append("kw.fid = f.fid AND tsv @@ query")
+        query_spec['GROUP_BY'].append("rank")
+        query_spec['ORDER_BY'].append("rank DESC, artists, title")
+        query_args['q'] = q
+
+    if not query_spec.get('ORDER_BY'):
+      query_spec['ORDER_BY'].append("artists, title")
+
+    search_query = query_base.format(
+        SELECT=",".join(query_spec['SELECT']),
+        FROM=",".join(query_spec['FROM']),
+        WHERE=" AND ".join(query_spec['WHERE']),
+        ORDER_BY=",".join(query_spec['ORDER_BY']),
+        GROUP_BY=",".join(query_spec['GROUP_BY']),
+        query_offset=query_offset
+    )
+
+    count_query = query_base_count.format(
+        SELECT=",".join(query_spec['SELECT']),
+        COUNT_FROM=",".join(query_spec['COUNT_FROM']),
+        WHERE=" AND ".join(query_spec['WHERE']),
+        ORDER_BY=",".join(query_spec['ORDER_BY']),
+        GROUP_BY=",".join(query_spec['GROUP_BY'])
+    )
+
     results = []
-
-    args = (q,)
-    if rating != -1:
-        if q:
-            args = (q, rating)
-            query = rating_query
-            query_count = rating_query_count
-        else:
-            args = (rating,)
-    query = "%s %s" % (query, query_offset)
     try:
-        print "query:", pg_cur.mogrify(query, args)
+        print "query:", pg_cur.mogrify(search_query, query_args)
         try:
-          res = get_results_assoc(query, args)
+          res = get_results_assoc(search_query, query_args)
         except Exception, err:
           print "ERR", err
         print "RES:", res
@@ -824,10 +785,8 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
 
     if not return_total:
         return results
-    print "query_count:", query_count
-    total = get_assoc(query_count, args)
-    for r in results:
-      print dict(r)
+    print "count_query:", pg_cur.mogrify(count_query, query_args)
+    total = get_assoc(count_query, query_args)
     return results, total['total']
 
 def locations_for_fid(fid):
