@@ -9,7 +9,8 @@ var fmpApp = angular.module('fmpApp', [
     'mgcrea.ngStrap.popover',
     'ngRoute', 
     'ngTagsInput',
-    'bgf.paginateAnything'
+    'bgf.paginateAnything',
+    'ngCookies'
 ]);
 
 
@@ -194,8 +195,8 @@ timeBetween = function(historyArray, $index, $modal, $aside, $tooltip) {
     return hours+":"+minutes+":"+seconds;
 };
 
-fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q', 'socket',
-    function($rootScope, $http, $interval, $timeout, $q, socket){
+fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q', 'socket', '$cookies',
+    function($rootScope, $http, $interval, $timeout, $q, socket, $cookies){
         var now = new Date();
         $rootScope.cacheFix = now.valueOf();
         $rootScope.devices = [];
@@ -482,7 +483,6 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         });
 
         socket.on("status", function(playing_data){
-            
             console.log("status:", playing_data);
             var process = {"extended": playing_data};
             sharedService.processStatus(process);
@@ -506,6 +506,7 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
         sharedService.initPagination = function($scope, $routeParams, $location, 
                                                 $modal) {
             var url = "/devices/";
+            $scope.loading = true;
             $http({method: 'GET', url: url})
             .success(function(data, status, headers, config) {
                 $rootScope.devices = data;
@@ -525,14 +526,14 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
 
             $scope.doSearch = function(query) {
                 console.log("doSearch query:", query);
-                document.location = "#/search/"+encodeURIComponent(query);
+                var perPage = $cookies.get('perPage') || 5;
+                document.location = "#/search/"+encodeURIComponent(query)+"&page=0&perPage="+perPage;
             };
 
             $scope.cue = sharedService.cue;
             $scope.uncue = sharedService.uncue;
 
             $scope.query = $routeParams.query || "";
-            
             $scope.perPage = parseInt($location.search().perPage, 10) || 5;
             $scope.page = parseInt($location.search().page, 10) || 0;
             $scope.clientLimit = 20;
@@ -541,21 +542,31 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout', '$q
                 $location.search('page', page); 
                 console.log("page:", page);
             });
-            $scope.$watch('perPage', function(page) { $location.search('perPage', page); });
+            $scope.$watch('perPage', function(perPage) {
+                $location.search('perPage', perPage);
+                $cookies.put("perPage", perPage); 
+            });
             $scope.$on('$locationChangeSuccess', function() {
                 var page = +$location.search().page,
-                  perPage = +$location.search().perPage;
-                if(page >= 0 && page != $scope.page) { 
+                    perPage = +$location.search().perPage;
+                if(page >= 0 && page != $scope.page) {
                     $scope.page = page; 
                 };
-                if(perPage >= 0 && $scope.perPage != perPage) { 
-                    $scope.perPage = perPage; 
+                if(perPage >= 0 && $scope.perPage != perPage) {
+                    $scope.perPage = perPage;
+                    $cookies.put("perPage", perPage); 
                 };
             });
             $scope.$on("pagination:loadPage", function(evt, status, config){
                 $location.search('page', evt.targetScope.page);
                 $location.search('perPage', evt.targetScope.perPage);
+                $scope.loading = false;
             });
+
+            $scope.$on("pagination:loadStart", function(evt, status, config){
+                $scope.loading = true;
+            });
+
 
             $scope.moreInfo = sharedService.moreInfo;
         };
@@ -698,7 +709,7 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
     $scope.queryUrl = '/search-data-new/?q='+encodeURIComponent($scope.query);
     $scope.keyup = function(evt){
         if (evt.keyCode == 13) {
-            document.location = "#/search/"+encodeURIComponent(evt.currentTarget.value);
+            document.location = "#/search/"+encodeURIComponent(evt.currentTarget.value)+"&page=0&perPage=5";
         }
     };
     fmpService.initPagination($scope, $routeParams, $location, $modal);
