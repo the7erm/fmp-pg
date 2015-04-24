@@ -26,7 +26,7 @@
   </div>
   <div ng-if="r.artists">
       <a class="glyphicon glyphicon-info-sign item-info" data-template="/static/templates/popover.tpl.html" bs-modal="modal"></a>
-      <span ng-repeat="a in r.artists track by a.artist">
+      <span ng-repeat="a in r.artists">
           <a href="#/search/{{a.artist}}">{{a.artist}}</a><span ng-if="!$last">, </span>
       </span> - 
       <a href="#/search/{{r.title}}" ng-if="r.title">{{r.title}}</a>
@@ -34,7 +34,7 @@
       &nbsp;
   </div>
   <div ng-if="r.albums.length > 0">
-      <span ng-repeat="a in r.albums track by a.album_name">
+      <span ng-repeat="a in r.albums">
           <a  href="#/search/{{a.album_name}}">{{a.album_name}}</a><span ng-if="!$last">, </span>
       </span>
       &nbsp;
