@@ -120,3 +120,7 @@ ul.rating {
 .location {
   cursor: pointer;
 }
+
+.true_score_badge {
+  color: white!important;
+}

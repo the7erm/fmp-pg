@@ -47,7 +47,7 @@
   </div>
   <div>
       <span ng-repeat="rating in r.ratings" class="pull-left">
-          {{rating.uname}} {{ rating.true_score | number : 2}}
+          {{rating.uname}} <span class="label location label-primary"><a href='#/search/true_score:{{ rating.true_score  | number:0  }}' class='true_score_badge'>{{ rating.true_score | number : 2}}</a></span>
           <div class="star-rating" star-rating rating-value="rating" data-max="6"></div>
       </span>
       &nbsp;

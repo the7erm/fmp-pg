@@ -258,3 +258,7 @@ input.ui-input-text.ui-slider-input {
     text-align:center;
 }
 
+.true_score_badge {
+    text-decoration: none;
+    color: white !important;
+}

@@ -739,10 +739,15 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
         query_spec["SELECT"].append("avg(true_score) AS true_score_avg")
         low_true_score = math.floor(true_score / 10) * 10
         high_true_score = low_true_score + 10
-        query_spec["WHERERATINGSCORE"].append("""(
-                                    usi2.true_score >= %(low_true_score)s AND
-                                    usi2.true_score <= %(high_true_score)s
-                                  )""")
+        if low_true_score >= 90:
+            query_spec["WHERERATINGSCORE"].append("""(
+                                        usi2.true_score >= %(low_true_score)s
+                                      )""")
+        else:
+            query_spec["WHERERATINGSCORE"].append("""(
+                                        usi2.true_score >= %(low_true_score)s AND
+                                        usi2.true_score < %(high_true_score)s
+                                      )""")
         query_args['low_true_score'] = low_true_score
         query_args['high_true_score'] = high_true_score
     
