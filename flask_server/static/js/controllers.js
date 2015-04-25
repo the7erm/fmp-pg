@@ -545,7 +545,6 @@ fmpApp.factory('fmpService', ['$rootScope','$http', '$interval', '$timeout',
                 console.log("page:", page);
             });
             $scope.$watch('perPage', function(perPage) {
-                
                 $location.search('perPage', perPage);
             });
             $scope.$on('$locationChangeSuccess', function() {
@@ -700,7 +699,6 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
     window.document.title = "fmp - Search";
     $scope.ctrler = "SearchCtrl";
     $scope.copyTo = fmpService.copyTo;
-
     // Pre-fetch an external template populated with a custom scope
 
     console.log("SearchCtrl initialized")
@@ -715,7 +713,7 @@ fmpApp.controller('SearchCtrl', ['$scope', '$rootScope', '$routeParams',
         }
     };
     fmpService.initPagination($scope, $routeParams, $location, $modal);
-    $scope.copyTo = fmpService.copyTo;
+    
 }]);
 
 fmpApp.controller('HistoryCtrl', ['$scope', '$routeParams', 'fmpService', 

@@ -26,6 +26,7 @@ from flask import Flask, request, redirect, session, jsonify, send_file, \
 
 from threading import Thread
 from flask.ext.socketio import SocketIO, emit, join_room, leave_room
+from flask.ext.cache import Cache
 from werkzeug.datastructures import Headers
 import datetime
 import random
@@ -39,6 +40,7 @@ import re
 import base64
 import StringIO
 import psycopg2
+import decimal
 import os
 from lib.netcast_fobj import Netcast
 from copy import deepcopy
@@ -74,16 +76,20 @@ class MainHandler(RequestHandler):
   def get(self):
     self.write("This message comes from Tornado ^_^")
 
+
+
 app = Flask(__name__)
 app.debug = False
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
+cache = Cache(app,config={'CACHE_TYPE': 'simple'})
 thread = None
 
 import gtk
 import gobject
 
 import gevent
+
 
 def _trigger_loop():
     gobject.timeout_add(10, gevent_loop, priority=gobject.PRIORITY_HIGH)
@@ -217,6 +223,7 @@ def reload_playing(fid):
 
 @app.route("/remove-file-artist/")
 def remove_file_artist():
+    cache.clear()
     fid = request.args.get("fid")
     aid = request.args.get("aid")
     print "fid:", fid
@@ -240,6 +247,7 @@ def remove_file_artist():
 
 @app.route("/add-file-artist/")
 def add_file_artist():
+    cache.clear()
     fid = request.args.get("fid")
     artist = request.args.get("artist")
     if not artist:
@@ -275,6 +283,7 @@ def add_file_artist():
 
 @app.route("/remove-file-genre/")
 def remove_file_genre():
+    cache.clear()
     fid = request.args.get("fid")
     gid = request.args.get("gid")
     print "fid:", fid
@@ -290,6 +299,7 @@ def remove_file_genre():
 
 @app.route("/add-file-genre/")
 def add_file_genre():
+    cache.clear()
     fid = request.args.get("fid")
     genre = request.args.get("genre")
     if not genre:
@@ -326,6 +336,7 @@ def add_file_genre():
 
 @app.route("/remove-file-album/")
 def remove_file_album():
+    cache.clear()
     fid = request.args.get("fid")
     alid = request.args.get("alid")
     print "fid:", fid
@@ -350,6 +361,7 @@ def remove_file_album():
 
 @app.route("/add-file-album/")
 def add_file_album():
+    cache.clear()
     fid = request.args.get("fid")
     album_name = request.args.get("album_name")
     if not album_name:
@@ -396,11 +408,11 @@ def keywords():
     limit = 10
     max_results = 10
 
-    result = get_results_assoc("""SELECT artist 
-                                  FROM artists 
-                                  WHERE artist ~* %s
-                                  ORDER BY artist
-                                  LIMIT """+str(limit), (q,))
+    result = cache_get_results_assoc("""SELECT artist 
+                                        FROM artists 
+                                        WHERE artist ~* %s
+                                        ORDER BY artist
+                                        LIMIT """+str(limit), (q,))
 
     for w in result:
         l = w["artist"].lower().strip()
@@ -410,11 +422,11 @@ def keywords():
     limit = max_results - len(words)
 
     if limit > 0:
-        result = get_results_assoc("""SELECT genre 
-                                      FROM genres 
-                                      WHERE genre ~* %s
-                                      ORDER BY genre 
-                                      LIMIT """+str(limit), (q,))
+        result = cache_get_results_assoc("""SELECT genre 
+                                            FROM genres 
+                                            WHERE genre ~* %s
+                                            ORDER BY genre 
+                                            LIMIT """+str(limit), (q,))
 
         for w in result:
             l = w["genre"].lower().strip()
@@ -424,11 +436,11 @@ def keywords():
         limit = max_results - len(words)
 
     if limit > 0:
-        result = get_results_assoc("""SELECT basename 
-                                      FROM file_locations 
-                                      WHERE basename ~* %s
-                                      ORDER BY basename
-                                      LIMIT """+str(limit), (request.args.get('q'),))
+        result = cache_get_results_assoc("""SELECT basename 
+                                            FROM file_locations 
+                                            WHERE basename ~* %s
+                                            ORDER BY basename
+                                            LIMIT """+str(limit), (request.args.get('q'),))
 
         for w in result:
             l = w['basename'].lower().strip()
@@ -446,11 +458,11 @@ def keywords():
 def keywords_artists():
     q = "%s" % request.args.get('q', "")
 
-    result = get_results_assoc("""SELECT aid, artist 
-                                  FROM artists 
-                                  WHERE artist ~* %s
-                                  ORDER BY artist
-                                  LIMIT 10""", (q,))
+    result = cache_get_results_assoc("""SELECT aid, artist 
+                                        FROM artists 
+                                        WHERE artist ~* %s
+                                        ORDER BY artist
+                                        LIMIT 10""", (q,))
     response = []
     for r in result:
         response.append({"aid": r['aid'], "artist": r['artist']})
@@ -461,11 +473,11 @@ def keywords_artists():
 def keywords_genres():
     q = "%s" % request.args.get('q', "")
 
-    result = get_results_assoc("""SELECT gid, genre 
-                                  FROM genres 
-                                  WHERE genre ~* %s
-                                  ORDER BY genre
-                                  LIMIT 10""", (q,))
+    result = cache_get_results_assoc("""SELECT gid, genre 
+                                        FROM genres 
+                                        WHERE genre ~* %s
+                                        ORDER BY genre
+                                        LIMIT 10""", (q,))
     response = []
     for r in result:
         response.append({"gid": r['gid'], "genre": r['genre']})
@@ -476,29 +488,30 @@ def keywords_genres():
 def keywords_albums():
     q = "%s" % request.args.get('q', "")
 
-    result = get_results_assoc("""SELECT alid, album_name 
-                                  FROM albums 
-                                  WHERE album_name ~* %s
-                                  ORDER BY album_name
-                                  LIMIT 10""", (q,))
+    result = cache_get_results_assoc("""SELECT alid, album_name 
+                                        FROM albums 
+                                        WHERE album_name ~* %s
+                                        ORDER BY album_name
+                                        LIMIT 10""", (q,))
     response = []
     for r in result:
         response.append({"alid": r['alid'], "album_name": r['album_name']})
 
     return json.dumps(response)
 
+@cache.memoize(timeout=5)
 def file_history(_id, id_type):
     history_res = get_results_assoc("""SELECT uh.*, uname
-                                   FROM user_history uh, users u
-                                   WHERE uh.uid = u.uid AND 
-                                         u.listening = true AND
-                                         time_played IS NOT NULL AND
-                                         uh.id = %s AND 
-                                         uh.id_type = %s
-                                   ORDER BY u.uname, 
-                                            time_played DESC, 
-                                            admin DESC""",
-                                   (_id, id_type))
+                                       FROM user_history uh, users u
+                                       WHERE uh.uid = u.uid AND 
+                                             u.listening = true AND
+                                             time_played IS NOT NULL AND
+                                             uh.id = %s AND 
+                                             uh.id_type = %s
+                                       ORDER BY u.uname, 
+                                                time_played DESC, 
+                                                admin DESC""",
+                                       (_id, id_type))
     results = []
     previous_date = None
     previous_uid = None
@@ -521,7 +534,7 @@ def file_history(_id, id_type):
                     previous_date,
                     h['uid'])
             # print "QUERY:", pg_cur.mogrify(q, args)
-            played = get_assoc(q, args)
+            played = cache_get_assoc(q, args)
             results[len(results) - 1]['gap'] = played['total']
         previous_date = h['time_played']
         h['date_played'] = h['date_played'].isoformat()
@@ -614,6 +627,7 @@ def prase_words(q, filter_by="all"):
         return query
     return ""
 
+@cache.memoize(timeout=60)
 def listeners_info_for_fid(fid):
     query = """SELECT uname, usi.*, f.sha512
                FROM user_song_info usi, users u, files f
@@ -622,8 +636,9 @@ def listeners_info_for_fid(fid):
                ORDER BY admin DESC, uname ASC
     """
     # print "query:%s" % query
-    return convert_to_dict(get_results_assoc(query, (fid,)))
+    return convert_to_dict(cache_get_results_assoc(query, (fid,)))
 
+@cache.memoize(timeout=30)
 def convert_to_dict(res):
     if not res:
         return []
@@ -659,6 +674,7 @@ def genres_for_fid(fid):
                                ORDER BY genre""", (fid,))
     return convert_to_dict(res)
 
+@cache.memoize(timeout=50)
 def get_search_results(q="", start=0, limit=20, filter_by="all", 
                       return_total=False):
     start = int(start)
@@ -666,6 +682,7 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
     query_offset = "LIMIT %d OFFSET %d" % (limit, start)
     # print "Q:",q
     print "get_search_results<<<<<<<<<<<<<<<<<<<<<<<<"
+    original_q = deepcopy(q)
     query_args = {}
     query_spec = {
       "SELECT": ["""DISTINCT f.fid, 
@@ -677,7 +694,8 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
                           LEFT JOIN artists a ON a.aid = fa.aid"""],
       "COUNT_FROM": ["files f"],
       "ORDER_BY": [],
-      "WHERE": ["f.fid = f.fid"],
+      "WHERE": [],
+      "WHERERATINGSCORE": [],
       "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
     }
 
@@ -692,41 +710,65 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
                           FROM {COUNT_FROM}
                           WHERE {WHERE}"""
 
-    rating_re = re.compile("rating\:(\d+)")
-    rating_match = rating_re.search(q)
-    rating = -1
-    if rating_match:
-        rating = rating_match.group(1)
-        q = q.replace("rating:%s" % rating, "").strip()
-        query_spec['FROM'].append("user_song_info usi")
-        query_spec['COUNT_FROM'].append("user_song_info usi")
-        query_spec['WHERE'].append("""usi.rating = %(rating)s AND
-                                      f.fid = usi.fid AND
-                                      usi.uid IN (SELECT uid 
-                                                  FROM users 
-                                                  WHERE listening = true)""")
-        query_args['rating'] = rating
-
-
     true_score_re = re.compile("true_score\:(\d+)")
     true_score_match = true_score_re.search(q)
+    rating_re = re.compile("rating\:(\d+)")
+    rating_match = rating_re.search(q)
+
+    if true_score_match or rating_match:
+        query_spec['FROM'].append("user_song_info usi")
+        query_spec['COUNT_FROM'].append("user_song_info usi")
+        sql = """f.fid IN (
+                            SELECT DISTINCT usi2.fid 
+                            FROM user_song_info usi2
+                            WHERE usi2.uid IN (SELECT uid 
+                                               FROM users 
+                                               WHERE listening = true)
+                            AND ({WHERERATINGSCORE})
+                          ) AND 
+                 f.fid = usi.fid AND
+                 usi.uid IN (SELECT uid 
+                             FROM users 
+                             WHERE listening = true)"""
+        query_spec['WHERE'].append(sql)
+
     if true_score_match:
         true_score = true_score_match.group(1)
         q = q.replace("true_score:%s" % true_score, "").strip()
         true_score = int(true_score)
-        if not rating_match:
-            query_spec['FROM'].append("user_song_info usi")
-            query_spec['COUNT_FROM'].append("user_song_info usi")
-            query_spec['WHERE'].append("""f.fid = usi.fid AND
-                                          usi.uid IN (SELECT uid 
-                                                      FROM users 
-                                                      WHERE listening = true)""")
+        query_spec["SELECT"].append("avg(true_score) AS true_score_avg")
         low_true_score = math.floor(true_score / 10) * 10
         high_true_score = low_true_score + 10
-        query_spec["WHERE"].append("""true_score >= %(low_true_score)s AND
-                                      true_score <= %(high_true_score)s""")
+        query_spec["WHERERATINGSCORE"].append("""(
+                                    usi2.true_score >= %(low_true_score)s AND
+                                    usi2.true_score <= %(high_true_score)s
+                                  )""")
         query_args['low_true_score'] = low_true_score
         query_args['high_true_score'] = high_true_score
+    
+    rating = -1
+    if rating_match:
+        rating = rating_match.group(1)
+        q = q.replace("rating:%s" % rating, "").strip()
+        query_spec["SELECT"].append(
+            "avg(rating) AS rating_avg")
+        query_spec["WHERERATINGSCORE"].append("usi2.rating = %(rating)s")
+        query_args['rating'] = rating
+
+    
+    if true_score_match and rating_match:
+        true_score_first_re = re.compile("true_score\:(\d+).*rating\:(\d+)")
+        true_score_first_match = true_score_first_re.search(original_q)
+        if true_score_first_match:
+            query_spec['ORDER_BY'].append("true_score_avg DESC")
+            query_spec['ORDER_BY'].append("rating_avg DESC")
+        else:
+            query_spec['ORDER_BY'].append("rating_avg DESC")
+            query_spec['ORDER_BY'].append("true_score_avg DESC")
+    elif true_score_match and not rating_match:
+        query_spec['ORDER_BY'].append("true_score_avg DESC")
+    elif rating_match and not true_score_match:
+        query_spec['ORDER_BY'].append("rating_avg DESC")
 
     if q is not None:
         q = q.strip()
@@ -738,11 +780,12 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
         query_spec["COUNT_FROM"].append(count_from)
         query_spec["WHERE"].append("kw.fid = f.fid AND tsv @@ query")
         query_spec['GROUP_BY'].append("rank")
-        query_spec['ORDER_BY'].append("rank DESC, artists, title")
         query_args['q'] = q
+        query_spec['ORDER_BY'].append("rank DESC")
+      
+    
+    query_spec['ORDER_BY'].append("artists, title")
 
-    if not query_spec.get('ORDER_BY'):
-      query_spec['ORDER_BY'].append("artists, title")
 
     search_query = query_base.format(
         SELECT=",".join(query_spec['SELECT']),
@@ -753,6 +796,9 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
         query_offset=query_offset
     )
 
+    search_query = search_query.format(
+        WHERERATINGSCORE=" OR ".join(query_spec['WHERERATINGSCORE']))
+
     count_query = query_base_count.format(
         SELECT=",".join(query_spec['SELECT']),
         COUNT_FROM=",".join(query_spec['COUNT_FROM']),
@@ -761,11 +807,19 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
         GROUP_BY=",".join(query_spec['GROUP_BY'])
     )
 
+    count_query = count_query.format(
+        WHERERATINGSCORE=" OR ".join(query_spec['WHERERATINGSCORE']))
+
+
+    if not query_spec['WHERE']:
+        search_query = search_query.replace("WHERE", '')
+        count_query = count_query.replace("WHERE", '')
+
     results = []
     try:
         print "query:", pg_cur.mogrify(search_query, query_args)
         try:
-          res = get_results_assoc(search_query, query_args)
+          res = cache_get_results_assoc(search_query, query_args)
         except Exception, err:
           print "ERR", err
         print "RES:", res
@@ -787,7 +841,8 @@ def get_search_results(q="", start=0, limit=20, filter_by="all",
     if not return_total:
         return results
     print "count_query:", pg_cur.mogrify(count_query, query_args)
-    total = get_assoc(count_query, query_args)
+    total = cache_get_assoc(count_query, query_args)
+    print "MADE IT"
     return results, total['total']
 
 def locations_for_fid(fid):
@@ -796,7 +851,7 @@ def locations_for_fid(fid):
                   LEFT JOIN devices d ON d.device_id = fl.device_id
              WHERE fid = %s
              ORDER BY label"""
-    locations = get_results_assoc(sql, (fid,))
+    locations = cache_get_results_assoc(sql, (fid,))
 
     results = []
     for l in locations:
@@ -809,8 +864,9 @@ def locations_for_fid(fid):
     return results
 
 
-
+@cache.memoize(timeout=60)
 def convert_res_to_dict(r):
+    print "REGENERATING"
     # print "R:",r
     rdict = dict(r)
     sha512 = ""
@@ -840,8 +896,8 @@ def convert_res_to_dict(r):
     return rdict
 
 @app.route("/file-info/<fid>/")
+@cache.cached(timeout=30)
 def file_info(fid, methods=["GET"]):
-
     r = get_assoc("""SELECT DISTINCT f.fid, dirname, basename, title,
                                      sha512, p.fid AS cued
                      FROM files f 
@@ -939,6 +995,9 @@ def json_obj_handler(obj):
     """Default JSON serializer."""
     import calendar, datetime
 
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+
     if isinstance(obj, datetime.date):
         obj = datetime.datetime(*obj.timetuple()[:3])
 
@@ -952,6 +1011,7 @@ def json_obj_handler(obj):
     return millis
     
 
+@cache.memoize(30)
 def json_dump(obj):
     _json = json.dumps(obj, default=json_obj_handler) or "{};"
     # print "JSON:",_json
@@ -995,7 +1055,6 @@ def sync(*args, **kw):
 
     return json_dump({"Result": "OK"})
 
-    
 def get_filter_by():
     filter_by = "%s" % request.args.get("f", "all")
     if filter_by == "any":
@@ -1043,9 +1102,10 @@ def do_search(q, start, limit, filter_by, return_total=False):
             continue
         already_present_fids.append(r['fid'])
         fixed_results.append(convert_res_to_dict(r))
-
+    print "LOOPED THROUGH RESULTS"
     json_data = json_dump(fixed_results)
     print "="*20
+    print "MADE IT TO RETURN"
     print "fetch time:",datetime.datetime.now() - start_time
     if not return_total:
         return json_data
@@ -1090,7 +1150,8 @@ def search_data_new():
     cachetimout = 60
 
     print "LIMIT:%s" % limit
-    fixed_results, total = do_search(q, start, limit, filter_by, return_total=True)
+    fixed_results, total = do_search(q, start, limit, filter_by, 
+                                     return_total=True)
     print "RUNNING TIME:", datetime.datetime.now() - start_time
     print "total:", total
 
@@ -1107,6 +1168,8 @@ def search_data_new():
     response.last_modified = int(time.time())
     response.expires=int( time.time() )
     response.make_conditional(request)
+
+    print "MADE IT 2"
 
     return response
 
@@ -1139,6 +1202,7 @@ def get_start_limit(return_end=False):
 
 @app.route('/cue/', methods=['GET', 'POST'])
 def cue():
+    cache.clear()
     user = get_assoc("""SELECT uid
                         FROM users WHERE listening = true
                         LIMIT 1""")
@@ -1187,6 +1251,7 @@ def rate(usid, fid, uid, rating):
     dta = simple_rate(usid=usid, fid=fid, uid=uid, rating=rating)
     print "5"*100
     print "DTA:",dta
+    cache.clear()
     return json_first([dta])
 
 @app.route('/player/<cmd>', methods=['GET', 'POST', 'PUT'])
@@ -1289,9 +1354,9 @@ def history_data():
            GROUP BY f.fid, title, sha512, cued, uh.time_played
            ORDER BY uh_time_played2 DESC
            LIMIT """+str(limit)+""" OFFSET """+str(start)
-    print "Q:<<<%s>>>" % q
+    # print "Q:<<<%s>>>" % q
 
-    history_res = get_results_assoc(q)
+    history_res = cache_get_results_assoc(q)
 
     sql = """SELECT count(DISTINCT uh.time_played) AS total
              FROM user_history uh,
@@ -1303,7 +1368,7 @@ def history_data():
                    uh.id_type = 'f' AND
                    uh.id = f.fid"""
 
-    total = get_assoc(sql)
+    total = cache_get_assoc(sql)
     total = total['total']
 
     if history_res:
@@ -1311,9 +1376,8 @@ def history_data():
 
     already_present_fids = []
     for p in history_res:
-        print "P:", p
+        # print "P:", p
         results.append(convert_res_to_dict(p))
-
 
     # fixed_results, total = do_search(q, start, limit, filter_by, return_total=True)
     print "RUNNING TIME:", datetime.datetime.now() - start_time
@@ -1334,51 +1398,23 @@ def history_data():
     response.last_modified = int(time.time())
     response.expires=int( time.time() )
     response.make_conditional(request)
-    print "MADE IT", 
-    print "results:", results
-    print "results_json:",results_json
+    # print "MADE IT", 
+    # print "results:", results
+    # print "results_json:",results_json
 
     return response
 
-    start, limit = get_start_limit()
-    offset = "%d" % start
-    limit = "%d" % limit
-    # LIMIT %d OFFSET %d
 
-    """
-                        SELECT DISTINCT f.fid, dirname, basename, title,
-                                        sha512, artist, p.fid AS cued,
-                                        f.fid AS id, 'f' AS id_type
-                        FROM files f 
-                             LEFT JOIN preload p ON p.fid = f.fid
-                             LEFT JOIN file_artists fa ON fa.fid = f.fid
-                             LEFT JOIN artists a ON a.aid = fa.aid,
-                             file_locations fl
-                        WHERE fl.fid = f.fid
-                        ORDER BY artist, title"""
-    q = """SELECT uh.*, uname,
-                  f.fid, title,
-                  sha512,
-                  p.fid AS cued
-           FROM user_history uh,
-                users u,
-                files f
-                LEFT JOIN preload p ON p.fid = f.fid
-           WHERE uh.uid = u.uid AND 
-                 u.listening = true AND
-                 time_played IS NOT NULL AND 
-                 uh.id_type = 'f' AND
-                 uh.id = f.fid
-           ORDER BY uh.time_played DESC, admin DESC, uname
-           LIMIT """+limit+""" OFFSET """+offset
+@cache.memoize(timeout=30)
+def cache_get_results_assoc(sql, args=None):
+    print "FETCHING"
+    return get_results_assoc(sql, args)
 
-    history_res = get_results_assoc(q)
+@cache.memoize(timeout=30)
+def cache_get_assoc(sql, args=None):
+    print "FETCHING"
+    return get_assoc(sql, args)
 
-    results = []
-    for h in history_res:
-        results.append(convert_res_to_dict(h))
-
-    return json_dump(results)
 
 @app.route("/preload", methods=['GET', 'POST'])
 def preload():
@@ -1407,30 +1443,45 @@ def preload():
 
     print "LIMIT:%s" % limit
 
+    sql = """SELECT uid 
+             FROM users 
+             WHERE listening = true 
+             ORDER BY last_time_cued"""
 
-    q = """SELECT DISTINCT p.plid, f.fid, title, sha512,
+
+      # row_number()
+
+    """
+    SELECT row_number() OVER(ORDER BY plid) % 9 + 1 AS pos, * from preload;"""
+
+    q = """SELECT DISTINCT row_number() OVER(ORDER BY plid) AS pos, 
+                row_number() OVER ( PARTITION BY uid ORDER BY uid) AS pos_order,
+                p.plid, p.reason, f.fid, title, sha512,
                            p.fid AS cued,
                            string_agg(DISTINCT a.artist, ',') 
                                         AS artists,
                            f.fid AS id, 'f' AS id_type,
-                           p.reason
-           FROM files f
+                           CASE reason 
+                               WHEN 'From search' THEN 1
+                               ELSE 2
+                           END AS reason_order
+           FROM preload p,
+                files f
                 LEFT JOIN file_artists fa ON fa.fid = f.fid
-                LEFT JOIN artists a ON a.aid = fa.aid,
-                preload p
+                LEFT JOIN artists a ON a.aid = fa.aid
            WHERE p.fid = f.fid
-           GROUP BY p.plid, f.fid, title, sha512, cued, id, id_type, reason
-           ORDER BY """+order_by+"""
+           GROUP BY p.plid, f.fid, title, sha512, cued, id, id_type, p.reason, p.uid
+           ORDER BY reason_order, pos_order, plid
            LIMIT """+str(limit)+""" OFFSET """+str(start)
-
+   
     print "Q:<<<%s>>>" % q
 
-    preload = get_results_assoc(q)
+    preload = cache_get_results_assoc(q)
 
     print "made it 1"
 
-    total = get_assoc("""SELECT count(*) AS total
-                         FROM preload p""")
+    total = cache_get_assoc("""SELECT count(*) AS total
+                               FROM preload p""")
     total = total['total']
 
     if preload:
@@ -1457,13 +1508,13 @@ def preload():
                         mimetype=mimetype, headers=headers, 
                         direct_passthrough=True)
     response.cache_control.public = True
-    response.cache_control.max_age = 0
+    response.cache_control.max_age = 10
     response.last_modified = int(time.time())
-    response.expires=int( time.time() )
+    response.expires=int( time.time() + 10 )
     response.make_conditional(request)
     print "MADE IT", 
-    print "results:", results
-    print "results_json:",results_json
+    # print "results:", results
+    # print "results_json:",results_json
 
     return response
 
@@ -1657,6 +1708,7 @@ def users():
 @app.route("/listening/<uid>/<state>/", methods=["GET"])
 @app.route("/listening/<uid>/<state>", methods=["GET"])
 def listening(uid, state):
+    cache.clear()
     listening = False
     if state.lower() == 'true':
         listening = True
@@ -1671,6 +1723,7 @@ def listening(uid, state):
 
 @app.route("/devices/", methods=["GET"])
 @app.route("/devices", methods=["GET"])
+@cache.cached(timeout=60)
 def devices():
     update_devices()
     sql = """SELECT * 
@@ -1689,6 +1742,7 @@ def devices():
 @app.route("/copy-to/<flid>/<device_id>/", methods=["GET"])
 @app.route("/copy-to/<flid>/<device_id>", methods=["GET"])
 def copy_to(flid, device_id):
+    cache.clear()
     print "1"
     sql = """SELECT *
              FROM file_locations
