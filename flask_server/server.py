@@ -1243,6 +1243,7 @@ def json_first(dta):
 
 @app.route("/rate/<usid>/<fid>/<uid>/<rating>", methods=['GET', 'POST', 'PUT'])
 def rate(usid, fid, uid, rating):
+    cache.clear()
     global playing
     print "RATE: usid:", usid, 'fid:', fid, 'uid', uid,'rating:', rating
     # playing.rate(uid=uid, rating=rafidting)
@@ -1872,6 +1873,7 @@ def emit_status(_playing=None):
       extended['genres'] = []
 
     extended = convert_res_to_dict(extended)
+    
     socketio.emit('status', extended,  namespace="/fmp")
 
 @socketio.on('status', namespace='/fmp')

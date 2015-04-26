@@ -539,15 +539,29 @@ def get_random_unplayed_sample(uid):
     return get_results_assoc(sql, (uid,))
 
 def get_single_random_unplayed(uid):
-    return get_assoc("""SELECT u.fid, u.true_score, ultp 
-                        FROM user_song_info u  
-                             LEFT JOIN dont_pick dp ON dp.fid = u.fid
-                        WHERE dp.fid IS NULL AND 
-                              u.uid = %s AND
-                              u.ultp IS NULL
-                        ORDER BY random() 
-                        LIMIT 1""", 
-                        (uid,))
+    sql = """SELECT f.fid
+             FROM files f 
+             LEFT JOIN user_history uh ON uh.id = f.fid AND 
+                                          uh.id_type = 'f' AND
+                                          uh.uid = %s 
+             WHERE uh.id IS NULL AND 
+                   f.fid NOT IN (SELECT fid FROM dont_pick)
+             ORDER BY random()"""
+
+    res = get_assoc(sql, (uid,))
+    if res:
+        return res
+
+    sql = """SELECT u.fid, u.true_score, ultp 
+             FROM user_song_info u  
+                  LEFT JOIN dont_pick dp ON dp.fid = u.fid
+             WHERE dp.fid IS NULL AND 
+                   u.uid = %s AND
+                   u.ultp IS NULL AND
+                   f.fid = u.fid
+             ORDER BY random()"""
+
+    return get_assoc(sql, (uid,))
 
 
 def get_existing_file(uid, true_score):

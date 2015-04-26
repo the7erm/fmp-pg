@@ -259,9 +259,12 @@ class FObj:
         if self.tags_hard is not None:
             print "self.tags_hard:", self.tags_hard
 
-        if self.tags_easy and 'artist' in self.tags_easy and 'title' in self.tags_easy:
-            if self.tags_easy['artist'] and self.tags_easy['title']:
-                return "%s - %s" % (self.tags_easy['artist'][0], self.tags_easy['title'][0])
+        if self.tags_combined != {}:
+            artists = self.tags_combined.get('artist', [])
+            titles = self.tags_combined.get('title', [])
+            if artists and titles:
+                return "%s - %s" % (artists[0], titles[0])
+
         return self.basename
 
     def to_dict(self):
@@ -303,9 +306,9 @@ class FObj:
         artist_title = self.get_artist_title()
 
         title = ""
-        if self.tags_easy and 'title' in self.tags_easy and self.tags_easy['title']:
-            title = self.tags_easy['title'][0]
-        
+        titles = self.tags_combined.get('title')
+        if titles:
+            title = titles[0]
 
         return {
             "fid": fid,
