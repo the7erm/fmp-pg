@@ -299,14 +299,20 @@ def set_score_for_uid(fid, uid, score):
 
 def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
     print "mark_as_played"
+    print "when:",type(when), when
     if when is None:
+        when = datetime.now()
+
+    if isinstance(when, (str, unicode)):
         when = datetime.now()
 
     if isinstance(when, float):
         when = datetime.fromtimestamp(when)
+        print "when from float:", when, when.tzinfo
 
-    when = when.replace(tzinfo=utc)
-    print "when:", when
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=utc)
+        print "when with replaced tzinfo:", when, when.tzinfo
 
     sql = """UPDATE files 
              SET ltp = %s
@@ -394,6 +400,7 @@ def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
                    uh.date_played = DATE(ufi.ultp) AND
                    uh.id = %s"""
     try:
+        print pg_cur.mogrify(sql, (when, when.date(), uid, fid))
         query(sql, (when, when.date(), uid, fid))
         print "- user_history updated"
     except psycopg2.IntegrityError, err:

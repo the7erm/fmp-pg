@@ -10,6 +10,7 @@ import gobject
 import time
 from lib import player
 from pprint import pprint, pformat
+import alsaaudio
 gobject.threads_init()
 
 
@@ -104,6 +105,7 @@ class Playlist(object):
 
     def on_keypress(self, widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
+        print "on_keypress:", keyname
         # if keyname in ('f','F'):
             #self.toggle_full_screen()
 
@@ -114,7 +116,7 @@ class Playlist(object):
                 self.window.set_decorated(True)
             self.window.emit('check-resize')
                 
-        if keyname in ('Return', 'p', 'P', 'a', 'A', 'space'):
+        if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter'):
             # self.show_controls()
             self.player.pause()
             
@@ -130,9 +132,71 @@ class Playlist(object):
         if keyname == 'Left':
             self.prev()
 
+        if keyname == 'KP_Add':
+            self.volume_up()
+
+        if keyname == 'KP_Add':
+            self.volume_up()
+
+        if keyname == 'KP_Subtract':
+            self.volume_down()
+
     def on_mouse_move(self, *args, **kwargs):
         # print "self.on_mouse_move:", args, kwargs
         return
+
+    def get_volume(self):
+        cards = alsaaudio.cards()
+        for i, c in enumerate(cards):
+            try:
+                m = alsaaudio.Mixer('Master', cardindex=i)
+                result = m.getvolume()
+                volume = result.pop()
+                return volume
+            except alsaaudio.ALSAAudioError:
+                continue
+        return -1;
+
+    def volume_up(self):
+        self.set_volume("+")
+        return
+
+    def volume_down(self):
+        self.set_volume("-")
+        return
+
+    def set_volume(self, vol):
+        cards = alsaaudio.cards()
+        print "SET_VOLUME:",vol
+        print "type:",type(vol)
+        if isinstance(vol, str) or isinstance(vol,unicode):
+            print "SET_VOLUME2:",vol
+            if vol in ("-","+"):
+                cur_vol = self.get_volume()
+                if vol == "-":
+                    vol = cur_vol - 3
+                else:
+                    vol = cur_vol + 3
+
+                if vol < 0:
+                    vol = 0
+                if vol > 100:
+                    vol = 100
+            print "SET_VOLUME3:",vol
+        try:
+            vol=int(vol)
+        except:
+            print "FAIL:",vol
+            return
+
+        if vol < 0 or vol > 100:
+            return;
+        for i, c in enumerate(cards):
+            try:
+                m = alsaaudio.Mixer('Master',cardindex=i)
+                m.setvolume(vol)
+            except alsaaudio.ALSAAudioError:
+                continue
 
     def on_mouse_click(self, *args, **kwargs):
         print "self.on_mouse_click:", args, kwargs
@@ -185,9 +249,11 @@ class Playlist(object):
         self.download_files()
 
     def download_preload(self):
+        print "download_preload"
         response = urllib2.urlopen(
             'http://erm:5050/preload?s=0&l=300&o=plid')
         contents = response.read()
+        print "read contents"
         server_preload = json.loads(contents)
         if not self.preload:
             self.preload = server_preload
@@ -274,7 +340,7 @@ class Playlist(object):
     def set_percent_played(self, percent_played):
         for r in self.playing['ratings']:
             r['percent_played'] = percent_played
-            r['ultp'] = time.time()
+            r['ultp'] = time.time() + time.timezone
             self.dirty_rating(r, 'percent_played')
             self.dirty_rating(r, 'ultp')
 

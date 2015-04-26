@@ -1057,7 +1057,7 @@ def sync(*args, **kw):
                 print "update percent_played"
                 mark_as_played(r['fid'], r['uid'], r['ultp'], 
                                r['percent_played'])
-
+    print "--sync complete"
     return json_dump({"Result": "OK"})
 
 def get_filter_by():
@@ -1482,7 +1482,7 @@ def preload():
    
     print "Q:<<<%s>>>" % q
 
-    preload = cache_get_results_assoc(q)
+    preload = get_results_assoc(q)
 
     print "made it 1"
 
@@ -1619,16 +1619,12 @@ def get_episodes(nid):
     return json_dump(res_data)
 
 @app.route("/stream/<fid>/")
-@app.route("/stream/<fid>\.mp4")
 def stream(fid):
-    print("STREAM:", fid)
-    locations = []
-    if "." not in fid:
-        locations = get_results_assoc("""SELECT device_id, label, 
-                                                dirname, basename
-                                         FROM file_locations fl
-                                              LEFT JOIN devices d ON d. 
-                                         WHERE fid = %s""", (fid, ))
+    print "STREAM:", fid
+    
+    locations = get_results_assoc("""SELECT dirname, basename
+                                     FROM file_locations fl
+                                     WHERE fid = %s""", (fid, ))
 
     print "LOCATIONS:",locations
 
@@ -1645,7 +1641,7 @@ def stream(fid):
             lext = ext.lower()
             if lext == '.mp3':
                 mimetype = "audio/mpeg"
-            break
+            
 
     return send_file(location, mimetype=mimetype, as_attachment=False,
                      attachment_filename=None, add_etags=False, 
@@ -1873,7 +1869,7 @@ def emit_status(_playing=None):
       extended['genres'] = []
 
     extended = convert_res_to_dict(extended)
-    
+
     socketio.emit('status', extended,  namespace="/fmp")
 
 @socketio.on('status', namespace='/fmp')
