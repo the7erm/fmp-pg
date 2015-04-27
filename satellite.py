@@ -29,15 +29,23 @@ class Playlist(object):
     def __init__(self):
         self.playlist = {
             "idx": 0,
-            "preload": []
+            "preload": [],
+            "playing_state": 'PLAYING'
         }
+        self.initialized = False
         self.time_to_update = 0
+        self.time_to_sync = 60
         self.player = player.Player()
         self.load_playlist()
         self.download_files()
         self.sync()
         self.init_player()
         self.init_window()
+        self.init_timers()
+
+    def init_timers(self):
+        gobject.timeout_add(5000, self.write_playlist)
+        gobject.timeout_add(10000, self.sync)
 
     @property
     def idx(self):
@@ -73,16 +81,33 @@ class Playlist(object):
     def preload(self, value):
         self.playlist['preload'] = value
 
+    @property
+    def playing_state(self):
+        return self.playlist.get('playing_state', 'PLAYING')
+
+    @playing_state.setter
+    def playing_state(self, value):
+        self.playlist['playing_state'] = value
+
+
     def init_player(self):
+        print "init_player()"
         self.player.filename = self.playing['satelite-cache']
-        self.player.start()
+        self.player.prepare()
+        print "PREPARED"
+
         if self.playing.get('playing'):
             for r in self.playing['ratings']:
                 self.player.seek("%s%%" % r['percent_played'])
                 break
+            
+        if self.playing_state == 'PLAYING' and self.player.playingState != player.PLAYING:
+            self.player.pause()
 
-        self.player.connect('time-status', self.on_time_status)
-        self.player.connect('end-of-stream', self.on_end_of_stream)
+        if not self.initialized:
+            self.initialized = True
+            self.player.connect('time-status', self.on_time_status)
+            self.player.connect('end-of-stream', self.on_end_of_stream)
 
     def init_window(self):
         self.window = gtk.Window()
@@ -118,7 +143,7 @@ class Playlist(object):
                 
         if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter'):
             # self.show_controls()
-            self.player.pause()
+            self.pause()
             
         if keyname == 'Up':
             self.player.seek("+5")
@@ -140,6 +165,14 @@ class Playlist(object):
 
         if keyname == 'KP_Subtract':
             self.volume_down()
+
+    def pause(self):
+        self.player.pause()
+        if self.player.playingState != player.PLAYING:
+            self.playing_state = 'PAUSED'
+        else:
+            self.playing_state = 'PLAYING'
+        self.write_playlist()
 
     def on_mouse_move(self, *args, **kwargs):
         # print "self.on_mouse_move:", args, kwargs
@@ -200,7 +233,7 @@ class Playlist(object):
 
     def on_mouse_click(self, *args, **kwargs):
         print "self.on_mouse_click:", args, kwargs
-        self.player.pause()
+        self.pause()
 
     def on_scroll(self, widget, event):
         print "on_scroll:"
@@ -249,17 +282,41 @@ class Playlist(object):
         self.download_files()
 
     def download_preload(self):
+        status = None
+        self_preload_fids = []
+        server_preload_fids = []
+        if self.playing_state != 'PLAYING':
+            try:
+                response = urllib2.urlopen('http://erm:5050/status/')
+            except urllib2.URLError, err:
+                print "urllib2.URLError:", err
+                return
+            contents = response.read()
+            _status = json.loads(contents)
+            # print "_status:", pformat(_status)
+            status = _status['extended']
+            status['plid'] = '0'
+            status['playing'] = True
+            for p in self.preload:
+                p['playing'] = False
+            self.preload[0] = status
+            server_preload_fids.append(status['id'])
+
+
         print "download_preload"
-        response = urllib2.urlopen(
-            'http://erm:5050/preload?s=0&l=300&o=plid')
+        try:
+            response = urllib2.urlopen(
+                'http://erm:5050/preload?s=0&l=300&o=plid')
+        except urllib2.URLError, err:
+            print "urllib2.URLError:", err
+            return
         contents = response.read()
         print "read contents"
         server_preload = json.loads(contents)
         if not self.preload:
             self.preload = server_preload
         else:
-            self_preload_fids = []
-            server_preload_fids = []
+
             for p in self.preload:
                 self_preload_fids.append(int(p['plid']))
             for p in server_preload:
@@ -308,7 +365,7 @@ class Playlist(object):
         fp.close()
         shutil.move(tmp, playlist_file)
         # pprint(self.playing)
-        self.time_to_update = 5
+        return True
 
 
     def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
@@ -317,11 +374,6 @@ class Playlist(object):
         self.set_percent_played(decimal * 100)
         # pprint(self.playing)
         self.playing['playing'] = True
-        if self.time_to_update <= 0:
-            self.write_playlist()
-            self.time_to_update = 5
-
-        self.time_to_update -= 1
 
 
     def on_end_of_stream(self, *args, **kwargs):
@@ -371,12 +423,23 @@ class Playlist(object):
         self.player.start()
 
     def sync(self):
+        self.download_preload()
+        if self.playing_state != 'PLAYING':
+            self.download_files()
+            self.init_player()
+
         url = 'http://erm:5050/sync/'
         data = json.dumps(self.playlist)
-        req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
-        response = urllib2.urlopen(req)
+        try:
+            req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
+            response = urllib2.urlopen(req)
+        except urllib2.URLError, err:
+            print "urllib2.URLError:", err
+            return True
+        
         the_page = response.read()
         print "the_page", the_page
+        return True
 
 playlist = Playlist()
 

@@ -307,8 +307,6 @@ def populate_preload(min_amount=0):
     picker.create_dont_pick()
     # picker.populate_dont_pick()
     picker.populate_preload(min_amount=min_amount)
-
-
     return True
 
 
@@ -599,11 +597,6 @@ def set_idx(idx, retry=2):
                 break;
             history_len = len(history)
 
-        f = append_file()
-        if 'fid' in f:
-            sql = """DELETE FROM preload WHERE fid = %s"""
-            print pg_cur.mogrify(sql, (f['fid'],))
-            query(sql, (f['fid'],))
         if retry > 0:
             print "RETRYING:",retry
             set_idx(idx, retry-1)
@@ -774,7 +767,7 @@ tray.quit.connect("activate", quit)
 tray.icon.connect('scroll-event', on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(15000, populate_preload, 5)
+gobject.timeout_add(15000, populate_preload, 20)
 gobject.timeout_add(1000, set_rating)
 
 flask_server.server.playing = playing

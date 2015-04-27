@@ -371,7 +371,7 @@ static char * invisible_xpm[] = {
     def prev(self, *args, **kwargs):
         self.prev_button.emit('clicked')
 
-    def start(self, *args, **kwargs):
+    def prepare(self):
         print "="*80
         self.tags = {}
         gc.collect()
@@ -385,9 +385,15 @@ static char * invisible_xpm[] = {
         if uri == "":
             print "empty uri"
             return
-        print "playing uri:", uri
         self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
+        self.player.set_state(PAUSED)
+        print "URI:", uri
+        self.player.get_state()
+
+    def start(self, *args, **kwargs):
+        print "="*80
+        self.prepare()
         # self.player.set_property("volume",self.volume)
         self.player.set_state(PLAYING)
         self.emit('state-changed', PLAYING)
@@ -637,9 +643,7 @@ static char * invisible_xpm[] = {
         self.update_time()
     
     def seek(self, string):
-        if self.pos_int <= 0:
-            print "self.pos_int <= 0"
-            return
+        
         if self.seek_locked:
             return
         self.seek_locked = True

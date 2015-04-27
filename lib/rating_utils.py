@@ -408,3 +408,10 @@ def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
         query("COMMIT;")
     print "-- done"
     calculate_true_score_for_fid_uid(fid, uid)
+    try:
+        print pg_cur.mogrify(sql, (when, when.date(), uid, fid))
+        query(sql, (when, when.date(), uid, fid))
+        print "- user_history updated"
+    except psycopg2.IntegrityError, err:
+        print "IntegrityError:", err
+        query("COMMIT;")
