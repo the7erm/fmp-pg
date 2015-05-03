@@ -29,7 +29,7 @@ from lib.fmp_plugin import FmpPluginWrapper
 import os
 import sys
 import re
-import lib.player as player
+import satellite_player as player
 import lib.notify as notify
 import lib.tray as tray
 import math
@@ -51,6 +51,7 @@ from subprocess import Popen, PIPE
 
 from ConfigParser import NoSectionError
 from lib.excemptions import CreationFailed, NotImpimented
+from pprint import pformat, pprint
 
 # setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
 
@@ -634,7 +635,7 @@ def on_end_of_stream(*args):
         {'end-of-stream': True}
     )
 
-def start_playing(direction="inc"):
+def start_playing(direction="inc", start=True):
     global playing
     if direction == "inc":
         inc_index()
@@ -657,7 +658,10 @@ def start_playing(direction="inc"):
     playing.rating_callback = flask_server.server.emit_status
 
     plr.filename = playing.filename
-    plr.start()
+    if start:
+        plr.start()
+    else:
+        plr.prepare()
     tray.set_play_pause_item(plr.playingState)
     notify.playing(playing)
     flask_server.server.player = plr
@@ -727,6 +731,16 @@ except IndexError:
         item = get_assoc("SELECT * FROM files ORDER BY random() LIMIT 1")
         history.append(dict(item))
 
+def sync_playing(file_data):
+    global idx, playing
+    print "-="*20, "sync_playing"
+    print "sync_playing:", pformat(file_data)
+    history.append(dict(file_data))
+    idx = len(history) - 1
+    set_idx(idx)
+    start_playing('stay', False)
+    print "-="*20, "/sync_playing"
+
 
 item_fobj = None
 while item_fobj is None:
@@ -767,15 +781,15 @@ tray.quit.connect("activate", quit)
 tray.icon.connect('scroll-event', on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(15000, populate_preload, 20)
+gobject.timeout_add(15000, populate_preload, 25)
 gobject.timeout_add(1000, set_rating)
 
 flask_server.server.playing = playing
 flask_server.server.player = plr
 flask_server.server.tray = tray
+flask_server.server.sync_playing = sync_playing
 flask_server.server.start_in_thread()
 
-print "START"
 picker.wait()
 
 try:

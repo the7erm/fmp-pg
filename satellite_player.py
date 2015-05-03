@@ -19,7 +19,7 @@
 
 ## TODO: add appindicator in __main__ section
 
-from gtk_utils import gtk_main_quit
+# from gtk_utils import gtk_main_quit
 import sys 
 import os 
 import time 
@@ -39,6 +39,10 @@ from time import sleep
 pygst.require("0.10")
 import gst
 import pprint
+
+def gtk_main_quit(*args, **kwargs):
+    kill_threads()
+    gtk.main_quit()
 
 STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
@@ -139,6 +143,7 @@ class Player(gobject.GObject):
         
         self.window.set_title("Video-Player")
         self.window.set_default_size(600, 400)
+        self.window.maximize()
 
     def init_main_event_box(self):
         #main Event Box
@@ -457,6 +462,7 @@ static char * invisible_xpm[] = {
         #    return True
 
         # print 'update_time';
+        self.player.get_state()
         try:
             dur_int = self.player.query_duration(self.time_format, None)[0]
             dur_str = self.convert_ns(dur_int)
@@ -479,6 +485,7 @@ static char * invisible_xpm[] = {
         left_str = self.convert_ns(left_int)
         decimal = float(pos_int) / dur_int
         percent = "%.2f%%" % (decimal * 100)
+        percent_played = "%s%%" % (decimal * 100)
         try:
             # print pos_int, dur_int, left_int, decimal, pos_str, dur_str, left_str, percent
             self.pos_int = pos_int
@@ -497,7 +504,8 @@ static char * invisible_xpm[] = {
                 "min": 0,
                 "max": dur_int,
                 "value": pos_int,
-                "playingState": self.state_to_string(self.playingState)
+                "playingState": self.state_to_string(self.playingState),
+                "percent_played": percent_played
             }
         except TypeError, e:
             print "TypeError:",e
@@ -643,11 +651,14 @@ static char * invisible_xpm[] = {
         self.update_time()
     
     def seek(self, string):
-        
+        print "SEEK:", string
         if self.seek_locked:
             return
         self.seek_locked = True
-
+        if not self.dur_int:
+            dur_int = self.player.query_duration(self.time_format, None)[0]
+            self.dur_int = dur_int
+                
         string = str(string)
         string = string.strip()
         firstChar = string[0]
@@ -663,18 +674,22 @@ static char * invisible_xpm[] = {
                 seek_ns = self.pos_int - skip_second
         elif lastChar == '%':
             seek_ns = int(float(string[0:-1]) * 0.01 * self.dur_int)
+
         else:
             seek_ns = int(string) * 1000000000
         
         if seek_ns < 0:
             seek_ns = 0
         elif seek_ns > self.dur_int:
+            print "SEEK_NS:",seek_ns
             self.seek_locked = False
             return
-        
+
+        print "2 - SEEK_NS:",seek_ns
         try:
             self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, 
                                     seek_ns)
+            self.update_time()
         except:
             print "ERROR SEEKING"
             self.seek_locked = False

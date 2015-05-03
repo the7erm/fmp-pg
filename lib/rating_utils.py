@@ -133,7 +133,10 @@ def calculate_true_score_for_fid_uid(fid, uid):
     print "averages:", averages
     print "average:", average
     print "true score:",
-    pprint.pprint(dict(res))
+    if res:
+        pprint.pprint(dict(res))
+    else:
+        print "NO RES"
     print "-"*len(title)
     print "3"*100
     return res
