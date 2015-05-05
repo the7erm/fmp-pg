@@ -242,9 +242,13 @@ class Satellite:
 
 
         _print ("[NEW DATA]")
-        _pprint(self.data)
         for k, v in self.data.items():
-            print "K:",k
+            if k == 'playlist':
+                continue
+            print "K:",k, "v:",pformat(v)
+            
+        for i, v in enumerate(self.data.get('playlist', [])):
+            print "I:", str(i), "V:", pformat(v)
         _print ("[/NEW DATA]")
         _print("playing:", self.data['playing'])
         self.download(self.data['playing'])
