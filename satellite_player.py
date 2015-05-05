@@ -48,6 +48,23 @@ STOPPED = gst.STATE_NULL
 PAUSED = gst.STATE_PAUSED
 PLAYING = gst.STATE_PLAYING
 
+def wait():
+    print ("swait()")
+    # print "leave1"
+    gtk.gdk.threads_leave()
+    # print "/leave1"
+    # print "enter"
+    gtk.gdk.threads_enter()
+    # print "/enter"
+    if gtk.events_pending():
+        while gtk.events_pending():
+            # print "pending:"
+            gtk.main_iteration(False)
+    # print "leave"
+    gtk.gdk.threads_leave()
+    # print "/leave"
+    print ("/swait()")
+
 class Player(gobject.GObject):
     __gsignals__ = {
         'error': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,str)),
@@ -457,6 +474,7 @@ static char * invisible_xpm[] = {
         return "0:%02d" % (_secs)
 
     def update_time(self, retry=True):
+        gtk.gdk.threads_leave()
         #if self.playingState != PLAYING :
         #    print "update_time:NOT PLAYING"
         #    return True
@@ -468,12 +486,15 @@ static char * invisible_xpm[] = {
             dur_str = self.convert_ns(dur_int)
             self.dur_int = dur_int
         except:
+            print "ERROR getting dur_int"
             return True
         
         try:
             pos_int = self.player.query_position(self.time_format, None)[0]
         except:
             pos_int = 0
+            print "ERROR getting pos_int"
+            return True
 
         if pos_int == 0 and retry:
             sleep(0.1)
@@ -513,17 +534,23 @@ static char * invisible_xpm[] = {
         return True
         
     def pause(self, *args, **kwargs):
-        self.playingState = self.player.get_state()[1]
-        if self.playingState == STOPPED:
+        playingState = self.player.get_state()[1]
+        if playingState == STOPPED:
             self.start()
-        elif self.playingState == PLAYING:
+            print "start()"
+        elif playingState == PLAYING:
             self.player.set_state(PAUSED)
-        elif self.playingState == PAUSED:
+            print "PAUSED"
+        elif playingState == PAUSED:
+            pos_int = self.player.query_position(self.time_format, None)[0]
+            self.prepare()
             self.player.set_state(PLAYING)
-            
+            self.seek_ns(pos_int)
+            print "PLAYING"
         self.playingState = self.player.get_state()[1]
+        wait()
         self.emit('state-changed', self.playingState)
-        self.update_time()
+        
 
     def debug_message(self, gst_message):
         attribs_to_check = ['parse_clock_lost', 'parse_clock_provide',
@@ -647,7 +674,9 @@ static char * invisible_xpm[] = {
     def seek_ns(self, ns):
         ns = int(ns)
         print "SEEK_NS:", ns
-        self.player.seek_simple(self.time_format, gst.SEEK_FLAG_FLUSH, ns)
+        self.player.seek_simple(self.time_format, 
+                                gst.SEEK_FLAG_FLUSH | gst.SEEK_FLAG_KEY_UNIT
+                                , ns)
         self.update_time()
     
     def seek(self, string):
@@ -656,8 +685,11 @@ static char * invisible_xpm[] = {
             return
         self.seek_locked = True
         if not self.dur_int:
-            dur_int = self.player.query_duration(self.time_format, None)[0]
-            self.dur_int = dur_int
+            try:
+                dur_int = self.player.query_duration(self.time_format, None)[0]
+                self.dur_int = dur_int
+            except gst.QueryError:
+                return
                 
         string = str(string)
         string = string.strip()

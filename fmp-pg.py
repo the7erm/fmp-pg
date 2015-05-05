@@ -732,6 +732,8 @@ except IndexError:
         history.append(dict(item))
 
 def sync_playing(file_data):
+    if not file_data or file_data == {}:
+        return
     global idx, playing
     print "-="*20, "sync_playing"
     print "sync_playing:", pformat(file_data)

@@ -1131,7 +1131,7 @@ def update_score(uid, fid, skip_score):
     query(sql, (score, uid, fid))
 
 def mark_dirty_played(obj, listeners):
-    if not obj or not listeners:
+    if not obj or not listeners or obj == {}:
         return
     if not obj.get('dirty') and not obj.get('played'):
         return
@@ -1277,9 +1277,9 @@ def build_playlist(history, netcasts, preload, playing):
     
     
 
-@app.route('/sattelite/', methods=['GET', 'POST'])
-def sattelite():
-    print "sattelite"
+@app.route('/satellite/', methods=['GET', 'POST'])
+def satellite():
+    print "satellite"
     cache.clear()
     global playing, player
     request_json = request.get_json()
@@ -1306,7 +1306,7 @@ def sattelite():
         print "3"
         if (playing_dict['playingState'] != 'PLAYING' and 
             playing_dict_percent != percent_played):
-                if playing_dict['id'] != request_json['playing']['id']:
+                if playing_dict.get('id') != request_json['playing'].get('id'):
                     sync_playing(request_json['playing'])
                 print "*"*20,"SEEK","*"*20
                 print "playing_dict_percent:", playing_dict_percent, "!=",
@@ -1316,17 +1316,21 @@ def sattelite():
 
 
     # Send last 10 songs
-    sql = """SELECT id, id_type, 
+    sql = """SELECT id, id_type, date_played, title, episode_title,
                     string_agg(
-                      to_char(time_played, 'YYYY-MM-DD HH24:MI:SS'), 
-                      ','
-                    ) AS times_played,
-                    string_agg(to_char(uh.uid, '999'), ',') AS uids,
-                    to_char(date_played, 'YYYY-MM-DD') AS date_played_str
-             FROM user_history uh, users u
+                    to_char(time_played, 'YYYY-MM-DD HH24:MI:SS'), 
+                    ','
+                    ) AS times_played, 
+                    string_agg(to_char(uh.uid, '999'), ',') AS uids
+             FROM users u, 
+                  user_history uh
+                  LEFT JOIN netcast_episodes ne ON uh.id_type = 'e' AND 
+                                                   uh.id = ne.eid
+                  LEFT JOIN files f ON uh.id_type = 'f' AND f.fid = uh.id 
              WHERE listening = true AND u.uid = uh.uid
-             GROUP BY id, id_type, date_played 
-             ORDER BY times_played DESC 
+             GROUP BY time_played, id, id_type, title, episode_title, 
+                      date_played
+             ORDER BY time_played DESC 
              LIMIT 10"""
 
     res = cache_get_results_assoc(sql)
@@ -1338,20 +1342,22 @@ def sattelite():
     
 
     # Send preload
-    sql = """SELECT DISTINCT row_number() OVER(ORDER BY plid) AS pos, 
-                row_number() OVER ( PARTITION BY uid ORDER BY uid) AS pos_order,
-                p.plid, p.reason, f.fid,
-                           
-                           f.fid AS id, 'f' AS id_type,
-                           CASE reason 
+    sql = """SELECT DISTINCT row_number() OVER (ORDER BY plid) AS pos, 
+                             row_number() OVER ( 
+                                PARTITION BY uid ORDER BY uid
+                             ) AS pos_order,
+                             p.plid, p.reason, f.fid,
+                             f.fid AS id, 'f' AS id_type,
+                             CASE reason 
                                WHEN 'From search' THEN 1
                                ELSE 2
-                           END AS reason_order
-           FROM preload p,
-                files f
-           WHERE p.fid = f.fid
-           GROUP BY p.plid, f.fid,  id, id_type, p.reason, p.uid
-           ORDER BY reason_order, pos_order, plid"""
+                             END AS reason_order,
+                             title
+             FROM preload p,
+                  files f
+             WHERE p.fid = f.fid
+             GROUP BY p.plid, f.fid,  id, id_type, p.reason, p.uid, title
+             ORDER BY reason_order, pos_order, plid"""
 
     res = cache_get_results_assoc(sql)
     preload = []
@@ -1360,7 +1366,7 @@ def sattelite():
 
     # Send Netcasts
     sql = """SELECT DISTINCT ne.eid, ne.episode_title, ne.episode_url, 
-                             ne.local_file
+                             ne.local_file, 'e' AS id_type, ne.eid AS id
              FROM users u,
                   netcast_episodes ne
                   LEFT JOIN netcast_subscribers ns 
@@ -1371,6 +1377,7 @@ def sattelite():
              WHERE nle.uid IS NULL AND
                    ns.nid = ne.nid AND
                    ns.uid = u.uid AND
+                   ne.local_file IS NOT null AND
                    u.listening = true"""
 
     res = cache_get_results_assoc(sql)
@@ -1383,7 +1390,7 @@ def sattelite():
     res = cache_get_results_assoc(sql)
     for r in res:
         listeners.append(dict(r))
-    print "/sattelite"
+    print "/satellite"
     extended = get_extended()
     index, playlist = build_playlist(history, netcasts, preload, extended)
 

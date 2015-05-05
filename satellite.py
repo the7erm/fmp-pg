@@ -36,9 +36,9 @@ config_dir = os.path.expanduser("~/.fmp")
 if not os.path.exists(config_dir):
     os.makedirs(config_dir)
 
-satelite_json = os.path.join(config_dir,"satelite.json")
+satellite_json = os.path.join(config_dir,"satellite.json")
 
-cache_dir = os.path.join(config_dir, 'satelite-cache')
+cache_dir = os.path.join(config_dir, 'satellite-cache')
 if not os.path.exists(cache_dir):
     os.makedirs(cache_dir)
 
@@ -60,6 +60,8 @@ def _pprint(*args, **kwargs):
 
 class Satellite:
     def __init__(self):
+        self.time_to_save = 5
+        self.sync_locked = False
         self.data = {
             "preload": [],
             "playing": {},
@@ -67,7 +69,7 @@ class Satellite:
             "history": [],
             "state": "PLAYING",
             "listeners": [],
-            "index": 0,
+            "index": -1,
             "playlist": []
         }
         _print("init_window()")
@@ -76,8 +78,9 @@ class Satellite:
         self.init_player()
         _print("load()")
         self.load()
-        _print("sync()")
-        self.sync()
+        _print("sync(just_playing=True)")
+        self.sync(just_playing=True)
+
         print "self.data['state']:", self.data['state']
         self.play()
         self.resume()
@@ -87,7 +90,9 @@ class Satellite:
         
         self.player.connect('time-status', self.on_time_status)
         self.player.connect('end-of-stream', self.on_end_of_stream)
-        gobject.timeout_add(10000, self.sync)
+        _print("sync(just_playing=False)")
+        self.sync()
+        gobject.timeout_add(30000, self.sync)
         print "DONE"
 
     def init_window(self):
@@ -104,15 +109,16 @@ class Satellite:
         self.window.connect('motion-notify-event', self.on_mouse_move)
         self.window.connect('button-press-event', self.on_mouse_click)
         self.window.connect("scroll-event", self.on_scroll)
+        self.window.maximize()
 
     def init_player(self):
         self.player = player.Player()
         return
 
     def load(self):
-        if not os.path.exists(satelite_json):
+        if not os.path.exists(satellite_json):
             return
-        fp = open(satelite_json, 'r')
+        fp = open(satellite_json, 'r')
         try:
             self.data = json.loads(fp.read())
             self.build_playlist()
@@ -177,13 +183,15 @@ class Satellite:
         self.data['history'] = value
 
     def write(self):
-        fp = open(satelite_json, 'w')
+        print "*WRITE*"
+        fp = open(satellite_json, 'w')
         self.data['last_written'] = time.time()
         fp.write(json.dumps(self.data,
                             sort_keys=True,
                             indent=4,
                             separators=(',', ': ')))
         fp.close()
+        self.time_to_save = 5
 
     def clean(self):
         self.data['playing']['dirty'] = False
@@ -193,11 +201,14 @@ class Satellite:
             self.data['playlist'][i]['dirty'] = False
             self.data['playlist'][i]['played'] = False
 
-    def sync(self, *args, **kwargs):
-        gtk.gdk.threads_leave()
+    def sync(self,just_playing=False, *args, **kwargs):
+        wait()
+        if self.sync_locked:
+            return
+        self.sync_locked = True
         self.files = []
         data = json.dumps(self.data)
-        url = 'http://erm:5050/sattelite/'
+        url = 'http://erm:5050/satellite/'
         try:
             req = urllib2.Request(url, data, 
                                   {'Content-Type': 'application/json'})
@@ -206,6 +217,7 @@ class Satellite:
             print "urllib2.URLError:", err
             self.build_playlist()
             _print("index:", self.data['index'])
+            self.sync_locked = False
             return True
 
         self.clean()
@@ -226,12 +238,7 @@ class Satellite:
         for key in sync_keys:
             self.data[key] = new_data[key]
 
-        playing_id, playing_id_type = self.get_id_type(self.data['playing'])
-        for i, p in enumerate(self.data['playlist']):
-            p_id, p_id_type = self.get_id_type(p)
-            if playing_id == p_id and playing_id_type == p_id_type:
-                print "INDEX:", i
-                self.index = i
+        self.set_playing_index()
 
 
         _print ("[NEW DATA]")
@@ -241,6 +248,9 @@ class Satellite:
         _print ("[/NEW DATA]")
         _print("playing:", self.data['playing'])
         self.download(self.data['playing'])
+        if just_playing:
+            self.sync_locked = False
+            return True
         
         for p in self.data['playlist']:
             # _print("playlist:", p)
@@ -253,6 +263,8 @@ class Satellite:
         if not self.data['state'] or self.data['state'] == 'PAUSED':
             self.play()
             self.resume()
+        self.write()
+        self.sync_locked = False
         return True
 
     def resume(self):
@@ -349,10 +361,22 @@ class Satellite:
         if id_type == 'e':
             url = 'http://erm:5050/stream-netcast/%s/' % _id
         _print("url:", url)
+        CHUNK = 16 * 1024
         response = urllib2.urlopen(url)
-        fp = open(tmp, "wb")
-        fp.write(response.read())
-        fp.close()
+        cnt = 100
+        total = 0
+        with open(tmp, 'wb') as fp:
+            while True:
+                chunk = response.read(CHUNK)
+                if not chunk: 
+                    break
+                fp.write(chunk)
+                if cnt <= 0:
+                    cnt = 100
+                    _print (total)
+                    wait()
+                cnt += -1
+                total += CHUNK
         shutil.move(tmp, dst)
 
     def quit(self, *args, **kwargs):
@@ -360,6 +384,7 @@ class Satellite:
         sys.exit()
 
     def on_keypress(self, widget, event):
+        wait()
         keyname = gtk.gdk.keyval_name(event.keyval)
         print "on_keypress:", keyname
         # if keyname in ('f','F'):
@@ -380,7 +405,7 @@ class Satellite:
             self.player.seek("+5")
         
         if keyname in ('Down', 'KP_Down'):
-            self.player.seek("+5")
+            self.player.seek("-5")
             
         if keyname in ('Right', 'KP_Right'):
             self.next()
@@ -398,12 +423,18 @@ class Satellite:
             self.volume_down()
 
     def pause(self):
+        _print("PAUSE CALLED")
         self.player.pause()
         if self.player.playingState != player.PLAYING:
             self.data['state'] = 'PAUSED'
         else:
             self.data['state'] = 'PLAYING'
+            pos_int = self.player.player.query_position(
+                self.player.time_format, None)[0]
+            self.player.seek_ns(pos_int)
+        
         self.write()
+        # wait()
 
     def on_mouse_move(self, *args, **kwargs):
         # print "self.on_mouse_move:", args, kwargs
@@ -463,12 +494,13 @@ class Satellite:
                 continue
 
     def on_mouse_click(self, *args, **kwargs):
+        wait()
         print "self.on_mouse_click:", args, kwargs
         self.pause()
 
     def on_scroll(self, widget, event):
         print "on_scroll:"
-        gtk.gdk.threads_leave()
+        wait()
         if event.direction == gtk.gdk.SCROLL_UP:
             self.player.seek("+5")
         if event.direction == gtk.gdk.SCROLL_DOWN:
@@ -483,14 +515,17 @@ class Satellite:
         self.play(True)
 
     def prev(self):
-        print "PREV"
         self.set_playing_data('played', True)
         self.player.stop()
-        self.deinc_trac()
+        self.deinc_track()
         self.play(True)
 
     def play(self, start=False):
         _id, id_type = self.get_id_type(self.data['playing'])
+        if not _id:
+            self.data['playing'] = self.data['playlist'][self.index]
+            _id, id_type = self.get_id_type(self.data['playing'])
+
         prefix = "file"
         if id_type == 'e':
             prefix = 'netcast'
@@ -507,7 +542,12 @@ class Satellite:
                        pos_str, dur_str, left_str, percent):
         wait()
         self.set_percent_played(decimal * 100)
-        self.write()
+
+        self.time_to_save -= 1
+        if self.time_to_save <= 0:
+            self.time_to_save = 5
+            self.write()
+        
 
     def on_end_of_stream(self, *args, **kwargs):
         gtk.gdk.threads_leave()
@@ -532,25 +572,48 @@ class Satellite:
             self.data['playing']['played'] = True
         self.data['playing']['dirty'] = True
         print "self.data['index']:", self.data['index']
+        try:
+            self.data['playlist'][self.data['index']].update(self.data['playing'])
+        except IndexError:
+            pass
 
-        self.data['playlist'][self.data['index']].update(self.data['playing'])
+    def inc_track(self, inc_by=1):
+        self.set_playing_index()
+        index = self.data['index'] + inc_by
+        max_index = len(self.data['playlist']) - 1
+        if index < 0:
+            index = max_index
+        if index > max_index:
+            index = 0
+        self.index = index
+        self.data['playing'] = self.data['playlist'][self.index]
+
         self.write()
 
-    def inc_track(self):
-        self.data['playlist'][self.data['index']].update(self.data['playing'])
-        self.data['index'] = self.data['index'] + 1
-        if self.data['index'] >= len(self.data['playlist']):
-            self.data['index'] = 0
-        self.data['playing'] = self.data['playlist'][self.data['index']]
-        self.write()
+    def deinc_track(self):
+        self.inc_track(inc_by=-1)
 
-    def deinc_trac(self):
-        self.data['playlist'][self.data['index']].update(self.data['playing'])
-        self.data['index'] = self.data['index'] - 1
-        if self.data['index'] <= 0:
-            self.data['index'] = len(self.data['playlist']) - 1
-        self.data['playing'] = self.data['playlist'][self.data['index']]
-        self.write()
+    def set_playing_index(self):
+        playing_id, playing_id_type = self.get_id_type(self.data['playing'])
+        index = -1
+        for i, p in enumerate(self.data['playlist']):
+            p_id, p_id_type = self.get_id_type(p)
+            if playing_id == p_id and playing_id_type == p_id_type:
+                print "INDEX:", i
+                index = i
 
+        if index == -1:
+            print "FALL BACK TO NO date_played"
+            for i, p in enumerate(self.data['playlist']):
+                if 'date_played' not in p:
+                    index = i
+                    break;
+
+        if index != -1:
+            self.data['index'] = index
+            print "set_playing_index:", index
+        else:
+            print "ERROR SETTING INDEX"
+         
 s = Satellite()
 gtk.main()
