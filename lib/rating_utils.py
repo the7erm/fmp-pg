@@ -300,7 +300,7 @@ def set_score_for_uid(fid, uid, score):
     return updated_again or updated or []
 
 
-def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
+def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
     print "mark_as_played"
     print "when:",type(when), when
     if when is None:
@@ -343,7 +343,7 @@ def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
         print "a:",a['aid']
         sql = """INSERT INTO user_artist_history (time_played, date_played, 
                                                   uid, aid)
-                 VALUES(%s, %s, %s, %s)"""
+                 VALUES(%s, %s, %s, %s, %s)"""
         try:
             print sql
             args = (when, when.date(), uid, a['aid'])
@@ -353,7 +353,7 @@ def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
         except psycopg2.IntegrityError, err:
             print "IntegrityError:", err
             query("COMMIT;")
-        except Error, err:
+        except Exception, err:
             print "- user_artist_history ERROR", err
             
 
@@ -379,10 +379,11 @@ def mark_as_played(fid, uid, when, percent_played, *args, **kwargs):
                (uid, id, id_type,
                 percent_played,
                 time_played,
-                date_played)
-             VALUES (%s, %s, %s, %s, %s, %s)"""
+                date_played,
+                reason)
+             VALUES (%s, %s, %s, %s, %s, %s, %s)"""
     try:
-        query(sql,(uid, fid, 'f', percent_played, when, when.date()))
+        query(sql,(uid, fid, 'f', percent_played, when, when.date(), reason))
         print "- user_history inserted"
     except psycopg2.IntegrityError, err:
         print "IntegrityError:", err

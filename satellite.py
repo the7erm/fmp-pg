@@ -12,7 +12,9 @@ import satellite_player as player
 from pprint import pprint, pformat
 import alsaaudio
 from copy import deepcopy
-gobject.threads_init()
+
+if __name__ == "__main__":
+    gobject.threads_init()
 
 def wait():
     _print ("wait()")
@@ -31,6 +33,27 @@ def wait():
     # print "/leave"
     _print ("/wait()")
 
+
+def get_id_type(obj):
+    if not obj or obj == {}:
+        return None, None
+
+    _id = int(obj.get('id', -1))
+    id_type = obj.get('id_type', None)
+
+    if _id not in (-1, None) and id_type in ('f', 'e'):
+        return _id, id_type
+
+    fid = int(obj.get('fid', -1))
+    eid = int(obj.get('eid', -1))
+
+    if fid not in (-1, None):
+        return fid, 'f'
+
+    if eid not in (-1, None):
+        return eid, 'e'
+
+    return None, None
 
 config_dir = os.path.expanduser("~/.fmp")
 if not os.path.exists(config_dir):
@@ -246,9 +269,13 @@ class Satellite:
             if k == 'playlist':
                 continue
             print "K:",k, "v:",pformat(v)
-            
+
         for i, v in enumerate(self.data.get('playlist', [])):
+            if i == self.index:
+                print "="*20, 'INDEX', "="*20
             print "I:", str(i), "V:", pformat(v)
+            if i == self.index:
+                print "="*20, '/INDEX', "="*20
         _print ("[/NEW DATA]")
         _print("playing:", self.data['playing'])
         self.download(self.data['playing'])
@@ -290,13 +317,13 @@ class Satellite:
 
 
     def in_playlist(self, obj):
-        _id, id_type = self.get_id_type(obj)
+        _id, id_type = get_id_type(obj)
         if _id is None or id_type is None:
             return False
 
         found = False
         for f in self.data['playlist']:
-            f_id, f_id_type = self.get_id_type(f)
+            f_id, f_id_type = get_id_type(f)
             if _id == f_id and id_type == f_id_type:
                 found = True
                 break
@@ -312,39 +339,9 @@ class Satellite:
                 if f not in self.files:
                     print "REMOVE:", f
                     os.unlink(os.path.join(root,f))
-                
-
-    def get_id_type(self, obj):
-        if not obj or obj == {}:
-            return None, None
-
-        _id = int(obj.get('id', -1))
-        id_type = obj.get('id_type', 'f')
-        fid = int(obj.get('fid', -1))
-        eid = int(obj.get('eid', -1))
-
-        if fid == -1:
-            fid = None
-
-        if fid is not None:
-            _id = fid
-            id_type = 'f'
-
-        if eid == -1:
-            eid = None
-
-        if eid is not None:
-            _id = eid
-            id_type = 'e'
-
-        if _id == -1:
-            _id = None
-            id_type = None
-
-        return _id, id_type
 
     def download(self, obj):
-        _id, id_type = self.get_id_type(obj)
+        _id, id_type = get_id_type(obj)
         if _id is None or id_type is None:
             return
 
@@ -356,7 +353,7 @@ class Satellite:
         dst = os.path.join(cache_dir, filename)
         self.files.append(filename)
         if os.path.exists(dst):
-           #  print "EXISTS", filename
+            print "EXISTS", filename
             return
         _print("DOWNLOAD:", filename)
         pprint(obj)
@@ -525,10 +522,10 @@ class Satellite:
         self.play(True)
 
     def play(self, start=False):
-        _id, id_type = self.get_id_type(self.data['playing'])
+        _id, id_type = get_id_type(self.data['playing'])
         if not _id:
             self.data['playing'] = self.data['playlist'][self.index]
-            _id, id_type = self.get_id_type(self.data['playing'])
+            _id, id_type = get_id_type(self.data['playing'])
 
         prefix = "file"
         if id_type == 'e':
@@ -598,10 +595,10 @@ class Satellite:
         self.inc_track(inc_by=-1)
 
     def set_playing_index(self):
-        playing_id, playing_id_type = self.get_id_type(self.data['playing'])
+        playing_id, playing_id_type = get_id_type(self.data['playing'])
         index = -1
         for i, p in enumerate(self.data['playlist']):
-            p_id, p_id_type = self.get_id_type(p)
+            p_id, p_id_type = get_id_type(p)
             if playing_id == p_id and playing_id_type == p_id_type:
                 print "INDEX:", i
                 index = i
@@ -618,6 +615,7 @@ class Satellite:
             print "set_playing_index:", index
         else:
             print "ERROR SETTING INDEX"
-         
-s = Satellite()
-gtk.main()
+
+if __name__ == "__main__":
+    s = Satellite()
+    gtk.main()

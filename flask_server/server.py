@@ -74,6 +74,8 @@ from tornado.web import FallbackHandler, RequestHandler, Application
 
 # from flasky import app
 
+from satellite import get_id_type
+
 debug = True
 
 def _print(*args, **kwargs):
@@ -1162,6 +1164,7 @@ def mark_dirty_played(obj, listeners):
     print "PERCENT_PLAYED:", percent_played
     skip_score = obj.get('skip_score', 0)
     _print("SKIP SCORE:", skip_score)
+    reason = obj.get('reason', '')
     if not percent_played:
         print "NO PERCENT PLAYED"
     else:
@@ -1173,39 +1176,13 @@ def mark_dirty_played(obj, listeners):
             mark_as_played(fid=fid, 
                            uid=l['uid'], 
                            percent_played=percent_played,
-                           when=when)
+                           when=when,
+                           reason=reason)
     
     sql = """DELETE FROM preload WHERE fid = %s"""
     query(sql, (fid,))
 
-def get_id_type(obj):
-      if not obj or obj == {}:
-          return None, None
 
-      _id = int(obj.get('id', -1))
-      id_type = obj.get('id_type', 'f')
-      fid = int(obj.get('fid', -1))
-      eid = int(obj.get('eid', -1))
-
-      if fid == -1:
-          fid = None
-
-      if fid is not None:
-          _id = fid
-          id_type = 'f'
-
-      if eid == -1:
-          eid = None
-
-      if eid is not None:
-          _id = eid
-          id_type = 'e'
-
-      if _id == -1:
-          _id = None
-          id_type = None
-
-      return _id, id_type
 
 
 def add_obj_to_playlist(obj, playing, new_playlist, already_added,
