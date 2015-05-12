@@ -222,20 +222,23 @@ def remove_missing_files_from_preload():
           query("""DELETE FROM preload WHERE fid = %s""", (fid,))
 
 
-def populate_preload(uid=None, min_amount=0, max_cue_time=10):
+def populate_preload(uid=None, min_amount=0, max_cue_time=10, 
+                     min_preload_size=0):
     remove_duplicates_from_preload()
     remove_missing_files_from_preload()
     if not uid or uid is None:
         sql = """SELECT uid FROM users WHERE listening = true"""
         listeners = get_results_assoc(sql, ())
         len_listeners = len(listeners)
-        max_cue_time = 10 / len_listeners
+        max_cue_time = 10
         for l in listeners:
-            populate_preload(l['uid'], min_amount, max_cue_time)
+            populate_preload(l['uid'], min_amount, max_cue_time,
+                             min_preload_size)
         return
     # populate_preload_for_uid(uid, min_amount)
     try:
-        populate_preload_for_uid(uid, min_amount, max_cue_time)
+        populate_preload_for_uid(uid, min_amount, max_cue_time,
+                                 min_preload_size)
     except Exception as err:
         print "ERROR!!!! COULD NOT POPULATE PRELOAD"
         print err
@@ -302,29 +305,34 @@ def get_single_from_true_score(uid, true_score):
                 ultp, random() 
          LIMIT 1""", (uid, true_score))
 
-def make_true_scores_list():
-    scores = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,85,90,90,
-              95,95]
-
-    # shuffle(scores)
-
+def gen_true_score_list(scores, whole=True):
     true_scores = []
-
     for true_score in scores:
-        iter_count = int(ceil((true_score * 0.1) * .5 ))
+        if whole:
+            iter_count = int(round((true_score * 0.1)))
+        else:
+            iter_count = int(round((true_score * 0.1) * .5 ))
         if iter_count <= 0:
             iter_count = 1
         print "true_score:", true_score, "iter_count:", iter_count
         for i in range(0, iter_count):
             true_scores.append(str(true_score))
 
-    print "true_scores:", true_scores
-    shuffle(true_scores)
-
     return true_scores
 
+def make_true_scores_list():
 
+    by_tens = [0, 10, 20, 30, 40, 50, 60, 70]
+    by_fives = [80, 85, 90, 95]
 
+    # shuffle(scores)
+
+    true_scores = (gen_true_score_list(by_tens, True) +
+                   gen_true_score_list(by_fives, False))
+    
+    shuffle(true_scores)
+    print "true_scores:", true_scores
+    return true_scores
 
 def insert_into_preload(msg, fid, uid, reason):
     print msg, get_assoc("SELECT * FROM files WHERE fid = %s",(fid,))
@@ -794,13 +802,40 @@ def get_something_for_everyone(users, true_score):
     return get_assoc(sql)
 
 
-def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10):
+def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
+                             min_preload_size=0):
     gtk.gdk.threads_leave()
+    sql = """INSERT INTO preload (fid, uid, reason)
+                 SELECT pc.fid, pc.uid, string_agg(pc.reason, ',') 
+                 FROM preload_cache pc
+                      LEFT JOIN preload p ON pc.fid = p.fid
+                 WHERE pc.uid = %s AND 
+                       p.fid IS NULL
+                 GROUP BY pc.fid, pc.uid"""
+    query(sql, (uid,))
+    sql = """DELETE FROM preload_cache WHERE uid = %s"""
+    query(sql, (uid,))
     print "populate_preload_for_uid 1"
     sql = """SELECT COUNT(*) as total 
              FROM preload 
              WHERE uid = %s"""
     total = get_assoc(sql, (uid,))
+
+    sql = """SELECT count(*) AS total
+             FROM preload"""
+
+    total_preload = get_assoc(sql)
+
+    min_preload_size = len(make_true_scores_list())
+    if min_preload_size:
+        sql = """SELECT count(*) AS total
+                 FROM users
+                 WHERE listening = true"""
+        total_listeners = get_assoc(sql)
+        new_min_amount = min_preload_size / total_listeners['total']
+        if new_min_amount > min_amount:
+            min_amount = new_min_amount
+
     if total['total'] > min_amount:
         print "uid: %s preload total: %s>%s :min_amount" % (
           uid, total['total'], min_amount)
@@ -937,45 +972,57 @@ def get_preload():
 
 
 def remove_songs_in_preload_for_users_who_are_not_listening():
-    query("""DELETE FROM preload p WHERE uid NOT IN (SELECT uid 
-                                                     FROM users 
-                                                     WHERE listening = true)""")
+    sql = """INSERT INTO preload_cache (uid, fid, reason)
+             SELECT p.uid, p.fid, p.reason 
+             FROM preload p, users u
+             WHERE p.uid = u.uid AND u.listening = false"""
+    query(sql)
+
+    sql = """DELETE FROM preload p 
+             WHERE uid IN (SELECT uid 
+                           FROM users 
+                           WHERE listening = false)"""
+    query(sql)
 
 def remove_duplicates_from_preload():
-    duplicates = get_results_assoc("""SELECT count(f.sha512) AS total, f.sha512 
-                                      FROM files f, preload p 
-                                      WHERE f.fid = p.fid AND (f.sha512 != ''
-                                        OR f.sha512 IS NOT NULL)
-                                      GROUP BY f.sha512 
-                                      HAVING count(f.sha512) > 1""")
+    sql = """SELECT count(f.sha512) AS total, f.sha512 
+             FROM files f, preload p 
+             WHERE f.fid = p.fid AND (f.sha512 != '' OR
+                                      f.sha512 IS NOT NULL)
+             GROUP BY f.sha512 HAVING count(f.sha512) > 1"""
+    duplicates = get_results_assoc(sql)
     for d in duplicates:
-      files = get_results_assoc("""SELECT p.fid, p.uid
-                                   FROM files f, preload p
-                                   WHERE f.fid = p.fid AND sha512 = %s""",
-                                   (d['sha512'],))
+      sql = """SELECT p.fid, p.uid
+               FROM files f, preload p
+               WHERE f.fid = p.fid AND sha512 = %s"""
+      files = get_results_assoc(sql, (d['sha512'],))
       for f in files[1:]:
-        query("""DELETE FROM preload WHERE fid = %s AND uid = %s""",
+        query("""DELETE FROM preload 
+                 WHERE fid = %s AND uid = %s""",
               (f['fid'], f['uid']))
 
 def get_cue_for():
-    return get_assoc("""SELECT uid, last_time_cued 
-                        FROM users 
-                        WHERE listening = true 
-                        ORDER BY CASE WHEN last_time_cued IS NULL THEN 0 ELSE 1 END, 
-                                 last_time_cued 
-                        LIMIT 1""")
+    sql = """SELECT uid, last_time_cued 
+             FROM users 
+             WHERE listening = true 
+             ORDER BY CASE WHEN last_time_cued IS NULL THEN 0 ELSE 1 END, 
+                      last_time_cued 
+             LIMIT 1"""
+    return get_assoc(sql)
 
 def set_last_time_cued(uid):
-    query("""UPDATE users SET last_time_cued = NOW() WHERE uid = %s""",
-             (uid,))
+    sql = """UPDATE users 
+             SET last_time_cued = NOW() 
+             WHERE uid = %s"""
+    query(sql, (uid,))
 
 def get_single_from_preload(uid=None):
     sql = """SELECT * 
-                 FROM preload p, files f 
-                 WHERE f.fid = p.fid AND 
-                       reason = 'From search'
-                 ORDER BY plid 
-                 LIMIT 1"""
+             FROM preload p, files f 
+             WHERE f.fid = p.fid AND 
+                   reason = 'From search'
+             ORDER BY plid 
+             LIMIT 1"""
     f = get_assoc(sql)
     if f:
       return f

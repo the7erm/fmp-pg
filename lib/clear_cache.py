@@ -8,7 +8,7 @@ import os
 from excemptions import CreationFailed
 
 def clear_cache():
-    history = fobj.recently_played(50)
+    history = fobj.recently_played(100)
     recent = []
 
     for h in history:
@@ -31,9 +31,6 @@ def clear_cache():
         if nobj.is_unlistened():
             print "keeping (unplayed):",filename
             continue
-
-       
-
         
         if os.remove(filename):
             print "removed:",filename

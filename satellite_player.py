@@ -72,11 +72,13 @@ class Player(gobject.GObject):
         'show-window': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         'time-status': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
                         (gobject.TYPE_INT64, gobject.TYPE_INT64, 
-                         gobject.TYPE_INT64, gobject.TYPE_DOUBLE, str, str, str, 
-                         str)), # pos, length, left, decimal, pos_formatted, 
+                         gobject.TYPE_INT64, gobject.TYPE_DOUBLE, str, str, 
+                         str, str)), 
+                                # pos, length, left, decimal, pos_formatted, 
                                 # length_formatted, left_formatted, 
                                 # percent_formatted
-        'state-changed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,)),
+        'state-changed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
+                          (object,)),
         'tag-received': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
                          (str, object)),
         'missing-plugin': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
@@ -412,6 +414,7 @@ static char * invisible_xpm[] = {
         self.player.set_state(PAUSED)
         print "URI:", uri
         self.player.get_state()
+        self.should_hide_window()
 
     def start(self, *args, **kwargs):
         print "="*80
@@ -546,9 +549,11 @@ static char * invisible_xpm[] = {
             self.prepare()
             self.player.set_state(PLAYING)
             self.seek_ns(pos_int)
+            if self.player.get_property('n-video') > 0:
+                self.window.show_all()
+                self.should_hide_window()
             print "PLAYING"
         self.playingState = self.player.get_state()[1]
-        wait()
         self.emit('state-changed', self.playingState)
         
 
@@ -604,7 +609,8 @@ static char * invisible_xpm[] = {
                 msg = message.structure[key]
                 if isinstance(msg, (gst.Date, gst.DateTime)):
                     self.tags[key] = "%s" % msg
-                elif key not in ('image','private-id3v2-frame', 'preview-image',
+                elif key not in ('image','private-id3v2-frame', 
+                                 'preview-image',
                                  'private-qt-tag'):
                     print "tags[%s]=%s" % (key, msg )
                     self.tags[key] = "%s" % msg
@@ -658,6 +664,7 @@ static char * invisible_xpm[] = {
             pprint.pprint(dir(video_sink.props))
             for k in video_sink.props:
                 print ("k:",k, "%s" % k)
+            self.should_hide_window()
             # import pdb; pdb.set_trace()
 
             # gst_base_sink_set_max_lateness(video_sink, -1)

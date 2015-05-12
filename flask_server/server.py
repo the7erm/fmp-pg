@@ -1122,9 +1122,9 @@ def update_score(uid, fid, skip_score):
         score = 10
         print "max:10"
 
-    if score < 0:
-        score = 0
-        print "min:0"
+    if score <= 0:
+        score = 1
+        print "min:1"
 
     sql = """UPDATE user_song_info
              SET score = %s
@@ -1133,13 +1133,16 @@ def update_score(uid, fid, skip_score):
     query(sql, (score, uid, fid))
 
 def mark_dirty_played(obj, listeners):
+    print "mark_dirty_played:", obj
     if not obj or not listeners or obj == {}:
         return
     if not obj.get('dirty') and not obj.get('played'):
         return
+    print "*"*20
+    print "mark_dirty_played:", obj
     id_type = obj.get("id_type")
     if id_type == 'e':
-        print "OBJ:",pformat(obj)
+        print "mark_dirty_played OBJ:",pformat(obj)
         _id = obj.get('id')
         percent_played = obj.get('percent_played')
         for l in listeners:
@@ -1183,8 +1186,6 @@ def mark_dirty_played(obj, listeners):
     query(sql, (fid,))
 
 
-
-
 def add_obj_to_playlist(obj, playing, new_playlist, already_added,
                         playing_id, playing_id_type):
     print "OBJ:", obj
@@ -1203,11 +1204,6 @@ def build_playlist(history, netcasts, preload, playing):
     new_playlist = []
     already_added = []
     playing_id, playing_id_type = get_id_type(playing)
-    
-    while history:
-        obj = history.pop(0)
-        add_obj_to_playlist(obj, playing, new_playlist, already_added,
-                            playing_id, playing_id_type)
     
     while preload:
         obj = preload.pop(0)
@@ -1233,14 +1229,15 @@ def build_playlist(history, netcasts, preload, playing):
         obj = netcasts.pop(0)
         add_obj_to_playlist(obj, playing, new_playlist, already_added,
                             playing_id, playing_id_type)
-        
-    _id, id_type = get_id_type(playing)
 
+    while history:
+        obj = history.pop(0)
+        add_obj_to_playlist(obj, playing, new_playlist, already_added,
+                            playing_id, playing_id_type)
+
+    add_obj_to_playlist(playing, playing, new_playlist, already_added,
+                        playing_id, playing_id_type)
     index = 0
-    for i, n in enumerate(new_playlist):
-        n_id, n_id_type = get_id_type(n)
-        if _id == n_id and n_id_type == id_type:
-            index = i
 
     _print("[PLAYLIST]")
     for i, p in enumerate(new_playlist):
@@ -1257,20 +1254,52 @@ def build_playlist(history, netcasts, preload, playing):
 @app.route('/satellite/', methods=['GET', 'POST'])
 def satellite():
     print "satellite"
-    cache.clear()
-    global playing, player
+    # cache.clear()
+    global playing, player, interaction_tracker
     request_json = request.get_json()
+    sql = """SELECT uid, uname FROM users"""
+    users = []
+    res = cache_get_results_assoc(sql)
+    for r in res:
+        users.append(dict(r))
+
     if request_json:
         print "request_json:"
         pprint(request_json)
+        remote_last_interaction = request_json.get('last_interaction', 0)
+        remote_state = request_json.get('state', 'PAUSED')
+        priority = interaction_tracker.get_priority(remote_last_interaction,
+                                                    remote_state)
+
         _playing = request_json.get('playing',{})
         _playlist = request_json.get("playlist", [])
         listeners = request_json.get('listeners', [])
+        if not listeners or priority == 'server':
+            sql = """SELECT uid, uname FROM users WHERE listening = true"""
+            listeners = []
+            res = cache_get_results_assoc(sql)
+            for r in res:
+                listeners.append(dict(r))
+        
+        listening_uids = []
+        for l in listeners:
+            listening_uids.append(l['uid'])
+            listening(l['uid'], 'true')
+
+        for u in users:
+            if u['uid'] not in listening_uids:
+              listening(u['uid'], 'false')
 
         for p in _playlist:
-            mark_dirty_played(p, listeners)
+            _listeners = p.get('listeners')
+            if not _listeners:
+                _listeners = listeners
+            mark_dirty_played(p, _listeners)
 
-        mark_dirty_played(_playing, listeners)
+        _listeners = _playing.get('listeners')
+        if not _listeners:
+            _listeners = listeners
+        mark_dirty_played(_playing, _listeners)
 
         playing_dict = get_extended()
         _percent_played = request_json['playing'].get('percent_played', 0)
@@ -1280,16 +1309,14 @@ def satellite():
 
         percent_played = "%.2f" % _percent_played
         playing_dict_percent = "%.2f" % playing_dict_percent
-        print "3"
-        if (playing_dict['playingState'] != 'PLAYING' and 
-            playing_dict_percent != percent_played):
-                if playing_dict.get('id') != request_json['playing'].get('id'):
-                    sync_playing(request_json['playing'])
-                print "*"*20,"SEEK","*"*20
-                print "playing_dict_percent:", playing_dict_percent, "!=",
-                print percent_played
-                player.seek(str(_percent_played)+"%")
-                player.update_time()
+        if priority == 'client' and playing_dict_percent != percent_played:
+            if playing_dict.get('id') != request_json['playing'].get('id'):
+                sync_playing(request_json['playing'])
+            print "*"*20,"SEEK","*"*20
+            print "playing_dict_percent:", playing_dict_percent, "!=",
+            print percent_played
+            player.seek(str(_percent_played)+"%")
+            player.update_time()
 
 
     # Send last 10 songs
@@ -1341,6 +1368,15 @@ def satellite():
     for p in res:
         preload.append(dict(p))
 
+    sql = """SELECT pc.*, f.title
+             FROM preload_cache pc,
+                  files f
+             WHERE pc.fid = f.fid"""
+    res = cache_get_results_assoc(sql)
+    preload_cache = []
+    for p in res:
+        preload_cache.append(dict(p))
+
     # Send Netcasts
     sql = """SELECT DISTINCT ne.eid, ne.episode_title, ne.episode_url, 
                              ne.local_file, 'e' AS id_type, ne.eid AS id
@@ -1367,6 +1403,7 @@ def satellite():
     res = cache_get_results_assoc(sql)
     for r in res:
         listeners.append(dict(r))
+
     print "/satellite"
     extended = get_extended()
     index, playlist = build_playlist(history, netcasts, preload, extended)
@@ -1378,7 +1415,10 @@ def satellite():
         "netcasts": netcasts,
         "listeners": listeners,
         "playlist": playlist,
-        "index": index
+        "index": index,
+        "preload_cache": preload_cache,
+        "users": users,
+        "last_interaction": interaction_tracker.last_interaction
     })
 
 
@@ -1654,7 +1694,7 @@ def history_data():
                 uh.id_type = 'f' AND
                 uh.id = f.fid
            GROUP BY f.fid, title, sha512, cued, uh.time_played
-           ORDER BY uh_time_played2 DESC
+           ORDER BY uh.time_played DESC
            LIMIT """+str(limit)+""" OFFSET """+str(start)
     # print "Q:<<<%s>>>" % q
 
@@ -1989,6 +2029,10 @@ def stream_netcast(eid):
             if lext == '.mp3':
                 mimetype = "audio/mpeg"
             
+    if not location:
+        for l in locations:
+            print "REDIRECTING"
+            return redirect(l['episode_url'])
 
     return send_file(location, mimetype=mimetype, as_attachment=False,
                      attachment_filename=None, add_etags=False, 
@@ -2065,7 +2109,23 @@ def listening(uid, state):
     uid = int(uid)
     sql = """UPDATE users SET listening = %s WHERE uid = %s"""
     query(sql, (listening, uid))
-    if not listening:
+    if listening:
+        sql = """INSERT INTO preload (fid, uid, reason)
+                 SELECT pc.fid, pc.uid, string_agg(pc.reason, ',') 
+                 FROM preload_cache pc
+                      LEFT JOIN preload p ON pc.fid = p.fid
+                 WHERE pc.uid = %s AND 
+                       p.fid IS NULL
+                 GROUP BY pc.fid, pc.uid"""
+        query(sql, (uid,))
+        sql = """DELETE FROM preload_cache WHERE uid = %s"""
+        query(sql, (uid,))
+    else:
+        sql = """INSERT INTO preload_cache (fid, uid, reason)
+                 SELECT p.fid, p.uid, p.reason
+                 FROM preload p
+                 WHERE p.uid = %s"""
+        query(sql, (uid,))
         sql = """DELETE FROM preload WHERE uid = %s"""
         query(sql, (uid,))
     return users()

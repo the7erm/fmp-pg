@@ -430,6 +430,7 @@ class RatingsAndScores:
 
     def update_history_for_uid(self, uid=None, percent_played=0):
         self.check_recently_played(uid=uid)
+        print "UPDATE HISTORY FROM ratings_and_scores"
         updated = get_results_assoc("""UPDATE user_history uh 
                                        SET true_score = ufi.true_score, 
                                            score = ufi.score, 
@@ -554,6 +555,8 @@ class RatingsAndScores:
                                       usi.fid = %s
                                 ORDER BY admin DESC, uname
                                 LIMIT 1""",(self.fid,))
+        if not selected:
+            return None
 
         selected['selected'] = True
         self.update([selected])

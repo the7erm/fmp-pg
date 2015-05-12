@@ -30,6 +30,7 @@ import os
 import sys
 import re
 import satellite_player as player
+from satellite_player import STOPPED, PAUSED, PLAYING
 import lib.notify as notify
 import lib.tray as tray
 import math
@@ -53,7 +54,12 @@ from ConfigParser import NoSectionError
 from lib.excemptions import CreationFailed, NotImpimented
 from pprint import pformat, pprint
 
+from interaction_tracker import InteractionTracker
+
 # setproctitle.setproctitle(os.path.basename(sys.argv[0])+" ".join(sys.argv[1:]))
+
+MIN_PRELOAD_SIZE_PER_USER = 15
+MIN_PRELOAD_SIZE = 40
 
 class DbusWatcher(dbus.service.Object):
     def __init__(self):
@@ -255,7 +261,6 @@ watcher = DbusWatcher()
 def update_history(percent_played=0):
     playing.update_history(percent_played)
 
-
 def mark_as_played(percent_played=0):
     updated = playing.mark_as_played(percent_played)
     res = []
@@ -278,9 +283,19 @@ def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str,
     gtk.gdk.threads_leave()
     global last_percent_played_decimal
     percent_played  = decimal * 100
+
     if percent_played == last_percent_played_decimal:
         # It's paused no need to update the database
         return
+
+    if plr.playingState != PLAYING:
+        print "on_time_status: not playing"
+        sys.stdout.flush()
+        return
+
+    print "on_time_status: playing"
+    sys.stdout.flush()
+
     last_percent_played_decimal = percent_played
     plugins.write({
         'time-status': {
@@ -307,7 +322,8 @@ def populate_preload(min_amount=0):
     # picker.create_preload()
     picker.create_dont_pick()
     # picker.populate_dont_pick()
-    picker.populate_preload(min_amount=min_amount)
+    picker.populate_preload(min_amount=min_amount, 
+                            min_preload_size=MIN_PRELOAD_SIZE)
     return True
 
 
@@ -324,11 +340,13 @@ def on_next_clicked(*args, **kwargs):
     playing.deinc_score()
     start_playing("inc")
     playing.check_recently_played()
+    interaction_tracker.mark_interaction()
 
 
 def on_prev_clicked(item):
     gtk.gdk.threads_leave()
     start_playing("deinc")
+    interaction_tracker.mark_interaction()
 
 def get_cue_netcasts():
     cue_netcasts = cfg.get('Netcasts', 'cue', False, bool)
@@ -766,6 +784,7 @@ notify.playing(playing)
 if plr.dur_int:
     try:
         plr.seek_ns(int(plr.dur_int  * playing["percent_played"] * 0.01))
+        plr.pause()
     except AttributeError:
         pass
 
@@ -783,9 +802,11 @@ tray.quit.connect("activate", quit)
 tray.icon.connect('scroll-event', on_scroll)
 # query("TRUNCATE preload")
 gobject.idle_add(create_dont_pick)
-gobject.timeout_add(15000, populate_preload, 25)
+gobject.timeout_add(15000, populate_preload, MIN_PRELOAD_SIZE_PER_USER)
 gobject.timeout_add(1000, set_rating)
 
+interaction_tracker = InteractionTracker('server', plr)
+flask_server.server.interaction_tracker = interaction_tracker
 flask_server.server.playing = playing
 flask_server.server.player = plr
 flask_server.server.tray = tray
