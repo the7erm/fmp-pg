@@ -326,7 +326,7 @@ class Satellite:
         response_string = response.read()
 
         try:
-            new_data = json.loads()
+            new_data = json.loads(response_string)
         except:
             self.sync_locked = False
             _print("JSON DECODE ERROR", time.time() - start)
