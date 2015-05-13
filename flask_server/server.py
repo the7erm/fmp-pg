@@ -63,7 +63,9 @@ from flask import render_template
 import lib.fobj as fobj
 from lib.rating_utils import rate as simple_rate, mark_as_played, \
                              calculate_true_score_for_fid_uid,\
-                             set_score_for_uid
+                             set_score_for_uid, convert_when_to_dt,\
+                             update_user_history
+
 
 from lib.local_file_fobj import get_words_from_string, Local_File
 from lib.scanner import scan_file
@@ -1093,19 +1095,38 @@ def search_data():
     print "end:", time.time() - start_time
     return json_dump(results)
 
-def mark_netcast_as_listened(eid, uid, percent_played):
+def mark_netcast_as_listened(eid, uid, percent_played, when=None, 
+                             *args, **kwargs):
+    when = convert_when_to_dt(when)
+    update_data = {
+      'uid': uid,
+      'id': eid,
+      'eid': eid,
+      'id_type': 'e',
+      'percent_played': percent_played,
+      'time_played': when,
+      'date_played': when.date(),
+      'when': when,
+      'when_date': when.date(),
+      'reason': ""
+    }
+
     print "mark_netcast_as_listened", eid, uid
     sql = """SELECT eid, uid 
              FROM netcast_listend_episodes
-             WHERE eid = %s AND uid = %s"""
-    present = get_assoc(sql, (eid, uid))
-    if present:
-        return
+             WHERE eid = %(eid)s AND uid = %(uid)s"""
+    present = get_assoc(sql, update_data)
+    
 
-    sql = """INSERT INTO netcast_listend_episodes (eid, uid, percent_played)
-             VALUES(%s, %s, %s)"""
+    if not present:
+        sql = """INSERT INTO netcast_listend_episodes (eid, uid, 
+                                                       percent_played)
+                 VALUES(%(eid)s, %(uid)s, %(percent_played)s)"""
 
-    query(sql, (eid, uid, percent_played))
+        query(sql, update_data)
+
+
+    update_user_history(update_data)
 
 def update_score(uid, fid, skip_score):
     if not skip_score:

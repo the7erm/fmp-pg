@@ -8,6 +8,7 @@ import shutil
 import gtk
 import gobject
 import time
+from datetime import datetime
 import satellite_player as player
 from pprint import pprint, pformat
 import alsaaudio
@@ -291,7 +292,7 @@ class Satellite:
             _print("LOCKED")
             return
         self.data['index'] = 0
-        self.sync_locked = True
+        self.sync_locked = time.time()
         self.files = []
         self.data['last_interaction'] = \
             self.interaction_tracker.last_interaction
@@ -309,11 +310,23 @@ class Satellite:
             self.sync_locked = False
             _print("END REQUEST ERROR", time.time() - start)
             return True
+        except:
+            self.sync_locked = False
+            _print("END REQUEST ERROR 2", time.time() - start)
+            return True
         _print("END REQUEST", time.time() - start)
         self.clean()
         wait("SYNC_WORKER /clean")
 
-        new_data = json.loads(response.read())
+        response_string = response.read()
+
+        try:
+            new_data = json.loads()
+        except:
+            self.sync_locked = False
+            _print("JSON DECODE ERROR", time.time() - start)
+            _print("<<<%s>>>" % response_string)
+            return
         # TODO compare new_data with self.data
         _print("new_data")
 
@@ -513,6 +526,23 @@ class Satellite:
                 self.window.set_decorated(True)
             self.window.emit('check-resize')
 
+        if keyname in ('KP_Delete',):
+            now = datetime.now()
+            self.say("The current time is %s" % now.strftime("%I:%M %p"), 
+                     wait=True )
+            _print("PLAYING:", self.data['playing'])
+            artist = self.data['playing'].get('artist', "")
+            artists = self.data['playing'].get("artists", [])
+            if artists:
+                artist = artists[0]['artist']
+            title = self.data['playing'].get('title', "")
+            if not title:
+                title = self.data['playing'].get("episode_title", "")
+            reason = self.data['playing'].get("reason", "")
+            self.say("%s - %s %s" % (artist, title, reason), wait=True)
+
+            self.sync()
+
         if keyname == "KP_Multiply":
             self.say("rate")
             self.rating_user = True
@@ -661,7 +691,7 @@ class Satellite:
             self.say("Set %s to listening" % uname)
 
     def say(self, string, wait=False):
-        cmd = ["espeak", "-a", "200", string]
+        cmd = ["espeak", "-v", "english-us", "-a", "200", string]
         if wait:
             subprocess.check_output(cmd)
         else:

@@ -301,9 +301,7 @@ def set_score_for_uid(fid, uid, score):
     return updated_again or updated or []
 
 
-def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
-    print "mark_as_played"
-    print "when:",type(when), when
+def convert_when_to_dt(when):
     if when is None:
         when = datetime.now()
 
@@ -317,6 +315,95 @@ def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
     if when.tzinfo is None:
         when = when.replace(tzinfo=utc)
         print "when with replaced tzinfo:", when, when.tzinfo
+
+    return when
+
+def update_user_history(update_data):
+
+    sql = """SELECT uhid, id, id_type
+             FROM user_history
+             WHERE uid = %(uid)s
+             ORDER BY time_played DESC
+             LIMIT 1"""
+
+    last_file_played = get_assoc(sql, update_data)
+    uhid = -1
+    if last_file_played['id'] == update_data.get('id') and \
+       last_file_played['id_type'] == update_data.get('id_type'):
+        uhid = last_file_played['uhid']
+
+    if uhid == -1:
+        sql = """INSERT INTO user_history 
+                   (uid, id, id_type,
+                    percent_played,
+                    time_played,
+                    date_played,
+                    reason)
+                 VALUES (%(uid)s, %(id)s, %(id_type)s, 
+                         %(percent_played)s, 
+                         %(time_played)s, 
+                         %(date_played)s, 
+                         %(reason)s) RETURNING *"""
+        try:
+            inserted = get_assoc(sql, update_data)
+            uhid = inserted['uhid']
+            print "- user_history inserted"
+        except psycopg2.IntegrityError, err:
+            print "IntegrityError:", err
+            query("COMMIT;")
+            sql = """SELECT uhid, id, id_type
+                     FROM user_history
+                     WHERE uid = %(uid)s AND
+                           date_played = %(when_date)s AND
+                           id = %(id)s AND
+                           id_type = %(id_type)s
+                     ORDER BY time_played DESC
+                     LIMIT 1"""
+            todays_data = get_assoc(sql, update_data)
+            if todays_data:
+                uhid = todays_data['uhid']
+    id_type = update_data.get("id_type")
+    if id_type == 'f':
+        sql = """UPDATE user_history uh
+                 SET true_score = ufi.true_score,
+                     score = ufi.score,
+                     rating = ufi.rating,
+                     percent_played = %(percent_played)s,
+                     time_played = %(when)s
+                 FROM user_song_info ufi
+                 WHERE uhid = %(uhid)s AND
+                       fid = %(fid)s"""
+    else:
+        sql = """UPDATE user_history uh
+                 SET percent_played = %(percent_played)s,
+                     time_played = %(when)s
+                 WHERE uhid = %(uhid)s"""
+    fid = update_data.get('id')
+    uid = update_data.get('uid')
+    try:
+        update_data['uhid'] = uhid
+        print pg_cur.mogrify(sql, update_data)
+        query(sql, update_data)
+        print "- user_history updated"
+    except psycopg2.IntegrityError, err:
+        print "IntegrityError:", err
+        query("COMMIT;")
+
+    if id_type == 'f':
+        
+        calculate_true_score_for_fid_uid(fid, uid)
+        try:
+            print pg_cur.mogrify(sql, update_data)
+            query(sql, update_data)
+            print "- user_history updated 2"
+        except psycopg2.IntegrityError, err:
+            print "IntegrityError:", err
+            query("COMMIT;")
+
+def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
+    print "mark_as_played"
+    print "when:",type(when), when
+    when = convert_when_to_dt(when)
 
     update_data = {
       'uid': uid,
@@ -333,26 +420,26 @@ def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
     }
 
     sql = """UPDATE files 
-             SET ltp = %(ltp)s
-             WHERE fid = %(fid)s"""
+             SET ltp = %(when)s
+             WHERE fid = %(id)s"""
     query(sql, update_data)
     print "- files updated"
 
     sql = """UPDATE artists a SET altp = %(when)s
              FROM file_artists fa 
              WHERE fa.aid = a.aid AND 
-                   fa.fid = %(fid)s"""
+                   fa.fid = %(id)s"""
     query(sql, update_data)
     print "- artists updated"
 
     
     sql = """UPDATE user_song_info 
              SET ultp = %(when)s, percent_played = %(percent_played)s 
-             WHERE fid = %(fid)s AND uid = %(uid)s"""
+             WHERE fid = %(id)s AND uid = %(uid)s"""
     query(sql, update_data)
     print "- user_song_info updated"
 
-    sql = """SELECT * FROM file_artists fa WHERE fid = %(fid)s"""
+    sql = """SELECT * FROM file_artists fa WHERE fid = %(id)s"""
     artists = get_results_assoc(sql, update_data)
 
     for a in artists:
@@ -380,7 +467,7 @@ def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
                     fa.fid = usi.fid AND
                     uah.uid = usi.uid AND
                     uah.aid = fa.aid AND
-                    usi.fid = %(fid)s AND 
+                    usi.fid = %(id)s AND 
                     uah.date_played = %(when_date)s"""
     try:
         query(sql, update_data)
@@ -389,73 +476,7 @@ def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
         print "IntegrityError:", err
         query("COMMIT;")
 
-    sql = """SELECT uhid, id, id_type
-             FROM user_history
-             WHERE uid = %(uid)s
-             ORDER BY time_played DESC
-             LIMIT 1"""
-
-    last_file_played = get_assoc(sql, update_data)
-    uhid = -1
-    if last_file_played['id'] == fid and last_file_played['id_type'] == 'f':
-        uhid = last_file_played['uhid']
-
-    if uhid == -1:
-        sql = """INSERT INTO user_history 
-                   (uid, id, id_type,
-                    percent_played,
-                    time_played,
-                    date_played,
-                    reason)
-                 VALUES (%(uid)s, %(id)s, %(id_type)s, 
-                         %(percent_played)s, 
-                         %(time_played)s, 
-                         %(date_played)s, 
-                         %(reason)s) RETURNING *"""
-        try:
-            inserted = get_assoc(sql, update_data)
-            uhid = inserted['uhid']
-            print "- user_history inserted"
-        except psycopg2.IntegrityError, err:
-            print "IntegrityError:", err
-            query("COMMIT;")
-            sql = """SELECT uhid, id, id_type
-                     FROM user_history
-                     WHERE uid = %(uid)s AND
-                           date_played = %(when_date)s AND
-                           id = %(fid)s AND
-                           id_type = 'f'
-                     ORDER BY time_played DESC
-                     LIMIT 1"""
-            todays_data = get_assoc(sql, update_data)
-            if todays_data:
-                uhid = todays_data['uhid']
-
-    sql = """UPDATE user_history uh
-             SET true_score = ufi.true_score,
-                 score = ufi.score,
-                 rating = ufi.rating,
-                 percent_played = ufi.percent_played, 
-                 time_played = %(when)s
-             FROM user_song_info ufi
-             WHERE uhid = %(uhid)s"""
-   
-    try:
-        print "UID:", uid
-        update_data['uhid'] = uhid
-        print pg_cur.mogrify(sql, update_data)
-        query(sql, update_data)
-        print "- user_history updated"
-    except psycopg2.IntegrityError, err:
-        print "IntegrityError:", err
-        query("COMMIT;")
+    update_user_history(update_data)
 
     print "-- done"
-    calculate_true_score_for_fid_uid(fid, uid)
-    try:
-        print pg_cur.mogrify(sql, update_data)
-        query(sql, update_data)
-        print "- user_history updated"
-    except psycopg2.IntegrityError, err:
-        print "IntegrityError:", err
-        query("COMMIT;")
+    
