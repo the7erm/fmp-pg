@@ -288,6 +288,11 @@ def rate(usid=None, uid=None, fid=None, rating=None, selected=None, uname=None):
 
     return []
 
+def get_time():
+    local_offset = time.timezone
+    if time.daylight:
+        local_offset = time.altzone
+    return time.time() + local_offset
 
 def set_score_for_uid(fid, uid, score):
     print "set_score_for_uid"

@@ -76,7 +76,7 @@ from tornado.web import FallbackHandler, RequestHandler, Application
 
 # from flasky import app
 
-from satellite import get_id_type
+from satellite import get_id_type, get_time
 
 debug = True
 
@@ -1161,14 +1161,18 @@ def mark_dirty_played(obj, listeners):
         return
     print "*"*20
     print "mark_dirty_played:", obj
-    id_type = obj.get("id_type")
+    id_type = obj.get("id_type", 'f')
+    if not obj.get('time'):
+        obj['time'] = get_time()
+    when = datetime.datetime.fromtimestamp(obj['time'])
+    percent_played = obj.get('percent_played')
+
     if id_type == 'e':
         print "mark_dirty_played OBJ:",pformat(obj)
         _id = obj.get('id')
-        percent_played = obj.get('percent_played')
         for l in listeners:
             print "l:", l
-            mark_netcast_as_listened(_id, l['uid'], percent_played)
+            mark_netcast_as_listened(_id, l['uid'], percent_played, when)
         return
 
     print "DIRTY"
@@ -1177,14 +1181,11 @@ def mark_dirty_played(obj, listeners):
         fid = obj.get("id")
     else:
         fid = obj.get('fid')
-    if not obj.get('time'):
-        obj['time'] = time.time() + time.timezone
-    when = datetime.datetime.fromtimestamp(obj['time'])
 
     print "FID:", fid
     print "WHEN:", when
     print "LISTENERS:", listeners
-    percent_played = obj.get('percent_played')
+    
     print "PERCENT_PLAYED:", percent_played
     skip_score = obj.get('skip_score', 0)
     _print("SKIP SCORE:", skip_score)

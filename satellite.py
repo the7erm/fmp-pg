@@ -40,6 +40,11 @@ def wait(*args, **kwargs):
     _print ("/wait()", args, kwargs)
     return True
 
+def get_time():
+    local_offset = time.timezone
+    if time.daylight:
+        local_offset = time.altzone
+    return time.time() + local_offset
 
 def get_id_type(obj):
     if not obj or obj == {}:
@@ -842,11 +847,7 @@ class Satellite:
 
     def set_percent_played(self, percent_played):
         self.set_playing_data('percent_played', percent_played)
-        local_offset = time.timezone
-        if time.daylight:
-            local_offset = time.altzone
-            
-        self.set_playing_data('time', time.time() + local_offset)
+        self.set_playing_data('time', get_time())
 
     def set_playing_data(self, key, value):
         _print(key,'=',value)
