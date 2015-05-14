@@ -89,10 +89,21 @@ def _pprint(*args, **kwargs):
         pprint(*args, **kwargs)
         sys.stdout.flush()
 
+class myURLOpener(urllib.FancyURLopener):
+    """Create sub-class in order to overide error 206.  This error means a
+       partial file is being sent,
+       which is ok in this case.  Do nothing with this error.
+    """
+    # http://code.activestate.com/recipes/83208-resuming-download-of-a-file/
+    def http_error_206(self, url, fp, errcode, errmsg, headers, data=None):
+        pass
+
 class Satellite:
     def __init__(self):
-        start = time.time()
         self.say("initializing player", wait=True)
+        start = time.time()
+        self.last_sync_time = 0
+        self.sync_response_string = ""
         self.shutting_down = False
         self.start_power_down_timer = 0
         self.time_to_save = 5
@@ -137,7 +148,7 @@ class Satellite:
         _print("sync(just_playing=False)")
         self.sync()
         gobject.timeout_add(15000, self.sync)
-        gobject.timeout_add(30000, self.fsync)
+        gobject.timeout_add(60000, self.fsync)
         print "DONE"
         self.say("Player ready")
 
@@ -304,29 +315,31 @@ class Satellite:
         data = json.dumps(self.data)
         url = 'http://%s/satellite/' % HOST
         start = time.time()
-        try:
-            _print("STARTING REQUEST")
-            req = urllib2.Request(url, data, 
-                                  {'Content-Type': 'application/json'})
-            response = urllib2.urlopen(req)
-        except urllib2.URLError, err:
-            print "urllib2.URLError:", err
-            self.build_playlist()
-            self.sync_locked = False
-            _print("END REQUEST ERROR", time.time() - start)
-            return True
-        except:
-            self.sync_locked = False
-            _print("END REQUEST ERROR 2", time.time() - start)
-            return True
+        if self.last_sync_time < (start - 6):
+            try:
+                _print("STARTING REQUEST")
+                req = urllib2.Request(url, data, 
+                                      {'Content-Type': 'application/json'})
+                response = urllib2.urlopen(req)
+            except urllib2.URLError, err:
+                print "urllib2.URLError:", err
+                self.build_playlist()
+                self.sync_locked = False
+                _print("END REQUEST ERROR", time.time() - start)
+                return True
+            except:
+                self.sync_locked = False
+                _print("END REQUEST ERROR 2", time.time() - start)
+                return True
+            self.sync_response_string = response.read()
+            self.last_sync_time = time.time()
+
         _print("END REQUEST", time.time() - start)
         self.clean()
         wait("SYNC_WORKER /clean")
 
-        response_string = response.read()
-
         try:
-            new_data = json.loads(response_string)
+            new_data = json.loads(self.sync_response_string)
         except:
             self.sync_locked = False
             _print("JSON DECODE ERROR", time.time() - start)
@@ -457,37 +470,66 @@ class Satellite:
         if os.path.exists(dst):
             print "EXISTS", filename
             return
-        title = obj.get('title', obj.get('episode_title'))
+        title = obj.get('title', obj.get('episode_title', ""))
         if title:
             self.say("downloading %s" % title)
         _print("DOWNLOAD:", filename)
         pprint(obj)
         tmp = dst + ".tmp"
+        exist_size = 0
+        open_attrs = "wb"
+        request = myURLOpener()
+        if os.path.exists(tmp):
+            open_attrs = "ab"
+            exist_size = os.path.getsize(tmp)
+            #If the file exists, then only download the remainder
+            request.addheader("Range","bytes=%s-" % (exist_size))
         url = 'http://%s/stream/%s/' % (HOST, _id)
         if id_type == 'e':
             url = 'http://%s/stream-netcast/%s/' % (HOST, _id)
         _print("url:", url)
-        CHUNK = 16 * 1024
+        
         try:
-            response = urllib2.urlopen(url)
+            response = request.open(url)
         except urllib2.HTTPError, err:
             return
-        start = time.time()
-        total = 0
-        with open(tmp, 'wb') as fp:
-            while True:
-                if self.shutting_down:
-                    return False
-                chunk = response.read(CHUNK)
-                if not chunk: 
-                    break
-                fp.write(chunk)
-                if start <= time.time() - 1:
-                    start = time.time()
-                    _print (total)
-                    wait()
-                total += CHUNK
-            os.fsync(fp.fileno())
+        
+        content_length = int(response.headers['Content-Length'])
+        if content_length == exist_size:
+            print "File already downloaded"
+            if os.path.exists(tmp):
+                shutil.move(tmp, dst)
+            return
+
+        CHUNK = 16 * 1024
+        total = 0.0
+        display_time = time.time()
+        start_time = time.time()
+        precent_complete = 0
+        try:
+            with open(tmp, open_attrs) as fp:
+                while True:
+                    if self.shutting_down:
+                        return False
+                    chunk = response.read(CHUNK)
+                    if not chunk: 
+                        break
+                    fp.write(chunk)
+                    total += len(chunk)
+                    if display_time <= time.time() - 1:
+                        display_time = time.time()
+                        precent_complete = (total / content_length) * 100
+                        _print ("%s:%s %s%%" % (total, content_length, 
+                                                precent_complete))
+                        wait()
+                os.fsync(fp.fileno())
+        except:
+            print "Error downloading:", sys.exc_info()[0]
+            return
+
+        running_time = time.time() - start_time
+        _print ("%s:%s %s%% %s" % (total, content_length, 
+                                   precent_complete, running_time))
         shutil.move(tmp, dst)
 
     def quit(self, *args, **kwargs):
@@ -503,9 +545,10 @@ class Satellite:
             self.pause()
 
         if keyname == "KP_Divide":
-            if not self.start_power_down_timer:
+            been_down_for = (time.time() - self.start_power_down_timer)
+            if not self.start_power_down_timer or been_down_for >= 5:
                 self.start_power_down_timer = time.time()
-            elif (time.time() - self.start_power_down_timer) >= 3:
+            elif been_down_for >= 4 and been_down_for <= 5:
                 if self.shutting_down:
                     return
                 self.shutting_down = True
@@ -535,14 +578,20 @@ class Satellite:
             now = datetime.now()
             self.say("The current time is %s" % now.strftime("%I:%M %p"), 
                      wait=True )
+            self.sync(just_playing=True)
             _print("PLAYING:", self.data['playing'])
-            artist = self.data['playing'].get('artist', "")
-            artists = self.data['playing'].get("artists", [])
-            if artists:
-                artist = artists[0]['artist']
-            title = self.data['playing'].get('title', "")
-            if not title:
-                title = self.data['playing'].get("episode_title", "")
+
+            artist = self.data['playing'].get("artist_title", "")
+            title = ""
+            if not artist:
+                artist = self.data['playing'].get('artist', "")
+                artists = self.data['playing'].get("artists", [])
+                if artists:
+                    artist = artists[0]['artist']
+                title = self.data['playing'].get('title', "")
+                if not title:
+                    title = self.data['playing'].get("episode_title", "")
+
             reason = self.data['playing'].get("reason", "")
             self.say("%s - %s %s" % (artist, title, reason), wait=True)
 
