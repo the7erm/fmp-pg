@@ -2,6 +2,7 @@ import urllib
 import urllib2
 import json
 import os
+import signal
 import sys
 import select
 import shutil
@@ -17,6 +18,7 @@ import subprocess
 from interaction_tracker import InteractionTracker
 from config_dir import config_dir
 import threading
+import re
 
 if __name__ == "__main__":
     gobject.threads_init()
@@ -100,7 +102,14 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
-        self.say("initializing player", wait=True)
+        self.sync_thread = False
+        self.last_sync_ok = False
+        self.write_lock = False
+        self.player = None
+        self.pico_thread = None
+        self.pico_stack = []
+        self.init_pico_thread()
+        self.say("initializing player")
         start = time.time()
         self.last_sync_time = 0
         self.sync_response_string = ""
@@ -120,10 +129,10 @@ class Satellite:
             "listeners": [],
             "index": -1,
             "playlist": [],
-            "satellite_playlist": [],
             "preload_cache": [],
             "users": [],
-            "volume": 100
+            "volume": 100,
+            "satellite_history": []
         }
         _print("init_window()")
         self.init_window()
@@ -135,7 +144,6 @@ class Satellite:
         self.set_volume(volume)
         _print("sync(just_playing=True)")
         self.sync(just_playing=True)
-
         print "self.data['state']:", self.data['state']
         self.play()
         self.resume()
@@ -150,6 +158,7 @@ class Satellite:
         gobject.timeout_add(15000, self.sync)
         gobject.timeout_add(60000, self.fsync)
         print "DONE"
+        self.set_track(0)
         self.say("Player ready")
 
     def wait(self, *args, **kwargs):
@@ -183,6 +192,10 @@ class Satellite:
         self.interaction_tracker = InteractionTracker('client', self.player)
         return
 
+    def init_pico_thread(self):
+        self.pico_thread = threading.Thread(target=self.pico_loop)
+        self.pico_thread.start()
+
     def load(self):
         if self.load_json(satellite_json):
             return
@@ -196,7 +209,9 @@ class Satellite:
         with open(filename, 'r') as fp:
             try:
                 self.data = json.loads(fp.read())
-                last_interaction = self.data.get('last_interaction')
+                if not self.data.get('satellite_history',[]):
+                    self.data['satellite_history'] = \
+                            self.data.get('history', [])
                 self.build_playlist()
                 loaded = True
             except ValueError:
@@ -261,10 +276,14 @@ class Satellite:
         self.data['history'] = value
 
     def write(self):
+        if self.write_lock:
+            return
+        self.write_lock = True
         wait()
         _print("*WRITE*")
         start = time.time()
         with open(satellite_json, 'wb') as fp:
+            self.data['playlist'] = []
             self.data['last_written'] = time.time()
             self.data['last_interaction'] = \
                 self.interaction_tracker.last_interaction
@@ -279,6 +298,7 @@ class Satellite:
         wait()
         _print("/*WRITE*", time.time() - start)
         self.time_to_save = 5
+        self.write_lock = False
 
     def clean(self):
         self.data['playing']['dirty'] = False
@@ -290,6 +310,11 @@ class Satellite:
             self.data['playlist'][i]['played'] = False
             self.data['playlist'][i]['listeners'] = {}
 
+        for i, p in enumerate(self.data['satellite_history']):
+            self.data['satellite_history'][i]['dirty'] = False
+            self.data['satellite_history'][i]['played'] = False
+            self.data['satellite_history'][i]['listeners'] = {}
+
     def sync(self, just_playing=False, *args, **kwargs):
         if self.shutting_down:
             return False
@@ -297,8 +322,10 @@ class Satellite:
         if just_playing:
             self.sync_worker(just_playing=just_playing, *args, **kwargs)
             return True
-        t = threading.Thread(target=self.sync_worker)
-        t.start()
+        if self.sync_locked:
+            return
+        self.sync_thread = threading.Thread(target=self.sync_worker)
+        self.sync_thread.start()
         _print("SYNC 2")
         return True
 
@@ -307,7 +334,7 @@ class Satellite:
         if self.sync_locked:
             _print("LOCKED")
             return
-        self.data['index'] = 0
+        self.last_sync_ok = False
         self.sync_locked = time.time()
         self.files = []
         self.data['last_interaction'] = \
@@ -315,7 +342,7 @@ class Satellite:
         data = json.dumps(self.data)
         url = 'http://%s/satellite/' % HOST
         start = time.time()
-        if self.last_sync_time < (start - 6):
+        if self.last_sync_time < (start - 5):
             try:
                 _print("STARTING REQUEST")
                 req = urllib2.Request(url, data, 
@@ -335,8 +362,6 @@ class Satellite:
             self.last_sync_time = time.time()
 
         _print("END REQUEST", time.time() - start)
-        self.clean()
-        wait("SYNC_WORKER /clean")
 
         try:
             new_data = json.loads(self.sync_response_string)
@@ -345,6 +370,10 @@ class Satellite:
             _print("JSON DECODE ERROR", time.time() - start)
             _print("<<<%s>>>" % response_string)
             return
+        self.clean()
+
+        wait("SYNC_WORKER /clean")
+
         # TODO compare new_data with self.data
         _print("new_data")
 
@@ -359,10 +388,10 @@ class Satellite:
         priority = self.interaction_tracker.get_priority(remote_last_interaction, remote_playing_state)
 
         if priority == 'server':
-            print "SYNCING PLAYING"
+            _print("SYNCING PLAYING")
             sync_keys += ['playing']
         else:
-            print "NOT SYNCING PLAYING"
+            _print("NOT SYNCING PLAYING")
             staging['playing'] = deepcopy(self.data['playing'])
             del staging['playing']['dirty']
             del staging['playing']['played']
@@ -372,50 +401,67 @@ class Satellite:
         for key in sync_keys:
             staging[key] = new_data[key]
 
-        self.set_playing_index(staging)
+        self.set_staging_playing_index(staging)
 
         _print ("[NEW DATA]")
         for k, v in staging.items():
             if k == 'playlist':
                 continue
-            print "K:",k, "v:",pformat(v)
+            _print("K:",k, "v:",pformat(v))
 
         for i, v in enumerate(staging.get('playlist', [])):
-            if i == staging['index']:
-                print "="*20, 'INDEX', "="*20
-            print "I:", str(i), "V:", pformat(v)
-            if i == staging['index']:
-                print "="*20, '/INDEX', "="*20
+            if i == staging['playlist_index']:
+                _print("="*20,"INDEX","="*20)
+            _print("I:", str(i), "V:", pformat(v))
+            if i == staging['playlist_index']:
+                _print("="*20,"/INDEX","="*20)
         _print ("[/NEW DATA]")
         _print("playing:", staging['playing'])
         self.download(staging['playing'])
         if just_playing:
             self.sync_locked = False
             self.data.update(staging)
+            self.sync_thread = False
             return True
         
         for p in staging['playlist']:
-            # _print("playlist:", p)
             self.download(p)
 
         for p in staging['preload_cache']:
             self.download(p)
 
+        _history = staging.get('history',[])
+        _history.reverse()
+        for h in _history:
+            indexes = self.get_indexes_for_item(h)
+            if not indexes:
+                self.data['satellite_history'].insert(0, h)
+
+        for p in self.data['satellite_history']:
+            self.download(p)
+        
+        for key in self.data.keys():
+            if key not in sync_keys:
+                staging[key] = self.data[key]
+        
         self.data.update(staging)
+
         self.clear_cache()
-        _print("index:", staging['index'])
         
         if priority == 'server':
             self.play()
             self.resume()
-        self.write()
+        self.set_track(0)
+        self.last_sync_ok = True
         self.sync_locked = False
+        if self.sync_thread:
+            self.sync_thread = False
         return True
 
     def resume(self):
-        print "RESUME"
+        _print("RESUME")
         pos_data = self.data['playing'].get('pos_data')
-        print "pos_data:"
+        _print("pos_data:")
         pprint(pos_data)
         percent_played = self.playing.get('percent_played')
         if pos_data and 'percent_played' in pos_data:
@@ -445,12 +491,12 @@ class Satellite:
 
     def clear_cache(self):
         if not self.files:
-            print "NO FILES"
+            _print("NO FILES")
             return
         for root, dirs, files in os.walk(cache_dir):
             for f in files:
                 if f not in self.files:
-                    print "REMOVE:", f
+                    _print("REMOVE:", f)
                     os.unlink(os.path.join(root,f))
 
     def download(self, obj):
@@ -468,11 +514,14 @@ class Satellite:
         dst = os.path.join(cache_dir, filename)
         self.files.append(filename)
         if os.path.exists(dst):
-            print "EXISTS", filename
+            # print "EXISTS", filename
             return
+        artists = obj.get("artist_title",
+                          obj.get('artist', 
+                                  obj.get('artists', "")))
         title = obj.get('title', obj.get('episode_title', ""))
         if title:
-            self.say("downloading %s" % title)
+            self.say("downloading %s - %s" % (artists, title))
         _print("DOWNLOAD:", filename)
         pprint(obj)
         tmp = dst + ".tmp"
@@ -533,6 +582,9 @@ class Satellite:
         shutil.move(tmp, dst)
 
     def quit(self, *args, **kwargs):
+        pid = os.getpid()
+        print "KILLING"
+        os.kill(pid)
         gtk.main_quit()
         sys.exit()
 
@@ -543,8 +595,10 @@ class Satellite:
 
         if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter'):
             self.pause()
+            self.rating_user = False
 
         if keyname == "KP_Divide":
+            self.rating_user = False
             been_down_for = (time.time() - self.start_power_down_timer)
             if not self.start_power_down_timer or been_down_for >= 5:
                 self.start_power_down_timer = time.time()
@@ -563,9 +617,11 @@ class Satellite:
 
         if keyname == 'KP_Add':
             self.volume_up()
+            self.rating_user = False
 
         if keyname == 'KP_Subtract':
             self.volume_down()
+            self.rating_user = False
 
         if keyname in ('d','D'):
             if self.window.get_decorated():
@@ -577,7 +633,7 @@ class Satellite:
         if keyname in ('KP_Delete',):
             now = datetime.now()
             self.say("The current time is %s" % now.strftime("%I:%M %p"), 
-                     wait=True )
+                     wait=True)
             self.sync(just_playing=True)
             _print("PLAYING:", self.data['playing'])
 
@@ -587,15 +643,19 @@ class Satellite:
                 artist = self.data['playing'].get('artist', "")
                 artists = self.data['playing'].get("artists", [])
                 if artists:
-                    artist = artists[0]['artist']
+                    if isinstance(artists, list):
+                        artist = artists[0]['artist']
+                    elif isinstance(artists, (str, unicode)):
+                        artist = artists
                 title = self.data['playing'].get('title', "")
                 if not title:
                     title = self.data['playing'].get("episode_title", "")
 
             reason = self.data['playing'].get("reason", "")
             self.say("%s - %s %s" % (artist, title, reason), wait=True)
-
+            self.last_sync_time = time.time()
             self.sync()
+            self.rating_user = False
 
         if keyname == "KP_Multiply":
             self.say("rate")
@@ -685,20 +745,20 @@ class Satellite:
 
         if is_lisening:
             move_to_preload_cache = []
-            for f in self.data['playlist']:
+            for f in self.data['preload']:
                 if f.get('uid') == uid:
                     move_to_preload_cache.append(f)
             self.data['listeners'].remove(is_lisening)
             self.data['preload_cache'] += move_to_preload_cache
             for f in move_to_preload_cache:
-                self.data['playlist'].remove(f)
+                self.data['preload'].remove(f)
             
         if not is_lisening:
-            move_to_playlist = []
+            move_to_preload = []
             for f in self.data['preload_cache']:
                 if f.get('uid') == uid:
-                    move_to_playlist.append(f)
-            self.data['playlist'] += move_to_playlist
+                    move_to_preload.append(f)
+            self.data['playlist'] += move_to_preload
             for f in move_to_playlist:
                 self.data['preload_cache'].remove(f)
             for user in self.data['users']:
@@ -706,7 +766,7 @@ class Satellite:
                     self.data['listeners'].append(user)
 
         # Restructure playlist
-        playlist = deepcopy(self.data['playlist'])
+        preload = deepcopy(self.data['preload'])
 
         partitioned = {}
         uids = []
@@ -714,42 +774,83 @@ class Satellite:
             uids.append(l['uid'])
             partitioned[l['uid']] = []
 
+        netcasts = []
+
         partitioned['others'] = []
 
-        for p in playlist:
+        for p in preload:
             if p.get('uid') in uids:
                 partitioned[p['uid']].append(p)
-            else:
-                partitioned['others'].append(p)
 
-        new_playlist = []
+        new_preload = []
         already_added = []
+        for p in self.data.get('satellite_history', []):
+            _id, id_type = get_id_type(item)
+            key = "%s-%s" % (id_type, _id)
+            already_added.append(key)
+
         still_data = True
         while still_data:
             still_data = False
             for _uid in partitioned.keys():
                 if partitioned[_uid]:
                     still_data = True
-                    item = partitioned[_uid].pop(0)
-                    _id, id_type = get_id_type(item)
-                    key = "%s-%s" % (id_type, _id)
-                    if key not in already_added:
-                        new_playlist.append(item)
-                        already_added.append(key)
+                    self.append_new_preload_item(partitioned[_uid],
+                                                 already_added, 
+                                                 new_preload)
 
-        self.data['playlist'] = new_playlist
 
+        self.data['preload'] = new_preload
         if is_lisening:
             self.say("Set %s to not listening" % uname)
         else:
             self.say("Set %s to listening" % uname)
+        self.set_track(0)
+
+    def append_new_preload_item(self, _list, already_added, new_preload):
+        if not _list:
+            return
+        item = _list.pop(0)
+        _id, id_type = get_id_type(item)
+        key = "%s-%s" % (id_type, _id)
+        if key not in already_added:
+            new_preload.append(item)
+            already_added.append(key)
 
     def say(self, string, wait=False):
-        cmd = ["espeak", "-v", "english-us", "-a", "200", string]
-        if wait:
+        self.pico_say(string)
+        return
+
+    def pico_loop(self):
+        rx = re.compile("\W+")
+        while True:
+            print "PICO_LOOP"
+            if not self.pico_stack:
+                time.sleep(1)
+                continue
+            string = self.pico_stack.pop(0)
+            if not string:
+                continue
+            string = re.sub(rx, " ", string)
+            print "SAY:", string
+            wav = "%s.wav" % (get_time(),)
+            wav = os.path.join(config_dir, wav)
+            cmd = ['pico2wave', "--lang=en-GB", "-w", wav, string]
             subprocess.check_output(cmd)
-        else:
-            subprocess.Popen(cmd)
+            cmd = ['aplay', wav]
+            vol = -1
+            if self.player:
+                vol = self.player.player.get_property("volume")
+                print "VOL:", vol
+                self.player.player.set_property("volume", 0.4)
+            subprocess.check_output(cmd)
+            if self.player:
+                print "VOL:", vol
+                self.player.player.set_property("volume", vol)
+            os.unlink(wav)
+
+    def pico_say(self, string):
+        self.pico_stack.append(string)
 
     def pause(self):
         _print("PAUSE CALLED")
@@ -762,6 +863,7 @@ class Satellite:
                 self.player.time_format, None)[0]
             self.player.seek_ns(pos_int)
         self.write()
+        self.sync()
         # wait()
 
     def on_mouse_move(self, *args, **kwargs):
@@ -898,6 +1000,17 @@ class Satellite:
         self.set_playing_data('percent_played', percent_played)
         self.set_playing_data('time', get_time())
 
+    def time_to_cue_netcasts(self):
+        found = False
+        if not self.data['netcasts']:
+            return False
+        for p in self.data['satellite_history'][-10:]:
+            _id, id_type = self.get_id_type(p)
+            if id_type == 'e':
+                found = True
+                break
+        return found
+
     def set_playing_data(self, key, value):
         _print(key,'=',value)
         if key != 'skip_score':
@@ -917,72 +1030,121 @@ class Satellite:
                 self.data['playing']['listeners'].append(deepcopy(l2))
 
         print "self.data['index']:", self.data['index']
-        found = []
 
-        playing_id, playing_id_type = get_id_type(self.data['playing'])
-        for i, p in enumerate(self.data['playlist']):
-            item_id, item_id_type = get_id_type(p)
-            # print "i:",i
-            if item_id == playing_id and playing_id_type == item_id_type:
-                _print ("set_playing_data UPDATE:", i, "self.data['index']:",
-                        self.data['index'])
-                found.append(i)
-                self.data['playlist'][i].update(self.data['playing'])
+        indexes = self.get_indexes_for_item(self.data['playing'])
+        if not indexes:
+            self.data['satellite_history'].append(self.data['playing'])
+            indexes = self.get_indexes_for_item(self.data['playing'])
+            indexes2 = deepcopy(indexes)
+            self.data['index'] = indexes2.pop()
 
-    def inc_track(self, direction=1):
-        current_song = deepcopy(self.data['playing'])
-        playing_id, playing_id_type = get_id_type(current_song)
-        
-        found = []
+        for idx in indexes:
+            self.data['satellite_history'][idx].update(self.data['playing'])
 
-        for i, p in enumerate(self.data['playlist']):
-            item_id, item_id_type = get_id_type(p)
-            if item_id == playing_id and playing_id_type == item_id_type:
-                print "inc_track UPDATE:",i
-                found.append(i)
-                self.data['playlist'][i].update(current_song)
-
-        if not found:
-            self.data['playlist'].append(current_song)
-
-        if direction == 1:
-            print "POP", self.data['playlist'][0]
-            self.data['playing'] = self.data['playlist'].pop(0)
-            self.data['playlist'].append(self.data['playing'])
-        elif direction == -1:
-            self.data['playing'] = self.data['playlist'].pop()
-            self.data['playlist'].insert(0, self.data['playing'])
-        for i, p in enumerate(self.data['playlist']):
-            print i, "P:", p
-        self.write()
+    def inc_track(self):
+        self.set_track(1)
 
     def deinc_track(self):
-        self.inc_track(-1)
+        self.set_track(-1)
 
-    def set_playing_index(self, staging=None):
+    def get_indexes_for_item(self, item, _list=None):
+        if _list is None:
+            _list = self.data.get('satellite_history', [])
+
+        _id, id_type = get_id_type(item)
+        indexes = []
+        for i, list_item in enumerate(_list):
+            item_id, item_id_type = get_id_type(list_item)
+            if _id == item_id and item_id_type == id_type:
+                indexes.append(i)
+        return indexes
+
+    def set_track(self, direction=1):
+        if len(self.data['satellite_history']) > 250:
+            print "RESIZE"
+            self.data['satellite_history'] = \
+                self.data['satellite_history'][-250:]
+
+        current_song = deepcopy(self.data['playing'])
+        index = -1
+        indexes = self.get_indexes_for_item(current_song)
+        for idx in indexes:
+            self.data['satellite_history'][idx].update(current_song)
+            index = idx
+
+        if not indexes:
+            self.data['satellite_history'].append(current_song)
+            indexes = self.get_indexes_for_item(current_song)
+            index = indexes.pop()
+
+        if direction == 1:
+            index = index + 1
+            try:
+                queue_song = self.data['satellite_history'][index]
+                self.data['index'] = index
+            except IndexError:
+                while (self.data['preload'] and 
+                       (len(self.data['satellite_history']) - 1) < index):
+                    queue_song = self.data['preload'].pop(0)
+                    self.data['satellite_history'].append(queue_song)
+                while (self.time_to_cue_netcasts() or 
+                       (
+                        self.data['netcasts'] and 
+                        (len(self.data['satellite_history']) - 1) < index
+                       )):
+                    queue_netcast = self.data['netcasts'].pop(0)
+                    self.data['satellite_history'].append(queue_netcast)
+                
+        elif direction == -1:
+            index = index - 1
+        
+        if (len(self.data['satellite_history']) - 1) < index:
+            index = 0
+
+        if index < 0:
+            index = (len(self.data['satellite_history']) - 1)
+
+        self.data['index'] = index
+
+        self.data['playing'] = self.data['satellite_history'][index]
+        for i, p in enumerate(self.data['satellite_history']):
+            if i == index:
+                _print("*"*20, "INDEX", "*"*20)
+            _print (i, "SH:", pformat(p))
+            if i == index:
+                _print("*"*20, "/INDEX", "*"*20)
+
+        self.write()
+
+    def set_staging_playing_index(self, staging=None):
         if staging is None:
             staging = deepcopy(self.data)
-        current_song = deepcopy(staging['playing'])
-        playing_id, playing_id_type = get_id_type(current_song)
-        found = []
 
-        playing_id, playing_id_type = get_id_type(staging['playing'])
-        for i, p in enumerate(staging['playlist']):
-            item_id, item_id_type = get_id_type(p)
-            if item_id == playing_id and playing_id_type == item_id_type:
-                _print ("set_playing_index UPDATE:",i)
-                found.append(i)
-                staging['playlist'][i].update(staging['playing'])
+        indexes = self.get_indexes_for_item(staging['playing'],
+                                            staging['playlist'])
+        for idx in indexes:
+            staging['playlist'][idx].update(staging['playing'])
 
-        if found:
-            print "FOUND:",found
-            staging['index'] = found[0]
+        if indexes:
+            staging['playlist_indexs'] = deepcopy(indexes)
+            staging['playlist_index'] = indexes.pop()
             return True
 
+        staging['playlist_indexs'] = [-1]
+        staging['playlist_index'] = 0
         return False
 
 
 
 if __name__ == "__main__":
-    s = Satellite()
-    gtk.main()
+    try:
+        s = Satellite()
+        gtk.main()
+    except KeyboardInterrupt:
+        pid = os.getpid()
+        s.write()
+        try:
+            gtk.main_quit()
+        except:
+            pass
+        os.kill(pid, signal.SIGTERM)

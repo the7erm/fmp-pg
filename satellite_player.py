@@ -457,7 +457,7 @@ static char * invisible_xpm[] = {
     def set_volume(self, widget, value):
         self.volume = value
         print "set_volume:", self.volume
-        # self.player.set_property("volume",self.volume)
+        # self.player.set_property("volume", self.volume)
         
     def convert_ns(self, time_int):
         time_int = time_int / 1000000000

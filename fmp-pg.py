@@ -329,10 +329,8 @@ def populate_preload(min_amount=0):
 
 def on_toggle_playing(item):
     gtk.gdk.threads_leave()
-    print "on_toggle_playing"
     plr.pause()
     tray.set_play_pause_item(plr.playingState)
-
 
 def on_next_clicked(*args, **kwargs):
     gtk.gdk.threads_leave()
@@ -341,7 +339,6 @@ def on_next_clicked(*args, **kwargs):
     start_playing("inc")
     playing.check_recently_played()
     interaction_tracker.mark_interaction()
-
 
 def on_prev_clicked(item):
     gtk.gdk.threads_leave()
@@ -548,31 +545,27 @@ def get_bible_chapters(episode_title):
 
 def append_file():
     global history
-
+    f = None
     if get_cue_netcasts():
         # TODO: Add config option for netcast spacing.
         recent = history[-10:]
         found_netcast = False
         for r in recent:
             r = dict(r)
-            print "r:", dict(r)
+            # print "r:", dict(r)
             if is_netcast(r):
                 found_netcast = True
                 break
 
-        if found_netcast:
-            f = picker.get_song_from_preload()
-        else:
+        if not found_netcast:
             f = fobj.netcast_fobj.get_one_unlistened_episode()
             if f and 'thru the bible' in f['netcast_name'].lower():
                 files = get_bible_chapters(f['episode_title'])
                 for _f in files:
                     history.append(_f)
-            if not f:
-                f = picker.get_song_from_preload()
-
-    else:
+    if not f:
         f = picker.get_song_from_preload()
+
     if f:
         print "APPEND:",f
         history.append(f)
@@ -581,9 +574,9 @@ def append_file():
         if 'id' in f and 'id_type' in 'f':
             delete_fid_from_preload(f['id'])
         return f
-    else:
-        print "NO FILE:"
-        return None
+    
+    print "NO FILE:"
+    return None
 
 
 def delete_fid_from_preload(fid):
@@ -601,10 +594,11 @@ def set_idx(idx, retry=2):
     print "set_idx: IDX:",idx
     try:
         f = dict(history[idx])
-        print "set_idx F:",f
+        print "set_idx F:", idx, f
         if 'fid' in f:
             delete_fid_from_preload(f['fid'])
-        tray.playing = flask_server.server.playing = playing = fobj.get_fobj(**f)
+        tray.playing = flask_server.server.playing = playing = \
+            fobj.get_fobj(**f)
         print "/set_idx F:"
         tray.set_rating()
         populate_preload()
@@ -613,8 +607,11 @@ def set_idx(idx, retry=2):
         while idx > history_len - 1:
             f = append_file()
             if not f:
-                break;
+                break
             history_len = len(history)
+
+        if idx == history_len - 1 and retry > 0:
+            retry = 1
 
         if retry > 0:
             print "RETRYING:",retry

@@ -54,9 +54,10 @@ class InteractionTracker:
         self.write_last_interaction()
 
     def write_last_interaction(self):
+        _print ("write_last_interaction:", self.last_interaction)
         with open(self.config_file, 'w') as fp:
             fp.write("%s" % self.last_interaction)
-            # os.fsync(fp.fileno())
+            os.fsync(fp.fileno())
 
     def get_priority(self, remote_last_interaction, remote_playing_state):
 

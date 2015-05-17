@@ -1222,10 +1222,10 @@ def add_obj_to_playlist(obj, playing, new_playlist, already_added,
         already_added.append(key)
 
 def build_playlist(history, netcasts, preload, playing):
-    playlist = []
     new_playlist = []
     already_added = []
     playing_id, playing_id_type = get_id_type(playing)
+
     
     while preload:
         obj = preload.pop(0)
@@ -1312,6 +1312,13 @@ def satellite():
             if u['uid'] not in listening_uids:
               listening(u['uid'], 'false')
 
+        _history = request_json.get("satellite_history", [])
+        for p in _history:
+            _listeners = p.get('listeners')
+            if not _listeners:
+                _listeners = listeners
+            mark_dirty_played(p, _listeners)
+
         for p in _playlist:
             _listeners = p.get('listeners')
             if not _listeners:
@@ -1339,6 +1346,10 @@ def satellite():
             print percent_played
             player.seek(str(_percent_played)+"%")
             player.update_time()
+            playing_dict = get_extended()
+            print "_PLAYING:", _playing
+            print "playing_dict:", playing_dict
+            _playing.update(playing_dict)
 
 
     # Send last 10 songs
@@ -1347,16 +1358,21 @@ def satellite():
                     to_char(time_played, 'YYYY-MM-DD HH24:MI:SS'), 
                     ','
                     ) AS times_played, 
-                    string_agg(to_char(uh.uid, '999'), ',') AS uids
+                    string_agg(to_char(uh.uid, '999'), ',') AS uids,
+                    string_agg(artist, ',' ORDER BY artist) AS artists,
+                    netcast_name
              FROM users u, 
                   user_history uh
                   LEFT JOIN netcast_episodes ne ON uh.id_type = 'e' AND 
                                                    uh.id = ne.eid
-                  LEFT JOIN files f ON uh.id_type = 'f' AND f.fid = uh.id 
+                  LEFT JOIN files f ON uh.id_type = 'f' AND f.fid = uh.id
+                  LEFT JOIN file_artists fa ON fa.fid = f.fid
+                  LEFT JOIN artists a ON a.aid = fa.aid
+                  LEFT JOIN netcasts n ON n.nid = ne.nid
              WHERE listening = true AND u.uid = uh.uid
              GROUP BY time_played, id, id_type, title, episode_title, 
-                      date_played
-             ORDER BY time_played DESC 
+                      date_played, netcast_name
+             ORDER BY time_played DESC
              LIMIT 10"""
 
     res = cache_get_results_assoc(sql)
@@ -1370,7 +1386,7 @@ def satellite():
     # Send preload
     sql = """SELECT DISTINCT row_number() OVER (ORDER BY plid) AS pos, 
                              row_number() OVER ( 
-                                PARTITION BY uid ORDER BY uid
+                                PARTITION BY u.uid ORDER BY u.last_time_cued
                              ) AS pos_order,
                              p.plid, p.reason, f.fid,
                              f.fid AS id, 'f' AS id_type,
@@ -1378,22 +1394,35 @@ def satellite():
                                WHEN 'From search' THEN 1
                                ELSE 2
                              END AS reason_order,
-                             title
+                             title,
+                             string_agg(
+                                artist, ',' ORDER BY artist
+                             ) AS artists,
+                             u.uid,
+                             u.last_time_cued
              FROM preload p,
                   files f
-             WHERE p.fid = f.fid
-             GROUP BY p.plid, f.fid,  id, id_type, p.reason, p.uid, title
-             ORDER BY reason_order, pos_order, plid"""
+                  LEFT JOIN file_artists fa ON fa.fid = f.fid
+                  LEFT JOIN artists a ON a.aid = fa.aid,
+                  users u
+             WHERE p.fid = f.fid AND u.uid = p.uid
+             GROUP BY p.plid, f.fid,  id, id_type, p.reason, u.uid, title, 
+                      p.uid, u.last_time_cued
+             ORDER BY reason_order, pos_order, last_time_cued, plid"""
 
     res = cache_get_results_assoc(sql)
     preload = []
     for p in res:
         preload.append(dict(p))
 
-    sql = """SELECT pc.*, f.title
+    sql = """SELECT pc.fid, pc.uid, pc.reason, f.title,
+                    string_agg(artist, ',' ORDER BY artist) AS artists
              FROM preload_cache pc,
                   files f
-             WHERE pc.fid = f.fid"""
+                  LEFT JOIN file_artists fa ON fa.fid = f.fid
+                  LEFT JOIN artists a ON a.aid = fa.aid
+             WHERE pc.fid = f.fid
+             GROUP BY pc.fid, pc.uid, pc.reason, f.title"""
     res = cache_get_results_assoc(sql)
     preload_cache = []
     for p in res:
@@ -1401,8 +1430,10 @@ def satellite():
 
     # Send Netcasts
     sql = """SELECT DISTINCT ne.eid, ne.episode_title, ne.episode_url, 
-                             ne.local_file, 'e' AS id_type, ne.eid AS id
+                             ne.local_file, 'e' AS id_type, ne.eid AS id,
+                             netcast_name AS artist, pub_date
              FROM users u,
+                  netcasts n,
                   netcast_episodes ne
                   LEFT JOIN netcast_subscribers ns 
                             ON ns.nid = ne.nid
@@ -1412,8 +1443,10 @@ def satellite():
              WHERE nle.uid IS NULL AND
                    ns.nid = ne.nid AND
                    ns.uid = u.uid AND
-                   ne.local_file IS NOT null AND
-                   u.listening = true"""
+                   ne.local_file IS NOT NULL AND
+                   u.listening = true AND
+                   n.nid = ne.nid
+             ORDER BY pub_date DESC"""
 
     res = cache_get_results_assoc(sql)
     netcasts = []
@@ -1428,7 +1461,6 @@ def satellite():
 
     print "/satellite"
     extended = get_extended()
-    index, playlist = build_playlist(history, netcasts, preload, extended)
 
     return json_dump({
         "history": history,
@@ -1436,7 +1468,7 @@ def satellite():
         "preload": preload,
         "netcasts": netcasts,
         "listeners": listeners,
-        "playlist": playlist,
+        "playlist": [],
         "index": index,
         "preload_cache": preload_cache,
         "users": users,
