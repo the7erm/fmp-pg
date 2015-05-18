@@ -167,6 +167,9 @@ class Satellite:
         try:
             ip = subprocess.check_output(['hostname', '-I'])
             ip = ip.strip()
+            if " " in ip:
+                ips = ip.split(" ")
+                ip = ips.pop(0)
         except:
             self.host = ""
 
