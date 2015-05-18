@@ -22,7 +22,6 @@ import re
 
 if __name__ == "__main__":
     gobject.threads_init()
-    HOST = "erm:5050"
 
 def wait(*args, **kwargs):
     _print ("wait()", args, kwargs)
@@ -102,6 +101,8 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
+        self.ip = ""
+        self.host = ""
         self.sync_thread = False
         self.last_sync_ok = False
         self.write_lock = False
@@ -144,7 +145,7 @@ class Satellite:
         self.set_volume(volume)
         _print("sync(just_playing=True)")
         self.sync(just_playing=True)
-        print "self.data['state']:", self.data['state']
+        _print("self.data['state']:", self.data['state'])
         self.play()
         self.resume()
         if self.data['state'] == 'PLAYING':
@@ -160,6 +161,75 @@ class Satellite:
         print "DONE"
         self.set_track(0)
         self.say("Player ready")
+
+    def get_ip(self):
+        ip = ""
+        try:
+            ip = subprocess.check_output(['hostname', '-I'])
+            ip = ip.strip()
+        except:
+            self.host = ""
+
+        if self.ip != ip:
+            self.host = ""
+
+        self.ip = ip
+
+    def scan_ips(self):
+        self.host = ""
+        self.get_ip()
+        if not self.ip:
+            return ""
+
+        if (not self.ip.startswith("192.168.") and 
+            not self.ip.startswith("10.") and
+            not self.ip.startswith("172.")):
+                return ""
+        
+        if self.ip.startswith("172."):
+            is_172 = False
+            for i in range(16, 32):
+                if self.ip.startswith("172.%s." % i):
+                    is_172 = True
+                    break
+            if not is_172:
+                return ""
+
+        parts = self.ip.split(".")
+        if not parts:
+            return ""
+        parts.pop() # remove that last element
+        parts.append("0")
+        start_ip = "%s/24" % (".".join(parts))
+        result = subprocess.check_output(["nmap","-sn", start_ip])
+        rx = re.compile("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
+        lines = result.split("\n")
+        ips_to_check = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            match = rx.search(line)
+            if match:
+                ips_to_check.append(match.group(1))
+
+        for ip in ips_to_check:
+            host = "%s:5050" % (ip,)
+            url = "http://%s/satellite/" % host
+            _print("SCANNING:", url)
+            data = json.dumps(self.data)
+            try:
+                req = urllib2.Request(url, data,
+                                      {'Content-Type': 'application/json'})
+                response = urllib2.urlopen(req)
+                _print("CONNECTED:", url)
+                works = json.loads(response.read())
+            except Exception as e:
+                _print("FAILED:", e)
+                continue
+            self.host = host
+            _print("FOUND:", host)
+            break
 
     def wait(self, *args, **kwargs):
         _print("self.wait()")
@@ -329,7 +399,25 @@ class Satellite:
         _print("SYNC 2")
         return True
 
+    def unlock_sync(self, last_sync_ok=False):
+        self.last_sync_ok = last_sync_ok
+        self.sync_locked = False
+        if self.sync_thread:
+            self.sync_thread = False
+
     def sync_worker(self, just_playing=False, *args, **kwargs):
+        self.get_ip()
+        if not self.ip:
+            self.unlock_sync(False)
+            return
+
+        if not self.host:
+            self.scan_ips()
+
+        if not self.host:
+            self.unlock_sync(False)
+            return
+
         _print("SYNC_WORKER")
         if self.sync_locked:
             _print("LOCKED")
@@ -340,7 +428,7 @@ class Satellite:
         self.data['last_interaction'] = \
             self.interaction_tracker.last_interaction
         data = json.dumps(self.data)
-        url = 'http://%s/satellite/' % HOST
+        url = 'http://%s/satellite/' % self.host
         start = time.time()
         if self.last_sync_time < (start - 5):
             try:
@@ -351,28 +439,29 @@ class Satellite:
             except urllib2.URLError, err:
                 print "urllib2.URLError:", err
                 self.build_playlist()
-                self.sync_locked = False
+                self.unlock_sync(False)
                 _print("END REQUEST ERROR", time.time() - start)
                 return True
             except:
-                self.sync_locked = False
+                self.unlock_sync(False)
                 _print("END REQUEST ERROR 2", time.time() - start)
                 return True
             self.sync_response_string = response.read()
             self.last_sync_time = time.time()
+            try:
+                new_data = json.loads(self.sync_response_string)
+            except:
+                _print("JSON DECODE ERROR", time.time() - start)
+                _print("<<<%s>>>" % response_string)
+                self.unlock_sync(False)
+                return True
+            # only clean after a successful connection.
+            self.clean()
+            wait("SYNC_WORKER /clean")
 
         _print("END REQUEST", time.time() - start)
 
-        try:
-            new_data = json.loads(self.sync_response_string)
-        except:
-            self.sync_locked = False
-            _print("JSON DECODE ERROR", time.time() - start)
-            _print("<<<%s>>>" % response_string)
-            return
-        self.clean()
-
-        wait("SYNC_WORKER /clean")
+        new_data = json.loads(self.sync_response_string)
 
         # TODO compare new_data with self.data
         _print("new_data")
@@ -380,7 +469,7 @@ class Satellite:
         staging = deepcopy(self.data)
         
         sync_keys = ['preload', 'netcasts', 'history', 'listeners',
-                     'playlist', 'preload_cache', 'users']
+                     'preload_cache', 'users']
 
         remote_last_interaction = new_data.get('last_interaction', 0.0)
         remote_playing_state = new_data.get('playing', {})\
@@ -399,7 +488,8 @@ class Satellite:
                 sync_keys += ['playing']
 
         for key in sync_keys:
-            staging[key] = new_data[key]
+            if key in new_data:
+                staging[key] = new_data[key]
 
         self.set_staging_playing_index(staging)
 
@@ -416,12 +506,20 @@ class Satellite:
             if i == staging['playlist_index']:
                 _print("="*20,"/INDEX","="*20)
         _print ("[/NEW DATA]")
-        _print("playing:", staging['playing'])
+        
+        # Make sure anything that's changed since the original copy
+        # was made is over written with new data.
+        for key in self.data.keys():
+            if key not in sync_keys:
+                staging[key] = self.data[key]
+
+        print("playing:", staging['playing'])
         self.download(staging['playing'])
+
         if just_playing:
-            self.sync_locked = False
+            # Just update the current 'playing' data and not self.ip.startswith("10.")) and
             self.data.update(staging)
-            self.sync_thread = False
+            self.unlock_sync(False)
             return True
         
         for p in staging['playlist']:
@@ -440,22 +538,19 @@ class Satellite:
         for p in self.data['satellite_history']:
             self.download(p)
         
+        # Make sure anything that's changed since the original copy
+        # was made is over written with new data.
         for key in self.data.keys():
             if key not in sync_keys:
                 staging[key] = self.data[key]
-        
         self.data.update(staging)
-
         self.clear_cache()
         
         if priority == 'server':
             self.play()
             self.resume()
         self.set_track(0)
-        self.last_sync_ok = True
-        self.sync_locked = False
-        if self.sync_thread:
-            self.sync_thread = False
+        self.unlock_sync(True)
         return True
 
     def resume(self):
@@ -824,7 +919,7 @@ class Satellite:
     def pico_loop(self):
         rx = re.compile("\W+")
         while True:
-            print "PICO_LOOP"
+            _print("PICO_LOOP")
             if not self.pico_stack:
                 time.sleep(1)
                 continue
@@ -832,7 +927,7 @@ class Satellite:
             if not string:
                 continue
             string = re.sub(rx, " ", string)
-            print "SAY:", string
+            _print("SAY:", string)
             wav = "%s.wav" % (get_time(),)
             wav = os.path.join(config_dir, wav)
             cmd = ['pico2wave', "--lang=en-GB", "-w", wav, string]
@@ -841,11 +936,11 @@ class Satellite:
             vol = -1
             if self.player:
                 vol = self.player.player.get_property("volume")
-                print "VOL:", vol
+                _print("VOL:", vol)
                 self.player.player.set_property("volume", 0.4)
             subprocess.check_output(cmd)
             if self.player:
-                print "VOL:", vol
+                _print ("VOL:", vol)
                 self.player.player.set_property("volume", vol)
             os.unlink(wav)
 
@@ -892,10 +987,10 @@ class Satellite:
 
     def set_volume(self, vol):
         cards = alsaaudio.cards()
-        print "SET_VOLUME:",vol
-        print "type:",type(vol)
+        _print("SET_VOLUME:",vol)
+        _print("type:",type(vol))
         if isinstance(vol, str) or isinstance(vol,unicode):
-            print "SET_VOLUME2:",vol
+            _print("SET_VOLUME2:",vol)
             if vol in ("-","+"):
                 cur_vol = self.get_volume()
                 if vol == "-":
@@ -907,11 +1002,11 @@ class Satellite:
                     vol = 0
                 if vol > 100:
                     vol = 100
-            print "SET_VOLUME3:",vol
+            _print("SET_VOLUME3:",vol)
         try:
             vol=int(vol)
         except:
-            print "FAIL:",vol
+            _print("FAIL:", vol)
             return
 
         if vol < 0 or vol > 100:
@@ -929,17 +1024,17 @@ class Satellite:
 
     def on_mouse_click(self, *args, **kwargs):
         wait()
-        print "self.on_mouse_click:", args, kwargs
+        _print("self.on_mouse_click:", args, kwargs)
         self.pause()
 
     def on_scroll(self, widget, event):
-        print "on_scroll:"
+        _print ("on_scroll:")
         wait()
         if event.direction == gtk.gdk.SCROLL_UP:
             self.player.seek("+5")
         if event.direction == gtk.gdk.SCROLL_DOWN:
             self.player.seek("-5")
-        print "/on_scroll"
+        _print "/on_scroll")
 
     def next(self):
         self.set_playing_data('played', True)
@@ -990,7 +1085,7 @@ class Satellite:
 
     def on_end_of_stream(self, *args, **kwargs):
         gtk.gdk.threads_leave()
-        print "END OF STREAM"
+        _print ("END OF STREAM")
         self.set_playing_data('skip_score', 1)
         self.set_percent_played(100)
         self.inc_track()
@@ -1029,7 +1124,7 @@ class Satellite:
             if l2 not in self.data['playing']['listeners']:
                 self.data['playing']['listeners'].append(deepcopy(l2))
 
-        print "self.data['index']:", self.data['index']
+        _print ("self.data['index']:", self.data['index'])
 
         indexes = self.get_indexes_for_item(self.data['playing'])
         if not indexes:
@@ -1061,7 +1156,7 @@ class Satellite:
 
     def set_track(self, direction=1):
         if len(self.data['satellite_history']) > 250:
-            print "RESIZE"
+            _print ("RESIZE")
             self.data['satellite_history'] = \
                 self.data['satellite_history'][-250:]
 

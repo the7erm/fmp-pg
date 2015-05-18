@@ -1413,7 +1413,11 @@ def satellite():
     res = cache_get_results_assoc(sql)
     preload = []
     for p in res:
-        preload.append(dict(p))
+        _p = dict(p)
+        last_time_cued = p.get('last_time_cued')
+        if last_time_cued:
+            _p['last_time_cued'] = "%s" % last_time_cued
+        preload.append(dict(_p))
 
     sql = """SELECT pc.fid, pc.uid, pc.reason, f.title,
                     string_agg(artist, ',' ORDER BY artist) AS artists
@@ -1451,7 +1455,11 @@ def satellite():
     res = cache_get_results_assoc(sql)
     netcasts = []
     for r in res:
-        netcasts.append(dict(r))
+        _r = dict(r)
+        pub_date = _r.get('pub_date')
+        if pub_date:
+            _r['pub_date'] = "%s" % pub_date
+        netcasts.append(_r)
 
     sql = """SELECT uid, uname FROM users WHERE listening = true"""
     listeners = []
@@ -1468,8 +1476,6 @@ def satellite():
         "preload": preload,
         "netcasts": netcasts,
         "listeners": listeners,
-        "playlist": [],
-        "index": index,
         "preload_cache": preload_cache,
         "users": users,
         "last_interaction": interaction_tracker.last_interaction

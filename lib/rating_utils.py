@@ -314,6 +314,11 @@ def convert_when_to_dt(when):
         when = datetime.now()
 
     if isinstance(when, float):
+        year_of_seconds = 365 * 60 * 60 * 24
+        if when <= year_of_seconds:
+            # The time is off because the mp3 player didn't connect
+            # to a wifi so use the current time - when
+            when = get_time() - when
         when = datetime.fromtimestamp(when)
         print "when from float:", when, when.tzinfo
 
