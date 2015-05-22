@@ -101,7 +101,7 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
-        self.ip = ""
+        self.ip = []
         self.host = ""
         self.sync_thread = False
         self.last_sync_ok = False
@@ -141,16 +141,18 @@ class Satellite:
         self.init_player()
         _print("load()")
         self.load()
+        self.set_track(0)
         volume = self.data.get('volume', 100)
         self.set_volume(volume)
-        _print("sync(just_playing=True)")
-        self.sync(just_playing=True)
-        _print("self.data['state']:", self.data['state'])
         self.play()
         self.resume()
         if self.data['state'] == 'PLAYING':
             print "RESUME"
             self.player.player.set_state(player.PLAYING)
+        _print("sync(just_playing=True)")
+        self.sync(just_playing=True)
+        _print("self.data['state']:", self.data['state'])
+        
         
         self.player.connect('time-status', self.on_time_status)
         self.player.connect('end-of-stream', self.on_end_of_stream)
@@ -163,83 +165,83 @@ class Satellite:
         self.say("Player ready")
 
     def get_ip(self):
-        ip = ""
+        ip = []
         try:
             ip = subprocess.check_output(['hostname', '-I'])
             ip = ip.strip()
             if " " in ip:
-                ips = ip.split(" ")
-                ip = ips.pop(0)
+                ip = ip.split(" ")
+            else:
+                ip = [ip]
         except:
             self.host = ""
 
         if self.ip != ip:
             self.host = ""
-
         self.ip = ip
 
     def scan_ips(self):
         self.host = ""
         self.get_ip()
         if not self.ip:
-            return ""
+            return
 
-        if (not self.ip.startswith("192.168.") and 
-            not self.ip.startswith("10.") and
-            not self.ip.startswith("172.")):
-                return ""
-        
-        if self.ip.startswith("172."):
-            is_172 = False
-            for i in range(16, 32):
-                if self.ip.startswith("172.%s." % i):
-                    is_172 = True
-                    break
-            if not is_172:
-                return ""
+        for ip in self.ip:
+            if (not ip.startswith("192.168.") and 
+                not ip.startswith("10.") and
+                not ip.startswith("172.")):
+                    continue
+            
+            if ip.startswith("172."):
+                is_172 = False
+                for i in range(16, 32):
+                    if ip.startswith("172.%s." % i):
+                        is_172 = True
+                        break
+                if not is_172:
+                    continue
 
-        parts = self.ip.split(".")
-        if not parts:
-            return ""
-        parts.pop() # remove that last element
-        parts.append("0")
-        start_ip = "%s/24" % (".".join(parts))
-        result = subprocess.check_output(["nmap","-sn", start_ip])
-        rx = re.compile("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
-        lines = result.split("\n")
-        ips_to_check = []
-        for line in lines:
-            line = line.strip()
-            if not line:
+            parts = ip.split(".")
+            if not parts:
                 continue
-            match = rx.search(line)
-            if match:
-                ips_to_check.append(match.group(1))
+            parts.pop() # remove that last element
+            parts.append("0")
+            ip_range = "%s/24" % (".".join(parts))
+            result = subprocess.check_output(["nmap","-sn", ip_range])
+            rx = re.compile("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
+            lines = result.split("\n")
+            ips_to_check = []
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                match = rx.search(line)
+                if match:
+                    ips_to_check.append(match.group(1))
 
-        for ip in ips_to_check:
-            host = "%s:5050" % (ip,)
-            url = "http://%s/satellite/" % host
-            _print("SCANNING:", url)
-            data = json.dumps(self.data)
-            try:
-                req = urllib2.Request(url, data,
-                                      {'Content-Type': 'application/json'})
-                response = urllib2.urlopen(req)
-                _print("CONNECTED:", url)
-                works = json.loads(response.read())
-            except Exception as e:
-                _print("FAILED:", e)
-                continue
-            self.host = host
-            _print("FOUND:", host)
-            break
+            for _ip in ips_to_check:
+                host = "%s:5050" % (_ip,)
+                url = "http://%s/satellite/" % host
+                _print("SCANNING:", url)
+                data = json.dumps(self.data)
+                try:
+                    req = urllib2.Request(url, data,
+                                          {'Content-Type': 'application/json'})
+                    response = urllib2.urlopen(req)
+                    _print("CONNECTED:", url)
+                    works = json.loads(response.read())
+                except Exception as e:
+                    _print("FAILED:", e)
+                    continue
+                self.host = host
+                _print("FOUND:", host)
+                break
 
     def wait(self, *args, **kwargs):
-        _print("self.wait()")
         wait()
-        _print("/self.wait()")
 
     def fsync(self, *args, **kwargs):
+        wait()
         # _print("FSYNC")
         # subprocess.Popen(['sync'])
         return True
@@ -247,6 +249,8 @@ class Satellite:
     def init_window(self):
         self.window = gtk.Window()
         self.event_box = gtk.EventBox()
+        self.keypress_label = gtk.Label()
+        self.event_box.add(self.keypress_label)
         self.window.add(self.event_box)
         self.window.show_all()
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK |
@@ -365,7 +369,8 @@ class Satellite:
                                    indent=4,
                                    separators=(',', ': '))
             fp.write(json_data)
-            os.fsync(fp.fileno())
+            # wait()
+            # os.fsync(fp.fileno())
         wait()
         shutil.copy2(satellite_json, satellite_json+".bak")
         wait()
@@ -444,8 +449,10 @@ class Satellite:
                 self.build_playlist()
                 self.unlock_sync(False)
                 _print("END REQUEST ERROR", time.time() - start)
+                self.host = ""
                 return True
             except:
+                self.host = ""
                 self.unlock_sync(False)
                 _print("END REQUEST ERROR 2", time.time() - start)
                 return True
@@ -618,8 +625,8 @@ class Satellite:
                           obj.get('artist', 
                                   obj.get('artists', "")))
         title = obj.get('title', obj.get('episode_title', ""))
-        if title:
-            self.say("downloading %s - %s" % (artists, title))
+        # if title:
+        #   self.say("downloading %s - %s" % (artists, title))
         _print("DOWNLOAD:", filename)
         pprint(obj)
         tmp = dst + ".tmp"
@@ -631,9 +638,9 @@ class Satellite:
             exist_size = os.path.getsize(tmp)
             #If the file exists, then only download the remainder
             request.addheader("Range","bytes=%s-" % (exist_size))
-        url = 'http://%s/stream/%s/' % (HOST, _id)
+        url = 'http://%s/stream/%s/' % (self.host, _id)
         if id_type == 'e':
-            url = 'http://%s/stream-netcast/%s/' % (HOST, _id)
+            url = 'http://%s/stream-netcast/%s/' % (self.host, _id)
         _print("url:", url)
         
         try:
@@ -669,6 +676,7 @@ class Satellite:
                         _print ("%s:%s %s%%" % (total, content_length, 
                                                 precent_complete))
                         wait()
+                wait()
                 os.fsync(fp.fileno())
         except:
             print "Error downloading:", sys.exc_info()[0]
@@ -689,9 +697,11 @@ class Satellite:
     def on_keypress(self, widget, event):
         wait()
         keyname = gtk.gdk.keyval_name(event.keyval)
+        self.keypress_label.set_text("%s %s" % (keyname, event.keyval))
         print "on_keypress:", keyname
 
-        if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter'):
+        if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter',
+                       'XF86AudioPlay'):
             self.pause()
             self.rating_user = False
 
@@ -713,11 +723,11 @@ class Satellite:
         else:
             self.start_power_down_timer = 0
 
-        if keyname == 'KP_Add':
+        if keyname in ('KP_Add', 'XF86AudioRaiseVolume'):
             self.volume_up()
             self.rating_user = False
 
-        if keyname == 'KP_Subtract':
+        if keyname in ('KP_Subtract', 'XF86AudioLowerVolume'):
             self.volume_down()
             self.rating_user = False
 
@@ -766,13 +776,13 @@ class Satellite:
         if keyname in ('KP_Begin',):
             self.pause()
             
-        if keyname in ('Up', 'KP_Up'):
+        if keyname in ('Up', 'KP_Up', 'XF86AudioForward'):
             self.player.seek("+5")
 
         if keyname in ("Page_Up", "KP_Page_Up"):
             self.player.seek("+30")
         
-        if keyname in ('Down', 'KP_Down'):
+        if keyname in ('Down', 'KP_Down', 'XF86AudioRewind'):
             self.player.seek("-5")
 
         if keyname in ("Page_Down", "KP_Page_Down"):
@@ -829,10 +839,10 @@ class Satellite:
 
 
     def set_listening(self, uid):
-        is_lisening = False
+        is_listening = False
         for l in self.data['listeners']:
             if l['uid'] == uid:
-                is_lisening = l
+                is_listening = l
                 break
 
         uname = "ERROR"
@@ -841,23 +851,23 @@ class Satellite:
                 uname = u['uname']
                 break
 
-        if is_lisening:
+        if is_listening:
             move_to_preload_cache = []
             for f in self.data['preload']:
                 if f.get('uid') == uid:
                     move_to_preload_cache.append(f)
-            self.data['listeners'].remove(is_lisening)
+            self.data['listeners'].remove(is_listening)
             self.data['preload_cache'] += move_to_preload_cache
             for f in move_to_preload_cache:
                 self.data['preload'].remove(f)
             
-        if not is_lisening:
+        if not is_listening:
             move_to_preload = []
             for f in self.data['preload_cache']:
                 if f.get('uid') == uid:
                     move_to_preload.append(f)
             self.data['playlist'] += move_to_preload
-            for f in move_to_playlist:
+            for f in move_to_preload:
                 self.data['preload_cache'].remove(f)
             for user in self.data['users']:
                 if user['uid'] == uid:
@@ -883,7 +893,7 @@ class Satellite:
         new_preload = []
         already_added = []
         for p in self.data.get('satellite_history', []):
-            _id, id_type = get_id_type(item)
+            _id, id_type = get_id_type(p)
             key = "%s-%s" % (id_type, _id)
             already_added.append(key)
 
@@ -899,7 +909,7 @@ class Satellite:
 
 
         self.data['preload'] = new_preload
-        if is_lisening:
+        if is_listening:
             self.say("Set %s to not listening" % uname)
         else:
             self.say("Set %s to listening" % uname)
@@ -923,6 +933,7 @@ class Satellite:
         rx = re.compile("\W+")
         while True:
             _print("PICO_LOOP")
+            wait()
             if not self.pico_stack:
                 time.sleep(1)
                 continue
@@ -1037,7 +1048,7 @@ class Satellite:
             self.player.seek("+5")
         if event.direction == gtk.gdk.SCROLL_DOWN:
             self.player.seek("-5")
-        _print "/on_scroll")
+        _print ("/on_scroll")
 
     def next(self):
         self.set_playing_data('played', True)
@@ -1103,7 +1114,7 @@ class Satellite:
         if not self.data['netcasts']:
             return False
         for p in self.data['satellite_history'][-10:]:
-            _id, id_type = self.get_id_type(p)
+            _id, id_type = get_id_type(p)
             if id_type == 'e':
                 found = True
                 break

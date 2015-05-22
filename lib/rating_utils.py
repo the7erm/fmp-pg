@@ -115,7 +115,6 @@ def calculate_true_score_for_fid_uid(fid, uid):
         for a in averages:
           total += float(a['percent_played'])
           cnt += 1
-
         average = (total / cnt)
     print "2"*100
     q = """UPDATE user_song_info 
@@ -131,6 +130,7 @@ def calculate_true_score_for_fid_uid(fid, uid):
     res = get_assoc(q, (uid, fid))
     title = "%s%s%s" % ("-"*10,"--[true score]--","-"*10)
     print title
+    print "uid:", uid
     print "averages:", averages
     print "average:", average
     print "true score:",
@@ -139,7 +139,7 @@ def calculate_true_score_for_fid_uid(fid, uid):
     else:
         print "NO RES"
     print "-"*len(title)
-    print "3x"*100
+    print "3x"*50
     return res
 
 
