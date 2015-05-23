@@ -338,7 +338,8 @@ def update_user_history(update_data):
 
     last_file_played = get_assoc(sql, update_data)
     uhid = -1
-    if last_file_played['id'] == update_data.get('id') and \
+    if last_file_played and \
+       last_file_played['id'] == update_data.get('id') and \
        last_file_played['id_type'] == update_data.get('id_type'):
         uhid = last_file_played['uhid']
 

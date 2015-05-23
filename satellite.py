@@ -152,8 +152,6 @@ class Satellite:
         _print("sync(just_playing=True)")
         self.sync(just_playing=True)
         _print("self.data['state']:", self.data['state'])
-        
-        
         self.player.connect('time-status', self.on_time_status)
         self.player.connect('end-of-stream', self.on_end_of_stream)
         _print("sync(just_playing=False)")
@@ -162,7 +160,7 @@ class Satellite:
         gobject.timeout_add(60000, self.fsync)
         print "DONE"
         self.set_track(0)
-        self.say("Player ready")
+        self.say("player initialization complete")
 
     def get_ip(self):
         ip = []
@@ -547,6 +545,12 @@ class Satellite:
 
         for p in self.data['satellite_history']:
             self.download(p)
+
+        for p in self.data['history']:
+            self.download(p)
+
+        for p in self.data['netcasts']:
+            self.download(p)
         
         # Make sure anything that's changed since the original copy
         # was made is over written with new data.
@@ -619,14 +623,13 @@ class Satellite:
         dst = os.path.join(cache_dir, filename)
         self.files.append(filename)
         if os.path.exists(dst):
-            # print "EXISTS", filename
             return
         artists = obj.get("artist_title",
                           obj.get('artist', 
                                   obj.get('artists', "")))
         title = obj.get('title', obj.get('episode_title', ""))
-        # if title:
-        #   self.say("downloading %s - %s" % (artists, title))
+        if title:
+            self.say("downloading %s - %s" % (artists, title))
         _print("DOWNLOAD:", filename)
         pprint(obj)
         tmp = dst + ".tmp"
@@ -638,6 +641,7 @@ class Satellite:
             exist_size = os.path.getsize(tmp)
             #If the file exists, then only download the remainder
             request.addheader("Range","bytes=%s-" % (exist_size))
+            self.say("Resuming download %s - %s" % (artists, title))
         url = 'http://%s/stream/%s/' % (self.host, _id)
         if id_type == 'e':
             url = 'http://%s/stream-netcast/%s/' % (self.host, _id)
@@ -646,6 +650,7 @@ class Satellite:
         try:
             response = request.open(url)
         except urllib2.HTTPError, err:
+            self.say("Download failed %s - %s" % (artists, title))
             return
         
         content_length = int(response.headers['Content-Length'])
@@ -705,7 +710,7 @@ class Satellite:
             self.pause()
             self.rating_user = False
 
-        if keyname == "KP_Divide":
+        if keyname in ("KP_Divide", "XF86PowerOff"):
             self.rating_user = False
             been_down_for = (time.time() - self.start_power_down_timer)
             if not self.start_power_down_timer or been_down_for >= 5:
@@ -738,7 +743,7 @@ class Satellite:
                 self.window.set_decorated(True)
             self.window.emit('check-resize')
 
-        if keyname in ('KP_Delete',):
+        if keyname in ('KP_Delete', 'period'):
             now = datetime.now()
             self.say("The current time is %s" % now.strftime("%I:%M %p"), 
                      wait=True)
@@ -788,10 +793,10 @@ class Satellite:
         if keyname in ("Page_Down", "KP_Page_Down"):
             self.player.seek("-30")
             
-        if keyname in ('Right', 'KP_Right'):
+        if keyname in ('Right', 'KP_Right', 'XF86AudioNext'):
             self.next()
         
-        if keyname in ('Left', 'KP_Left'):
+        if keyname in ('Left', 'KP_Left', 'XF86AudioPrev'):
             self.prev()
 
         for l in self.data.get('users'):
@@ -1080,10 +1085,15 @@ class Satellite:
             prefix = 'netcast'
         filename = "{prefix}-{_id}".format(prefix=prefix, _id=_id)
         path = os.path.join(cache_dir, filename)
+        if not os.path.isfile(path):
+            self.say("MISSING:%s" % filename)
+            # self.inc_track()
+            return
         self.player.filename = path
         self.player.prepare()
         if start:
             self.player.start()
+            
 
         return
 
@@ -1099,7 +1109,7 @@ class Satellite:
 
     def on_end_of_stream(self, *args, **kwargs):
         gtk.gdk.threads_leave()
-        _print ("END OF STREAM")
+        _print ("on_end_of_stream: END OF STREAM")
         self.set_playing_data('skip_score', 1)
         self.set_percent_played(100)
         self.inc_track()
@@ -1169,6 +1179,7 @@ class Satellite:
         return indexes
 
     def set_track(self, direction=1):
+        _print("set_track: direction:%s" % direction)
         if len(self.data['satellite_history']) > 250:
             _print ("RESIZE")
             self.data['satellite_history'] = \
