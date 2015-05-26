@@ -188,7 +188,7 @@ class Listeners_Listview(gtk.VBox):
         stateBool = bool(stateInt)
         # cell.set_active(state)
         
-        query("UPDATE users SET "+key+" = %s WHERE uid = %s",(stateBool,uid))
+        query("UPDATE users SET "+key+" = %s WHERE uid = %s",(stateBool, uid))
         if key == 'admin':
             if stateInt == 1:
                 self.status_bar.push(0, "%s is now an admin" % (uname,))
@@ -197,11 +197,34 @@ class Listeners_Listview(gtk.VBox):
         elif key == 'listening':
             if stateInt == 1:
                 self.status_bar.push(0, "%s is now listening" % (uname,))
-                zero = get_results_assoc("SELECT p.fid FROM preload p, user_song_info u WHERE u.fid = p.fid AND u.rating = 0 AND u.uid = %s",(uid,))
-                for f in zero:
-                    query("DELETE FROM preload WHERE fid = %s",(f['fid'],))
+                q = """INSERT INTO preload (fid, uid, reason) 
+                       SELECT DISTINCT pc.fid, pc.uid, pc.reason 
+                       FROM preload_cache pc
+                            LEFT JOIN preload p ON p.fid = pc.fid
+                       WHERE pc.uid = %s AND
+                             p.fid IS NULL"""
+                query(q, (uid,))
+                q = """DELETE FROM preload_cache WHERE uid = %s"""
+                query(q, (uid,))
+                q = """DELETE FROM preload 
+                       WHERE fid IN (
+                            SELECT p.fid 
+                            FROM preload p, user_song_info usi, users u
+                            WHERE usi.fid = p.fid AND 
+                                  usi.rating = 0 AND
+                                  u.uid = usi.uid AND
+                                  u.listening = true
+                      )"""
+                query(q)
             else:
                 # print "DELETE FROM preload WHERE uid = %s" % (uid,)
+                q = """DELETE FROM preload_cache WHERE uid = %s"""
+                query(q, (uid,))
+                q = """INSERT INTO preload_cache (fid, uid, reason) 
+                       SELECT fid, uid, reason 
+                       FROM preload 
+                       WHERE uid = %s"""
+                query(q, (uid,))
                 query("DELETE FROM preload WHERE uid = %s",(uid,))
                 self.status_bar.push(0, "%s is no longer listening" % (uname,))
                 

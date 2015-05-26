@@ -98,6 +98,22 @@ def insert_duplicate_files_into_dont_pick():
 def populate_dont_pick():
     associate_gernes()
     query("TRUNCATE dont_pick")
+    q = """INSERT INTO preload_cache (fid, uid, reason) 
+           SELECT fid, uid, reason 
+           FROM preload 
+           WHERE uid IN (
+                 SELECT uid 
+                 FROM users
+                 WHERE listening = false
+           )"""
+    query(q)
+    q = """DELETE FROM preload 
+           WHERE uid IN (
+                   SELECT uid 
+                   FROM users
+                   WHERE listening = false
+                 )"""
+    query(q)
     query("""INSERT INTO dont_pick (fid, reason) 
                 SELECT fid, 'already in preload' 
                 FROM preload""")
@@ -295,6 +311,7 @@ def get_true_score_sample(uid, true_score):
          LIMIT 10""", (uid, true_score))
 
 def get_single_from_true_score(uid, true_score):
+    insert_artists_in_preload_into_dont_pick()
     return get_assoc(
       """SELECT u.fid, true_score, ultp 
          FROM user_song_info u 
@@ -302,7 +319,7 @@ def get_single_from_true_score(uid, true_score):
          WHERE dp.fid IS NULL AND u.uid = %s AND 
                true_score >= %s
          ORDER BY CASE WHEN ultp IS NULL THEN 0 ELSE 1 END, 
-                ultp, random() 
+                  ultp, random() 
          LIMIT 1""", (uid, true_score))
 
 def gen_true_score_list(scores, whole=True):
@@ -340,10 +357,10 @@ def insert_into_preload(msg, fid, uid, reason):
     query("""INSERT INTO preload (fid, uid, reason)
              VALUES (%s, %s, %s)""",
            (fid, uid, reason))
-    preload_data = get_assoc("""SELECT *
-                                FROM preload
-                                WHERE fid = %s AND uid = %s AND reason = %s""", 
-                            (fid, uid, reason))
+    q = """SELECT *
+           FROM preload
+           WHERE fid = %s AND uid = %s AND reason = %s"""
+    preload_data = get_assoc(q, (fid, uid, reason))
 
 def insert_fid_into_preload(fid, uid, reason):
     # seq_info = is_sequential(fid)
@@ -531,6 +548,7 @@ def insert_artists_in_preload_into_dont_pick():
                                          WHERE dp.fid IS NULL
                                         )
                           )"""
+    wait()
     query(sql)
     wait()
 
@@ -574,6 +592,7 @@ def get_single_random_unplayed(uid):
 
 def get_existing_file(uid, true_score):
     file_info = None
+    insert_artists_in_preload_into_dont_pick()
     while not file_info:
         file_info = get_single_from_true_score(uid, true_score)
 
@@ -613,11 +632,7 @@ def get_existing_file(uid, true_score):
     return file_info
 
 def insert_into_dont_pick(fid):
-    sql = """INSERT INTO dont_pick (fid, reason) 
-             VALUES(%s, 'fid in preload')"""
-    query(sql, (fid, ))  # this must be done every time because sometimes
-                         # files don't have artists, and the filename
-                         # is not Artist - Title.ext
+    
     sql = """SELECT fa.fid, fa.aid 
              FROM file_artists fa LEFT JOIN dont_pick dp ON dp.fid = fa.fid
              WHERE fa.fid = %s AND dp.fid IS NULL"""
@@ -626,7 +641,14 @@ def insert_into_dont_pick(fid):
     already_processed_artist = []
     already_processed_basename = []
     alread_processed_fid = []
+    insert_artists_in_preload_into_dont_pick()
     insert_location_into_dont_pick(fid, already_processed_basename)
+
+    sql = """INSERT INTO dont_pick (fid, reason) 
+             VALUES(%s, 'fid in preload')"""
+    query(sql, (fid, ))  # this must be done every time because sometimes
+                         # files don't have artists, and the filename
+                         # is not Artist - Title.ext
     for a in artists:
         sql = """SELECT fa.fid, fa.aid 
                  FROM file_artists fa
@@ -649,6 +671,7 @@ def insert_into_dont_pick(fid):
                                            already_processed_basename)
 
 def insert_location_into_dont_pick(fid, already_processed_basename):
+    return
     sql = """SELECT fid, basename
              FROM file_locations
              WHERE fid = %s"""
@@ -666,16 +689,15 @@ def insert_location_into_dont_pick(fid, already_processed_basename):
         dont_pick_artist_basename(underscore_artist, 
                                   already_processed_basename)
 
-        space_artist = artist.replace("_", " ")
-        dont_pick_artist_basename(space_artist, 
-                                  already_processed_basename)
+        # space_artist = artist.replace("_", " ")
+        # dont_pick_artist_basename(space_artist, 
+        #                           already_processed_basename)
 
 def dont_pick_artist_basename(artist, already_processed_basename):
     insert_basename_into_dont_pick(artist, already_processed_basename)
     
 
 def insert_basename_into_dont_pick(artist, already_processed_basename):
-    wait()
     artist = artist.lower()
     if not artist or artist in already_processed_basename:
         return
@@ -805,6 +827,7 @@ def get_something_for_everyone(users, true_score):
 def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
                              min_preload_size=0):
     gtk.gdk.threads_leave()
+
     sql = """INSERT INTO preload (fid, uid, reason)
                  SELECT pc.fid, pc.uid, string_agg(pc.reason, ',') 
                  FROM preload_cache pc
@@ -884,7 +907,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
     print "USERS:", users
     user_len = len(users)
     while time.time() - start_time < max_cue_time:
-        wait()
+        
         if not true_scores or len(true_scores) == 0:
             print "making true score list"
             true_scores = make_true_scores_list()
@@ -918,7 +941,6 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
 
 
         f = get_existing_file(uid, true_score)
-
         if not f:
             print "nothing for:",true_score
             empty_scores.append(true_score)
@@ -943,6 +965,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
 
         insert_fid_into_preload(f['fid'], uid, "random unplayed for %s" % (uname,))
         insert_into_dont_pick(f['fid'])
+
 
     sql = """SELECT count(*) as total 
              FROM preload 

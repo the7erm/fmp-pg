@@ -19,6 +19,7 @@ from interaction_tracker import InteractionTracker
 from config_dir import config_dir
 import threading
 import re
+import hashlib
 
 if __name__ == "__main__":
     gobject.threads_init()
@@ -110,7 +111,7 @@ class Satellite:
         self.pico_thread = None
         self.pico_stack = []
         self.init_pico_thread()
-        self.say("initializing player")
+        self.say("initializing player", permanent=True)
         start = time.time()
         self.last_sync_time = 0
         self.sync_response_string = ""
@@ -133,8 +134,16 @@ class Satellite:
             "preload_cache": [],
             "users": [],
             "volume": 100,
-            "satellite_history": []
+            "satellite_history": [],
+            "weather": '',
+            "weather_cache": 0,
+            "weather_city": "Cheyenne,WY"
         }
+        self.pico_dir = os.path.join(config_dir, 'pico-wav')
+        print "PICO_DIR:", self.pico_dir
+        if not os.path.exists(self.pico_dir):
+            print "MKDIR:"
+            os.makedirs(self.pico_dir)
         _print("init_window()")
         self.init_window()
         _print("init_player()")
@@ -160,7 +169,7 @@ class Satellite:
         gobject.timeout_add(60000, self.fsync)
         print "DONE"
         self.set_track(0)
-        self.say("player initialization complete")
+        self.say("player initialization complete", permanent=True)
 
     def get_ip(self):
         ip = []
@@ -178,13 +187,42 @@ class Satellite:
             self.host = ""
         self.ip = ip
 
+    def set_host(self, ip, ip_tocheck, ip_history):
+        host = "%s:5050" % (ip_tocheck,)
+        url = "http://%s/satellite/" % host
+        _print("SCANNING:", url)
+        data = json.dumps(self.data)
+        try:
+            req = urllib2.Request(url, data,
+                                  {'Content-Type': 'application/json'})
+            response = urllib2.urlopen(req)
+            _print("CONNECTED:", url)
+            works = json.loads(response.read())
+        except Exception as e:
+            _print("FAILED:", e)
+            return ""
+        if self.host != host:
+            self.say("Connected to server", permanent=True)
+        self.host = host
+        _print("FOUND:", host)
+        if ip not in ip_history:
+            self.data['ip_history'][ip] = []
+        if ip_tocheck not in self.data['ip_history'][ip]:
+            self.data['ip_history'][ip].append(ip_tocheck)
+        return host
+
     def scan_ips(self):
         self.host = ""
         self.get_ip()
         if not self.ip:
             return
 
+        ip_history = self.data.get('ip_history', {})
         for ip in self.ip:
+            if ip in ip_history:
+                if self.set_host(ip, ip_history[ip], ip_history):
+                    return
+
             if (not ip.startswith("192.168.") and 
                 not ip.startswith("10.") and
                 not ip.startswith("172.")):
@@ -216,24 +254,9 @@ class Satellite:
                 match = rx.search(line)
                 if match:
                     ips_to_check.append(match.group(1))
-
-            for _ip in ips_to_check:
-                host = "%s:5050" % (_ip,)
-                url = "http://%s/satellite/" % host
-                _print("SCANNING:", url)
-                data = json.dumps(self.data)
-                try:
-                    req = urllib2.Request(url, data,
-                                          {'Content-Type': 'application/json'})
-                    response = urllib2.urlopen(req)
-                    _print("CONNECTED:", url)
-                    works = json.loads(response.read())
-                except Exception as e:
-                    _print("FAILED:", e)
-                    continue
-                self.host = host
-                _print("FOUND:", host)
-                break
+            for ip_tocheck in ips_to_check:
+                if self.set_host(ip, ip_tocheck, ip_history):
+                    break
 
     def wait(self, *args, **kwargs):
         wait()
@@ -391,15 +414,20 @@ class Satellite:
             self.data['satellite_history'][i]['played'] = False
             self.data['satellite_history'][i]['listeners'] = {}
 
+        
+
     def sync(self, just_playing=False, *args, **kwargs):
         if self.shutting_down:
             return False
         _print("SYNC 1")
         if just_playing:
-            self.sync_worker(just_playing=just_playing, *args, **kwargs)
+            try:
+                self.sync_worker(just_playing=just_playing, *args, **kwargs)
+            except Exception as e:
+                print "SYNC Exception:",e
             return True
         if self.sync_locked:
-            return
+            return True
         self.sync_thread = threading.Thread(target=self.sync_worker)
         self.sync_thread.start()
         _print("SYNC 2")
@@ -415,19 +443,19 @@ class Satellite:
         self.get_ip()
         if not self.ip:
             self.unlock_sync(False)
-            return
+            return True
 
         if not self.host:
             self.scan_ips()
 
         if not self.host:
             self.unlock_sync(False)
-            return
+            return True
 
         _print("SYNC_WORKER")
         if self.sync_locked:
             _print("LOCKED")
-            return
+            return True
         self.last_sync_ok = False
         self.sync_locked = time.time()
         self.files = []
@@ -529,12 +557,6 @@ class Satellite:
             self.data.update(staging)
             self.unlock_sync(False)
             return True
-        
-        for p in staging['playlist']:
-            self.download(p)
-
-        for p in staging['preload_cache']:
-            self.download(p)
 
         _history = staging.get('history',[])
         _history.reverse()
@@ -543,14 +565,30 @@ class Satellite:
             if not indexes:
                 self.data['satellite_history'].insert(0, h)
 
-        for p in self.data['satellite_history']:
-            self.download(p)
 
-        for p in self.data['history']:
-            self.download(p)
+        files_to_download = self.data.get('playlist', []) + \
+                            staging.get('playlist', []) + \
+                            self.data.get('preload', []) + \
+                            staging.get('preload', []) + \
+                            self.data.get('preload_cache', []) + \
+                            staging.get('preload_cache', []) + \
+                            self.data.get('satellite_history', []) + \
+                            self.data.get('history', []) + \
+                            staging.get('history',[]) + \
+                            self.data.get('netcasts', []) + \
+                            staging.get('netcasts', [])
 
-        for p in self.data['netcasts']:
-            self.download(p)
+        missing_files = []
+        for p in files_to_download:
+            dst = self.get_dst(p)
+            if not dst or os.path.exists(dst):
+                continue
+            missing_files.append(p)
+        if missing_files:
+            self.say("Cache downloads started", permanent=True)
+            for f in missing_files:
+                self.download(f)
+            self.say("Cache downloads finished", permanent=True)
         
         # Make sure anything that's changed since the original copy
         # was made is over written with new data.
@@ -566,6 +604,21 @@ class Satellite:
         self.set_track(0)
         self.unlock_sync(True)
         return True
+
+    def get_dst(self, obj):
+        _id, id_type = get_id_type(obj)
+        if _id is None or id_type is None:
+            return False
+
+        prefix = "file"
+        if id_type == 'e':
+            prefix = 'netcast'
+
+        filename = "{prefix}-{_id}".format(prefix=prefix, _id=_id)
+        dst = os.path.join(cache_dir, filename)
+        if filename not in self.files:
+            self.files.append(filename)
+        return os.path.join(cache_dir, filename)
 
     def resume(self):
         _print("RESUME")
@@ -612,40 +665,30 @@ class Satellite:
         if self.shutting_down:
             return False
         _id, id_type = get_id_type(obj)
-        if _id is None or id_type is None:
-            return
-
-        prefix = "file"
-        if id_type == 'e':
-            prefix = 'netcast'
-
-        filename = "{prefix}-{_id}".format(prefix=prefix, _id=_id)
-        dst = os.path.join(cache_dir, filename)
-        self.files.append(filename)
+        dst = self.get_dst(obj)
         if os.path.exists(dst):
             return
         artists = obj.get("artist_title",
                           obj.get('artist', 
                                   obj.get('artists', "")))
         title = obj.get('title', obj.get('episode_title', ""))
-        if title:
-            self.say("downloading %s - %s" % (artists, title))
-        _print("DOWNLOAD:", filename)
+        #if title:
+        #    self.say("downloading %s - %s" % (artists, title))
         pprint(obj)
         tmp = dst + ".tmp"
         exist_size = 0
         open_attrs = "wb"
         request = myURLOpener()
         if os.path.exists(tmp):
+            self.say("Resuming download %s - %s" % (artists, title))
             open_attrs = "ab"
             exist_size = os.path.getsize(tmp)
             #If the file exists, then only download the remainder
             request.addheader("Range","bytes=%s-" % (exist_size))
-            self.say("Resuming download %s - %s" % (artists, title))
         url = 'http://%s/stream/%s/' % (self.host, _id)
         if id_type == 'e':
             url = 'http://%s/stream-netcast/%s/' % (self.host, _id)
-        _print("url:", url)
+        _print("DOWNLOAD URL:", url)
         
         try:
             response = request.open(url)
@@ -678,8 +721,8 @@ class Satellite:
                     if display_time <= time.time() - 1:
                         display_time = time.time()
                         precent_complete = (total / content_length) * 100
-                        _print ("%s:%s %s%%" % (total, content_length, 
-                                                precent_complete))
+                        _print ("DL %s:%s %s%%" % (total, content_length, 
+                                                   precent_complete))
                         wait()
                 wait()
                 os.fsync(fp.fileno())
@@ -720,9 +763,10 @@ class Satellite:
                     return
                 self.shutting_down = True
                 _print ("SHUTDOWN")
-                self.say("Shutting down", wait=True)
+                self.say("Shutting down", wait=True, permanent=True)
                 self.write()
-                self.say("Playlist written to disk", wait=True)
+                subprocess.check_output(["sync"])
+                self.say("Playlist written to disk", wait=True, permanent=True)
                 subprocess.check_output(["sudo","poweroff"])
                 sys.exit()
         else:
@@ -744,9 +788,30 @@ class Satellite:
             self.window.emit('check-resize')
 
         if keyname in ('KP_Delete', 'period'):
+            self.get_ip()
             now = datetime.now()
             self.say("The current time is %s" % now.strftime("%I:%M %p"), 
                      wait=True)
+
+            weather = self.data.get("weather", "")
+            weather_cache = self.data.get("weather_cache", 0)
+            time_now = get_time()
+            if self.ip and \
+                weather_cache < time_now - 300:
+                cmd = ["inxi","-c","0","-w", 
+                       self.data.get('weather_city', 'Cheyenne,WY')]
+                try:
+                    weather = subprocess.check_output(cmd)
+                    idx = weather.rfind("Time:")
+                    if idx:
+                        weather = weather[0:idx]
+                    self.data['weather'] = weather
+                    self.data['weather_cache'] = time_now
+                except:
+                    pass
+
+            self.say(weather)
+
             self.sync(just_playing=True)
             _print("PLAYING:", self.data['playing'])
 
@@ -771,7 +836,7 @@ class Satellite:
             self.rating_user = False
 
         if keyname == "KP_Multiply":
-            self.say("rate")
+            self.say("rate", permanent=True)
             self.rating_user = True
 
         if self.rating_user:
@@ -826,7 +891,7 @@ class Satellite:
             for l in self.data.get('users'):
                 if l['uid'] == value:
                     self.rating_user = l
-                    self.say(l['uname'])
+                    self.say(l['uname'], permanent=True)
                     break
         elif value != -1:
             self.rate(value)
@@ -915,9 +980,9 @@ class Satellite:
 
         self.data['preload'] = new_preload
         if is_listening:
-            self.say("Set %s to not listening" % uname)
+            self.say("Set %s to not listening" % uname, permanent=True)
         else:
-            self.say("Set %s to listening" % uname)
+            self.say("Set %s to listening" % uname, permanent=True)
         self.set_track(0)
 
     def append_new_preload_item(self, _list, already_added, new_preload):
@@ -930,8 +995,8 @@ class Satellite:
             new_preload.append(item)
             already_added.append(key)
 
-    def say(self, string, wait=False):
-        self.pico_say(string)
+    def say(self, string, wait=False, permanent=False):
+        self.pico_say(string, permanent=permanent)
         return
 
     def pico_loop(self):
@@ -942,29 +1007,43 @@ class Satellite:
             if not self.pico_stack:
                 time.sleep(1)
                 continue
-            string = self.pico_stack.pop(0)
+            string_data = self.pico_stack.pop(0)
+            if not string_data or string_data == {} and\
+               not string_data.get('string', ''):
+                continue
+            string = string_data.get('string', '').replace("_", ' ')
+            string = string.strip()
             if not string:
                 continue
             string = re.sub(rx, " ", string)
             _print("SAY:", string)
-            wav = "%s.wav" % (get_time(),)
-            wav = os.path.join(config_dir, wav)
-            cmd = ['pico2wave', "--lang=en-GB", "-w", wav, string]
-            subprocess.check_output(cmd)
+            wav = "%s.wav" % (hashlib.sha1(string).hexdigest(),)
+            wav = os.path.join(self.pico_dir, wav)
+            if not os.path.exists(wav):
+                cmd = ['pico2wave', "--lang=en-GB", "-w", wav, string]
+                subprocess.check_output(cmd)
+            wait()
             cmd = ['aplay', wav]
             vol = -1
             if self.player:
                 vol = self.player.player.get_property("volume")
                 _print("VOL:", vol)
                 self.player.player.set_property("volume", 0.4)
+                wait()
             subprocess.check_output(cmd)
+            wait()
             if self.player:
                 _print ("VOL:", vol)
                 self.player.player.set_property("volume", vol)
-            os.unlink(wav)
+                wait()
+            if not string_data.get('permanent', False):
+                os.unlink(wav)
 
-    def pico_say(self, string):
-        self.pico_stack.append(string)
+    def pico_say(self, string, permanent=False):
+        self.pico_stack.append({
+            'string': string,
+            'permanent': permanent
+        })
 
     def pause(self):
         _print("PAUSE CALLED")

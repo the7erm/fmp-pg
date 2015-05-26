@@ -46,11 +46,17 @@ class InteractionTracker:
         _print("last_interaction:", last_interaction)
         self.last_interaction = last_interaction
 
-    def mark_interaction(self, *args, **kwargs):
+    def get_time(self, adjust=True):
         local_offset = time.timezone
         if time.daylight:
             local_offset = time.altzone
-        self.last_interaction = time.time()+local_offset
+        _time = time.time()+local_offset
+        if adjust and not self.system_clock_ok():
+            _time = self.last_interaction + _time
+        return _time
+
+    def mark_interaction(self, *args, **kwargs):
+        self.last_interaction = self.get_time()
         self.write_last_interaction()
 
     def write_last_interaction(self):
@@ -59,9 +65,22 @@ class InteractionTracker:
             fp.write("%s" % self.last_interaction)
             os.fsync(fp.fileno())
 
+    def system_clock_ok(self):
+        return self.time_is_ok(self.get_time(adjust=False))
+
+    def time_is_ok(self, _time):
+        return _time > (60 * 60 * 24 * 365)
+
     def get_priority(self, remote_last_interaction, remote_playing_state):
 
         remote_last_interaction = float(remote_last_interaction)
+        
+        if self.system_clock_ok():
+            now = self.get_time(adjust=False)
+            if not self.time_is_ok(remote_last_interaction):
+                remote_last_interaction = (now - remote_last_interaction)
+            elif remote_last_interaction > now:
+                remote_last_interaction = now
 
         if self.player.playingState == PLAYING:
             _print("PRIORITY self.mode:", self.mode.upper())
