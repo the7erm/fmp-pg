@@ -103,6 +103,7 @@ class myURLOpener(urllib.FancyURLopener):
 class Satellite:
     def __init__(self):
         self.ip = []
+        self.keystack = []
         self.host = ""
         self.sync_thread = False
         self.last_sync_ok = False
@@ -170,6 +171,9 @@ class Satellite:
         print "DONE"
         self.set_track(0)
         self.say("player initialization complete", permanent=True)
+        if self.data['state'] == 'PLAYING':
+            print "PLAYING"
+            self.player.player.set_state(player.PLAYING)
 
     def get_ip(self):
         ip = []
@@ -202,7 +206,7 @@ class Satellite:
             _print("FAILED:", e)
             return ""
         if self.host != host:
-            self.say("Connected to server", permanent=True)
+            self.say("Connected to F M P server", permanent=True)
         self.host = host
         _print("FOUND:", host)
         if ip not in ip_history:
@@ -296,6 +300,7 @@ class Satellite:
 
     def load(self):
         if self.load_json(satellite_json):
+            _print("LOADED:", satellite_json)
             return
         self.load_json(satellite_json+".bak")
 
@@ -377,6 +382,7 @@ class Satellite:
         if self.write_lock:
             return
         self.write_lock = True
+        self.time_to_save = 5
         wait()
         _print("*WRITE*")
         start = time.time()
@@ -390,12 +396,12 @@ class Satellite:
                                    indent=4,
                                    separators=(',', ': '))
             fp.write(json_data)
-            # wait()
-            # os.fsync(fp.fileno())
+            wait()
+            os.fsync(fp.fileno())
         wait()
         shutil.copy2(satellite_json, satellite_json+".bak")
         wait()
-        _print("/*WRITE*", time.time() - start)
+        _print("/*WRITE* ", time.time() - start)
         self.time_to_save = 5
         self.write_lock = False
 
@@ -414,7 +420,7 @@ class Satellite:
             self.data['satellite_history'][i]['played'] = False
             self.data['satellite_history'][i]['listeners'] = {}
 
-        
+
 
     def sync(self, just_playing=False, *args, **kwargs):
         if self.shutting_down:
@@ -514,7 +520,7 @@ class Satellite:
 
         if priority == 'server':
             _print("SYNCING PLAYING")
-            sync_keys += ['playing']
+            sync_keys += ['playing', 'pos_data']
         else:
             _print("NOT SYNCING PLAYING")
             staging['playing'] = deepcopy(self.data['playing'])
@@ -565,7 +571,6 @@ class Satellite:
             if not indexes:
                 self.data['satellite_history'].insert(0, h)
 
-
         files_to_download = self.data.get('playlist', []) + \
                             staging.get('playlist', []) + \
                             self.data.get('preload', []) + \
@@ -599,6 +604,7 @@ class Satellite:
         self.clear_cache()
         
         if priority == 'server':
+            # self.set_percent_played()
             self.play()
             self.resume()
         self.set_track(0)
@@ -626,11 +632,8 @@ class Satellite:
         _print("pos_data:")
         pprint(pos_data)
         percent_played = self.playing.get('percent_played')
-        if pos_data and 'percent_played' in pos_data:
-            self.player.seek(pos_data['percent_played'])
-        elif percent_played:
-            self.player.seek(str(percent_played)+"%")
-
+        print "percent_played:", percent_played
+        self.player.seek(str(percent_played)+"%")
 
     def build_playlist(self):
         if not self.data.get('playlist', []):
@@ -748,27 +751,33 @@ class Satellite:
         self.keypress_label.set_text("%s %s" % (keyname, event.keyval))
         print "on_keypress:", keyname
 
+        self.keystack.append(keyname)
+        self.keystack = self.keystack[-5:]
+
         if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter',
                        'XF86AudioPlay'):
             self.pause()
             self.rating_user = False
 
         if keyname in ("KP_Divide", "XF86PowerOff"):
+            all_same = True
+            for k in self.keystack:
+                if not all_same:
+                    break
+                for k2 in self.keystack:
+                    if k != k2:
+                        all_same = False
+                        break
+            if all_same:
+                self.shutdown()
+                return
+
             self.rating_user = False
             been_down_for = (time.time() - self.start_power_down_timer)
             if not self.start_power_down_timer or been_down_for >= 5:
                 self.start_power_down_timer = time.time()
             elif been_down_for >= 4 and been_down_for <= 5:
-                if self.shutting_down:
-                    return
-                self.shutting_down = True
-                _print ("SHUTDOWN")
-                self.say("Shutting down", wait=True, permanent=True)
-                self.write()
-                subprocess.check_output(["sync"])
-                self.say("Playlist written to disk", wait=True, permanent=True)
-                subprocess.check_output(["sudo","poweroff"])
-                sys.exit()
+                self.shutdown()
         else:
             self.start_power_down_timer = 0
 
@@ -867,6 +876,18 @@ class Satellite:
         for l in self.data.get('users'):
             if keyname in ("%s" % l['uid'], "KP_%s" % l['uid']):
                 self.set_listening(l['uid'])
+
+    def shutdown(self):
+        if self.shutting_down:
+            return
+        self.shutting_down = True
+        _print ("SHUTDOWN")
+        self.say("Shutting down", wait=True, permanent=True)
+        self.write()
+        subprocess.check_output(["sync"])
+        self.say("Playlist written to disk", wait=True, permanent=True)
+        subprocess.check_output(["sudo","poweroff"])
+        sys.exit()
 
 
     def rating_on_keypress(self, keyname):
@@ -1199,13 +1220,13 @@ class Satellite:
         self.set_playing_data('time', get_time())
 
     def time_to_cue_netcasts(self):
-        found = False
         if not self.data['netcasts']:
             return False
+        time_to_cue = True
         for p in self.data['satellite_history'][-10:]:
             _id, id_type = get_id_type(p)
             if id_type == 'e':
-                found = True
+                time_to_cue = False
                 break
         return found
 
@@ -1257,12 +1278,39 @@ class Satellite:
                 indexes.append(i)
         return indexes
 
-    def set_track(self, direction=1):
-        _print("set_track: direction:%s" % direction)
+    def organize_history(self):
         if len(self.data['satellite_history']) > 250:
             _print ("RESIZE")
             self.data['satellite_history'] = \
                 self.data['satellite_history'][-250:]
+        history_by_time = {}
+        for h in self.data['satellite_history']:
+            _time = h.get('time', 0)
+            if _time not in history_by_time:
+                history_by_time[_time] = []
+            history_by_time[_time].append(h)
+        keys = history_by_time.keys()
+        keys.sort()
+        zero_time = []
+        new_history = []
+        already_added = []
+        for key in keys:
+            files = history_by_time[key]
+            for f in files:
+                _id, id_type = get_id_type(f)
+                id_type = "%s-%s" % (_id, id_type)
+                if id_type not in already_added:
+                    new_history.append(f)
+                    already_added.append(id_type)
+
+        self.data['satellite_history'] = new_history
+
+
+    def set_track(self, direction=1):
+        _print("set_track: direction:%s" % direction)
+
+        if direction == 0:
+            self.organize_history()
 
         current_song = deepcopy(self.data['playing'])
         index = -1
@@ -1282,26 +1330,27 @@ class Satellite:
                 queue_song = self.data['satellite_history'][index]
                 self.data['index'] = index
             except IndexError:
-                while (self.data['preload'] and 
-                       (len(self.data['satellite_history']) - 1) < index):
+                if self.time_to_cue_netcasts() or not self.data['preload']:
+                    if self.data['netcasts']:
+                        queue_netcast = self.data['netcasts'].pop(0)
+                        self.data['satellite_history'].append(queue_netcast)
+                elif self.data['preload']:
                     queue_song = self.data['preload'].pop(0)
+                    print "CUE SONG:", queue_song
                     self.data['satellite_history'].append(queue_song)
-                while (self.time_to_cue_netcasts() or 
-                       (
-                        self.data['netcasts'] and 
-                        (len(self.data['satellite_history']) - 1) < index
-                       )):
-                    queue_netcast = self.data['netcasts'].pop(0)
-                    self.data['satellite_history'].append(queue_netcast)
+                else:
+                    index = 0
                 
         elif direction == -1:
             index = index - 1
+
+        last_item_index = (len(self.data['satellite_history']) - 1)
         
-        if (len(self.data['satellite_history']) - 1) < index:
+        if last_item_index < index:
             index = 0
 
         if index < 0:
-            index = (len(self.data['satellite_history']) - 1)
+            index = last_item_index
 
         self.data['index'] = index
 
@@ -1341,7 +1390,10 @@ if __name__ == "__main__":
         gtk.main()
     except KeyboardInterrupt:
         pid = os.getpid()
-        s.write()
+        try:
+            s.write()
+        except:
+            pass
         try:
             gtk.main_quit()
         except:

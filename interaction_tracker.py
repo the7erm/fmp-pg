@@ -80,7 +80,7 @@ class InteractionTracker:
             if not self.time_is_ok(remote_last_interaction):
                 remote_last_interaction = (now - remote_last_interaction)
             elif remote_last_interaction > now:
-                remote_last_interaction = now
+                remote_last_interaction = now + 1
 
         if self.player.playingState == PLAYING:
             _print("PRIORITY self.mode:", self.mode.upper())
