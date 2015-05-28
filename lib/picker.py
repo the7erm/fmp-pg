@@ -565,6 +565,7 @@ def get_random_unplayed_sample(uid):
     return get_results_assoc(sql, (uid,))
 
 def get_single_random_unplayed(uid):
+    insert_artists_in_preload_into_dont_pick()
     sql = """SELECT f.fid
              FROM files f 
              LEFT JOIN user_history uh ON uh.id = f.fid AND 

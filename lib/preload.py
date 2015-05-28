@@ -81,6 +81,7 @@ class Preload(gtk.ScrolledWindow):
             str, # basename
             str, # cued for
             str, # reason
+            int, # plid
         ]
         self.user_map_cols = {}
         self.user_cols = {}
@@ -133,6 +134,7 @@ class Preload(gtk.ScrolledWindow):
 
         # self.refresh_data()
 
+        self.append_simple_col("Plid", 4)
         self.append_simple_col("Filename", 1)
         self.append_simple_col("Cued For", 2)
         self.append_simple_col("Reason", 3)
@@ -257,7 +259,8 @@ class Preload(gtk.ScrolledWindow):
                     return True
         wait()
         print "fetching files"
-        files = get_results_assoc("""SELECT p.fid, fl.dirname, fl.basename, 
+        files = get_results_assoc("""SELECT p.plid, p.fid, fl.dirname, 
+                                            fl.basename, 
                                             p.uid, u.uname, reason 
                                      FROM preload p, files f, users u,
                                           file_locations fl
@@ -347,7 +350,8 @@ class Preload(gtk.ScrolledWindow):
             f['fid'],
             f['basename'],
             f['uname'],
-            f['reason']
+            f['reason'],
+            f['plid'],
         ]
         for u in user_file_info:
             for c in cols:
