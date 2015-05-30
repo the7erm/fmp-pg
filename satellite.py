@@ -107,6 +107,7 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
+        self.saying_something = False
         self.ip = []
         self.keystack = []
         self.host = ""
@@ -414,9 +415,10 @@ class Satellite:
                                    sort_keys=True,
                                    indent=4,
                                    separators=(',', ': '))
-            fp.write(json_data)
             wait()
-            os.fsync(fp.fileno())
+            fp.write(json_data)
+            # wait()
+            # os.fsync(fp.fileno())
         wait()
         shutil.copy2(satellite_json, satellite_json+".bak")
         wait()
@@ -465,6 +467,7 @@ class Satellite:
             self.sync_thread = False
 
     def sync_worker(self, just_playing=False, *args, **kwargs):
+        wait()
         self.get_ip()
         if not self.ip:
             self.unlock_sync(False)
@@ -495,6 +498,7 @@ class Satellite:
                 req = urllib2.Request(url, data, 
                                       {'Content-Type': 'application/json'})
                 response = urllib2.urlopen(req)
+                wait()
             except urllib2.URLError, err:
                 print "urllib2.URLError:", err
                 self.build_playlist()
@@ -523,9 +527,6 @@ class Satellite:
         _print("END REQUEST", time.time() - start)
 
         new_data = json.loads(self.sync_response_string)
-
-        # TODO compare new_data with self.data
-        _print("new_data")
 
         staging = deepcopy(self.data)
         
@@ -576,7 +577,7 @@ class Satellite:
             if key not in sync_keys:
                 staging[key] = self.data[key]
 
-        print("playing:", staging['playing'])
+        _print("playing:", staging['playing'])
         self.download(staging['playing'])
 
         if just_playing:
@@ -924,6 +925,9 @@ class Satellite:
         self.write()
         subprocess.check_output(["sync"])
         self.say("Playlist written to disk", wait=True, permanent=True)
+        while self.pico_stack or self.saying_something:
+            time.sleep(1)
+            wait()
         subprocess.check_output(["sudo","poweroff"])
         sys.exit()
 
@@ -1064,8 +1068,10 @@ class Satellite:
             _print("PICO_LOOP")
             wait()
             if not self.pico_stack:
-                time.sleep(1)
+                self.self.saying_something = False
+                time.sleep(0.5)
                 continue
+            self.saying_something = True
             string_data = self.pico_stack.pop(0)
             if not string_data or string_data == {} and\
                not string_data.get('string', ''):
