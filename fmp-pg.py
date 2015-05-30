@@ -289,11 +289,11 @@ def on_time_status(player, pos_int, dur_int, left_int, decimal, pos_str,
         return
 
     if plr.playingState != PLAYING:
-        print "on_time_status: not playing"
+        # print "on_time_status: not playing"
         sys.stdout.flush()
         return
 
-    print "on_time_status: playing"
+    # print "on_time_status: playing"
     sys.stdout.flush()
 
     last_percent_played_decimal = percent_played
@@ -730,7 +730,7 @@ if not history:
     history = []
 
 for u in listeners.listeners:
-    picker.insert_missing_songs(u['uid'])
+    picker.insert_missing_songs_into_usi(u['uid'])
 
 idx = len(history) - 1
 if idx < 0:

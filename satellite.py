@@ -187,6 +187,7 @@ class Satellite:
         ip = []
         try:
             ip = subprocess.check_output(['hostname', '-I'])
+            wait()
             ip = ip.strip()
             if " " in ip:
                 ip = ip.split(" ")
@@ -267,6 +268,7 @@ class Satellite:
             parts.append("0")
             ip_range = "%s/24" % (".".join(parts))
             result = subprocess.check_output(["nmap","-sn", ip_range])
+            wait()
             rx = re.compile("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
             lines = result.split("\n")
             ips_to_check = []
@@ -859,6 +861,7 @@ class Satellite:
                        self.data.get('weather_city', 'Cheyenne,WY')]
                 try:
                     weather = subprocess.check_output(cmd)
+                    wait()
                     p = re.compile(r'([\d]+) (F) \(([\d]+) (C)\) \- (.*)\ '
                                     'Time\:(.*)')
                     weather = p.sub('\g<5>\n \g<1> Degrees Fahrenheit\n \g<3> '

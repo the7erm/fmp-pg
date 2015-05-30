@@ -114,8 +114,11 @@ def populate_dont_pick():
                    WHERE listening = false
                  )"""
     query(q)
+
+
+
     query("""INSERT INTO dont_pick (fid, reason) 
-                SELECT fid, 'already in preload' 
+                SELECT fid, 'fid already in preload' 
                 FROM preload""")
     # insert all disabled genres into dont_pick
     query("""INSERT INTO dont_pick (fid, reason) 
@@ -140,7 +143,7 @@ def populate_dont_pick():
     sql = """SELECT uid 
              FROM users 
              WHERE listening = true"""
-    listeners = get_results_assoc(sql, ())
+    listeners = get_results_assoc(sql)
 
     if listeners:
         total_to_remove = get_assoc(
@@ -151,7 +154,9 @@ def populate_dont_pick():
         total_artists_to_remove = get_assoc(
             """SELECT FLOOR(count(DISTINCT aid) * 0.01) AS total 
                FROM file_artists fa, file_genres fg, genres g 
-               WHERE g.gid = fg.gid AND g.enabled = true AND fa.fid = fg.fid""")
+               WHERE g.gid = fg.gid AND 
+                     g.enabled = true AND 
+                     fa.fid = fg.fid""")
 
         if total_to_remove.has_key('total'):
             total_to_remove = str(total_to_remove['total'])
@@ -165,31 +170,35 @@ def populate_dont_pick():
 
         for l in listeners:
             query("""INSERT INTO dont_pick (fid, reason, reason_value) 
-                        SELECT DISTINCT fid, 'rated 0', uid 
+                        SELECT DISTINCT fid, concat('rated 0 for ', uid) AS select_reason, uid 
                         FROM user_song_info 
                         WHERE rating = 0 AND uid = %s""",
                      (l['uid'],))
 
             # Add recently played files.
             query("""INSERT INTO dont_pick (fid, reason, reason_value) 
-                        SELECT DISTINCT fid, 'recently played', ultp 
-                        FROM user_song_info 
+                        SELECT DISTINCT fid, concat('recently played for ', usi.uid), ultp 
+                        FROM user_song_info usi
                         WHERE uid = %s AND ultp IS NOT NULL 
                         ORDER BY ultp DESC LIMIT """+total_to_remove, 
                      (l['uid'],))
 
             # Add recently played artists
             # Don't add aid column
-            query("""INSERT INTO dont_pick (fid, reason) 
-                     SELECT DISTINCT fid, 'Recently played artist' 
+            q = """INSERT INTO dont_pick (fid, reason) 
+                     SELECT DISTINCT fid, 'Recently played artist for {uid}'
                      FROM file_artists 
                      WHERE aid IN (SELECT aid 
                                    FROM file_artists fa, user_song_info u 
-                                   WHERE fa.fid = u.fid AND ultp IS NOT NULL AND 
+                                   WHERE fa.fid = u.fid AND 
+                                         ultp IS NOT NULL AND 
                                          u.uid = %s 
-                                   ORDER BY ultp DESC 
-                                   LIMIT """+total_artists_to_remove+")", 
-                     (l['uid'],))
+                                   ORDER BY ultp DESC
+                                   LIMIT {total_artists_to_remove})""";
+            q = q.format(total_artists_to_remove=total_artists_to_remove,
+                         uid=l['uid'])
+            print "Q:",q
+            query(q, (l['uid'],))
 
     query("""INSERT INTO dont_pick (fid, reason) 
                 SELECT DISTINCT fid, 'artist in preload' 
@@ -208,10 +217,9 @@ def populate_dont_pick():
     sql = """SELECT fid FROM preload"""
     fids = get_results_assoc(sql)
     for fid in fids:
-        print "INSERTING"
         insert_into_dont_pick(fid['fid'])
 
-    time.sleep(2)
+    # time.sleep(2)
 
 
 def remove_missing_files_from_preload():
@@ -282,22 +290,30 @@ def fix_bad_scores(uid):
         query(q)
 
     
-def insert_missing_songs(uid):
+def insert_missing_songs_into_usi(uid):
     print "inserting missing songs"
-    m = pg_cur.mogrify("""SELECT f.fid FROM files f 
-                              LEFT JOIN user_song_info usi ON usi.fid = f.fid AND 
-                                        usi.uid = %s 
-                          WHERE usi.fid IS NULL""", (uid,))
 
-    q = """INSERT INTO user_song_info (fid, uid, rating, score, percent_played, 
-                                       true_score) 
-                SELECT f.fid, '%s', '%s', '%s', '%s', 
-                       '%s' 
+    query_args = {
+        "uid": uid,
+        "rating": DEFAULT_RATING,
+        "score" : DEFAULT_SCORE,
+        "percent_played": DEFAULT_PERCENT_PLAYED,
+        "true_score": DEFAULT_TRUE_SCORE
+    }
+
+    q = """INSERT INTO user_song_info (fid, uid, rating, score, 
+                                       percent_played, true_score) 
+           SELECT f.fid, %(uid)s, %(rating)s, %(score)s, 
+                  %(percent_played)s, %(true_score)s
                 FROM files f 
-                WHERE f.fid IN (%s)""" % (uid, DEFAULT_RATING, DEFAULT_SCORE, 
-                                          DEFAULT_PERCENT_PLAYED, 
-                                          DEFAULT_TRUE_SCORE, m)
-    query(q)
+                WHERE f.fid IN (
+                        SELECT f.fid 
+                        FROM files f 
+                        LEFT JOIN user_song_info usi ON usi.fid = f.fid AND 
+                                                        usi.uid = %(uid)s 
+                        WHERE usi.fid IS NULL
+                )"""
+    query(q, query_args)
 
 def get_true_score_sample(uid, true_score):
     return get_results_assoc(
@@ -537,17 +553,18 @@ def is_sequential(fid):
 
 def insert_artists_in_preload_into_dont_pick():
     sql = """INSERT INTO dont_pick (fid, reason) 
-             SELECT DISTINCT fid, 'artist in preload' 
-             FROM file_artists 
-             WHERE aid IN (SELECT DISTINCT aid 
-                           FROM file_artists fa 
-                           WHERE fid IN (SELECT DISTINCT p.fid 
-                                         FROM preload p 
-                                              LEFT JOIN dont_pick dp ON 
-                                                        dp.fid = p.fid
-                                         WHERE dp.fid IS NULL
-                                        )
-                          )"""
+             SELECT DISTINCT fa.fid, 'artist in preload' 
+             FROM file_artists fa
+                  LEFT JOIN dont_pick dp ON dp.fid = fa.fid
+             WHERE aid IN (
+                    SELECT DISTINCT aid
+                    FROM file_artists fa 
+                    WHERE fid IN (
+                        SELECT DISTINCT p.fid 
+                        FROM preload p
+                    )
+                  ) AND 
+                  dp.fid IS NULL"""
     wait()
     query(sql)
     wait()
@@ -633,23 +650,27 @@ def get_existing_file(uid, true_score):
     return file_info
 
 def insert_into_dont_pick(fid):
+
+
     
     sql = """SELECT fa.fid, fa.aid 
              FROM file_artists fa LEFT JOIN dont_pick dp ON dp.fid = fa.fid
              WHERE fa.fid = %s AND dp.fid IS NULL"""
 
     artists = get_results_assoc(sql, (fid, ))
-    already_processed_artist = []
-    already_processed_basename = []
-    alread_processed_fid = []
-    insert_artists_in_preload_into_dont_pick()
-    insert_location_into_dont_pick(fid, already_processed_basename)
 
     sql = """INSERT INTO dont_pick (fid, reason) 
              VALUES(%s, 'fid in preload')"""
     query(sql, (fid, ))  # this must be done every time because sometimes
                          # files don't have artists, and the filename
                          # is not Artist - Title.ext
+
+    already_processed_artist = []
+    already_processed_basename = []
+    alread_processed_fid = []
+    insert_artists_in_preload_into_dont_pick()
+    insert_location_into_dont_pick(fid, already_processed_basename)
+    
     for a in artists:
         sql = """SELECT fa.fid, fa.aid 
                  FROM file_artists fa
@@ -664,6 +685,7 @@ def insert_into_dont_pick(fid):
             sql = """INSERT INTO dont_pick (fid, reason)
                      VALUES (%s, 'artist already inserted')"""
 
+            query(sql, (f['fid'],))
             if f['fid'] not in alread_processed_fid:
                 query(sql, (f['fid'],))
 
@@ -828,7 +850,6 @@ def get_something_for_everyone(users, true_score):
 def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
                              min_preload_size=0):
     gtk.gdk.threads_leave()
-
     sql = """INSERT INTO preload (fid, uid, reason)
                  SELECT pc.fid, pc.uid, string_agg(pc.reason, ',') 
                  FROM preload_cache pc
@@ -880,7 +901,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
     print "populate_preload_for_uid 4"
     fix_bad_scores(uid)
     print "populate_preload_for_uid 5"
-    insert_missing_songs(uid)
+    insert_missing_songs_into_usi(uid)
     empty_scores = []
     empty_for_everyone = []
 
@@ -897,8 +918,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
 
     out_of_random_unplayed = False
     max_cue_time = int(ceil(max_cue_time))
-    if max_cue_time < 5:
-        max_cue_time = 5
+    max_cue_time = 10
     start_time = time.time()
     print "max_cue_time:", max_cue_time
 
@@ -908,7 +928,6 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
     print "USERS:", users
     user_len = len(users)
     while time.time() - start_time < max_cue_time:
-        
         if not true_scores or len(true_scores) == 0:
             print "making true score list"
             true_scores = make_true_scores_list()
@@ -918,6 +937,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
         if true_score in empty_scores:
             print "skipping empty score:", true_score
             continue
+
 
         sample = get_true_score_sample(uid, true_score)
         

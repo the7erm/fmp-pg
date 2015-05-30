@@ -28,7 +28,7 @@ import math
 import pytz
 from subprocess import Popen
 from rating_utils import rate_for_uid
-from picker import insert_missing_songs
+from picker import insert_missing_songs_into_usi
 
 gobject.threads_init()
 gtk.gdk.threads_init()
