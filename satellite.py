@@ -1068,7 +1068,7 @@ class Satellite:
             _print("PICO_LOOP")
             wait()
             if not self.pico_stack:
-                self.self.saying_something = False
+                self.saying_something = False
                 time.sleep(0.5)
                 continue
             self.saying_something = True
