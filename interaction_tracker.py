@@ -25,6 +25,7 @@ class InteractionTracker:
     def __init__(self, mode, player):
         self.mode = mode
         self.last_interaction = 0
+        self.priority = self.mode
         self.config_file = os.path.join(config_dir, 
                                         "last-interaction-%s" % mode)
         self.read_last_interaction()
@@ -88,20 +89,24 @@ class InteractionTracker:
 
         if remote_playing_state == 'PLAYING' and self.mode == 'client':
             _print("PRIORITY SERVER it's PLAYING")
-            return 'server'
+            self.priority = 'server'
+            return self.priority
 
         if remote_playing_state == 'PLAYING' and self.mode == 'server':
             _print("PRIORITY CLIENT it's PLAYING")
-            return 'client'
+            self.priority = 'client'
+            return self.priority
 
         if self.last_interaction == remote_last_interaction:
             _print("PRIORITY last_interaction == remote_last_interaction so "
                    "SERVER")
-            return 'server'
+            self.priority = 'server'
+            return self.priority
 
         if self.last_interaction > remote_last_interaction:
             _print("PRIORITY self.last_interaction > remote_last_interaction "
                    "self.mode", self.mode.upper())
+            self.priority = self.mode
             return self.mode
 
         if self.last_interaction < remote_last_interaction:
@@ -109,14 +114,17 @@ class InteractionTracker:
                 _print("PRIORITY "
                        "self.last_interaction < remote_last_interaction "
                        "self.mode == 'server' CLIENT")
-                return 'client'
+                self.priority = 'client'
+                return self.priority
             else:
                 _print("PRIORITY "
                        "self.last_interaction < remote_last_interaction "
                        "self.mode != 'server' SERVER")
-                return 'server'
+                self.priority = 'server'
+                return self.priority
 
-        
+        _print("ERROR priority not determined using self.mode:", self.mode)
+        return self.mode
 
 
 

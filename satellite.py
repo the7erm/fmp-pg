@@ -25,7 +25,7 @@ if __name__ == "__main__":
     gobject.threads_init()
 
 def wait(*args, **kwargs):
-    _print ("wait()", args, kwargs)
+    # _print ("wait()", args, kwargs)
     # print "leave1"
     gtk.gdk.threads_leave()
     # print "/leave1"
@@ -39,7 +39,7 @@ def wait(*args, **kwargs):
     # print "leave"
     gtk.gdk.threads_leave()
     # print "/leave"
-    _print ("/wait()", args, kwargs)
+    #  _print ("/wait()", args, kwargs)
     return True
 
 def get_time():
@@ -78,18 +78,23 @@ if not os.path.exists(cache_dir):
 debug = True
 
 def _print(*args, **kwargs):
-    if debug:
-        for arg in args:
-            print arg,
-        if kwargs != {}:
-            print kwargs
-        print
+    if not debug:
         sys.stdout.flush()
+        return
+
+    for arg in args:
+        print arg,
+    if kwargs != {}:
+        print kwargs
+    print
+    sys.stdout.flush()
 
 def _pprint(*args, **kwargs):
-    if debug:
-        pprint(*args, **kwargs)
+    if not debug:
         sys.stdout.flush()
+        return
+    pprint(*args, **kwargs)
+    sys.stdout.flush()
 
 class myURLOpener(urllib.FancyURLopener):
     """Create sub-class in order to overide error 206.  This error means a
@@ -138,7 +143,8 @@ class Satellite:
             "satellite_history": [],
             "weather": '',
             "weather_cache": 0,
-            "weather_city": "Cheyenne,WY"
+            "weather_city": "Cheyenne,WY",
+            "ip_history": {}
         }
         self.pico_dir = os.path.join(config_dir, 'pico-wav')
         print "PICO_DIR:", self.pico_dir
@@ -190,9 +196,12 @@ class Satellite:
         if self.ip != ip:
             self.host = ""
         self.ip = ip
+        _print("IP HISTORY")
+        _pprint(self.data.get('ip_history'))
 
-    def set_host(self, ip, ip_tocheck, ip_history):
-        host = "%s:5050" % (ip_tocheck,)
+    def set_host(self, ip, server_ip):
+        # ip = this machine's ip
+        host = "%s:5050" % (server_ip,)
         url = "http://%s/satellite/" % host
         _print("SCANNING:", url)
         data = json.dumps(self.data)
@@ -209,10 +218,16 @@ class Satellite:
             self.say("Connected to F M P server", permanent=True)
         self.host = host
         _print("FOUND:", host)
-        if ip not in ip_history:
+        if 'ip_history' not in self.data:
+            self.data['ip_history'] = {}
+
+        if ip not in self.data.get('ip_history', {}):
             self.data['ip_history'][ip] = []
-        if ip_tocheck not in self.data['ip_history'][ip]:
-            self.data['ip_history'][ip].append(ip_tocheck)
+        if server_ip not in self.data['ip_history'][ip]:
+            self.data['ip_history'][ip].append(server_ip)
+        _print("IP HISTORY")
+        _pprint(self.data.get('ip_history'))
+        self.write()
         return host
 
     def scan_ips(self):
@@ -221,12 +236,16 @@ class Satellite:
         if not self.ip:
             return
 
-        ip_history = self.data.get('ip_history', {})
         for ip in self.ip:
+            ip_history = self.data.get('ip_history', {})
+            print "ip_history:", ip_history
             if ip in ip_history:
-                if self.set_host(ip, ip_history[ip], ip_history):
-                    return
+                print "USING HOST CACHE"
+                for server_ip in ip_history[ip]:
+                    if self.set_host(ip, server_ip):
+                        return
 
+        for ip in self.ip:
             if (not ip.startswith("192.168.") and 
                 not ip.startswith("10.") and
                 not ip.startswith("172.")):
@@ -258,8 +277,8 @@ class Satellite:
                 match = rx.search(line)
                 if match:
                     ips_to_check.append(match.group(1))
-            for ip_tocheck in ips_to_check:
-                if self.set_host(ip, ip_tocheck, ip_history):
+            for server_ip in ips_to_check:
+                if self.set_host(ip, server_ip):
                     break
 
     def wait(self, *args, **kwargs):
@@ -534,8 +553,9 @@ class Satellite:
                 staging[key] = new_data[key]
 
         self.set_staging_playing_index(staging)
-
+        """
         _print ("[NEW DATA]")
+        
         for k, v in staging.items():
             if k == 'playlist':
                 continue
@@ -548,6 +568,7 @@ class Satellite:
             if i == staging['playlist_index']:
                 _print("="*20,"/INDEX","="*20)
         _print ("[/NEW DATA]")
+        """
         
         # Make sure anything that's changed since the original copy
         # was made is over written with new data.
@@ -604,9 +625,12 @@ class Satellite:
         self.clear_cache()
         
         if priority == 'server':
+            _print("*"*20,"PRIORITY SERVER");
             # self.set_percent_played()
             self.play()
             self.resume()
+        else:
+             _print("*"*20,"PRIORITY SELF");
         self.set_track(0)
         self.unlock_sync(True)
         return True
@@ -627,13 +651,25 @@ class Satellite:
         return os.path.join(cache_dir, filename)
 
     def resume(self):
-        _print("RESUME")
-        pos_data = self.data['playing'].get('pos_data')
+        _print("*"*20,"RESUME", "*"*20)
+        pos_data = self.data['playing'].get('pos_data', {})
         _print("pos_data:")
         pprint(pos_data)
-        percent_played = self.playing.get('percent_played')
-        print "percent_played:", percent_played
-        self.player.seek(str(percent_played)+"%")
+        pos_data_percent_played = pos_data.get('percent_played', '0%')
+        percent_played = self.playing.get('percent_played',
+                                          pos_data_percent_played)
+
+        if self.interaction_tracker.priority == 'server':
+            percent_played = pos_data_percent_played
+        
+        if not isinstance(percent_played, (str, unicode)):
+            percent_played = str(percent_played)
+
+        if not percent_played.endswith("%"):
+            percent_played = percent_played+"%"
+        
+        print "***percent_played:", percent_played
+        self.player.seek(percent_played)
 
     def build_playlist(self):
         if not self.data.get('playlist', []):
@@ -811,9 +847,11 @@ class Satellite:
                        self.data.get('weather_city', 'Cheyenne,WY')]
                 try:
                     weather = subprocess.check_output(cmd)
-                    idx = weather.rfind("Time:")
-                    if idx:
-                        weather = weather[0:idx]
+                    p = re.compile(r'([\d]+) (F) \(([\d]+) (C)\) \- (.*)\ '
+                                    'Time\:(.*)')
+                    weather = p.sub('\g<5>\n \g<1> Degrees Fahrenheit\n \g<3> '
+                                    'Degrees Celsius', 
+                                    weather)
                     self.data['weather'] = weather
                     self.data['weather_cache'] = time_now
                 except:
@@ -1055,6 +1093,8 @@ class Satellite:
             wait()
             if self.player:
                 _print ("VOL:", vol)
+                if vol < 0:
+                    vol = 1.0
                 self.player.player.set_property("volume", vol)
                 wait()
             if not string_data.get('permanent', False):
@@ -1325,21 +1365,24 @@ class Satellite:
             index = indexes.pop()
 
         if direction == 1:
-            index = index + 1
-            try:
-                queue_song = self.data['satellite_history'][index]
-                self.data['index'] = index
-            except IndexError:
-                if self.time_to_cue_netcasts() or not self.data['preload']:
-                    if self.data['netcasts']:
-                        queue_netcast = self.data['netcasts'].pop(0)
-                        self.data['satellite_history'].append(queue_netcast)
-                elif self.data['preload']:
-                    queue_song = self.data['preload'].pop(0)
-                    print "CUE SONG:", queue_song
-                    self.data['satellite_history'].append(queue_song)
-                else:
-                    index = 0
+            index = 0
+            if self.data['netcasts'] and (
+                    not self.data['preload'] or
+                    self.time_to_cue_netcasts()
+               ):
+                    queue_netcast = self.data['netcasts'].pop(0)
+                    print "CUE NETCAST:", queue_netcast
+                    self.data['satellite_history'].append(queue_netcast)
+                    indexes = self.get_indexes_for_item(queue_netcast)
+                    index = indexes.pop()
+            elif self.data['preload']:
+                queue_song = self.data['preload'].pop(0)
+                print "CUE SONG:", queue_song
+                self.data['satellite_history'].append(queue_song)
+                indexes = self.get_indexes_for_item(queue_song)
+                index = indexes.pop()
+            else:
+                self.organize_history()
                 
         elif direction == -1:
             index = index - 1
@@ -1358,10 +1401,9 @@ class Satellite:
         for i, p in enumerate(self.data['satellite_history']):
             if i == index:
                 _print("*"*20, "INDEX", "*"*20)
-            _print (i, "SH:", pformat(p))
-            if i == index:
+                _print(i, "SH:", pformat(p))
+                _print("playlist length:", len(self.data['satellite_history']))
                 _print("*"*20, "/INDEX", "*"*20)
-
         self.write()
 
     def set_staging_playing_index(self, staging=None):

@@ -1154,7 +1154,6 @@ def update_score(uid, fid, skip_score):
     query(sql, (score, uid, fid))
 
 def mark_dirty_played(obj, listeners):
-    print "mark_dirty_played:", obj
     if not obj or not listeners or obj == {}:
         return
     if not obj.get('dirty') and not obj.get('played'):
@@ -1276,7 +1275,7 @@ def build_playlist(history, netcasts, preload, playing):
 @app.route('/satellite/', methods=['GET', 'POST'])
 def satellite():
     print "satellite"
-    # cache.clear()
+    cache.clear()
     global playing, player, interaction_tracker
     request_json = request.get_json()
     sql = """SELECT uid, uname FROM users"""
@@ -1463,7 +1462,7 @@ def satellite():
 
     sql = """SELECT uid, uname FROM users WHERE listening = true"""
     listeners = []
-    res = cache_get_results_assoc(sql)
+    res = get_results_assoc(sql)
     for r in res:
         listeners.append(dict(r))
 

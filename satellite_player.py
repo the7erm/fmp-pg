@@ -712,7 +712,12 @@ static char * invisible_xpm[] = {
             else:
                 seek_ns = self.pos_int - skip_second
         elif lastChar == '%':
-            seek_ns = int(float(string[0:-1]) * 0.01 * self.dur_int)
+            try:
+                seek_ns = int(float(string[0:-1]) * 0.01 * self.dur_int)
+            except ValueError as e:
+                print "ValueError:",e
+                self.seek_locked = False
+                return 
 
         else:
             seek_ns = int(string) * 1000000000

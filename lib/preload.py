@@ -41,6 +41,7 @@ class Preload(gtk.ScrolledWindow):
         self.tv = None
         self.create_treeview()
         self.stop = False
+        self.liststore.set_sort_column_id(4, -1)
         gobject.timeout_add(10000, self.refresh_data)
 
 
