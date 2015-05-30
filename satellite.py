@@ -107,6 +107,7 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
+        self.download_thread = False
         self.downloading_cache = False
         self.saying_something = False
         self.saying_status = False
@@ -131,6 +132,7 @@ class Satellite:
         self.rating_user = False
         self.rating = False
         self.real_history = []
+        self.files_to_download = []
         self.data = {
             "preload": [],
             "playing": {},
@@ -618,21 +620,15 @@ class Satellite:
                 self.data['last_seen_times'][dst] = _time
             if not dst or os.path.exists(dst):
                 continue
-            missing_files.append(p)
-        # _pprint(self.data['last_seen_times'])
+            if p not in self.files_to_download:
+                self.files_to_download.append(p)
 
-        if missing_files:
-            if not self.downloading_cache:
-                self.say("Cache downloads started", permanent=True)
-                self.downloading_cache = True
-            for f in missing_files:
-                self.download(f)
-        else:
-            if self.downloading_cache:
-                self.say("Cache downloads finished", permanent=True)
-                self.downloading_cache = False
+        if self.files_to_download and not self.download_thread:
+            self.download_thread = threading.Thread(
+                target=self.download_worker)
+            self.download_thread.start()
 
-        
+
         # Make sure anything that's changed since the original copy
         # was made is over written with new data.
         for key in self.data.keys():
@@ -640,7 +636,6 @@ class Satellite:
                 staging[key] = self.data[key]
         self.data.update(staging)
         self.clear_cache()
-        
         if priority == 'server':
             _print("*"*20,"PRIORITY SERVER");
             # self.set_percent_played()
@@ -714,21 +709,43 @@ class Satellite:
             _print("NO FILES")
             return
         last_seen_times = self.data.get('last_seen_times', {})
-        a_day_ago = get_time() - (60 * 60 * 24)
+        now = get_time()
+        expire_time = now - (60 * 60 * 1)
         for root, dirs, files in os.walk(cache_dir):
             for f in files:
                 if f not in self.files:
                     dst = os.path.join(root, f)
                     if dst in last_seen_times:
                         last_seen = self.data['last_seen_times'][dst]
-                        if last_seen > a_day_ago:
+                        if last_seen > expire_time:
                             # It's been downloaded in the last 24 hours
                             # so skip it.
-                            _print("NOT REMOVING:", f)
+                            _print("NOT REMOVING:", f, now - last_seen, "delete in:", last_seen - expire_time)
                             continue
                         del self.data['last_seen_times'][dst]
                     _print("REMOVE:", f)
-                    os.unlink(dst)
+                    if os.path.exists(dst):
+                        os.unlink(dst)
+
+    def download_worker(self):
+        started_download_time = get_time()
+        
+        self.say("Cache downloads started", permanent=True)
+        cnt = 0
+        while self.files_to_download:
+            cnt += 1
+            f = self.files_to_download.pop(0)
+            self.download(f)
+            try:
+                self.download(f)
+            except Exception as e:
+                _print("ERROR WHILE DOWNLOADING:", e)
+        download_time = get_time() - started_download_time
+        _print("download_time:", download_time)
+        _print("#files", cnt)
+        self.say("Cache downloads finished", permanent=True)
+        self.download_thread = False
+        self.write()
 
     def download(self, obj):
         if self.shutting_down:
@@ -736,6 +753,7 @@ class Satellite:
         _id, id_type = get_id_type(obj)
         dst = self.get_dst(obj)
         if os.path.exists(dst):
+            self.data['last_seen_times'][dst] = get_time()
             return
         
         artists = obj.get("artist_title",
@@ -746,6 +764,7 @@ class Satellite:
         #    self.say("downloading %s - %s" % (artists, title))
         pprint(obj)
         tmp = dst + ".tmp"
+        self.data['last_seen_times'][tmp] = get_time()
         exist_size = 0
         open_attrs = "wb"
         request = myURLOpener()
@@ -775,8 +794,8 @@ class Satellite:
 
         CHUNK = 16 * 1024
         total = 0.0
-        display_time = time.time()
-        start_time = time.time()
+        display_time = get_time()
+        start_time = get_time()
         precent_complete = 0
         try:
             with open(tmp, open_attrs) as fp:
@@ -784,26 +803,30 @@ class Satellite:
                     if self.shutting_down:
                         return False
                     chunk = response.read(CHUNK)
-                    if not chunk: 
+                    if not chunk:
                         break
                     fp.write(chunk)
                     total += len(chunk)
-                    if display_time <= time.time() - 1:
-                        display_time = time.time()
+                    if display_time <= get_time() - 1:
+                        display_time = get_time()
                         precent_complete = (total / content_length) * 100
                         _print ("DL %s:%s %s%%" % (total, content_length, 
                                                    precent_complete))
                         wait()
                 wait()
                 os.fsync(fp.fileno())
+            precent_complete = (total / content_length) * 100
         except:
             print "Error downloading:", sys.exc_info()[0]
             return
 
-        running_time = time.time() - start_time
+        running_time = get_time() - start_time
         _print ("%s:%s %s%% %s" % (total, content_length, 
                                    precent_complete, running_time))
-        shutil.move(tmp, dst)
+        if os.path.exists(tmp):
+            self.data['last_seen_times'][dst] = get_time()
+            del self.data['last_seen_times'][tmp]
+            shutil.move(tmp, dst)
 
     def quit(self, *args, **kwargs):
         pid = os.getpid()
