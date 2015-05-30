@@ -108,6 +108,7 @@ class myURLOpener(urllib.FancyURLopener):
 class Satellite:
     def __init__(self):
         self.saying_something = False
+        self.saying_status = False
         self.ip = []
         self.keystack = []
         self.host = ""
@@ -197,8 +198,6 @@ class Satellite:
         if self.ip != ip:
             self.host = ""
         self.ip = ip
-        _print("IP HISTORY")
-        _pprint(self.data.get('ip_history'))
 
     def set_host(self, ip, server_ip):
         # ip = this machine's ip
@@ -782,6 +781,11 @@ class Satellite:
         gtk.main_quit()
         sys.exit()
 
+    def wait_for_empty_pico_stack(self):
+        while self.pico_stack or self.saying_something:
+            wait()
+            time.sleep(1)
+
     def on_keypress(self, widget, event):
         wait()
         keyname = gtk.gdk.keyval_name(event.keyval)
@@ -797,6 +801,7 @@ class Satellite:
             self.rating_user = False
 
         if keyname in ("KP_Divide", "XF86PowerOff"):
+            self.rating_user = False
             all_same = True
             for k in self.keystack:
                 if not all_same:
@@ -809,7 +814,7 @@ class Satellite:
                 self.shutdown()
                 return
 
-            self.rating_user = False
+            
             been_down_for = (time.time() - self.start_power_down_timer)
             if not self.start_power_down_timer or been_down_for >= 5:
                 self.start_power_down_timer = time.time()
@@ -819,12 +824,12 @@ class Satellite:
             self.start_power_down_timer = 0
 
         if keyname in ('KP_Add', 'XF86AudioRaiseVolume'):
-            self.volume_up()
             self.rating_user = False
+            self.volume_up()
 
         if keyname in ('KP_Subtract', 'XF86AudioLowerVolume'):
-            self.volume_down()
             self.rating_user = False
+            self.volume_down()
 
         if keyname in ('d','D'):
             if self.window.get_decorated():
@@ -834,14 +839,20 @@ class Satellite:
             self.window.emit('check-resize')
 
         if keyname in ('KP_Delete', 'period'):
-            self.get_ip()
+            self.rating_user = False
+            if self.saying_status:
+                return
+            self.saying_status = True
             now = datetime.now()
-            self.say("The current time is %s" % now.strftime("%I:%M %p"), 
-                     wait=True)
-
+            now = now.strftime("%I:%M %p")
+            now = now.lstrip('0')
+            self.say("The current time is %s" % now, wait=True)
             weather = self.data.get("weather", "")
             weather_cache = self.data.get("weather_cache", 0)
             time_now = get_time()
+            self.get_ip()
+            if self.host:
+                self.say("Connected to F M P server", permanent=True)
             if self.ip and \
                 weather_cache < time_now - 300:
                 cmd = ["inxi","-c","0","-w", 
@@ -881,7 +892,9 @@ class Satellite:
             self.say("%s - %s %s" % (artist, title, reason), wait=True)
             self.last_sync_time = time.time()
             self.sync()
-            self.rating_user = False
+            self.wait_for_empty_pico_stack()
+            self.saying_status = False
+            return
 
         if keyname == "KP_Multiply":
             self.say("rate", permanent=True)
@@ -925,9 +938,7 @@ class Satellite:
         self.write()
         subprocess.check_output(["sync"])
         self.say("Playlist written to disk", wait=True, permanent=True)
-        while self.pico_stack or self.saying_something:
-            time.sleep(1)
-            wait()
+        self.wait_for_empty_pico_stack()
         subprocess.check_output(["sudo","poweroff"])
         sys.exit()
 
