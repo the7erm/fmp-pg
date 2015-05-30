@@ -1268,7 +1268,7 @@ class Satellite:
             if id_type == 'e':
                 time_to_cue = False
                 break
-        return found
+        return time_to_cue
 
     def set_playing_data(self, key, value):
         _print(key,'=',value)
