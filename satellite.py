@@ -107,6 +107,7 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
+        self.downloading_cache = False
         self.saying_something = False
         self.saying_status = False
         self.ip = []
@@ -146,7 +147,8 @@ class Satellite:
             "weather": '',
             "weather_cache": 0,
             "weather_city": "Cheyenne,WY",
-            "ip_history": {}
+            "ip_history": {},
+            "last_seen_times": {}
         }
         self.pico_dir = os.path.join(config_dir, 'pico-wav')
         print "PICO_DIR:", self.pico_dir
@@ -336,6 +338,8 @@ class Satellite:
                 if not self.data.get('satellite_history',[]):
                     self.data['satellite_history'] = \
                             self.data.get('history', [])
+                if 'last_seen_times' not in self.data:
+                    self.data['last_seen_times'] = {}
                 self.build_playlist()
                 loaded = True
             except ValueError:
@@ -607,16 +611,27 @@ class Satellite:
                             staging.get('netcasts', [])
 
         missing_files = []
+        _time = get_time()
         for p in files_to_download:
             dst = self.get_dst(p)
+            if dst:
+                self.data['last_seen_times'][dst] = _time
             if not dst or os.path.exists(dst):
                 continue
             missing_files.append(p)
+        # _pprint(self.data['last_seen_times'])
+
         if missing_files:
-            self.say("Cache downloads started", permanent=True)
+            if not self.downloading_cache:
+                self.say("Cache downloads started", permanent=True)
+                self.downloading_cache = True
             for f in missing_files:
                 self.download(f)
-            self.say("Cache downloads finished", permanent=True)
+        else:
+            if self.downloading_cache:
+                self.say("Cache downloads finished", permanent=True)
+                self.downloading_cache = False
+
         
         # Make sure anything that's changed since the original copy
         # was made is over written with new data.
@@ -650,7 +665,9 @@ class Satellite:
         dst = os.path.join(cache_dir, filename)
         if filename not in self.files:
             self.files.append(filename)
-        return os.path.join(cache_dir, filename)
+        dst = os.path.join(cache_dir, filename)
+
+        return dst
 
     def resume(self):
         _print("*"*20,"RESUME", "*"*20)
@@ -696,11 +713,22 @@ class Satellite:
         if not self.files:
             _print("NO FILES")
             return
+        last_seen_times = self.data.get('last_seen_times', {})
+        a_day_ago = get_time() - (60 * 60 * 24)
         for root, dirs, files in os.walk(cache_dir):
             for f in files:
                 if f not in self.files:
+                    dst = os.path.join(root, f)
+                    if dst in last_seen_times:
+                        last_seen = self.data['last_seen_times'][dst]
+                        if last_seen > a_day_ago:
+                            # It's been downloaded in the last 24 hours
+                            # so skip it.
+                            _print("NOT REMOVING:", f)
+                            continue
+                        del self.data['last_seen_times'][dst]
                     _print("REMOVE:", f)
-                    os.unlink(os.path.join(root,f))
+                    os.unlink(dst)
 
     def download(self, obj):
         if self.shutting_down:
@@ -709,6 +737,7 @@ class Satellite:
         dst = self.get_dst(obj)
         if os.path.exists(dst):
             return
+        
         artists = obj.get("artist_title",
                           obj.get('artist', 
                                   obj.get('artists', "")))
@@ -853,8 +882,7 @@ class Satellite:
             weather_cache = self.data.get("weather_cache", 0)
             time_now = get_time()
             self.get_ip()
-            if self.host:
-                self.say("Connected to F M P server", permanent=True)
+            
             if self.ip and \
                 weather_cache < time_now - 300:
                 cmd = ["inxi","-c","0","-w", 
@@ -867,13 +895,17 @@ class Satellite:
                     weather = p.sub('\g<5>\n \g<1> Degrees Fahrenheit\n \g<3> '
                                     'Degrees Celsius', 
                                     weather)
-                    self.data['weather'] = weather
-                    self.data['weather_cache'] = time_now
+                    if 'error' not in weather.lower():
+                        self.data['weather'] = weather
+                        self.data['weather_cache'] = time_now
+                    else:
+                        weather = self.data.get("weather", "")
                 except:
                     pass
 
             self.say(weather)
-
+            if self.host:
+                self.host = ""
             self.sync(just_playing=True)
             _print("PLAYING:", self.data['playing'])
 
@@ -894,7 +926,17 @@ class Satellite:
             reason = self.data['playing'].get("reason", "")
             self.say("%s - %s %s" % (artist, title, reason), wait=True)
             self.last_sync_time = time.time()
+            listeners = []
+            for l in self.data['listeners']:
+                listeners.append(l['uname'])
+            if listeners:
+                self.say("Listeners before sync :%s" % ",".join(listeners))
             self.sync()
+            listeners = []
+            for l in self.data['listeners']:
+                listeners.append(l['uname'])
+            if listeners:
+                self.say("Listeners after sync %s" % ",".join(listeners))
             self.wait_for_empty_pico_stack()
             self.saying_status = False
             return
@@ -986,6 +1028,11 @@ class Satellite:
 
 
     def set_listening(self, uid):
+        while self.sync_locked:
+            _print("Waiting for sync to unlock")
+            time.sleep(0.25)
+        self.sync_locked = True
+
         is_listening = False
         for l in self.data['listeners']:
             if l['uid'] == uid:
@@ -998,27 +1045,46 @@ class Satellite:
                 uname = u['uname']
                 break
 
+        if not self.data.get('preload_cache', []):
+            self.data['preload_cache'] = []
+
         if is_listening:
+            self.data['listeners'].remove(is_listening)
             move_to_preload_cache = []
             for f in self.data['preload']:
                 if f.get('uid') == uid:
                     move_to_preload_cache.append(f)
-            self.data['listeners'].remove(is_listening)
-            self.data['preload_cache'] += move_to_preload_cache
+        
             for f in move_to_preload_cache:
-                self.data['preload'].remove(f)
+                self.data['preload_cache'].append(f)
+                _print("append to preload_cache f:",f)
+                try:
+                    self.data['preload'].remove(f)
+                except ValueError, e:
+                    print "ValueError:",e
+                    print "f:",f
+            
             
         if not is_listening:
+            for user in self.data['users']:
+                if user['uid'] == uid:
+                    user['listening'] = True
+                    self.data['listeners'].append(user)
             move_to_preload = []
             for f in self.data['preload_cache']:
                 if f.get('uid') == uid:
                     move_to_preload.append(f)
-            self.data['playlist'] += move_to_preload
+
             for f in move_to_preload:
-                self.data['preload_cache'].remove(f)
-            for user in self.data['users']:
-                if user['uid'] == uid:
-                    self.data['listeners'].append(user)
+                self.data['preload'].append(f)
+                try:
+                    _print("remove from preload_cache f:",f)
+                    self.data['preload_cache'].remove(f)
+                except ValueError, e:
+                    print "ValueError:",e
+                    print "f:",f
+
+            
 
         # Restructure playlist
         preload = deepcopy(self.data['preload'])
@@ -1060,7 +1126,10 @@ class Satellite:
             self.say("Set %s to not listening" % uname, permanent=True)
         else:
             self.say("Set %s to listening" % uname, permanent=True)
+        
+        self.sync_locked = False
         self.set_track(0)
+        self.sync()
 
     def append_new_preload_item(self, _list, already_added, new_preload):
         if not _list:
@@ -1073,6 +1142,7 @@ class Satellite:
             already_added.append(key)
 
     def say(self, string, wait=False, permanent=False):
+        string = string.replace("halle", "hally")
         self.pico_say(string, permanent=permanent)
         return
 

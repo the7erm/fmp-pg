@@ -651,19 +651,17 @@ def get_existing_file(uid, true_score):
 
 def insert_into_dont_pick(fid):
 
-
-    
-    sql = """SELECT fa.fid, fa.aid 
-             FROM file_artists fa LEFT JOIN dont_pick dp ON dp.fid = fa.fid
-             WHERE fa.fid = %s AND dp.fid IS NULL"""
-
-    artists = get_results_assoc(sql, (fid, ))
-
     sql = """INSERT INTO dont_pick (fid, reason) 
              VALUES(%s, 'fid in preload')"""
     query(sql, (fid, ))  # this must be done every time because sometimes
                          # files don't have artists, and the filename
                          # is not Artist - Title.ext
+
+    sql = """SELECT fa.fid, fa.aid 
+             FROM file_artists fa LEFT JOIN dont_pick dp ON dp.fid = fa.fid
+             WHERE fa.fid = %s AND dp.fid IS NULL"""
+
+    artists = get_results_assoc(sql, (fid, ))
 
     already_processed_artist = []
     already_processed_basename = []
@@ -872,6 +870,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
     total_preload = get_assoc(sql)
 
     min_preload_size = len(make_true_scores_list())
+    min_amount = len(make_true_scores_list())
     if min_preload_size:
         sql = """SELECT count(*) AS total
                  FROM users
@@ -928,6 +927,7 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
     print "USERS:", users
     user_len = len(users)
     while time.time() - start_time < max_cue_time:
+        insert_artists_in_preload_into_dont_pick()
         if not true_scores or len(true_scores) == 0:
             print "making true score list"
             true_scores = make_true_scores_list()
@@ -937,7 +937,6 @@ def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
         if true_score in empty_scores:
             print "skipping empty score:", true_score
             continue
-
 
         sample = get_true_score_sample(uid, true_score)
         
