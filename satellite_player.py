@@ -87,6 +87,7 @@ class Player(gobject.GObject):
     
     def __init__(self, filename=None, alt_widget=None):
         gobject.GObject.__init__(self)
+        self.player = None
         self.showing_controls = False
         self.filename = filename
         self.playingState = STOPPED
@@ -413,16 +414,46 @@ static char * invisible_xpm[] = {
         self.player.set_property("uri", uri)
         self.player.set_state(PAUSED)
         print "URI:", uri
-        self.player.get_state()
         self.should_hide_window()
+
+    @property
+    def playingState(self):
+        if self.player:
+            return self.player.get_state()[1]
+        else:
+            return STOPPED
+
+    @playingState.setter
+    def playingState(self, new_state):
+        old_state = self.playingState
+        unpause = False
+        emit = False
+        if old_state != new_state:
+            emit = True
+            if old_state == PAUSED and new_state == PLAYING:
+                unpause = True
+        if self.player:
+            """
+            if unpause:
+                pos_int = self.player.query_position(self.time_format, None)[0]
+                self.prepare()
+                self.seek_ns(pos_int)
+                
+            """
+            self.player.set_state(new_state)
+            if self.player.get_property('n-video') > 0:
+                self.window.show_all()
+                self.should_hide_window()
+            if emit:
+                self.emit('state-changed', new_state)
+        else:
+            print "NO PLAYER can't set state"
 
     def start(self, *args, **kwargs):
         print "="*80
         self.prepare()
         # self.player.set_property("volume",self.volume)
-        self.player.set_state(PLAYING)
-        self.emit('state-changed', PLAYING)
-        self.playingState = self.player.get_state()[1]
+        self.playingState = PLAYING
         try:
             self.dur_int = self.player.query_duration(self.time_format, None)[0]
         except gst.QueryError, e:
@@ -537,24 +568,16 @@ static char * invisible_xpm[] = {
         return True
         
     def pause(self, *args, **kwargs):
-        playingState = self.player.get_state()[1]
+        playingState = self.playingState
         if playingState == STOPPED:
             self.start()
             print "start()"
         elif playingState == PLAYING:
-            self.player.set_state(PAUSED)
+            self.playingState = PAUSED
             print "PAUSED"
         elif playingState == PAUSED:
-            pos_int = self.player.query_position(self.time_format, None)[0]
-            self.prepare()
-            self.player.set_state(PLAYING)
-            self.seek_ns(pos_int)
-            if self.player.get_property('n-video') > 0:
-                self.window.show_all()
-                self.should_hide_window()
+            self.playingState = PLAYING
             print "PLAYING"
-        self.playingState = self.player.get_state()[1]
-        self.emit('state-changed', self.playingState)
         
 
     def debug_message(self, gst_message):

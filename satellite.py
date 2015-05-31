@@ -120,7 +120,6 @@ class Satellite:
         self.player = None
         self.pico_thread = None
         self.pico_stack = []
-        self.init_pico_thread()
         self.say("initializing player", permanent=True)
         start = time.time()
         self.last_sync_time = 0
@@ -167,10 +166,13 @@ class Satellite:
         volume = self.data.get('volume', 100)
         self.set_volume(volume)
         self.play()
+        if self.data['state'] == 'PLAYING':
+            print "RESUME"
+            self.player.playingState = player.PAUSED
         self.resume()
         if self.data['state'] == 'PLAYING':
             print "RESUME"
-            self.player.player.set_state(player.PLAYING)
+            self.player.playingState = player.PLAYING
         _print("sync(just_playing=True)")
         self.sync(just_playing=True)
         _print("self.data['state']:", self.data['state'])
@@ -183,15 +185,12 @@ class Satellite:
         print "DONE"
         self.set_track(0)
         self.say("player initialization complete", permanent=True)
-        if self.data['state'] == 'PLAYING':
-            print "PLAYING"
-            self.player.player.set_state(player.PLAYING)
+        
 
     def get_ip(self):
         ip = []
         try:
-            ip = subprocess.check_output(['hostname', '-I'])
-            wait()
+            ip = self.check_output(['hostname', '-I'])
             ip = ip.strip()
             if " " in ip:
                 ip = ip.split(" ")
@@ -271,8 +270,7 @@ class Satellite:
             parts.pop() # remove that last element
             parts.append("0")
             ip_range = "%s/24" % (".".join(parts))
-            result = subprocess.check_output(["nmap","-sn", ip_range])
-            wait()
+            result = self.check_output(["nmap","-sn", ip_range])
             rx = re.compile("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
             lines = result.split("\n")
             ips_to_check = []
@@ -318,10 +316,6 @@ class Satellite:
         self.player = player.Player()
         self.interaction_tracker = InteractionTracker('client', self.player)
         return
-
-    def init_pico_thread(self):
-        self.pico_thread = threading.Thread(target=self.pico_loop)
-        self.pico_thread.start()
 
     def load(self):
         if self.load_json(satellite_json):
@@ -423,6 +417,7 @@ class Satellite:
                                    indent=4,
                                    separators=(',', ': '))
             wait()
+            self.time_to_save = 5
             fp.write(json_data)
             # wait()
             # os.fsync(fp.fileno())
@@ -896,6 +891,7 @@ class Satellite:
             self.rating_user = False
             if self.saying_status:
                 return
+            self.interaction_tracker.mark_interaction()
             self.saying_status = True
             now = datetime.now()
             now = now.strftime("%I:%M %p")
@@ -903,6 +899,7 @@ class Satellite:
             self.say("The current time is %s" % now, wait=True)
             weather = self.data.get("weather", "")
             weather_cache = self.data.get("weather_cache", 0)
+            weather_cache = 0
             time_now = get_time()
             self.get_ip()
             
@@ -911,11 +908,10 @@ class Satellite:
                 cmd = ["inxi","-c","0","-w", 
                        self.data.get('weather_city', 'Cheyenne,WY')]
                 try:
-                    weather = subprocess.check_output(cmd)
-                    wait()
+                    weather = self.check_output(cmd)
                     p = re.compile(r'([\d]+) (F) \(([\d]+) (C)\) \- (.*)\ '
                                     'Time\:(.*)')
-                    weather = p.sub('\g<5>\n \g<1> Degrees Fahrenheit\n \g<3> '
+                    weather = p.sub('\g<5>\n: \g<1> Degrees Fahrenheit\n: \g<3>: '
                                     'Degrees Celsius', 
                                     weather)
                     if 'error' not in weather.lower():
@@ -947,19 +943,20 @@ class Satellite:
                     title = self.data['playing'].get("episode_title", "")
 
             reason = self.data['playing'].get("reason", "")
-            self.say("%s - %s %s" % (artist, title, reason), wait=True)
-            self.last_sync_time = time.time()
+            if artist or title:
+                self.say("%s - %s" % (artist, title), wait=True)
+            self.say(reason, permanent=True)
             listeners = []
             for l in self.data['listeners']:
                 listeners.append(l['uname'])
             if listeners:
-                self.say("Listeners before sync :%s" % ",".join(listeners))
+                self.say("Listeners before sync: %s" % ", ".join(listeners))
             self.sync()
             listeners = []
             for l in self.data['listeners']:
                 listeners.append(l['uname'])
             if listeners:
-                self.say("Listeners after sync %s" % ",".join(listeners))
+                self.say("Listeners after sync: %s" % ", ".join(listeners))
             self.wait_for_empty_pico_stack()
             self.saying_status = False
             return
@@ -1004,10 +1001,10 @@ class Satellite:
         _print ("SHUTDOWN")
         self.say("Shutting down", wait=True, permanent=True)
         self.write()
-        subprocess.check_output(["sync"])
+        self.check_output(["sync"])
         self.say("Playlist written to disk", wait=True, permanent=True)
         self.wait_for_empty_pico_stack()
-        subprocess.check_output(["sudo","poweroff"])
+        self.check_output(["sudo","poweroff"])
         sys.exit()
 
 
@@ -1169,55 +1166,56 @@ class Satellite:
         self.pico_say(string, permanent=permanent)
         return
 
-    def pico_loop(self):
+    def pico_worker(self):
         rx = re.compile("\W+")
-        while True:
-            _print("PICO_LOOP")
+        paused = False
+        while self.pico_stack:
+            _print("PICO WORKER")
             wait()
-            if not self.pico_stack:
-                self.saying_something = False
-                time.sleep(0.5)
-                continue
             self.saying_something = True
             string_data = self.pico_stack.pop(0)
             if not string_data or string_data == {} and\
                not string_data.get('string', ''):
                 continue
+
             string = string_data.get('string', '').replace("_", ' ')
+            # string = re.sub(rx, " ", string)
             string = string.strip()
             if not string:
                 continue
-            string = re.sub(rx, " ", string)
             _print("SAY:", string)
             wav = "%s.wav" % (hashlib.sha1(string).hexdigest(),)
             wav = os.path.join(self.pico_dir, wav)
             if not os.path.exists(wav):
                 cmd = ['pico2wave', "--lang=en-GB", "-w", wav, string]
-                subprocess.check_output(cmd)
-            wait()
+                self.check_output(cmd)
+            if self.player and self.player.playingState == player.PLAYING:
+                paused = True
+                self.player.pause()
             cmd = ['aplay', wav]
-            vol = -1
-            if self.player:
-                vol = self.player.player.get_property("volume")
-                _print("VOL:", vol)
-                self.player.player.set_property("volume", 0.4)
-                wait()
-            subprocess.check_output(cmd)
-            wait()
-            if self.player:
-                _print ("VOL:", vol)
-                if vol < 0:
-                    vol = 1.0
-                self.player.player.set_property("volume", vol)
-                wait()
+            self.check_output(cmd)
             if not string_data.get('permanent', False):
                 os.unlink(wav)
+
+        if self.player and self.player.playingState == player.PAUSED and paused:
+            self.player.pause()
+        self.pico_thread = None
+        self.saying_something = False
+
+    def check_output(self, cmd):
+        wait()
+        res = subprocess.check_output(cmd)
+        wait()
+        return res
 
     def pico_say(self, string, permanent=False):
         self.pico_stack.append({
             'string': string,
             'permanent': permanent
         })
+        if not self.pico_thread:
+            self.pico_thread = threading.Thread(target=self.pico_worker)
+            self.pico_thread.start()
 
     def pause(self):
         _print("PAUSE CALLED")

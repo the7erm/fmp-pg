@@ -1135,6 +1135,8 @@ def update_score(uid, fid, skip_score):
              FROM user_song_info 
              WHERE uid = %s AND fid = %s"""
     current_score = get_assoc(sql, (uid, fid))
+    if not current_score:
+        return
     score = current_score['score']
     print "BEFORE score:", score
     score += skip_score
