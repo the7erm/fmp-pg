@@ -866,20 +866,26 @@ class Satellite:
         self.keystack = self.keystack[-5:]
 
         if keyname in ('XF86Tools',):
+            self.rating_user = False
             if self.data.get('cue_netcasts', True):
                 self.data['cue_netcasts'] = False
                 self.say("Don't Cue Netcasts", permanent=True)
             else:
                 self.data['cue_netcasts'] = True
                 self.say("Cue Netcasts", permanent=True)
+            self.write()
+            return True
 
         if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter',
                        'XF86AudioPlay'):
             self.pause()
             self.rating_user = False
+            return
 
         if keyname == 'XF86HomePage':
             self.set_track(0)
+            self.rating_user = False
+            return
 
         if keyname in ("KP_Divide", "XF86PowerOff"):
             self.rating_user = False
@@ -894,8 +900,6 @@ class Satellite:
             if all_same:
                 self.shutdown()
                 return
-
-            
             been_down_for = (time.time() - self.start_power_down_timer)
             if not self.start_power_down_timer or been_down_for >= 5:
                 self.start_power_down_timer = time.time()
@@ -907,10 +911,12 @@ class Satellite:
         if keyname in ('KP_Add', 'XF86AudioRaiseVolume'):
             self.rating_user = False
             self.volume_up()
+            return
 
         if keyname in ('KP_Subtract', 'XF86AudioLowerVolume'):
             self.rating_user = False
             self.volume_down()
+            return
 
         if keyname in ('d','D'):
             if self.window.get_decorated():
@@ -918,6 +924,7 @@ class Satellite:
             else:
                 self.window.set_decorated(True)
             self.window.emit('check-resize')
+            return
 
         if keyname in ('KP_Delete', 'period'):
             self.rating_user = False
@@ -1155,7 +1162,7 @@ class Satellite:
 
         new_preload = []
         already_added = []
-        self.organize_history()
+        # self.organize_history()
         for p in self.data.get('satellite_history', []):
             already_added.append(self.make_key(item=p))
 
@@ -1362,7 +1369,7 @@ class Satellite:
         _id, id_type = get_id_type(self.data['playing'])
         if not _id:
             try:
-                self.organize_history()
+                # self.organize_history()
                 self.index = len(self.data['satellite_history']) - 1
                 self.data['playing'] = self.data['satellite_history'][self.index]
             except IndexError:
@@ -1501,8 +1508,8 @@ class Satellite:
     def set_track(self, direction=1):
         _print("set_track: DIRECTION:%s" % direction)
         # 2 is a `special` direction
-        if direction in (0, 2):
-            self.organize_history()
+        #if direction in (0, 2):
+        #    self.organize_history()
 
         current_song = deepcopy(self.data['playing'])
         index = -1
@@ -1513,7 +1520,7 @@ class Satellite:
         _print("current_song", current_song)
         _print("current_song index:", index)
 
-        if not indexes:
+        if not indexes or index == -1:
             self.data['satellite_history'].append(current_song)
             indexes = self.get_indexes_for_item(current_song)
             index = indexes.pop()
@@ -1525,7 +1532,7 @@ class Satellite:
             try:
                 test_index = self.data['satellite_history'][index]
             except IndexError:
-                print "INDEX ERROR"
+                _print("INDEX ERROR (Try to cue fallback to index 0)")
                 index = 0
                 if (
                         self.data['netcasts'] and 
@@ -1551,7 +1558,7 @@ class Satellite:
         if index < 0:
             index = last_item_index
 
-        self.data['index'] = index
+        self.index = index
         self.data['playing'] = self.data['satellite_history'][index]
         _print("*"*20, "INDEX", "*"*20)
         _print(index, "SH:", pformat(self.data['satellite_history'][index]))
@@ -1576,7 +1583,7 @@ class Satellite:
         if indexes:
             _print("ALREADY PRESENT:", item)
             return False, 0
-        self.organize_history()
+        # self.organize_history()
         self.data['satellite_history'].append(item)
         indexes = self.get_indexes_for_item(item)
         index = indexes.pop()
