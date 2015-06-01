@@ -693,7 +693,7 @@ static char * invisible_xpm[] = {
             # gst_base_sink_set_max_lateness(video_sink, -1)
         elif message_name == 'missing-plugin':
             print "MISSING PLUGGIN"
-            self.emit('missing-plugin')
+            self.emit('missing-plugin', {})
         if message_name == 'playbin2-stream-changed':
             print "-"*80
             
@@ -719,6 +719,7 @@ static char * invisible_xpm[] = {
                 dur_int = self.player.query_duration(self.time_format, None)[0]
                 self.dur_int = dur_int
             except gst.QueryError:
+                self.seek_locked = False
                 return
                 
         string = str(string)
@@ -729,7 +730,11 @@ static char * invisible_xpm[] = {
         
         if firstChar in ('+','-'):
             # skip ahead x xeconds
-            skip_second = int(string[1:]) * 1000000000
+            try:
+                skip_second = int(string[1:]) * 1000000000
+            except:
+                self.seek_locked = False
+                return
             if firstChar == '+':
                 seek_ns = self.pos_int + skip_second
             else:

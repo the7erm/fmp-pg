@@ -426,6 +426,7 @@ def mark_as_played(fid, uid, when, percent_played, reason="", *args, **kwargs):
       'date_played': when.date(),
       'reason': reason,
       'ltp': when,
+      'ultp': when,
       'when': when,
       'when_date': when.date()
     }

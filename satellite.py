@@ -107,6 +107,7 @@ class myURLOpener(urllib.FancyURLopener):
 
 class Satellite:
     def __init__(self):
+        self.files = []
         self.download_thread = False
         self.downloading_cache = False
         self.saying_something = False
@@ -149,7 +150,8 @@ class Satellite:
             "weather_cache": 0,
             "weather_city": "Cheyenne,WY",
             "ip_history": {},
-            "last_seen_times": {}
+            "last_seen_times": {},
+            "cue_netcasts": True
         }
         self.pico_dir = os.path.join(config_dir, 'pico-wav')
         print "PICO_DIR:", self.pico_dir
@@ -314,8 +316,17 @@ class Satellite:
 
     def init_player(self):
         self.player = player.Player()
+        self.player.connect('missing-plugin', self.on_missing_plugin)
         self.interaction_tracker = InteractionTracker('client', self.player)
         return
+
+    def on_missing_plugin(self, *args, **kwargs):
+        state = self.data['state']
+        self.set_track(1)
+        start = False
+        if state == 'PLAYING':
+            start = True
+        self.play(start)
 
     def load(self):
         if self.load_json(satellite_json):
@@ -341,39 +352,47 @@ class Satellite:
             except ValueError:
                 pass
         return loaded
-        
+
+    def data_setter(self, key, value):
+        _print("SET:", key,'=', value)
+        self.data[key] = value
+
+    def data_getter(self, key, default=None):
+        res = self.data.get(key, default)
+        _print("GET:", key, '=', pformat(res))
+        return res
 
     @property
     def index(self):
-        return self.data['index']
+        return self.data_getter('index', 0)
 
     @index.setter
-    def index(self, value):
-        self.data['index'] = value
+    def index_setter(self, value):
+        self.data_setter('index', value)
 
     @property
     def playing(self):
-        return self.data.get('playing', {})
+        return self.data_getter('playing', {})
 
     @playing.setter
-    def playing(self, value):
-        self.data['playing'] = value
+    def playing_setter(self, value):
+        self.data_setter('playing', value)
 
     @property
     def playlist(self):
-        return self.data.get('playlist', [])
+        return self.data_getter('playlist', [])
 
     @playlist.setter
-    def playlist(self, value):
-        self.data['playlist'] = value
+    def playlist_setter(self, value):
+        self.data_setter('playlist', value)
 
     @property
     def state(self):
-        return self.data.get('state')
+        return self.data_getter('state', 'PLAYING')
 
     @state.setter
-    def state(self, value):
-        self.data['state'] = value
+    def state_state(self, value):
+        self.data_setter('state', value)
 
     @property
     def preload(self):
@@ -385,19 +404,19 @@ class Satellite:
 
     @property
     def netcasts(self):
-        return self.data.get('netcasts', [])
+        return self.data_getter('netcasts', [])
 
     @netcasts.setter
     def netcasts(self, value):
-        self.data['netcasts'] = value
+        self.data_setter('netcasts', value)
 
     @property
     def history(self):
-        return self.data.get('history', [])
+        return self.data_getter('history', [])
 
     @history.setter
     def history(self, value):
-        self.data['history'] = value
+        self.data_setter('history', value)
 
     def write(self):
         if self.write_lock:
@@ -433,16 +452,10 @@ class Satellite:
         self.data['playing']['played'] = False
         self.data['playing']['listeners'] = []
 
-        for i, p in enumerate(self.data['playlist']):
-            self.data['playlist'][i]['dirty'] = False
-            self.data['playlist'][i]['played'] = False
-            self.data['playlist'][i]['listeners'] = {}
-
         for i, p in enumerate(self.data['satellite_history']):
             self.data['satellite_history'][i]['dirty'] = False
             self.data['satellite_history'][i]['played'] = False
-            self.data['satellite_history'][i]['listeners'] = {}
-
+            self.data['satellite_history'][i]['listeners'] = []
 
 
     def sync(self, just_playing=False, *args, **kwargs):
@@ -532,7 +545,7 @@ class Satellite:
 
         staging = deepcopy(self.data)
         
-        sync_keys = ['preload', 'netcasts', 'history', 'listeners',
+        sync_keys = ['preload', 'netcasts', 'history',
                      'preload_cache', 'users']
 
         remote_last_interaction = new_data.get('last_interaction', 0.0)
@@ -542,14 +555,20 @@ class Satellite:
 
         if priority == 'server':
             _print("SYNCING PLAYING")
-            sync_keys += ['playing', 'pos_data']
+            sync_keys += ['playing', 'pos_data', 'listeners']
         else:
             _print("NOT SYNCING PLAYING")
-            staging['playing'] = deepcopy(self.data['playing'])
-            del staging['playing']['dirty']
-            del staging['playing']['played']
+            staging['playing'] = deepcopy(self.data.get('playing', {}))
+            try:
+                del staging['playing']['dirty']
+            except KeyError:
+                pass
+            try:
+                del staging['playing']['played']
+            except KeyError:
+                pass
             if not staging['playing'] or staging['playing'] == {}:
-                sync_keys += ['playing']
+                sync_keys += ['playing', 'pos_data', 'listeners']
 
         for key in sync_keys:
             if key in new_data:
@@ -593,6 +612,8 @@ class Satellite:
         for h in _history:
             indexes = self.get_indexes_for_item(h)
             if not indexes:
+                h['time'] = h['date_played']
+                self.data['index'] += 1
                 self.data['satellite_history'].insert(0, h)
 
         files_to_download = self.data.get('playlist', []) + \
@@ -646,17 +667,11 @@ class Satellite:
         _id, id_type = get_id_type(obj)
         if _id is None or id_type is None:
             return False
-
-        prefix = "file"
-        if id_type == 'e':
-            prefix = 'netcast'
-
-        filename = "{prefix}-{_id}".format(prefix=prefix, _id=_id)
+        filename = self.make_key(_id, id_type)
         dst = os.path.join(cache_dir, filename)
         if filename not in self.files:
             self.files.append(filename)
         dst = os.path.join(cache_dir, filename)
-
         return dst
 
     def resume(self):
@@ -839,15 +854,32 @@ class Satellite:
         wait()
         keyname = gtk.gdk.keyval_name(event.keyval)
         self.keypress_label.set_text("%s %s" % (keyname, event.keyval))
-        print "on_keypress:", keyname
+        _print("="*20, "ON_KEYPRESS:", keyname, keyname.upper())
+        _print("="*20, "ON_KEYPRESS:", event)
+        _print(dir(event))
+        _print('event.string:', event.string)
+        _print('event.state:', event.state)
+        _print('event.hardware_keycode', event.hardware_keycode)
+        _print('event.group', event.group)
 
         self.keystack.append(keyname)
         self.keystack = self.keystack[-5:]
+
+        if keyname in ('XF86Tools',):
+            if self.data.get('cue_netcasts', True):
+                self.data['cue_netcasts'] = False
+                self.say("Don't Cue Netcasts", permanent=True)
+            else:
+                self.data['cue_netcasts'] = True
+                self.say("Cue Netcasts", permanent=True)
 
         if keyname in ('Return', 'p', 'P', 'a', 'A', 'space', 'KP_Enter',
                        'XF86AudioPlay'):
             self.pause()
             self.rating_user = False
+
+        if keyname == 'XF86HomePage':
+            self.set_track(0)
 
         if keyname in ("KP_Divide", "XF86PowerOff"):
             self.rating_user = False
@@ -1104,8 +1136,6 @@ class Satellite:
                     print "ValueError:",e
                     print "f:",f
 
-            
-
         # Restructure playlist
         preload = deepcopy(self.data['preload'])
 
@@ -1125,10 +1155,9 @@ class Satellite:
 
         new_preload = []
         already_added = []
+        self.organize_history()
         for p in self.data.get('satellite_history', []):
-            _id, id_type = get_id_type(p)
-            key = "%s-%s" % (id_type, _id)
-            already_added.append(key)
+            already_added.append(self.make_key(item=p))
 
         still_data = True
         while still_data:
@@ -1139,7 +1168,6 @@ class Satellite:
                     self.append_new_preload_item(partitioned[_uid],
                                                  already_added, 
                                                  new_preload)
-
 
         self.data['preload'] = new_preload
         if is_listening:
@@ -1155,11 +1183,20 @@ class Satellite:
         if not _list:
             return
         item = _list.pop(0)
-        _id, id_type = get_id_type(item)
-        key = "%s-%s" % (id_type, _id)
+        key = self.make_key(item=item)
         if key not in already_added:
             new_preload.append(item)
             already_added.append(key)
+
+    def make_key(self, _id=None, id_type=None, item=None):
+        if item is not None:
+            _id = item.get('id')
+            id_type = item.get('id_type')
+        prefix = 'file'
+        if id_type == 'e':
+            prefix = 'netcast'
+        res = "%s-%s" % (prefix, _id)
+        return res
 
     def say(self, string, wait=False, permanent=False):
         string = string.replace("halle", "hally")
@@ -1322,37 +1359,29 @@ class Satellite:
         self.interaction_tracker.mark_interaction()
 
     def play(self, start=False):
-        self.index = 0
         _id, id_type = get_id_type(self.data['playing'])
         if not _id:
             try:
-                self.data['playing'] = self.data['playlist'][self.index]
+                self.organize_history()
+                self.index = len(self.data['satellite_history']) - 1
+                self.data['playing'] = self.data['satellite_history'][self.index]
             except IndexError:
                 return
             _id, id_type = get_id_type(self.data['playing'])
-
-        prefix = "file"
-        if id_type == 'e':
-            prefix = 'netcast'
-        filename = "{prefix}-{_id}".format(prefix=prefix, _id=_id)
-        path = os.path.join(cache_dir, filename)
-        if not os.path.isfile(path):
-            self.say("MISSING:%s" % filename)
-            # self.inc_track()
+        filename = self.get_dst(self.data['playing'])
+        if not os.path.isfile(filename):
+            self.say("MISSING:%s" % os.path.basename(filename))
             return
-        self.player.filename = path
+        self.player.filename = filename
         self.player.prepare()
         if start:
             self.player.start()
-            
-
         return
 
     def on_time_status(self, player, pos_int, dur_int, left_int, decimal, 
                        pos_str, dur_str, left_str, percent):
         wait()
         self.set_percent_played(decimal * 100)
-
         self.time_to_save -= 1
         if self.time_to_save <= 0:
             self.time_to_save = 5
@@ -1371,7 +1400,7 @@ class Satellite:
         self.set_playing_data('time', get_time())
 
     def time_to_cue_netcasts(self):
-        if not self.data['netcasts']:
+        if not self.data['netcasts'] or not self.data.get('cue_netcasts', True):
             return False
         time_to_cue = True
         for p in self.data['satellite_history'][-10:]:
@@ -1399,7 +1428,10 @@ class Satellite:
             if l2 not in self.data['playing']['listeners']:
                 self.data['playing']['listeners'].append(deepcopy(l2))
 
+        _print ("self.index", self.index)
         _print ("self.data['index']:", self.data['index'])
+        _print ("len(self.data['satellite_history'])", 
+            len(self.data['satellite_history']))
 
         indexes = self.get_indexes_for_item(self.data['playing'])
         if not indexes:
@@ -1430,37 +1462,46 @@ class Satellite:
         return indexes
 
     def organize_history(self):
-        if len(self.data['satellite_history']) > 250:
+        if len(self.data['satellite_history']) > 200:
             _print ("RESIZE")
             self.data['satellite_history'] = \
-                self.data['satellite_history'][-250:]
+                self.data['satellite_history'][-200:]
         history_by_time = {}
         for h in self.data['satellite_history']:
             _time = h.get('time', 0)
             if _time not in history_by_time:
                 history_by_time[_time] = []
             history_by_time[_time].append(h)
-        keys = history_by_time.keys()
-        keys.sort()
-        zero_time = []
-        new_history = []
         already_added = []
-        for key in keys:
-            files = history_by_time[key]
-            for f in files:
-                _id, id_type = get_id_type(f)
-                id_type = "%s-%s" % (_id, id_type)
-                if id_type not in already_added:
-                    new_history.append(f)
-                    already_added.append(id_type)
+        new_list  = self.unique_list(history_by_time, already_added)
+        self.data['satellite_history'] = new_list
 
-        self.data['satellite_history'] = new_history
+    def unique_list(self, _list, already_added=[]):
+        if not _list:
+            return []
+        new_list = []
+        if isinstance(_list, dict):
+            keys = _list.keys()
+            keys.sort()
+            for key in keys:
+                sub_list = _list[key]
+                new_list = new_list + self.unique_list(
+                    sub_list, already_added=already_added)
+
+            return new_list
+        else:
+            for f in _list:
+                key = self.make_key(item=f)
+                if key not in already_added:
+                    new_list.append(f)
+                    already_added.append(key)
+        return new_list
 
 
     def set_track(self, direction=1):
-        _print("set_track: direction:%s" % direction)
-
-        if direction == 0:
+        _print("set_track: DIRECTION:%s" % direction)
+        # 2 is a `special` direction
+        if direction in (0, 2):
             self.organize_history()
 
         current_song = deepcopy(self.data['playing'])
@@ -1469,31 +1510,35 @@ class Satellite:
         for idx in indexes:
             self.data['satellite_history'][idx].update(current_song)
             index = idx
+        _print("current_song", current_song)
+        _print("current_song index:", index)
 
         if not indexes:
             self.data['satellite_history'].append(current_song)
             indexes = self.get_indexes_for_item(current_song)
             index = indexes.pop()
 
-        if direction == 1:
-            index = 0
-            if self.data['netcasts'] and (
-                    not self.data['preload'] or
-                    self.time_to_cue_netcasts()
-               ):
-                    queue_netcast = self.data['netcasts'].pop(0)
-                    print "CUE NETCAST:", queue_netcast
-                    self.data['satellite_history'].append(queue_netcast)
-                    indexes = self.get_indexes_for_item(queue_netcast)
-                    index = indexes.pop()
-            elif self.data['preload']:
-                queue_song = self.data['preload'].pop(0)
-                print "CUE SONG:", queue_song
-                self.data['satellite_history'].append(queue_song)
-                indexes = self.get_indexes_for_item(queue_song)
-                index = indexes.pop()
-            else:
-                self.organize_history()
+        if direction in (1,):
+            if index == -1:
+                index = len(self.data['satellite_history']) - 1
+            index = index + 1
+            try:
+                test_index = self.data['satellite_history'][index]
+            except IndexError:
+                print "INDEX ERROR"
+                index = 0
+                if (
+                        self.data['netcasts'] and 
+                        self.data.get('cue_netcasts', True)
+                   ) and (
+                        not self.data['preload'] or
+                        self.time_to_cue_netcasts()
+                   ):
+                        result, index = self.cue_from('netcasts')
+                elif self.data['preload']:
+                    result, index = self.cue_from('preload')
+                else:
+                    self.organize_history()
                 
         elif direction == -1:
             index = index - 1
@@ -1507,15 +1552,35 @@ class Satellite:
             index = last_item_index
 
         self.data['index'] = index
-
         self.data['playing'] = self.data['satellite_history'][index]
-        for i, p in enumerate(self.data['satellite_history']):
-            if i == index:
-                _print("*"*20, "INDEX", "*"*20)
-                _print(i, "SH:", pformat(p))
-                _print("playlist length:", len(self.data['satellite_history']))
-                _print("*"*20, "/INDEX", "*"*20)
+        _print("*"*20, "INDEX", "*"*20)
+        _print(index, "SH:", pformat(self.data['satellite_history'][index]))
+        _print("playlist length:", len(self.data['satellite_history']))
+        _print("*"*20, "/INDEX", "*"*20)
         self.write()
+
+    def cue_from(self, key):
+        cued = False
+        while self.data[key] and not cued:
+            item = self.data[key].pop(0)
+            cued, index = self.cue_if_not_played(item)
+        if cued:
+            _print("CUE %s:" % key.upper())
+        else:
+            _print("FAIL TO CUE:%s" % key.upper())
+        return cued, index
+
+    def cue_if_not_played(self, item):
+        indexes = self.get_indexes_for_item(item)
+        _print("INDEXES:", indexes)
+        if indexes:
+            _print("ALREADY PRESENT:", item)
+            return False, 0
+        self.organize_history()
+        self.data['satellite_history'].append(item)
+        indexes = self.get_indexes_for_item(item)
+        index = indexes.pop()
+        return True, index
 
     def set_staging_playing_index(self, staging=None):
         if staging is None:
