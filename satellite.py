@@ -316,6 +316,7 @@ class Satellite:
 
     def init_player(self):
         self.player = player.Player()
+        self.player.log = os.path.join(config_dir, "satellite.log")
         self.player.connect('missing-plugin', self.on_missing_plugin)
         self.interaction_tracker = InteractionTracker('client', self.player)
         return
@@ -1370,8 +1371,8 @@ class Satellite:
         if not _id:
             try:
                 # self.organize_history()
-                self.index = len(self.data['satellite_history']) - 1
-                self.data['playing'] = self.data['satellite_history'][self.index]
+                self.data['index'] = index = len(self.data['satellite_history']) - 1
+                self.data['playing'] = self.data['satellite_history'][index]
             except IndexError:
                 return
             _id, id_type = get_id_type(self.data['playing'])
@@ -1558,7 +1559,7 @@ class Satellite:
         if index < 0:
             index = last_item_index
 
-        self.index = index
+        self.data['index'] = index
         self.data['playing'] = self.data['satellite_history'][index]
         _print("*"*20, "INDEX", "*"*20)
         _print(index, "SH:", pformat(self.data['satellite_history'][index]))

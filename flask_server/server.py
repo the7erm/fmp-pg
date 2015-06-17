@@ -1272,19 +1272,38 @@ def build_playlist(history, netcasts, preload, playing):
 
     return index, new_playlist
     
-    
+
 
 @app.route('/satellite/', methods=['GET', 'POST'])
 def satellite():
     print "satellite"
+
     cache.clear()
     global playing, player, interaction_tracker
     request_json = request.get_json()
+    if request_json and request_json.get("check_connection"):
+        return json_dump({"FMP": "CONNECTED"})
+        
+    pprint(request_json)
     sql = """SELECT uid, uname FROM users"""
     users = []
     res = cache_get_results_assoc(sql)
     for r in res:
         users.append(dict(r))
+
+    
+    sql = """SELECT uid, uname, listening, last_time_cued 
+             FROM users 
+             ORDER BY admin DESC, uname"""
+    res = cache_get_results_assoc(sql)
+    all_users = []
+    for r in res:
+        r = dict(r)
+        if r['last_time_cued']:
+            r['last_time_cued'] = int(r['last_time_cued'].strftime("%s"))
+        else:
+          r['last_time_cued'] = 0
+        all_users.append(r)
 
     if request_json:
         print "request_json:"
@@ -1297,6 +1316,7 @@ def satellite():
         _playing = request_json.get('playing',{})
         _playlist = request_json.get("playlist", [])
         listeners = request_json.get('listeners', [])
+        all_users = request_json.get('all_users', [])
         if not listeners or priority == 'server':
             sql = """SELECT uid, uname FROM users WHERE listening = true"""
             listeners = []
@@ -1312,6 +1332,27 @@ def satellite():
         for u in users:
             if u['uid'] not in listening_uids:
               listening(u['uid'], 'false')
+
+        _history = request_json.get("history", [])
+        for h in _history:
+          print "HISTORY:", h
+          mark_dirty_played(h, h.get('listeners'))
+          """
+          {u'history': [{u'date_played': 1434348000,
+               u'eid': None,
+               u'fid': 2252,
+               u'new_history_format': True,
+               u'skip_delta': -3,
+               u'time_played': 1434361640,
+               u'users': [{u'uid': 1}]},
+              {u'date_played': 1434348000,
+               u'eid': 2781,
+               u'fid': None,
+               u'new_history_format': True,
+               u'skip_delta': 0,
+               u'time_played': 1434364656,
+               u'users': [{u'uid': 1}]}]}
+        """
 
         _history = request_json.get("satellite_history", [])
         for p in _history:
@@ -1332,7 +1373,8 @@ def satellite():
         mark_dirty_played(_playing, _listeners)
 
         playing_dict = get_extended()
-        _percent_played = request_json['playing'].get('percent_played', 0)
+        _playing = request_json.get('playing', {})
+        _percent_played = _playing.get('percent_played', 0)
         playing_dict_percent = playing_dict['pos_data']['percent_played']
         playing_dict_percent = playing_dict_percent.replace("%", "")
         playing_dict_percent = float(playing_dict_percent)
@@ -1340,8 +1382,8 @@ def satellite():
         percent_played = "%.2f" % _percent_played
         playing_dict_percent = "%.2f" % playing_dict_percent
         if priority == 'client' and playing_dict_percent != percent_played:
-            if playing_dict.get('id') != request_json['playing'].get('id'):
-                sync_playing(request_json['playing'])
+            if playing_dict.get('id') != _playing.get('id'):
+                sync_playing(_playing)
             print "*"*20,"SEEK","*"*20
             print "playing_dict_percent:", playing_dict_percent, "!=",
             print percent_played
@@ -1479,7 +1521,8 @@ def satellite():
         "listeners": listeners,
         "preload_cache": preload_cache,
         "users": users,
-        "last_interaction": interaction_tracker.last_interaction
+        "last_interaction": interaction_tracker.last_interaction,
+        "all_users": all_users
     })
 
 

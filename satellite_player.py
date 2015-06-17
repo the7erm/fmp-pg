@@ -34,6 +34,7 @@ import gtk
 import pango
 import base64
 import hashlib
+from datetime import datetime
 from time import sleep
 # gobject.threads_init()
 pygst.require("0.10")
@@ -87,6 +88,8 @@ class Player(gobject.GObject):
     
     def __init__(self, filename=None, alt_widget=None):
         gobject.GObject.__init__(self)
+        self.log = None
+        self.uri = ''
         self.player = None
         self.showing_controls = False
         self.filename = filename
@@ -410,6 +413,14 @@ static char * invisible_xpm[] = {
         if uri == "":
             print "empty uri"
             return
+
+        if uri != self.uri and self.log:
+            fp = open(self.log,'a')
+            fp.write("%s - %s\n" % (datetime.now(), uri))
+            os.fsync(fp.fileno())
+            fp.close()
+
+        self.uri = uri
         self.player.set_state(STOPPED)
         self.player.set_property("uri", uri)
         self.player.set_state(PAUSED)
@@ -452,7 +463,7 @@ static char * invisible_xpm[] = {
     def start(self, *args, **kwargs):
         print "="*80
         self.prepare()
-        # self.player.set_property("volume",self.volume)
+        self.player.set_property("volume", 1.0)
         self.playingState = PLAYING
         try:
             self.dur_int = self.player.query_duration(self.time_format, None)[0]
