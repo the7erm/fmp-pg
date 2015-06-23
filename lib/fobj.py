@@ -92,7 +92,8 @@ class FObj:
             raise CreationFailed(
                 "Unabled to allocate filename:%s\n" % (filename,) + 
                 "Unabled to allocate dirname:%s\n" % (dirname,) + 
-                "Unabled to allocate basename:%s" % (basename, )
+                "Unabled to allocate basename:%s\n" % (basename, )+
+                "kwargs:%s" % kwargs
             )
         
         if self.filename and (

@@ -1041,12 +1041,52 @@ def sanity_check(fid):
     finfo = get_assoc("""SELECT *
                          FROM files
                          WHERE fid = %s""",(fid,))
+
+    sql = """INSERT INTO dont_pick (fid, reason) 
+             VALUES(%s, 'file is missing, or not readable')"""
+    query(sql, (fid,))
+
     if not finfo:
         print "DELETING FID:",fid
         delete_fid(fid)
         wait()
         return
     print "SHIT'S FUCKED UP."
+    sql = """SELECT *
+             FROM file_locations
+             WHERE fid = %s"""
+    locations = get_results_assoc(sql, (fid,))
+    
+    for l in locations:
+        dirname = l['dirname']
+        # 1. Confirm that the folder can be read from.
+        #    The folder may have been unmounted, and no longer
+        #    exists, but we'd like to keep the data if this is
+        #    the situation.
+        if not os.path.exists(dirname) or not os.access(dirname, os.R_OK):
+            continue
+        filename = os.path.join(l['dirname'], l['basename'])
+        if os.path.exists(filename):
+            # 2. make sure we're not removing a file that exists.
+            continue
+        # 3. Delete the location from the database because the 
+        #    dir exists and is readable, but the file does not.
+        sql = """DELETE FROM file_locations WHERE flid = %s"""
+        query(sql, (l['flid'],))
+
+    sql = """SELECT *
+             FROM file_locations
+             WHERE fid = %s"""
+
+    locations = get_results_assoc(sql, (fid,))
+
+    if not locations:
+        print "NO LOCATIONS"
+        # 4. There are no file locations so we delete the file
+        #    from the database.
+        delete_fid(fid)
+
+    # sys.exit()
 
 
 def delete_fid(fid):
@@ -1060,6 +1100,19 @@ def delete_fid(fid):
     wait()
     delete_genres_for_fid(fid)
     wait()
+    delete_fid_from_preload(fid)
+    wait()
+    delete_fid_from_files(fid)
+    wait()
+
+def delete_fid_from_files(fid):
+    sql = """DELETE FROM files WHERE fid = %s"""
+    query(sql, (fid,))
+
+def delete_fid_from_preload(fid):
+    query("""DELETE FROM preload WHERE fid = %s""",(fid,))
+    query("""DELETE FROM preload_cache WHERE fid = %s""",(fid,))
+    query("""DELETE FROM dont_pick WHERE fid = %s""",(fid,))
 
 def delete_user_history_for_fid(fid):
     query("""DELETE FROM user_history

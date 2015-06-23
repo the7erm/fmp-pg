@@ -17,6 +17,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+
 from gevent import monkey
 monkey.patch_all()
 
@@ -1156,7 +1157,7 @@ def update_score(uid, fid, skip_score):
     query(sql, (score, uid, fid))
 
 def mark_dirty_played(obj, listeners):
-    if not obj or not listeners or obj == {}:
+    if not obj or not listeners or obj == {} or obj['id'] is None:
         return
     if not obj.get('dirty') and not obj.get('played'):
         return
@@ -1188,6 +1189,8 @@ def mark_dirty_played(obj, listeners):
     print "LISTENERS:", listeners
     
     print "PERCENT_PLAYED:", percent_played
+    if percent_played is None:
+        percent_played = 0
     skip_score = obj.get('skip_score', 0)
     _print("SKIP SCORE:", skip_score)
     reason = obj.get('reason', '')
@@ -1378,7 +1381,8 @@ def satellite():
         playing_dict_percent = playing_dict['pos_data']['percent_played']
         playing_dict_percent = playing_dict_percent.replace("%", "")
         playing_dict_percent = float(playing_dict_percent)
-
+        if _percent_played is None:
+          _percent_played = 0
         percent_played = "%.2f" % _percent_played
         playing_dict_percent = "%.2f" % playing_dict_percent
         if priority == 'client' and playing_dict_percent != percent_played:

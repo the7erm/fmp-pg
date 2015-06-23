@@ -18,8 +18,7 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-
-import gobject, gtk, gc
+import gtk, gc, gobject
 import glib 
 # gobject.threads_init()
 
@@ -710,6 +709,7 @@ def on_scroll(widget, event):
         direction = "RIGHT"
     plugins.write({'on-scroll': direction })
 
+print "*"*20,"MADE IT"
 import flask_server
 flask_server.server.threads = threads
 flask_server.server.get_results_assoc = get_results_assoc
@@ -747,7 +747,7 @@ except IndexError:
         history.append(dict(item))
 
 def sync_playing(file_data):
-    if not file_data or file_data == {}:
+    if not file_data or file_data == {} or file_data['id'] is None:
         return
     global idx, playing
     print "-="*20, "sync_playing"
@@ -756,6 +756,7 @@ def sync_playing(file_data):
     idx = len(history) - 1
     set_idx(idx)
     start_playing('stay', False)
+    
     print "-="*20, "/sync_playing"
 
 
