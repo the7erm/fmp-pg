@@ -142,7 +142,7 @@ class Player(gobject.GObject):
         self.unfs_button.connect('clicked', self.toggle_full_screen)
 
     def init_window(self):
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window = gtk.Window()
         self.window.set_title("Video-Player")
         
         img_path = ""

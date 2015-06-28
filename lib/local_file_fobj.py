@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # local_file_fobj.py -- Netcast file obj
-#    Copyright (C) 2012 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2015 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -322,6 +322,7 @@ class Local_File(fobj.FObj):
                   (txt, self.fid))
 
     def update_hash(self):
+        print "UPDATE HASH"
         self.db_info['sha512'] = self.hash_file()
         query("""UPDATE files 
                  SET sha512 = %s, mtime = %s 

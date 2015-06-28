@@ -435,7 +435,8 @@ removed_history = get_results_assoc("""SELECT uh.*
                                        FROM user_history uh
                                             LEFT JOIN files f ON f.fid = uh.id 
                                             AND uh.id_type = 'f'
-                                       WHERE f.fid IS NULL""")
+                                       WHERE f.fid IS NULL AND 
+                                             uh.id_type = 'f'""")
 for d in removed_history:
     exeq("""DELETE FROM user_history WHERE uhid = %s""",(d['uhid'],))
 

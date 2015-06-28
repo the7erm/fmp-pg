@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # file_location.py -- File location
-#    Copyright (C) 2014 Eugene Miller <theerm@gmail.com>
+#    Copyright (C) 2015 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -31,10 +31,10 @@ from fingerprint_history import FingerprintHistory
 from fingerprint_util import calculate_file_fingerprint
 from __init__ import *
 
-audio_ext = ['.mp3','.wav','.ogg','.wma','.flac']
-audio_with_tags = ['.mp3','.ogg','.wma','.flac']
-video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv','.mp4', 
-             'm4v', '.m4a', '.mov',]
+audio_ext = ['.mp3', '.wav', '.ogg', '.wma', '.flac']
+audio_with_tags = ['.mp3', '.ogg', '.wma', '.flac']
+video_ext = ['.wmv', '.mpeg', '.mpg', '.avi', '.theora', '.div', '.divx',
+             '.flv', '.mp4', 'm4v', '.m4a', '.mov',]
 
 try:
     import mutagen
@@ -144,7 +144,8 @@ class FileLocation:
             return
         print "--updating fingerprint"
         try:
-            main, front, end, middle = calculate_file_fingerprint(self.filename)
+            main, front, end, middle = calculate_file_fingerprint(
+                dself.filename)
         except ValueError, e:
             main = "%s" % e
             front = "%s" % e
@@ -153,13 +154,13 @@ class FileLocation:
 
         print "MADE IT"
         print (main,
-                                 front,
-                                 end,
-                                 middle, 
-                                 self.size,
-                                 self.atime,
-                                 self.mtime,
-                                 self.flid)
+               front,
+               end,
+               middle, 
+               self.size,
+               self.atime,
+               self.mtime,
+               self.flid)
         self.db_info = get_assoc("""UPDATE file_locations 
                                     SET fingerprint = %s,
                                         front_fingerprint = %s,
@@ -312,13 +313,15 @@ class FileLocation:
     @property
     def atime(self):
         if self.exists:
-            return datetime.datetime.fromtimestamp(os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(
+                os.path.getatime(self.filename)).replace(tzinfo=pytz.UTC)
         return None
 
     @property
     def mtime(self):
         if self.exists:
-            return datetime.datetime.fromtimestamp(os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
+            return datetime.datetime.fromtimestamp(
+                os.path.getmtime(self.filename)).replace(tzinfo=pytz.UTC)
         return None
 
     @property
