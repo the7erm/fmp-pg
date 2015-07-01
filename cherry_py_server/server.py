@@ -41,21 +41,19 @@ class FmpServer(object):
 
     @cherrypy.expose
     def next(self):
-        playlist.next()
+        GObject.idle_add(playlist.next)
         return "Next"
 
     @cherrypy.expose
     def pause(self):
-        Gdk.threads_leave()
         print "WEB PAUSE", "*"*100
-        playlist.player.state_string = 'TOGGLE'
+        GObject.idle_add(playlist.player.pause)
         print "/WEB PAUSE","*"*100
         return "pause"
 
     @cherrypy.expose
     def prev(self):
-        playlist.prev()
-        wait()
+        GObject.idle_add(playlist.prev)
         return "prev"
 
     @cherrypy.expose
@@ -71,7 +69,6 @@ def cherry_py_worker():
     })
 
 def broadcast(data):
-    wait()
     cherrypy.engine.publish('websocket-broadcast', 
             TextMessage(json.dumps(data)))
 
