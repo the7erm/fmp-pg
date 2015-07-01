@@ -63,7 +63,7 @@ SUPPORTED_EXTENSIONS = (
     '.wmv',
 )
 
-debug_threads = True
+debug_threads = False
 
 def wait(*args):
     now = "%s " % datetime.now()

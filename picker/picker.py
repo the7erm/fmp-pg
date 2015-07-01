@@ -52,6 +52,7 @@ def initial_picker():
         populate_preload()
 
 def populate_preload(uid=None, listeners=None):
+    wait()
     print "populate_preload:", uid
     totals = totals_in_preload()
     listeners = _listeners(listeners)

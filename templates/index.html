@@ -1,50 +1,62 @@
 <!DOCTYPE html>
 <html>
-   <head>
-     <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
-     <script type="text/javascript">
-       $(document).ready(function() {
+    <head>
+        <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+        <script type="text/javascript">
 
-          $("#next").click(function(e) {
-             e.preventDefault();
-             $.get("/next/");
-          });
+            function connecWs() {
+                console.log("connecting....");
+                websocket = 'ws://localhost:5050/ws';
+                try {
+                    if (window.WebSocket) {
+                        ws = new WebSocket(websocket);
+                    }
+                    else if (window.MozWebSocket) {
+                        ws = MozWebSocket(websocket);
+                    }
+                    else {
+                        $('#time-status').text("WebSocket Not Supported");
+                        return;
+                    }
+                } catch (e) {
+                    console.log("Catch:", e)
+                    setTimeout(connecWs, 10000);
+                    return;
+                }
+                ws.onmessage = function (evt) {
+                    console.log("evt.data:", JSON.parse(evt.data));
+                    $('#time-status').text(evt.data);
+                };
 
-          $("#pause").click(function(e) {
-             e.preventDefault();
-             $.get("/pause/");
-          });
+                ws.onclose = function(evt) {
+                    $('#time-status').text("Server closed");
+                    setTimeout(connecWs, 3000);
+                };
+            }
+            $(document).ready(function() {
+                connecWs();
+                $("#next").click(function(e) {
+                    e.preventDefault();
+                    $.get("/next/");
+                });
 
-          $("#prev").click(function(e) {
-             e.preventDefault();
-             $.get("/prev/");
-          });
-          websocket = 'ws://localhost:5050/ws';
-          if (window.WebSocket) {
-              ws = new WebSocket(websocket);
-          }
-          else if (window.MozWebSocket) {
-              ws = MozWebSocket(websocket);
-          }
-          else {
-            $('#time-status').text("WebSocket Not Supported");
-            return;
-          }
-          ws.onmessage = function (evt) {
-              console.log("evt.data:", JSON.parse(evt.data));
-              $('#time-status').text(evt.data);
-          };
+                $("#pause").click(function(e) {
+                    e.preventDefault();
+                    $.get("/pause/");
+                });
 
-          ws.onclose = function(evt) {
-             $('#time-status').text("Server closed");
-          };
-        });
-     </script>
-   </head>
-   <body>
+                $("#prev").click(function(e) {
+                    e.preventDefault();
+                    $.get("/prev/");
+                });
+                
+            });
+        </script>
+    </head>
+    <body>
        <button id="prev">Prev</button>
        <button id="pause">Pause</button>
        <button id="next">Next</button>
        <code id="time-status"></code>
-   </body>
+    </body>
 </html>
