@@ -19,7 +19,6 @@
 #
 
 
-import gtk
 from __init__ import *
 from random import shuffle
 from local_file_fobj import Local_File
@@ -847,7 +846,6 @@ def get_something_for_everyone(users, true_score):
 
 def populate_preload_for_uid(uid, min_amount=0, max_cue_time=10,
                              min_preload_size=0):
-    gtk.gdk.threads_leave()
     sql = """INSERT INTO preload (fid, uid, reason)
                  SELECT pc.fid, pc.uid, string_agg(pc.reason, ',') 
                  FROM preload_cache pc

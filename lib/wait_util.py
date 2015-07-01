@@ -1,27 +1,27 @@
 
-import gtk
+from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango
 
 def wait():
     # print "leave1"
-    gtk.gdk.threads_leave()
+    Gdk.threads_leave()
     # print "/leave1"
     # print "enter"
-    gtk.gdk.threads_enter()
+    Gdk.threads_enter()
     # print "/enter"
-    if gtk.events_pending():
-        while gtk.events_pending():
+    if Gtk.events_pending():
+        while Gtk.events_pending():
             # print "pending:"
-            gtk.main_iteration(False)
+            Gtk.main_iteration(False)
     # print "leave"
-    gtk.gdk.threads_leave()
+    Gdk.threads_leave()
     # print "/leave"
 
 def enter(msg=None):
     # print "enter:",msg
-    gtk.gdk.threads_enter()
+    Gdk.threads_enter()
     # print "/enter:",msg
 
 def leave(msg=None):
     # print "leave:",msg
-    gtk.gdk.threads_leave()
+    Gdk.threads_leave()
     # print "/leave:",msg

@@ -19,7 +19,8 @@
 #
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango
+from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
+                          GLib, Gio
 GObject.threads_init()
 Gst.init(None)
 import sys
@@ -31,6 +32,8 @@ import math
 from random import shuffle
 from pprint import pprint
 from datetime import datetime
+from copy import deepcopy
+from time import sleep, time
 
 PLAYING = Gst.State.PLAYING
 PAUSED = Gst.State.PAUSED
@@ -60,6 +63,35 @@ SUPPORTED_EXTENSIONS = (
     '.wmv',
 )
 
+debug_threads = True
+
+def wait(*args):
+    now = "%s " % datetime.now()
+    msg = now + " ".join(map(str, args))
+    if debug_threads:
+        print "++START WAIT "+msg
+    threads_leave("\t" + msg)
+    threads_enter("\t" + msg)
+    if Gtk.events_pending():
+        while Gtk.events_pending():
+            if debug_threads:
+                print "\t\tevents_pending " + msg
+            Gtk.main_iteration()
+    threads_leave("\t" + msg)
+    if debug_threads:
+        print "--END WAIT "+msg
+
+def threads_enter(*args):
+    Gdk.threads_enter()
+    if debug_threads:
+        print "ENTER " + " ".join(map(str, args))
+
+def threads_leave(*args):
+    Gdk.threads_leave()
+    if debug_threads:
+        print "LEAVE " + " ".join(map(str, args))
+
+
 class PlayerError(Exception):
     def __init__(self, value):
         self.value = value
@@ -75,9 +107,12 @@ class Player(GObject.GObject):
         'time-status': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
                         (object,)),
     }
-    def __init__(self, uri=None, resume_percent=0):
+    def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
         GObject.GObject.__init__(self)
+        self.use_state_cache_until = 0
+        self.state_cache = False
         self.uri_path = ""
+        self.duration_cache = {}
         self.pipeline = None
         self.filename = ""
         self.last_good_position = 0
@@ -90,12 +125,15 @@ class Player(GObject.GObject):
         self.connect("state-changed", self.on_state_change)
         # uri has to be set after the player is initialized.
         self.uri = uri
+        self.state = state
         GObject.timeout_add(1000, self.time_status)
 
     def on_state_change(self, player, state):
         self.show_video_window()
 
     def show_video_window(self):
+        Gdk.threads_leave()
+        Gdk.threads_enter()
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
@@ -104,8 +142,9 @@ class Player(GObject.GObject):
             self.alt_drawingarea_vbox.show()
         # self.window.show_all()
         # self.top_hbox.hide()
+        Gdk.threads_leave()
 
-    def time_status(self):
+    def get_time_status(self):
         position = self.position
         duration = self.duration
         remaining = duration - position
@@ -121,22 +160,29 @@ class Player(GObject.GObject):
             'decimal_played': decimal,
             'position_str': self.format_ns(position),
             'duration_str': self.format_ns(duration),
-            'remaining_str': "-"+self.format_ns(remaining),
+            'remaining_str': "-%s" % self.format_ns(remaining),
             'state': self.state_string
         }
+        print "self.state_string:",self.state_string
+        return obj
+
+    def time_status(self):
+        obj = self.get_time_status()
 
         if obj['state'] != self.last_state:
             self.last_state = self.state_string
             # self.file_label.set_text(self.filename)
-            self.emit('state-changed', self.state)
+            if not self.seek_lock:
+               self.emit('state-changed', self.state)
         
         if obj != self.last_time_status:
             self.time_label.set_text("%s %s/%s" % (
                 obj['remaining_str'], 
                 obj['position_str'], 
                 obj['duration_str']))
-            
-            self.emit('time-status', obj)
+            emit_obj = deepcopy(obj)
+            emit_obj['now'] = datetime.utcnow()
+            self.emit('time-status', emit_obj)
             # self.show_video_window()
         self.last_time_status = obj
         return True
@@ -173,10 +219,8 @@ class Player(GObject.GObject):
         self.window.connect('motion-notify-event', self.show_controls)
         self.window.connect('button-press-event', self.pause)
         self.window.connect("scroll-event", self.on_scroll)
-
-
-        
         self.window.connect('destroy', self.quit)
+        
         img_path = ""
         possible_paths = [
             os.path.join(sys.path[0],"images"),
@@ -239,8 +283,8 @@ class Player(GObject.GObject):
         self.main_vbox.pack_start(self.bottom_hbox, False, True, 0)
         self.push_status("Started")
         self.window.show_all()
-        self.stack.show_all()
-        self.alt_drawingarea_vbox.hide()
+        self.drawingarea.hide()
+        self.alt_drawingarea_vbox.show()
         try:
             self.xid = self.drawingarea.get_property('window').get_xid()
         except AttributeError, e:
@@ -271,9 +315,12 @@ class Player(GObject.GObject):
         self.prev_btn.set_image(prev_img)
 
         self.pause_btn = Gtk.Button()
-        self.pause_image = Gtk.Image.new_from_stock(
+        self.play_img = Gtk.Image.new_from_stock(
+            Gtk.STOCK_MEDIA_PLAY, Gtk.IconSize.BUTTON)
+        self.pause_img = Gtk.Image.new_from_stock(
             Gtk.STOCK_MEDIA_PAUSE, Gtk.IconSize.BUTTON)
-        self.pause_btn.set_image(self.pause_image)
+        
+        self.pause_btn.set_image(self.play_img)
 
         self.next_btn = Gtk.Button()
         next_img = Gtk.Image.new_from_stock(
@@ -281,6 +328,7 @@ class Player(GObject.GObject):
         self.next_btn.set_image(next_img)
 
         self.pause_btn.connect("clicked", self.pause)
+        self.connect('state-changed', self.on_state_changed)
 
     def push_status(self, msg):
         print "PUSH:", msg
@@ -342,9 +390,9 @@ class Player(GObject.GObject):
     @property
     def position(self):
         try:
-            res, position = self.pipeline.query_position(time_format)
-        except:
-            print "ERROR GETTING POSITION"
+           res, position = self.pipeline.query_position(time_format)
+        except Exception as e:
+            print "ERROR GETTING POSITION:", e
             return self.last_good_position
 
         if res and position:
@@ -352,6 +400,36 @@ class Player(GObject.GObject):
         else:
             print "FAIL GETTING RES", res, position
         return self.last_good_position
+
+    @position.setter
+    def position(self, position):
+        if self.seek_lock:
+            return
+        self.seek_lock = True
+        if isinstance(position, (str, unicode)):
+            position = self.parse_position_string(position)
+
+        if position < 0:
+            position = 0
+
+        """
+        
+
+        self_duration = self.duration
+        if position > self_duration:
+            position = self_duration
+        """
+
+        self.playbin.seek_simple(
+            Gst.Format.TIME,
+            Gst.SeekFlags.FLUSH,
+            position
+        )
+        self.push_status("SEEK:%s" % (self.format_ns(position)))
+        print "self.state:", self.state_string
+        self.use_state_cache_until = time() + 1
+        self.last_good_position = position
+        self.seek_lock = False
 
     def parseInt(self, string):
         value = 0
@@ -381,11 +459,17 @@ class Player(GObject.GObject):
                ) * Gst.SECOND
 
     def parse_percent(self, position):
+        print "BEFORE:", position[:-1]
         percent = float(position[:-1]) * 0.01
-        if not percent < 0 or percent > 1:
+        print "AFTER:", percent
+        if percent < 0 or percent > 1:
             self.seek_lock = False
             raise PlayerError('invalid percent %r' % position)
-        return self.duration * percent
+        duration = self.duration
+        print "DURATION:", duration
+        seek_to = duration * percent
+        print "SEEK_TO:", seek_to
+        return seek_to
 
     def parse_pos_negative_position(self, position):
         seconds = int(position[1:])
@@ -409,38 +493,26 @@ class Player(GObject.GObject):
             position = int(position)
         return position
 
-    @position.setter
-    def position(self, position):
-        if self.seek_lock:
-            return
-        self.seek_lock = False
-        if isinstance(position, (str, unicode)):
-            position = self.parse_position_string(position)
-
-        if position < 0:
-            position = 0
-
-        self_duration = self.duration
-        if position > self_duration:
-            position = self_duration
-
-        self.playbin.seek_simple(
-            Gst.Format.TIME,
-            Gst.SeekFlags.FLUSH,
-            position
-        )
-        self.push_status("SEEK:%s" % (self.format_ns(position)))
-        self.last_good_position = position
-        self.seek_lock = False
-
     @property
     def duration(self):
+        cnt = 0
+        res = False
+        duration = 0
+        if self.uri in self.duration_cache:
+            return self.duration_cache[self.uri]
         try:
-            res, duration = self.pipeline.query_duration(time_format)
+            while cnt < 100 and not (res and duration):
+                res, duration = self.pipeline.query_duration(time_format)
+                sleep(0.1)
+                cnt += 1
+            if cnt > 1:
+                print "TRIES:", cnt
         except:
+            print "ERROR GETTING DURATION"
             return self.last_good_duration
 
         if res and duration:
+            self.duration_cache[self.uri] = duration
             self.last_good_duration = duration
 
         return self.last_good_duration
@@ -477,12 +549,6 @@ class Player(GObject.GObject):
         Gtk.main_quit()
 
     @property
-    def state(self):
-        self.pipeline_ready()
-        states = self.playbin.get_state(0)
-        return states[1]
-
-    @property
     def uri(self):
         return self.uri_path
 
@@ -508,10 +574,19 @@ class Player(GObject.GObject):
             self.push_status("uri:%s" % urllib.unquote(self.uri))
             self.emit('uri-changed', self.uri)
 
+    @property
+    def state(self):
+        self.pipeline_ready()
+        if self.use_state_cache_until < time() or not self.state_cache:
+            self.state_cache = self.playbin.get_state(0)
+        else:
+            print "USING STATE CACHE self.state_cache", self.state_cache[1]
+        return self.state_cache[1]
 
     @state.setter
     def state(self, value=None):
         self.pipeline_ready()
+        print "SET STATE:", value
         if value not in (PLAYING, PAUSED, STOPPED):
             self.state_string = value
             return
@@ -521,15 +596,19 @@ class Player(GObject.GObject):
         self_state = self.state
         if old_state != self_state or value != self_state:
             self.last_state = value
-            if value in(PAUSED, STOPPED, READY):
-                self.pause_btn.get_image().set_from_stock(
-                    Gtk.STOCK_MEDIA_PLAY, Gtk.IconSize.BUTTON)
-            if value == PLAYING:
-                self.pause_btn.get_image().set_from_stock(
-                    Gtk.STOCK_MEDIA_PAUSE, Gtk.IconSize.BUTTON)
-            self.push_status("state-changed:%s" % self.state_to_string(value))
-            self.file_label.set_text(os.path.basename(self.filename))
             self.emit('state-changed', value)
+
+    def on_state_changed(self, player, value):
+        state = self.state
+        if state in(PAUSED, STOPPED, READY):
+            print "SET IMAGE: PLAY"
+            self.pause_btn.set_image(self.play_img)
+        elif state == PLAYING:
+            print "SET IMAGE: PAUSE"
+            self.pause_btn.set_image(self.pause_img)
+        else:
+            print "INVALID STATE"
+        # self.push_status("state-changed:%s" % self.state_to_string(value))
 
     def pipeline_ready(self):
         if not self.pipeline:
@@ -555,8 +634,10 @@ class Player(GObject.GObject):
     def state_string(self, value=''):
         if not value:
             raise ValueError('Invalid state_string %r' % value)
-
         value_upper = str(value).upper()
+        if value_upper == 'READY':
+            value_upper = 'PLAYING'
+
         if value_upper not in ('PLAY', 'PLAYING', 'PAUSED', 'PAUSE', 
                                'STOPPED', 'STOP', 'START', 'TOGGLE'):
             raise ValueError('Invalid state_string %r' % value)
@@ -569,6 +650,7 @@ class Player(GObject.GObject):
             if state in (STOPPED, PAUSED, READY):
                 self.state = PLAYING
                 return
+            return
 
         if value_upper in ('PLAYING', 'PLAY', 'START'):
             self.state = PLAYING
@@ -599,7 +681,7 @@ class Player(GObject.GObject):
         print 'Player.on_error():', error[0]
         
 
-class Playlist:
+class Playlist(object):
     def __init__(self, files=[], player=None, index=0):
         self.index = index
         self.files = files
@@ -609,7 +691,7 @@ class Playlist:
             self.player = player
 
         try:
-            self.player.uri = self.files[self.index]
+            self.set_player_uri()
         except IndexError:
             pass
         self.player.state = 'PLAYING'
@@ -618,6 +700,10 @@ class Playlist:
         self.player.window.connect("key-press-event", self.on_key_press)
         self.player.prev_btn.connect("clicked", self.prev)
         self.player.next_btn.connect("clicked", self.next)
+        self.init_connections()
+
+    def init_connections(self):
+        return
 
     def on_key_press(self, widget, event):
         keyname = Gdk.keyval_name(event.keyval)
@@ -697,9 +783,9 @@ class Playlist:
                 self.set_error_message(error)
             return
 
-        import pdb; pdb.set_trace()
-        if 'Could not determine type of stream.' in msg.parse_error():
-            inc_index();
+        # import pdb; pdb.set_trace()
+        #if 'Could not determine type of stream.' in msg.parse_error():
+        #    inc_index();
 
     def set_error_message(self, error):
         self.player.show_video_window()
@@ -726,26 +812,33 @@ class Playlist:
             self.index = last_index
 
         self.player.state = STOPPED
-        self.player.uri = self.files[self.index]
+        self.set_player_uri()
         print "SANITY CHECK", self.player.uri
         self.player.state = PLAYING
 
+    def set_player_uri(self):
+        self.player.uri = self.files[self.index]
+
 class TrayIcon():
-    def __init__(self, player=None, playlist=None):
+    def __init__(self, player=None, playlist=None, state="PLAYING"):
         self.player = player
         self.playlist = playlist
         if player is None:
             self.player = self.playlist.player
-        self.init_icon()
-        self.init_menu()
-        self.on_state_change(self.player, self.player.state)
+        self.init_icon(state)
+        self.init_menu(state)
+        
 
-    def init_icon(self):
+    def init_icon(self, state="PLAYING"):
         self.ind = Gtk.StatusIcon()
-        self.ind.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+        if state != 'PLAYING':
+            self.ind.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+        else:
+            self.ind.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
         self.ind.set_name("player.py")
         self.ind.set_title("player.py")
         self.ind.connect("button-press-event", self.on_button_press)
+        self.ind.connect("scroll-event", self.player.on_scroll)
         self.player.connect("state-changed", self.on_state_change)
         
 
@@ -760,8 +853,8 @@ class TrayIcon():
                                         Gtk.IconSize.BUTTON)
 
     def on_state_change(self, player, state):
-        print "on_state_change:", player, state
-        if state != PLAYING or state in (READY,):
+        print "TrayIcon.on_state_change:", player, state
+        if state != PLAYING:
             self.play_pause_item.set_label('Play')
             self.play_pause_item.set_image(self.play_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
@@ -769,16 +862,21 @@ class TrayIcon():
             self.play_pause_item.set_label('Pause')
             self.play_pause_item.set_image(self.pause_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
+        
 
     def on_button_press(self, icon, event, **kwargs):
         print "on_button_press:", icon, event
         if event.button == 1:
             self.menu.popup(None, None, None, None, event.button, event.time)
 
-    def init_menu(self):
+    def init_menu(self, state):
         self.menu = Gtk.Menu()
         self.play_pause_item = Gtk.ImageMenuItem("Pause")
-        self.play_pause_item.set_image(self.pause_img)
+        if state == 'PLAYING':
+            img = self.pause_img
+        else:
+            img = self.play_img
+        self.play_pause_item.set_image(img)
         self.play_pause_item.connect("activate", self.on_menuitem_clicked)
         self.play_pause_item.show()
         self.menu.append(self.play_pause_item)

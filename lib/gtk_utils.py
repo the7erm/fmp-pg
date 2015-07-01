@@ -1,8 +1,5 @@
 
-import gtk
-import gobject
-gobject.threads_init()
-gtk.gdk.threads_init()
+from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango
 
 global threads
 threads = []
@@ -20,4 +17,4 @@ def kill_threads():
 
 def gtk_main_quit(*args, **kwargs):
     kill_threads()
-    gtk.main_quit()
+    Gtk.main_quit()
