@@ -17,6 +17,7 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
+
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
@@ -198,9 +199,13 @@ class Player(GObject.GObject):
         seconds = int(math.floor(ns / 1000000000))
         if not seconds:
             return "0:00"
+        hours = math.floor(seconds / (60 * 60))
+        seconds = seconds - (hours * 60 * 60)
         minutes = math.floor(seconds / 60)
         seconds = seconds - (minutes * 60)
-        return "%d:%02d" % (minutes, seconds)
+        if not hours:
+            return "%d:%02d" % (minutes, seconds)
+        return "%d:%02d:%02d" % (hours, minutes, seconds)
 
     def init_window(self):
         self.debug_messages = []
@@ -643,7 +648,7 @@ class Player(GObject.GObject):
         else:
             print "INVALID STATE"
         Gdk.threads_leave()
-        # self.push_status("state-changed:%s" % self.state_to_string(value))
+        self.push_status("state-changed:%s" % self.state_to_string(value))
 
     def pipeline_ready(self):
         Gdk.threads_leave()

@@ -55,6 +55,5 @@ if not os.path.isdir(cache_dir):
 cfg = cfg_wrapper.ConfigWrapper(config_file, DEFAULTS)
 
 salt = cfg.get('password_salt', 'salt', create_salt(), str)
-print "salt:", salt
 
 cfg.set('password_salt', 'salt', salt, str)

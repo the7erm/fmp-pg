@@ -24,8 +24,21 @@
                     return;
                 }
                 ws.onmessage = function (evt) {
-                    console.log("evt.data:", JSON.parse(evt.data));
-                    $('#time-status').text(evt.data);
+                    var obj = JSON.parse(evt.data);
+                    console.log("evt.data:", obj);
+                    if (typeof obj['time-status'] != 'undefined') {
+                        $('#time-status').text(evt.data);
+                        return;
+                    }
+
+                    if (typeof obj['state-changed'] != 'undefined') {
+                        if (obj['state-changed'] == 'PLAYING') {
+                            $(".play-pause").text('Pause');
+                        }
+                        if (obj['state-changed'] == 'PAUSED') {
+                            $(".play-pause").text('Play');
+                        }
+                    }
                 };
 
                 ws.onclose = function(evt) {
@@ -40,7 +53,7 @@
                     $.get("/next/");
                 });
 
-                $("#pause").click(function(e) {
+                $(".play-pause").click(function(e) {
                     e.preventDefault();
                     $.get("/pause/");
                 });
@@ -55,7 +68,7 @@
     </head>
     <body>
        <button id="prev">Prev</button>
-       <button id="pause">Pause</button>
+       <button class="play-pause">Pause</button>
        <button id="next">Next</button>
        <code id="time-status"></code>
     </body>

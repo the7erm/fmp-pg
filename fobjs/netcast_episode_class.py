@@ -22,6 +22,9 @@ from local_fobj_class import Listeners
 from misc import _listeners, get_unlistend_episode, get_expired_netcasts
 from episode_downloader import downloader
 
+def utcnow():
+    return datetime.utcnow().replace(tzinfo=pytz.utc)
+
 class Netcast_Listeners(Listeners):
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
@@ -244,25 +247,34 @@ class Netcast(object):
         self.netcast_name = kwargs.get('netcast_name')
         self.rss_url = kwargs.get('rss_url')
         self.episodes = []
+        self.refresh_feed_and_download_episodes()
+
+    def refresh_feed_and_download_episodes(self):
         if self.time_for_update:
+            print "updating:", self.dbInfo.get('rss_url')
             self.refresh_feed()
+            self.download_unlistened_netcasts()
 
     @property
     def is_expired(self):
         expire_time = self.dbInfo.get('expire_time')
-        print "expire_time:",expire_time
         if not expire_time:
             return True
-        return expire_time < datetime.utcnow()
+        return utcnow() > expire_time
 
     @property
     def time_for_update(self):
-        last_updated = self.dbInfo.get('last_updated')
-        min_dt = datetime.utcnow() - timedelta(minutes=30)
-        min_dt = min_dt.replace(tzinfo=pytz.utc)
-        if last_updated and last_updated < min_dt:
+        if self.too_soon_to_refresh:
             return False
         return self.is_expired
+
+    @property
+    def too_soon_to_refresh(self):
+        last_updated = self.dbInfo.get('last_updated')
+        if not last_updated:
+            return False
+        min_dt = utcnow() - timedelta(minutes=30)
+        return last_updated > min_dt
 
     @property
     def nid(self):
@@ -319,11 +331,12 @@ class Netcast(object):
         self.dbInfo = get_assoc_dict(sql, {"netcast_name": netcast_name})
 
     def refresh_feed(self):
-        print "SELF.DBINFO:", self.dbInfo
+        if self.too_soon_to_refresh:
+            print "too_soon_to_refresh:", self.too_soon_to_refresh
+            return
+        print "Netcast dbInfo:", self.dbInfo
         socket.setdefaulttimeout(30)
-        # self.emit('updating')
-        # wait()
-        print "self.rss_url:", self.rss_url
+        print "refreshing:", self.rss_url
         try:
             feed = feedparser.parse(self.rss_url)
         except socket.error, msg:
@@ -417,17 +430,19 @@ class Netcast(object):
                  WHERE nid = %(nid)s"""
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
-if __name__ == "__main__":
-    from time import sleep
+
+def refresh_and_download_all_netcasts():
+    print "refresh_and_download_all_netcasts"
     sql = """SELECT * 
              FROM netcasts"""
     netcasts = get_results_assoc_dict(sql)
     for n in netcasts:
-        print "N:", n
         obj = Netcast(**n)
-        obj.download_unlistened_netcasts()
+        obj.refresh_feed_and_download_episodes()
+
+if __name__ == "__main__":
+    from time import sleep
+    refresh_and_download_all_netcasts()
     while True:
         print "SLEEP"
         sleep(1)
-
-    
