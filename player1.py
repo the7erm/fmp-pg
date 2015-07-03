@@ -68,6 +68,7 @@ SUPPORTED_EXTENSIONS = (
 debug_threads = False
 
 def wait(*args):
+    return
     now = "%s " % datetime.now()
     msg = now + " ".join(map(str, args))
     if debug_threads:
@@ -129,15 +130,14 @@ class Player(GObject.GObject):
         self.uri = uri
         self.state = state
         GObject.timeout_add(1000, self.time_status)
-        wait()
+        
 
     def on_state_change(self, player, state):
-        return
         self.show_video_window()
 
     def show_video_window(self):
-        Gdk.threads_leave()
-        Gdk.threads_enter()
+        # Gdk.threads_leave()
+        # Gdk.threads_enter()
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
@@ -146,7 +146,7 @@ class Player(GObject.GObject):
             self.alt_drawingarea_vbox.show()
         # self.window.show_all()
         # self.top_hbox.hide()
-        Gdk.threads_leave()
+        # Gdk.threads_leave()
 
     def get_time_status(self):
         position = self.position
@@ -396,8 +396,6 @@ class Player(GObject.GObject):
         self.connect('state-changed', self.on_state_changed)
 
     def push_status(self, msg):
-        Gdk.threads_leave()
-        Gdk.threads_enter()
         print "PUSH:", msg
         self.alt_drawingarea_vbox_label.set_text(msg)
         context_id = self.status_bar.get_context_id(msg)
@@ -407,7 +405,6 @@ class Player(GObject.GObject):
         if len(self.debug_messages) > 35:
             self.debug_messages = self.debug_messages[0:35]
         self.debug_text_buffer.set_text("\n".join(self.debug_messages))
-        Gdk.threads_leave()
 
     def on_key_press(self, widget, event):
         Gdk.threads_leave()
@@ -959,15 +956,15 @@ class TrayIcon():
     def __init__(self, player=None, playlist=None, state="PLAYING"):
         self.player = player
         self.playlist = playlist
-        self.play_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, 
+        self.pause_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, 
                                                  Gtk.IconSize.BUTTON)
-        self.pause_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PLAY, 
+        self.play_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PLAY, 
                                                   Gtk.IconSize.BUTTON)
         if player is None:
             self.player = self.playlist.player
         self.init_icon(state)
         self.init_menu(state)
-        
+        self.player.connect("state-changed", self.on_state_change)
 
     def init_icon(self, state="PLAYING"):
         self.ind = Gtk.StatusIcon()
@@ -979,30 +976,28 @@ class TrayIcon():
         self.ind.set_title("player.py")
         self.ind.connect("button-press-event", self.on_button_press)
         self.ind.connect("scroll-event", self.player.on_scroll)
-        self.player.connect("state-changed", self.on_state_change)
+        
         
     def on_state_change(self, player, state):
-        Gdk.threads_leave()
         print "TrayIcon.on_state_change:", player, state
-        Gdk.threads_enter()
         if state != PLAYING:
+            play_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PLAY, 
+                                                 Gtk.IconSize.BUTTON)
             self.play_pause_item.set_label('Play')
-            self.play_pause_item.set_image(self.play_img)
+            self.play_pause_item.set_image(play_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
         else:
             self.play_pause_item.set_label('Pause')
-            self.play_pause_item.set_image(self.pause_img)
+            pause_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, 
+                                                 Gtk.IconSize.BUTTON)
+            self.play_pause_item.set_image(pause_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
-        Gdk.threads_leave()
-        
+        print "/TrayIcon.on_state_change:", player, state
 
     def on_button_press(self, icon, event, **kwargs):
-        Gdk.threads_leave()
         print "on_button_press:", icon, event
         if event.button == 1:
-            Gdk.threads_enter()
             self.menu.popup(None, None, None, None, event.button, event.time)
-            Gdk.threads_leave()
 
     def init_menu(self, state):
         self.menu = Gtk.Menu()

@@ -19,11 +19,9 @@ except:
 
 import config
 from local_fobj_class import Listeners
-from misc import _listeners, get_unlistend_episode, get_expired_netcasts
+from misc import _listeners, get_unlistend_episode, get_expired_netcasts,\
+                 utcnow
 from episode_downloader import downloader
-
-def utcnow():
-    return datetime.utcnow().replace(tzinfo=pytz.utc)
 
 class Netcast_Listeners(Listeners):
     def __init__(self, *args, **kwargs):

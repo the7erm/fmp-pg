@@ -1,5 +1,6 @@
 
 from db.db import *
+import pytz
 
 def get_fobj(*args, **kwargs):
     print "GET_FOBJ"
@@ -131,3 +132,6 @@ def get_expired_netcasts():
              FROM netcasts
              WHERE expire_time <= NOW() OR expire_time IS NULL"""
     return get_results_assoc_dict(sql)
+
+def utcnow():
+    return datetime.utcnow().replace(tzinfo=pytz.utc)
