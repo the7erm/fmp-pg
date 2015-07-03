@@ -21,12 +21,13 @@
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
-                          GLib, Gio
+                          GLib, Gio, GdkPixbuf
 GObject.threads_init()
 Gst.init(None)
 import sys
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+import mutagen
 import os
 import urllib
 import math
@@ -166,7 +167,7 @@ class Player(GObject.GObject):
             'remaining_str': "-%s" % self.format_ns(remaining),
             'state': self.state_string
         }
-        print "self.state_string:",self.state_string
+        # print "self.state_string:",self.state_string
         return obj
 
     def time_status(self):
@@ -208,6 +209,8 @@ class Player(GObject.GObject):
         return "%d:%02d:%02d" % (hours, minutes, seconds)
 
     def init_window(self):
+        self.temp_height = 0
+        self.temp_width = 0
         self.debug_messages = []
         self.window = Gtk.Window()
         self.window.set_default_size(400, 300)
@@ -263,7 +266,18 @@ class Player(GObject.GObject):
         
 
         self.alt_drawingarea_vbox.pack_start(
-            self.alt_drawingarea_vbox_label, False, True, 0)
+            self.alt_drawingarea_vbox_label, False, False, 0)
+
+        self.playing_image_sbox = Gtk.ScrolledWindow()
+        self.playing_image_sbox.set_policy(Gtk.PolicyType.AUTOMATIC,
+                                           Gtk.PolicyType.AUTOMATIC)
+
+        self.playing_image = Gtk.Image()
+        self.window.connect("check_resize", self.on_check_resize)
+
+        self.playing_image_sbox.add_with_viewport(self.playing_image)
+        self.alt_drawingarea_vbox.pack_start(
+            self.playing_image_sbox, True, True, 0)
 
         self.debug_text_view = Gtk.TextView()
         self.debug_text_buffer = Gtk.TextBuffer()
@@ -295,10 +309,51 @@ class Player(GObject.GObject):
         self.window.show_all()
         self.drawingarea.hide()
         self.alt_drawingarea_vbox.show()
+        self.alt_drawingarea_vbox_label.hide()
         try:
             self.xid = self.drawingarea.get_property('window').get_xid()
         except AttributeError, e:
             print "AttributeError:", e
+
+    def on_window_resize(self, *args):
+        self.temp_height = 0
+        self.temp_width = 0
+        self.on_check_resize()
+
+
+    def on_check_resize(self, *args):
+        if not hasattr(self, 'pixbuf'):
+            return
+        boxAllocation = self.playing_image_sbox.get_allocation()
+        self.playing_image.set_allocation(boxAllocation)
+        self.resizeImage(boxAllocation.width, boxAllocation.height)
+
+    def resizeImage(self, allocation_width, allocation_height, force=False):
+        
+        allocation_height = allocation_height - 40
+        if self.temp_height != allocation_height or self.temp_width != allocation_width or force:
+            pb_width = self.pixbuf.get_width()
+            pb_height = self.pixbuf.get_height()
+            percent =  allocation_height / float(pb_height)
+            width = int(percent * pb_width)
+            height = int(percent * pb_height)
+
+            if width > allocation_width:
+                percent =  allocation_width / float(pb_width)
+                width = int(percent * pb_width)
+                height = int(percent * pb_height)
+
+            self.temp_height = allocation_height
+            self.temp_width = allocation_width
+
+            pixbuf = self.pixbuf.scale_simple(
+                width, height, GdkPixbuf.InterpType.BILINEAR)
+
+            self.playing_image.set_from_pixbuf(pixbuf)
+            self.playing_image.set_allocation(
+                self.playing_image_sbox.get_allocation())
+            
+        # self.image.connect('expose-event', self.on_image_resize, self.window)
 
     def init_top_hbox(self):
         self.top_hbox = Gtk.HBox()
@@ -550,6 +605,7 @@ class Player(GObject.GObject):
         self.bus.add_signal_watch()
         self.bus.connect('message::eos', self.on_eos)
         self.bus.connect('message::error', self.on_error)
+        self.bus.connect('message::tag', self.on_tag)
 
         # This is needed to make the video output in our DrawingArea:
         self.bus.enable_sync_message_emission()
@@ -721,6 +777,38 @@ class Player(GObject.GObject):
     def on_eos(self, bus, msg):
         Gdk.threads_leave()
         print('Player.on_eos(): seeking to start of video')
+
+    def print_tag(self, tag_list, tag_name):
+        if tag_name == 'image':
+            if os.path.exists(self.filename):
+                media_tags = MediaTags(self.filename)
+                # print "tags_hard.get('APIC'):", media_tags.tags_combined.get('image')
+                image = media_tags.tags_combined.get('image')
+                if image:
+                    if isinstance(image, list):
+                        image = image[0]
+                        if not hasattr(image, 'data'):
+                            print "NO DATA:",image.data
+                            return
+                    print "WRITING IMAGE"
+                    fp = open("/tmp/tmp.img", 'wb')
+                    fp.write(image.data)
+                    fp.close()
+                    self.set_image()
+        else:
+            print "tag_list.get_string(%s):" % tag_name, tag_list.get_string(tag_name)
+
+    def set_image(self):
+        self.pixbuf = GdkPixbuf.Pixbuf.new_from_file("/tmp/tmp.img")
+        self.temp_width = 0
+        self.temp_height = 0
+        self.on_check_resize()
+
+    def on_tag(self, bus, msg):
+        print "ON_TAG", bus, msg
+        tag_list = msg.parse_tag()
+        tag_list.foreach(self.print_tag)
+
 
     def on_error(self, bus, msg):
         Gdk.threads_leave()
@@ -983,6 +1071,139 @@ def get_files_in_dir(folder):
                 continue
             result.append(os.path.realpath(os.path.join(root, name)))
     return result
+
+audio_ext = ['.mp3','.wav','.ogg','.wma','.flac', '.m4a']
+audio_with_tags = ['.mp3','.ogg','.wma','.flac', '.m4a']
+video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
+             '.mp4', '.mov', '.m4v']
+
+def is_video(ext=None):
+    return ext.lower() in video_ext
+
+
+def is_audio(ext=None):
+    return ext.lower() in audio_ext
+
+
+def has_tags(ext=None):
+    return ext.lower() in audio_with_tags
+
+
+class MediaTags(object):
+    def __init__(self, filename=None):
+        self.filename = filename
+        self.direction = os.path.dirname(filename)
+        self.basename = os.path.basename(filename)
+        self.tags_easy = None
+        self.tags_hard = None
+        self.base, self.ext = os.path.splitext(self.basename)
+        self.has_tags = has_tags(self.ext)
+        self.is_audio = is_audio(self.ext)
+        self.is_video = is_video(self.ext)
+        self.tags_combined = {}
+        self.exists = os.path.exists(self.filename)
+        self.get_tags()
+
+    def get_easy_tags(self):
+        if not self.exists or not self.has_tags or self.tags_easy is not None:
+            return
+        try:
+            self.tags_easy = mutagen.File(self.filename, easy=True)
+            print "GET_TAGS EASY"
+            if self.tags_easy:
+                self.combine_tags(self.tags_easy)
+                    
+        except mutagen.mp3.HeaderNotFoundError, e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            self.tags_easy = None
+        except KeyError, e:
+            print "KeyError:", e
+            # if self.tags_easy:
+            # self.tags_easy = None
+
+    def combine_tags(self, tags):
+        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist',
+                       'tpe1', 'tpe2', 'tpe3')
+        title_keys = ('title', 'tit2')
+        album_keys = ('album', 'wm/albumtitle', 'albumtitle', 'talb')
+        year_keys = ('year', 'wm/year', 'date', 'tdrc', 'tdat', 'tory', 'tdor',
+                     'tyer')
+        genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
+                      'tcon')
+        track_keys = ('wm/tracknumber', 'track', 'trck')
+        image_keys = ('apic:', 'apic')
+        for k in tags:
+            print "k:",k
+            # print "k:",k,":",tags[k]
+            self.add_to_combined(k, tags[k])
+            k_lower = k.lower()
+            if k_lower in artist_keys:
+                self.add_to_combined('artist', tags[k])
+            if k_lower in title_keys:
+                self.add_to_combined('title', tags[k])
+            if k_lower in album_keys:
+                self.add_to_combined('album', tags[k])
+            if k_lower in year_keys:
+                self.add_to_combined('year', tags[k])
+            if k_lower in genre_keys:
+                self.add_to_combined('genre', tags[k])
+            if k_lower in track_keys:
+                self.add_to_combined('track', tags[k])
+            if k_lower in image_keys:
+                print "FOUND IMAGE"
+                self.add_to_combined('image', tags[k], convert_to_string=False)
+            if k_lower.startswith('apic:'):
+                self.add_to_combined('image', tags[k], convert_to_string=False)
+
+    def add_to_combined(self, tag, value, convert_to_string=True):
+        if tag not in self.tags_combined:
+            self.tags_combined[tag] = []
+        if value not in self.tags_combined[tag]:
+            if isinstance(value, list):
+                for v in value:
+                    if isinstance(v, list):
+                        for _v in value:
+                            if _v not in self.tags_combined[tag]:
+                                print "_v:", _v
+                                if convert_to_string:
+                                    vs = "%s" % _v
+                                    vs = vs.replace("\x00", "")
+                                else:
+                                    vs = _v
+                                self.tags_combined[tag].append(vs)
+                    elif v not in self.tags_combined[tag]:
+                        try:
+                            if convert_to_string:
+                                vs = "%s" % v
+                                vs = vs.replace("\x00", "")
+                            else:
+                                vs = v
+                            self.tags_combined[tag].append(vs)
+                        except TypeError:
+                            continue
+                return
+            if convert_to_string:
+                self.tags_combined[tag].append("%s" % value)
+            else:
+                self.tags_combined[tag].append(value)
+
+    def get_hard_tags(self):
+        if not self.exists or not self.has_tags or self.tags_hard is not None:
+            return
+        try:
+            self.tags_hard = mutagen.File(self.filename)
+            print "GET_TAGS HARD"
+            if self.tags_hard:
+                self.combine_tags(self.tags_hard)
+        except mutagen.mp3.HeaderNotFoundError, e:
+            print "mutagen.mp3.HeaderNotFoundError:",e
+            self.tags_hard = None
+
+    def get_tags(self, easy=True, hard=True):
+        if easy:
+            self.get_easy_tags()
+        if hard:
+            self.get_hard_tags()
 
 if __name__ == "__main__":
     files = []
