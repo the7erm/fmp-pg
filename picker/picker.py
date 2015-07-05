@@ -17,6 +17,11 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
+                          GLib, Gio, GdkPixbuf
+GObject.threads_init()
 
 import os
 try:
@@ -31,12 +36,13 @@ from fobjs.misc import get_listeners, _listeners
 from random import shuffle
 
 def wait():
+    Gdk.threads_leave()
     return
 
 def get_files_from_preload(listeners=None):
     listeners = _listeners(listeners)
 
-    sql = """SELECT *
+    select_sql = """SELECT *
              FROM preload
              WHERE uid = %(uid)s
              ORDER BY plid
@@ -44,13 +50,16 @@ def get_files_from_preload(listeners=None):
 
     items = []
     for listener in listeners:
-        dbInfo = get_assoc_dict(sql, listener)
-        if dbInfo != {}:
-            sql = """DELETE FROM preload 
-                     WHERE plid = %(plid)s"""
-            query(sql, dbInfo)
+        dbInfo = get_assoc_dict(select_sql, listener)
+        if dbInfo and dbInfo != {}:
+            delete_sql = """DELETE FROM preload 
+                            WHERE plid = %(plid)s"""
+            query(delete_sql, dbInfo)
+            print "+"*100
             print "get_file_from_preload:", dbInfo
-            items.append(get_fobj(**dbInfo))
+            item = get_fobj(**dbInfo)
+            print "ITEM:", item.filename
+            items.append(item)
     return items
 
 def get_users():
@@ -87,17 +96,24 @@ def populate_preload(uid=None, listeners=None):
             return True
 
     populate_pick_from(listeners)
+    wait()
     true_scores = make_true_scores_list()
+    wait()
     uname = ""
     for u in listeners:
         if u['uid'] == uid:
             uname = u['uname']
     for true_score in true_scores:
+        wait()
         dbInfos = get_files_for_true_score(uid=uid, true_score=true_score, 
                                            uname=uname)
         for dbInfo in dbInfos:
+            wait()
             insert_into_preload(dbInfo)
+            wait()
             remove_from_pick_from(**dbInfo)
+            wait()
+
 
     return True
 
@@ -165,11 +181,10 @@ def remove_recently_played(listeners=None):
     for listener in listeners:
         sql = """DELETE FROM pick_from 
                  WHERE fid IN (
-                           SELECT uh.id
+                           SELECT uh.fid
                            FROM user_history uh
                            WHERE uh.uid = %(uid)s AND
-                                 time_played IS NOT NULL AND
-                                 uh.id_type = 'f'
+                                 time_played IS NOT NULL
                            ORDER BY time_played DESC
                            LIMIT {limit}
                        )""".format(limit=limit)
@@ -187,11 +202,19 @@ def remove_preload_from_pick_from(listeners=None):
                  )"""
         query(sql, listener)
 
-def get_preload():
+def get_preload(convert_to_fobj=False):
     sql = """SELECT *
              FROM preload
              ORDER BY plid, uid"""
-    return get_results_assoc_dict(sql)
+    results = get_results_assoc_dict(sql)
+    if not convert_to_fobj:
+        return results
+    fobj_results = []
+    for r in results:
+        fobj = get_fobj(**r)
+        if fobj:
+            fobj_results.append(fobj)
+    return fobj_results
 
 def gen_true_score_list(scores, whole=True):
     true_scores = []
@@ -210,7 +233,7 @@ def gen_true_score_list(scores, whole=True):
 def make_true_scores_list():
 
     by_tens = [0, 10, 20, 30, 40, 50, 60, 70]
-    by_fives = [80, 85, 90, 95]
+    by_fives = [80, 85, 90, 95, 105, 110]
 
     # shuffle(scores)
 
@@ -240,6 +263,6 @@ target_preload_length = len(true_scores)
 if __name__ == "__main__":
     # clear_preload()
     populate_preload()
-    preload = get_preload()
+    preload = get_preload(True)
     for p in preload:
-        print p
+        print p.filename

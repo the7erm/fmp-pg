@@ -6,6 +6,8 @@ class FObj_Class(object):
     def __init__(self, *args, **kwargs):
         self.filename = kwargs.get('filename', "")
         self.percent_played = kwargs.get("percent_played", -1)
+        if self.percent_played is None:
+            self.percent_played = 0
 
     @property
     def exists(self):

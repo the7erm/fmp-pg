@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <link rel="icon" 
+              type="image/svg+xml" 
+              href="/static/fmp-logo.svg">
         <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
         <script type="text/javascript">
 
@@ -27,7 +30,12 @@
                     var obj = JSON.parse(evt.data);
                     console.log("evt.data:", obj);
                     if (typeof obj['time-status'] != 'undefined') {
-                        $('#time-status').text(evt.data);
+                        $('#time-status').text(obj['time-status']['str']);
+                        return;
+                    }
+
+                    if (typeof obj['CONNECTED'] != 'undefined') {
+                        $('#conneted').text(evt.data);
                         return;
                     }
 
@@ -67,9 +75,12 @@
         </script>
     </head>
     <body>
+       <div id="conneted"></div>
        <button id="prev">Prev</button>
        <button class="play-pause">Pause</button>
        <button id="next">Next</button>
-       <code id="time-status"></code>
+       <span id="time-status"></span>
+
+
     </body>
 </html>

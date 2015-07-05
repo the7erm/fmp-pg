@@ -19,33 +19,30 @@ except:
 
 import config
 from local_fobj_class import Listeners
-from misc import _listeners, get_unlistend_episode, get_expired_netcasts,\
-                 utcnow
+from misc import _listeners, get_unlistend_episode, get_expired_netcasts
 from episode_downloader import downloader
+from utils import utcnow
 
 class Netcast_Listeners(Listeners):
     def __init__(self, *args, **kwargs):
+        print "Netcast_Listeners.init()"
         self.kwargs = kwargs
         self.listeners = _listeners(kwargs.get('listeners', None))
         self.parent = kwargs.get('parent')
 
     def init_mark_as_played_sql_args(self, sql_args):
         ultp = sql_args.get('ltp', 
-                            sql_args.get('now', datetime.utcnow())
+                            sql_args.get('now', utcnow())
                          )
         sql_args.update({
             'ultp': ultp,
             'time_played': ultp,
             'date_played': ultp.date(),
             'eid': self.parent.eid,
-            'target_type': 'e',
-            'target_key': 'eid',
-            'id': self.parent.eid
+            'fid': None
         })
 
     def mark_as_played_for_listener(self, **sql_args):
-        if not 'eid' in sql_args and sql_args.get('id_type') == 'e':
-            sql_args['eid'] = sql_args['id']
         self.mark_episode_as_played_listened(**sql_args)
         self.update_most_recent(**sql_args)
 
@@ -79,7 +76,7 @@ class Netcast_FObj(FObj_Class):
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
-        self.listeners = Netcast_Listeners(parent=self)
+        self.listeners = Netcast_Listeners(parent=self, **kwargs)
         self.real_filename = kwargs.get('filename', "")
         self.insert_new = kwargs.get("insert", False)
         self.eid = kwargs.get("eid", None)
@@ -137,6 +134,10 @@ class Netcast_FObj(FObj_Class):
         self_eid = self.eid
         if self_eid != value:
             self.load_from_eid(value)
+
+    @property
+    def fid(self):
+        return None
 
     def load_from_eid(self, eid):
         if not eid:
@@ -434,6 +435,13 @@ def refresh_and_download_all_netcasts():
     sql = """SELECT * 
              FROM netcasts"""
     netcasts = get_results_assoc_dict(sql)
+    for n in netcasts:
+        obj = Netcast(**n)
+        obj.refresh_feed_and_download_episodes()
+
+def refresh_and_download_expired_netcasts():
+    print "refresh_and_download_expired_netcasts"
+    netcasts = get_expired_netcasts()
     for n in netcasts:
         obj = Netcast(**n)
         obj.refresh_feed_and_download_episodes()

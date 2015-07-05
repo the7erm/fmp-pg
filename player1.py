@@ -36,6 +36,7 @@ from pprint import pprint
 from datetime import datetime
 from copy import deepcopy
 from time import sleep, time
+from utils import utcnow
 
 PLAYING = Gst.State.PLAYING
 PAUSED = Gst.State.PAUSED
@@ -43,6 +44,9 @@ STOPPED = Gst.State.NULL
 READY = Gst.State.READY
 
 time_format = Gst.Format(Gst.Format.TIME)
+
+from log_class import Log, logging
+logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = (
     '',
@@ -68,7 +72,6 @@ SUPPORTED_EXTENSIONS = (
 debug_threads = False
 
 def wait(*args):
-    return
     now = "%s " % datetime.now()
     msg = now + " ".join(map(str, args))
     if debug_threads:
@@ -101,7 +104,9 @@ class PlayerError(Exception):
     def __str__(self):
         return repr(self.value)
 
-class Player(GObject.GObject):
+class Player(GObject.GObject, Log):
+    __name__ = 'Player'
+    logger = logger
     __gsignals__ = {
         'state-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
                           (object,)),
@@ -111,10 +116,12 @@ class Player(GObject.GObject):
                         (object,)),
     }
     def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
+        # Player.__init__()
         GObject.GObject.__init__(self)
         self.use_state_cache_until = 0
         self.state_cache = False
         self.uri_path = ""
+        self.last_time_status = {}
         self.duration_cache = {}
         self.pipeline = None
         self.filename = ""
@@ -123,19 +130,24 @@ class Player(GObject.GObject):
         self.last_state = None
         self.seek_lock = False
         self.init_window()
+        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+        self.on_check_resize()
         self.init_player(uri=uri)
-        self.last_time_status = {}
+        
         self.connect("state-changed", self.on_state_change)
         # uri has to be set after the player is initialized.
+        
         self.uri = uri
         self.state = state
         GObject.timeout_add(1000, self.time_status)
         
 
     def on_state_change(self, player, state):
+        # Player.on_state_change()
         self.show_video_window()
 
     def show_video_window(self):
+        # Player.show_video_window()
         # Gdk.threads_leave()
         # Gdk.threads_enter()
         if self.playbin.get_property('n-video'):
@@ -149,6 +161,7 @@ class Player(GObject.GObject):
         # Gdk.threads_leave()
 
     def get_time_status(self):
+        # Player.get_time_status()
         position = self.position
         duration = self.duration
         remaining = duration - position
@@ -171,6 +184,7 @@ class Player(GObject.GObject):
         return obj
 
     def time_status(self):
+        # Player.time_status()
         Gdk.threads_leave()
         obj = self.get_time_status()
 
@@ -181,20 +195,26 @@ class Player(GObject.GObject):
             #  self.emit('state-changed', self.state)
         
         if obj != self.last_time_status:
-            Gdk.threads_enter()
-            self.time_label.set_text("%s %s/%s" % (
+            self.last_time_status = deepcopy(obj)
+            obj['str'] = "%s %s/%s" % (
                 obj['remaining_str'], 
                 obj['position_str'], 
-                obj['duration_str']))
+                obj['duration_str']
+            );
+            Gdk.threads_enter()
+            self.time_label.set_text(obj['str'])
             Gdk.threads_leave()
-            emit_obj = deepcopy(obj)
-            emit_obj['now'] = datetime.utcnow()
-            self.emit('time-status', emit_obj)
+            # print "time status obj:", obj
+            obj['now'] = utcnow()
+            obj['now_iso'] = obj['now'].isoformat()
+            self.emit('time-status', obj)
+            GObject.idle_add(self.show_video_window)
             # self.show_video_window()
-        self.last_time_status = obj
+        
         return True
 
     def format_ns(self, ns):
+        # Player.format_ns()
         if not ns:
             return "0:00"
         seconds = int(math.floor(ns / 1000000000))
@@ -209,6 +229,7 @@ class Player(GObject.GObject):
         return "%d:%02d:%02d" % (hours, minutes, seconds)
 
     def init_window(self):
+        # Player.init_window()
         self.temp_height = 0
         self.temp_width = 0
         self.debug_messages = []
@@ -316,12 +337,15 @@ class Player(GObject.GObject):
             print "AttributeError:", e
 
     def on_window_resize(self, *args):
+        # Player.on_window_resize()
+        self.show_video_window()
         self.temp_height = 0
         self.temp_width = 0
         self.on_check_resize()
 
 
     def on_check_resize(self, *args):
+        # Player.on_check_resize()
         if not hasattr(self, 'pixbuf'):
             return
         boxAllocation = self.playing_image_sbox.get_allocation()
@@ -329,7 +353,7 @@ class Player(GObject.GObject):
         self.resizeImage(boxAllocation.width, boxAllocation.height)
 
     def resizeImage(self, allocation_width, allocation_height, force=False):
-        
+        # Player.resizeImage()
         allocation_height = allocation_height - 40
         if self.temp_height != allocation_height or self.temp_width != allocation_width or force:
             pb_width = self.pixbuf.get_width()
@@ -356,6 +380,7 @@ class Player(GObject.GObject):
         # self.image.connect('expose-event', self.on_image_resize, self.window)
 
     def init_top_hbox(self):
+        # Player.init_top_hbox()
         self.top_hbox = Gtk.HBox()
 
         self.file_label = Gtk.Label()
@@ -374,6 +399,7 @@ class Player(GObject.GObject):
 
 
     def init_controls(self):
+        # Player.init_controls()
         self.prev_btn = Gtk.Button()
         prev_img = Gtk.Image.new_from_stock(
             Gtk.STOCK_MEDIA_PREVIOUS, Gtk.IconSize.BUTTON)
@@ -396,7 +422,8 @@ class Player(GObject.GObject):
         self.connect('state-changed', self.on_state_changed)
 
     def push_status(self, msg):
-        print "PUSH:", msg
+        # Player.push_status()
+        self.log_debug(".push_status:%s", msg)
         self.alt_drawingarea_vbox_label.set_text(msg)
         context_id = self.status_bar.get_context_id(msg)
         self.status_bar.push(context_id, msg)
@@ -407,9 +434,10 @@ class Player(GObject.GObject):
         self.debug_text_buffer.set_text("\n".join(self.debug_messages))
 
     def on_key_press(self, widget, event):
+        # Player.on_key_press()
         Gdk.threads_leave()
         keyname = Gdk.keyval_name(event.keyval)
-        print "keyname:", keyname
+        self.log_debug(".on_key_press:%s", keyname)
         self.push_status("Player.on_key_press:"+keyname)
         if keyname in ('space', 'Return'):
             self.pause()
@@ -442,13 +470,16 @@ class Player(GObject.GObject):
         return False
 
     def show_controls(self, *args, **kwargs):
+        # Player.show_controls()
         return
 
     def pause(self, *args, **kwargs):
+        # Player.pause()
         Gdk.threads_leave()
         self.state = 'TOGGLE'
 
     def on_scroll(self, widget, event):
+        # Player.on_scroll()
         Gdk.threads_leave()
         if event.direction == Gdk.ScrollDirection.UP:
             self.position = "+5"
@@ -457,21 +488,23 @@ class Player(GObject.GObject):
 
     @property
     def position(self):
+        # Player.position()
         Gdk.threads_leave()
         try:
            res, position = self.pipeline.query_position(time_format)
         except Exception as e:
-            print "ERROR GETTING POSITION:", e
+            self.log_error(".position ERROR GETTING POSITION:%s", e)
             return self.last_good_position
 
         if res and position:
             self.last_good_position = position
         else:
-            print "FAIL GETTING RES", res, position
+            self.log_error(".position FAIL GETTING RES:%s %s", res, position)
         return self.last_good_position
 
     @position.setter
     def position(self, position):
+        # Player.position()
         Gdk.threads_leave()
         if self.seek_lock:
             return
@@ -503,6 +536,7 @@ class Player(GObject.GObject):
         self.seek_lock = False
 
     def parseInt(self, string):
+        # Player.parseInt()
         value = 0
         try:
             value = int(string)
@@ -511,6 +545,7 @@ class Player(GObject.GObject):
         return value
 
     def parse_minutes_seconds(self, position):
+        # Player.parse_minutes_seconds()
         parts = position.split(':')
         part_len = len(parts)
         seconds = 0
@@ -530,8 +565,12 @@ class Player(GObject.GObject):
                ) * Gst.SECOND
 
     def parse_percent(self, position):
+        # Player.parse_percent()
         print "BEFORE:", position[:-1]
-        percent = float(position[:-1]) * 0.01
+        try:
+            percent = float(position[:-1]) * 0.01
+        except:
+            percent = 0
         print "AFTER:", percent
         if percent < 0 or percent > 1:
             self.seek_lock = False
@@ -543,6 +582,7 @@ class Player(GObject.GObject):
         return seek_to
 
     def parse_pos_negative_position(self, position):
+        # Player.parse_pos_negative_position()
         seconds = int(position[1:])
         if position.startswith("-"):
             seconds = -seconds
@@ -554,18 +594,24 @@ class Player(GObject.GObject):
         return int(position)
 
     def parse_position_string(self, position):
+        # Player.parse_position_string()
         if ':' in position:
             position = self.parse_minutes_seconds(position)
         elif position.startswith("+") or position.startswith("-"):
             position = self.parse_pos_negative_position(position)
         elif position.endswith("%"):
-            position = self.parse_percent(position)
+            try:
+                position = self.parse_percent(position)
+            except PlayerError, e:
+                self.log_error("PlayerError:%s", e)
+                return 0
         else:
             position = int(position)
         return position
 
     @property
     def duration(self):
+        # Player.duration()
         Gdk.threads_leave()
         cnt = 0
         res = False
@@ -593,7 +639,7 @@ class Player(GObject.GObject):
         return self.last_good_duration
 
     def init_player(self, uri=None):
-
+        # Player.init_player()
         # Create GStreamer pipeline
         self.pipeline = Gst.Pipeline()
 
@@ -621,6 +667,7 @@ class Player(GObject.GObject):
             self.state = PLAYING
 
     def quit(self, *args, **kwargs):
+        # Player.quit()
         Gdk.threads_leave()
         Gdk.threads_enter()
         self.pipeline.set_state(STOPPED)
@@ -629,10 +676,14 @@ class Player(GObject.GObject):
 
     @property
     def uri(self):
+        # Player.uri()
         return self.uri_path
 
     @uri.setter
     def uri(self, value):
+        # Player.uri()
+        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+        self.on_check_resize()
         Gdk.threads_leave()
         if value is None:
             return
@@ -659,6 +710,7 @@ class Player(GObject.GObject):
 
     @property
     def state(self):
+        # Player.state()
         Gdk.threads_leave()
         self.pipeline_ready()
         if self.use_state_cache_until < time() or not self.state_cache:
@@ -666,14 +718,16 @@ class Player(GObject.GObject):
             self.state_cache = self.playbin.get_state(0)
             Gdk.threads_leave()
         else:
-            print "USING STATE CACHE self.state_cache", self.state_cache[1]
+            log_debug(" USING STATE CACHE self.state_cache %s", 
+                      self.state_cache[1])
         return self.state_cache[1]
 
     @state.setter
     def state(self, value=None):
+        # Player.state()
         Gdk.threads_leave()
         self.pipeline_ready()
-        print "SET STATE:", value
+        self.log_info(' SET STATE:%s', value)
         if value not in (PLAYING, PAUSED, STOPPED):
             self.state_string = value
             return
@@ -686,9 +740,10 @@ class Player(GObject.GObject):
         if old_state != self_state or value != self_state:
             self.last_state = value
             self.emit('state-changed', value)
-        print "/SET STATE:", value
+        self.log_info(' /SET STATE:%s', value)
 
     def on_state_changed(self, player, value):
+        # Player.on_state_changed()
         Gdk.threads_leave()
         state = self.state
         Gdk.threads_enter()
@@ -704,6 +759,7 @@ class Player(GObject.GObject):
         self.push_status("state-changed:%s" % self.state_to_string(value))
 
     def pipeline_ready(self):
+        # Player.pipeline_ready()
         Gdk.threads_leave()
         if not self.pipeline:
             raise PlayerError('Player.player is %r\nInfo:%s' % (
@@ -711,9 +767,11 @@ class Player(GObject.GObject):
 
     @property
     def state_string(self):
+        # Player.state_string()
         return self.state_to_string(self.state)
 
     def state_to_string(self, state):
+        # Player.state_to_string()
         if state == PLAYING:
             return "PLAYING"
         if state == PAUSED:
@@ -726,6 +784,7 @@ class Player(GObject.GObject):
 
     @state_string.setter
     def state_string(self, value=''):
+        # Player.state_string()
         Gdk.threads_leave()
         if not value:
             raise ValueError('Invalid state_string %r' % value)
@@ -763,6 +822,7 @@ class Player(GObject.GObject):
             (value, value))
 
     def on_sync_message(self, bus, msg):
+        # Player.on_sync_message()
         Gdk.threads_leave()
         if msg.get_structure().get_name() == 'prepare-window-handle':
             print "-"*100
@@ -772,10 +832,12 @@ class Player(GObject.GObject):
             Gdk.threads_leave()
 
     def on_eos(self, bus, msg):
+        # Player.on_eos()
         Gdk.threads_leave()
         print('Player.on_eos(): seeking to start of video')
 
     def print_tag(self, tag_list, tag_name):
+        # Player.print_tag()
         if tag_name == 'image':
             if os.path.exists(self.filename):
                 media_tags = MediaTags(self.filename)
@@ -793,27 +855,36 @@ class Player(GObject.GObject):
                     fp.close()
                     self.set_image()
         else:
-            print "tag_list.get_string(%s):" % tag_name, tag_list.get_string(tag_name)
+            try:
+                print "tag_list.get_string(%s):%s" % (tag_name, tag_list.get_string(tag_name))
+            except Exception as e:
+                print "Exception:", e
+                
 
     def set_image(self):
+        # Player.set_image()
         self.pixbuf = GdkPixbuf.Pixbuf.new_from_file("/tmp/tmp.img")
         self.temp_width = 0
         self.temp_height = 0
         self.on_check_resize()
 
     def on_tag(self, bus, msg):
+        # Player.on_tag()
         print "ON_TAG", bus, msg
         tag_list = msg.parse_tag()
         tag_list.foreach(self.print_tag)
 
 
     def on_error(self, bus, msg):
+        # Player.on_error()
         Gdk.threads_leave()
         error = msg.parse_error()
         print 'Player.on_error():', error[0]
         
 
-class Playlist(object):
+class Playlist(Log):
+    __name__ == 'Playilst'
+    logger = logger
     def __init__(self, files=[], player=None, index=0):
         self.index = index
         self.files = files
@@ -840,7 +911,7 @@ class Playlist(object):
     def on_key_press(self, widget, event):
         Gdk.threads_leave()
         keyname = Gdk.keyval_name(event.keyval)
-        print "Playlist.on_key_press keyname:", keyname
+        self.log_debug(".on_key_press keyname:%s", keyname)
         
         if keyname in ('Right', 'KP_Right'):
             self.next()
@@ -863,16 +934,15 @@ class Playlist(object):
         self.player.push_status("Prev")
 
     def on_eos(self, bus, msg):
-        print "Playlist.on_eos"
+        self.log_debug(".on_eos()")
         self.inc_index()
         self.player.push_status("End of stream")
 
     def on_error(self, bus, msg):
-        print "*"*100
-        print "Playlist.on_error"
         error = msg.parse_error()[0]
-        print "ERROR:", error.message
-        print "CODE:", error.code
+        self.log_error("*"*100)
+        self.log_error(".on_error ERROR:%s", error.message)
+        self.log_error(".on_error CODE:%s", error.code)
         self.player.push_status("----------------")
         self.player.push_status("Filename     :%s" % self.player.filename)
         self.player.push_status("URI          :%s" % self.player.uri)
@@ -898,9 +968,9 @@ class Playlist(object):
 
         for code in codes:
             if error.code == getattr(Gst.StreamError, code):
-                print "CODE:", error.code, '=', code
+                self.log_error(".on_error CODE TYPE:%s", code)
 
-        print self.player.filename
+        self.log_error(".player.filename:%s", self.player.filename)
         if error.code in(Gst.StreamError.TYPE_NOT_FOUND,
                          Gst.StreamError.WRONG_TYPE):
             self.set_error_message(error)
@@ -946,13 +1016,16 @@ class Playlist(object):
 
         self.player.state = STOPPED
         self.set_player_uri()
-        print "SANITY CHECK", self.player.uri
+        # print "SANITY CHECK", self.player.uri
+        self.log_debug(".sanity_check:%s", self.player.uri)
         self.player.state = PLAYING
 
     def set_player_uri(self):
         self.player.uri = self.files[self.index]
 
-class TrayIcon():
+class TrayIcon(Log):
+    __name__ = 'TrayIcon'
+    logger = logger
     def __init__(self, player=None, playlist=None, state="PLAYING"):
         self.player = player
         self.playlist = playlist
@@ -979,7 +1052,7 @@ class TrayIcon():
         
         
     def on_state_change(self, player, state):
-        print "TrayIcon.on_state_change:", player, state
+        self.log_debug('.on_state_change: player:%s  state:%s', player, state)
         if state != PLAYING:
             play_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PLAY, 
                                                  Gtk.IconSize.BUTTON)
@@ -992,10 +1065,10 @@ class TrayIcon():
                                                  Gtk.IconSize.BUTTON)
             self.play_pause_item.set_image(pause_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
-        print "/TrayIcon.on_state_change:", player, state
+        self.log_debug('/.on_state_change')
 
     def on_button_press(self, icon, event, **kwargs):
-        print "on_button_press:", icon, event
+        self.log_info(".on_button_press: %s, %s", icon, event)
         if event.button == 1:
             self.menu.popup(None, None, None, None, event.button, event.time)
 

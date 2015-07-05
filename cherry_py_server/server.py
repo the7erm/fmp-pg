@@ -25,18 +25,29 @@ from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
 GObject.threads_init()
 
 import cherrypy
+from utils import utcnow
 
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from ws4py.messaging import TextMessage, BinaryMessage
 import json
 
+preload = []
+
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
-        cherrypy.engine.publish('websocket-broadcast', m)
+        print "received_message:", m
+        return
+        # cherrypy.engine.publish('websocket-broadcast', m)
+
+    def opened(self):
+        broadcast({
+            "CONNECTED": "OK", 
+            "time": "%s" % utcnow().isoformat() 
+        })
 
     def closed(self, code, reason="A client left the room without a proper explanation."):
         cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
@@ -80,15 +91,37 @@ class FmpServer(object):
     def ws(self):
         cherrypy.log("Handler created: %s" % repr(cherrypy.request.ws_handler))
 
+    @cherrypy.expose
+    def satellite(self):
+        preload_list = []
+        for p in preload:
+            preload_list.append(p.json())
+        response = {
+            'preload': preload_list
+        }
+        return json.dumps(response)
+
+
+
 def cherry_py_worker():
     cherrypy.quickstart(FmpServer(), '/', config={
         '/ws': {
             'tools.websocket.on': True,
             'tools.websocket.handler_cls': ChatWebSocketHandler
-            }
+        },
+        '/favicon.ico': {
+            'tools.staticfile.on': True,
+            'tools.staticfile.filename': "/home/erm/fmp-pg/static/favicon.ico"
+        },
+        '/static/fmp-logo.svg': {
+            'tools.staticfile.on': True,
+            'tools.staticfile.filename': "/home/erm/fmp-pg/static/fmp-logo.svg"
+        }
     })
 
 def broadcast(data):
+    if not data.get('time-status'):
+        print "broadcast:", data
     cherrypy.engine.publish('websocket-broadcast', 
             TextMessage(json.dumps(data)))
 
