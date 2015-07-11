@@ -13,7 +13,8 @@ except:
 from datetime import timedelta
 
 from misc import get_most_recent, user_history_sanity_check,\
-                 date_played_info_for_uid, get_most_recent_for_uid
+                 date_played_info_for_uid, get_most_recent_for_uid, \
+                 jsonize
 from utils import utcnow
 
 from log_class import Log, logging
@@ -96,6 +97,9 @@ class UserFile(Log):
         # UserFile.fid
         if hasattr(self.parent, 'fid'):
             return self.parent.fid
+        fid = self.kwargs.get('fid')
+        if fid:
+            return fid
         return None
 
     @property
@@ -103,6 +107,9 @@ class UserFile(Log):
         # UserFile.eid
         if hasattr(self.parent, 'eid'):
             return self.parent.eid
+        eid = self.kwargs.get('eid')
+        if eid:
+            return eid
         return None
 
     @property
@@ -168,6 +175,7 @@ class UserFile(Log):
 
     @property
     def most_recent_history_item(self):
+        self.log_debug(".most_recent_history_item")
         # UserFile.most_recent_history_item
         # We only need to get the most recent once a minute.
         if self.most_recent and self.most_recent_expire > utcnow():
@@ -260,6 +268,13 @@ class UserFile(Log):
             (self.score * 10)
         ) / 2.0
 
+    def json(self):
+        # UserFile.json
+        if self.userFileDbInfo == {}:
+            self.load_user_file_db_info()
+        return jsonize(self.userFileDbInfo)
+
+
 
 class UserHistoryItem(UserFile):
     __name__ = 'UserHistoryItem'
@@ -316,7 +331,21 @@ class UserHistoryItem(UserFile):
     def can_save(self):
         # Check to make sure that the object has all
         # the right things to save.
-        return self.uhid or (self.uid and (self.fid or self.eid))
+        uhid = self.uhid
+        if uhid:
+            self.log_debug("CAN save uhid:%s" % uhid)
+            return True
+
+        uid = self.uid
+        eid = self.eid
+        fid = self.fid
+        if not uid or (not eid and not fid):
+            self.log_debug("CANT'T save uid:%s fid:%s eid:%s" % (
+                uid, fid, eid))
+            return False
+
+        self.log_debug("CAN save fid:%s eid:%s" % (fid, eid))
+        return True
 
     @property
     def time_played(self):
@@ -336,10 +365,12 @@ class UserHistoryItem(UserFile):
     def load_from_uid_fid_eid_date_played(self):
         self.log_debug(".load_from_uid_fid_eid_date_played()")
         self.log_debug(".historyDbInfo:%s", self.historyDbInfo)
+        self.historyDbInfo_sanity_check()
         if 'uid' not in self.historyDbInfo:
             self.log_error(".historyDbInfo missing uid"+("<"*20))
             return
         user_history_sanity_check()
+        
         sql_args = deepcopy(self.historyDbInfo)
         # This one makes sure it hasn't been played today.
         fid_query, eid_query = self.get_history_query(**sql_args)
@@ -356,45 +387,97 @@ class UserHistoryItem(UserFile):
         historyDbInfo = get_assoc_dict(sql, sql_args)
         if historyDbInfo != {}:
             self.historyDbInfo = historyDbInfo
-        self.log_debug("/.load_from_uid_fid_eid_date_played()")
         self.historyDbInfo_sanity_check()
+        self.log_debug("/.load_from_uid_fid_eid_date_played()")
 
     def historyDbInfo_sanity_check(self):
         check_keys = ['uid', 'eid', 'fid', 'date_played',
                       'time_played', 'rating', 'score', 
                       'reason', 'true_score']
-
+        now = utcnow()
         for key in check_keys:
-            if key not in self.historyDbInfo and key in self.kwargs:
+            if key in self.historyDbInfo:
+                continue
+            self.log_error(".historyDbInfo missing %s"+("<"*20), key)
+            if key in self.kwargs and self.kwargs.get(key):
                 self.historyDbInfo[key] = self.kwargs[key]
-                self.log_error(".historyDbInfo missing %s"+("<"*20), key)
-                self.log_error("using self.kwargs:%s", self.kwargs[key])
-
-        for key in check_keys:
-            if key not in self.historyDbInfo and \
-               key in self.kwargs['userDbInfo']:
+                self.log_error("using self.kwargs[%s]:%s" %
+                               (key, self.kwargs[key]))
+            elif key in self.kwargs['userDbInfo'] and self.kwargs['userDbInfo'].get(key):
                 self.historyDbInfo[key] = self.kwargs['userDbInfo'][key]
-                self.log_error(".historyDbInfo missing %s"+("<"*20), key)
-                self.log_error("using self.kwargs['userDbInfo']:%s", 
-                    self.kwargs[key])
+                self.log_error("using self.kwargs['userDbInfo'][%s]:%s" %
+                               (key, self.kwargs['userDbInfo'][key]))
+            else:
+                if key in ('date', 'time_played'):
+                    if key == 'date':
+                        self.log_error("using now:%s" % now.date())
+                        self.historyDbInfo[key] = now.date()
+                    elif key == 'time_played':
+                        self.log_error("using now:%s" % now)
+                        self.historyDbInfo[key] = now
+                    continue
+                if key == 'reason':
+                    self.historyDbInfo[key] = ""
+                    self.log_error("using empty reason:''")
+                    continue
+
+                if key == 'rating':
+                    self.historyDbInfo['rating'] = 6
+                
+                if key == 'score':
+                    self.historyDbInfo['score'] = 5
+
+                if key == 'true_score':
+                    rating = self.historyDbInfo.get('rating')
+                    score = self.historyDbInfo.get('score')
+                    self.historyDbInfo['true_score'] = (
+                        (rating * 2 * 10) +
+                        (score * 10)
+                    ) / 2.0
+
+                self.log_error("No suitable fallback for %s" % key)
 
         if 'eid' not in self.historyDbInfo:
             self.historyDbInfo['eid'] = None
 
         if 'fid' not in self.historyDbInfo:
             self.historyDbInfo['fid'] = None
+
+
+        rating = self.historyDbInfo.get('rating')
+        if rating is None:
+            self.historyDbInfo['rating'] = 6
+
+        score = self.historyDbInfo.get('score')
+        if score is None:
+            self.historyDbInfo['score'] = 5
+
+        if rating is None or score is None:
+            rating = self.historyDbInfo.get('rating')
+            score = self.historyDbInfo.get('score')
+            self.historyDbInfo['true_score'] = (
+                            (rating * 2 * 10) +
+                            (score * 10)
+                        ) / 2.0
         
+        all_good = True
         for key in check_keys:
             if key not in self.historyDbInfo:
-                self.log_error(".historyDbInfo missing %s"+("<"*20), key)
+                all_good = False
+                self.log_error(".historyDbInfo STILL missing %s"+("<"*20), key)
+        self.log_info("/.historyDbInfo ALL GOOD")
+
+
 
     def insert(self):
+        self.log_debug(".insert()")
+        self.historyDbInfo_sanity_check()
         if not self.can_save:
+            self.log_crit("CAN'T INSERT")
             return
 
-        self.historyDbInfo_sanity_check()
-
         if self.uhid:
+            self.log_crit("INSERT CALLED and uhid is present uhid:%s" % (uhid,))
             self.save()
             return
 
@@ -402,29 +485,33 @@ class UserHistoryItem(UserFile):
                                            time_played, rating, score, 
                                            reason, true_score)
                  VALUES (%(uid)s, %(eid)s, %(fid)s, %(date_played)s,
-                         %(time_played)s, %(rating)s,%(score)s,
+                         %(time_played)s, %(rating)s, %(score)s,
                          %(reason)s, %(true_score)s)
                  RETURNING *"""
         # You need to figure out how to handle eid vs fid updates
         # In particular how netcast vs local files.
         # how would we get them to use this class.
+        self.log_debug("query:%s" % mogrify(sql, self.historyDbInfo))
         self.historyDbInfo = get_assoc_dict(sql, self.historyDbInfo)
 
     def load_user_file_db_info(self):
         self.load_from_uid_fid_eid_date_played()
 
     def save(self):
+        self.log_debug(".save()")
         self.historyDbInfo_sanity_check()
         if not self.can_save:
-            self.log_warn("Can't save")
+            self.log_debug("CANT'T save")
             return
-
+        self.log_debug(".save() CAN SAVE")
         if not self.uhid:
             self.load_from_uid_fid_eid_date_played()
-
+        self.log_debug("Load ok")
         if not self.uhid:
+            self.log_debug("NO UHID")
             self.insert()
             return
+
         if 'reason' not in self.historyDbInfo:
             self.historyDbInfo['reason'] = ''
 
@@ -450,8 +537,12 @@ class UserHistoryItem(UserFile):
                      eid = %(eid)s
                  WHERE uhid = %(uhid)s
                  RETURNING *"""
-        self.historyDbInfo = get_assoc_dict(sql, self.historyDbInfo)
-        
+        historyDbInfo = get_assoc_dict(sql, self.historyDbInfo)
+        if historyDbInfo != {}:
+            self.log_debug("SAVED:%s" % historyDbInfo)
+            self.historyDbInfo = historyDbInfo
+        else:
+            self.log_crit("UNABLE TO UPDATE HISTORY:%s" % self.historyDbInfo)
 
     def mark_as_played(self, **sql_args):
         self.log_debug(".mark_as_played:%s", sql_args['percent_played'])

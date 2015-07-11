@@ -11,6 +11,8 @@ import sys
 import traceback
 import logging
 import sqlparse
+from copy import deepcopy
+from datetime import date, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,9 @@ def time_to_cue_netcast(listeners=None):
     for r in recent:
         if r.get('eid') is not None:
             cue = False
+            logger.debug("FOUND EID")
             break
+    logger.debug("TIME TO CUE NETCAST:%s", cue)
     return cue
 
 def get_listeners():
@@ -146,7 +150,7 @@ def get_uids(listeners=None):
     return uids
 
 def get_unlistend_episode(listeners=None):
-    print "GET_unlistend_episode"
+    logger.debug("GET_unlistend_episode")
     listeners = _listeners(listeners)
     uids = get_uids(listeners)
 
@@ -229,3 +233,52 @@ def format_sql(sql, sql_args={}, sets=[], wheres=[], values=[],
     )
 
 
+JSON_WHITE_LIST = [
+    'album_name',
+    'aid',
+    'alid',
+    'altp',
+    'artist',
+    'artists',
+    'date_played',
+    'eid',
+    'enabled',
+    'episode_title',
+    'fid',
+    'genre',
+    'genres',
+    'gid',
+    'listening',
+    'listeners',
+    'ltp',
+    'netcast_name',
+    'nid',
+    'percent_played',
+    'rating',
+    'reason',
+    'score',
+    'seq',
+    'title',
+    'time_played',
+    'true_score',
+    'uhid',
+    'uid',
+    'ultp',
+    'uname',
+    'users',
+    'user_file_info',
+]
+
+
+def jsonize(dbInfo):
+    dbInfo = deepcopy(dbInfo)
+    remove_keys = []
+    for key, item in dbInfo.iteritems():
+        if key not in JSON_WHITE_LIST:
+            remove_keys.append(key)
+            continue
+        if isinstance(item, (datetime, date)):
+            dbInfo[key] = item.isoformat()
+    for key in remove_keys:
+        del dbInfo[key]
+    return dbInfo

@@ -114,10 +114,16 @@ class Player(GObject.GObject, Log):
                         (object,)),
         'time-status': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
                         (object,)),
+        'artist-title-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+                                (object,)),
     }
     def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
         # Player.__init__()
         GObject.GObject.__init__(self)
+        self.debug_messages = []
+        self.artist_title = ""
+        self.artist = ""
+        self.title = ""
         self.use_state_cache_until = 0
         self.state_cache = False
         self.uri_path = ""
@@ -130,17 +136,175 @@ class Player(GObject.GObject, Log):
         self.last_state = None
         self.seek_lock = False
         self.init_window()
-        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
-        self.on_check_resize()
+        
         self.init_player(uri=uri)
         
-        self.connect("state-changed", self.on_state_change)
-        # uri has to be set after the player is initialized.
-        
-        self.uri = uri
         self.state = state
         GObject.timeout_add(1000, self.time_status)
+
+    def init_window(self):
+        # Player.init_window()
+        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+        self.temp_height = 0
+        self.temp_width = 0
         
+        self.window = Gtk.Window()
+        self.init_window_image()
+        self.window.set_default_size(400, 300)
+        self.window.set_resizable(True)
+        self.window.set_title("Video-Player")
+        
+        self.window.add_events(Gdk.EventMask.KEY_PRESS_MASK |
+                               Gdk.EventMask.POINTER_MOTION_MASK |
+                               Gdk.EventMask.BUTTON_PRESS_MASK |
+                               Gdk.EventMask.SCROLL_MASK |
+                               Gdk.EventMask.SMOOTH_SCROLL_MASK )
+        
+        self.main_vbox = Gtk.VBox()
+        self.window.add(self.main_vbox)
+
+        self.init_top_hbox()
+        self.init_stack()
+        
+        self.init_drawing_area()
+        self.init_debug_window()
+
+        self.init_bottom_hbox()
+
+        self.init_window_connections()
+        self.drawingarea.hide()
+
+    def init_window_image(self):
+        img_path = ""
+        possible_paths = [
+            os.path.join(sys.path[0],"images"),
+            os.path.join(sys.path[0], "..", "images"),
+            os.path.join(sys.path[0], "..")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                img_path = p
+                break
+
+        self.window.set_icon_from_file(os.path.join(img_path, "tv.png"))
+
+    def init_top_hbox(self):
+        # Player.init_top_hbox()
+        self.top_hbox = Gtk.HBox()
+
+        self.file_label = Gtk.Label()
+        self.file_label.set_line_wrap(True)
+        self.file_label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.file_label.set_alignment(0, 0)
+        self.file_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+
+        self.time_label = Gtk.Label()
+        self.time_label.set_line_wrap(True)
+        self.time_label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.time_label.set_alignment(1, 0)
+        self.time_label.set_ellipsize(Pango.EllipsizeMode.START)
+        self.top_hbox.pack_start(self.file_label, True, True, 0)
+        self.top_hbox.pack_start(self.time_label, False, True, 0)
+        self.main_vbox.pack_start(self.top_hbox, False, True, 0)
+
+    def init_stack(self):
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(
+            Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        self.stack_switcher = Gtk.StackSwitcher()
+        self.stack_switcher.set_stack(self.stack)
+        self.main_vbox.pack_start(self.stack_switcher, False, True, 0)
+        self.main_vbox.pack_start(self.stack, True, True, 1)
+
+    def init_drawing_area(self):
+        self.drawingarea = Gtk.DrawingArea()
+        self.init_alt_drawing_area()
+
+        self.video_area_vbox = Gtk.VBox()
+        self.video_area_vbox.pack_start(
+            self.alt_drawingarea_vbox, True, True, 0)
+        self.video_area_vbox.pack_start(self.drawingarea, True, True, 0)
+        self.video_area_vbox.show_all()
+        self.stack.add_titled(self.video_area_vbox, "Video", "Video")
+
+    def init_alt_drawing_area(self):
+        self.alt_drawingarea_vbox = Gtk.VBox()
+        self.init_playing_image_sbox()
+
+    def init_playing_image_sbox(self):
+        self.playing_image_sbox = Gtk.ScrolledWindow()
+        self.playing_image_sbox.set_policy(Gtk.PolicyType.AUTOMATIC,
+                                           Gtk.PolicyType.AUTOMATIC)
+
+        self.playing_image = Gtk.Image()
+        self.playing_image_sbox.add_with_viewport(self.playing_image)
+        self.alt_drawingarea_vbox.pack_start(
+            self.playing_image_sbox, True, True, 0)
+
+    def init_debug_window(self):
+        self.debug_text_view = Gtk.TextView()
+        self.debug_text_buffer = Gtk.TextBuffer()
+        self.debug_scrolled_window = Gtk.ScrolledWindow()
+        self.debug_scrolled_window.add(self.debug_text_view)
+        self.debug_text_view.set_editable(False)
+        self.debug_text_view.set_buffer(self.debug_text_buffer)
+        self.debug_text_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        
+        self.stack.add_titled(self.debug_scrolled_window, "Debug", "Debug")
+
+    def init_bottom_hbox(self):
+        # Controls
+        self.init_controls()
+        
+        self.bottom_hbox = Gtk.HBox()
+        self.status_bar = Gtk.Statusbar()
+        self.bottom_hbox.pack_start(self.prev_btn, False, True, 0)
+        self.bottom_hbox.pack_start(self.pause_btn, False, True, 0)
+        self.bottom_hbox.pack_start(self.next_btn, False, True, 0)
+
+        self.bottom_hbox.pack_start(self.status_bar, False, True, 0)
+        self.main_vbox.pack_start(self.bottom_hbox, False, True, 0)
+        self.push_status("Started")
+
+    def init_controls(self):
+        # Player.init_controls()
+        self.prev_btn = Gtk.Button()
+        prev_img = Gtk.Image.new_from_stock(
+            Gtk.STOCK_MEDIA_PREVIOUS, Gtk.IconSize.BUTTON)
+        self.prev_btn.set_image(prev_img)
+
+        self.pause_btn = Gtk.Button()
+        self.play_img = Gtk.Image.new_from_stock(
+            Gtk.STOCK_MEDIA_PLAY, Gtk.IconSize.BUTTON)
+        self.pause_img = Gtk.Image.new_from_stock(
+            Gtk.STOCK_MEDIA_PAUSE, Gtk.IconSize.BUTTON)
+        
+        self.pause_btn.set_image(self.play_img)
+
+        self.next_btn = Gtk.Button()
+        next_img = Gtk.Image.new_from_stock(
+            Gtk.STOCK_MEDIA_NEXT, Gtk.IconSize.BUTTON)
+        self.next_btn.set_image(next_img)
+
+        self.pause_btn.connect("clicked", self.pause)
+        self.connect('state-changed', self.on_state_changed)
+
+    def init_window_connections(self):
+        self.window.connect('key-press-event', self.on_key_press)
+        self.window.connect('motion-notify-event', self.show_controls)
+        self.window.connect('button-press-event', self.pause)
+        self.window.connect("scroll-event", self.on_scroll)
+        self.window.connect('destroy', self.quit)
+        self.window.connect("check_resize", self.on_check_resize)
+        self.window.show_all()
+
+        try:
+            self.xid = self.drawingarea.get_property('window').get_xid()
+        except AttributeError, e:
+            print "AttributeError:", e
+
+    def on_artist_title_changed(self, player, artist_title):
+        self.file_label.set_text(artist_title)
 
     def on_state_change(self, player, state):
         # Player.on_state_change()
@@ -228,121 +392,12 @@ class Player(GObject.GObject, Log):
             return "%d:%02d" % (minutes, seconds)
         return "%d:%02d:%02d" % (hours, minutes, seconds)
 
-    def init_window(self):
-        # Player.init_window()
-        self.temp_height = 0
-        self.temp_width = 0
-        self.debug_messages = []
-        self.window = Gtk.Window()
-        self.window.set_default_size(400, 300)
-        self.window.set_resizable(True)
-        self.window.set_title("Video-Player")
-        self.stack = Gtk.Stack()
-        self.stack.set_transition_type(
-            Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
-        self.stack_switcher = Gtk.StackSwitcher()
-        self.stack_switcher.set_stack(self.stack)
-        
-        self.window.add_events(Gdk.EventMask.KEY_PRESS_MASK |
-                               Gdk.EventMask.POINTER_MOTION_MASK |
-                               Gdk.EventMask.BUTTON_PRESS_MASK |
-                               Gdk.EventMask.SCROLL_MASK |
-                               Gdk.EventMask.SMOOTH_SCROLL_MASK )
-
-        self.window.connect('key-press-event', self.on_key_press)
-        self.window.connect('motion-notify-event', self.show_controls)
-        self.window.connect('button-press-event', self.pause)
-        self.window.connect("scroll-event", self.on_scroll)
-        self.window.connect('destroy', self.quit)
-        
-        img_path = ""
-        possible_paths = [
-            os.path.join(sys.path[0],"images"),
-            os.path.join(sys.path[0], "..", "images"),
-            os.path.join(sys.path[0], "..")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                img_path = p
-                break
-
-        self.window.set_icon_from_file(os.path.join(img_path, "tv.png"))
-        self.main_vbox = Gtk.VBox()
-        
-        self.init_top_hbox()
-
-        self.drawingarea = Gtk.DrawingArea()
-        self.alt_drawingarea_vbox = Gtk.VBox()
-        self.alt_drawingarea_vbox_label = Gtk.Label()
-        self.alt_drawingarea_vbox_label.set_line_wrap_mode(
-            Pango.WrapMode.WORD_CHAR)
-        self.alt_drawingarea_vbox_label.set_ellipsize(
-            Pango.EllipsizeMode.MIDDLE)
-        
-        self.window.add(self.main_vbox)
-        
-        self.main_vbox.pack_start(self.top_hbox, False, True, 0)
-        self.main_vbox.pack_start(self.stack_switcher, False, True, 0)
-        self.main_vbox.pack_start(self.stack, True, True, 1)
-        
-
-        self.alt_drawingarea_vbox.pack_start(
-            self.alt_drawingarea_vbox_label, False, False, 0)
-
-        self.playing_image_sbox = Gtk.ScrolledWindow()
-        self.playing_image_sbox.set_policy(Gtk.PolicyType.AUTOMATIC,
-                                           Gtk.PolicyType.AUTOMATIC)
-
-        self.playing_image = Gtk.Image()
-        self.window.connect("check_resize", self.on_check_resize)
-
-        self.playing_image_sbox.add_with_viewport(self.playing_image)
-        self.alt_drawingarea_vbox.pack_start(
-            self.playing_image_sbox, True, True, 0)
-
-        self.debug_text_view = Gtk.TextView()
-        self.debug_text_buffer = Gtk.TextBuffer()
-        self.debug_scrolled_window = Gtk.ScrolledWindow()
-        self.debug_scrolled_window.add(self.debug_text_view)
-        self.debug_text_view.set_editable(False)
-        self.debug_text_view.set_buffer(self.debug_text_buffer)
-        self.debug_text_view.set_wrap_mode(Gtk.WrapMode.WORD)
-        vbox = Gtk.VBox()
-        vbox.pack_start(self.alt_drawingarea_vbox, True, True, 0)
-        vbox.pack_start(self.drawingarea, True, True, 0)
-        vbox.show_all()
-        self.stack.add_titled(vbox, "Video", "Video")
-        self.stack.add_titled(self.debug_scrolled_window, "Debug", "Debug")
-
-        self.bottom_hbox = Gtk.HBox()
-        self.status_bar = Gtk.Statusbar()
-        
-        # Controls
-        self.init_controls()
-
-        self.bottom_hbox.pack_start(self.prev_btn, False, True, 0)
-        self.bottom_hbox.pack_start(self.pause_btn, False, True, 0)
-        self.bottom_hbox.pack_start(self.next_btn, False, True, 0)
-
-        self.bottom_hbox.pack_start(self.status_bar, False, True, 0)
-        self.main_vbox.pack_start(self.bottom_hbox, False, True, 0)
-        self.push_status("Started")
-        self.window.show_all()
-        self.drawingarea.hide()
-        self.alt_drawingarea_vbox.show()
-        self.alt_drawingarea_vbox_label.hide()
-        try:
-            self.xid = self.drawingarea.get_property('window').get_xid()
-        except AttributeError, e:
-            print "AttributeError:", e
-
     def on_window_resize(self, *args):
         # Player.on_window_resize()
         self.show_video_window()
         self.temp_height = 0
         self.temp_width = 0
         self.on_check_resize()
-
 
     def on_check_resize(self, *args):
         # Player.on_check_resize()
@@ -379,52 +434,10 @@ class Player(GObject.GObject, Log):
             
         # self.image.connect('expose-event', self.on_image_resize, self.window)
 
-    def init_top_hbox(self):
-        # Player.init_top_hbox()
-        self.top_hbox = Gtk.HBox()
-
-        self.file_label = Gtk.Label()
-        self.file_label.set_line_wrap(True)
-        self.file_label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        self.file_label.set_alignment(0, 0)
-        self.file_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
-
-        self.time_label = Gtk.Label()
-        self.time_label.set_line_wrap(True)
-        self.time_label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        self.time_label.set_alignment(1, 0)
-        self.time_label.set_ellipsize(Pango.EllipsizeMode.START)
-        self.top_hbox.pack_start(self.file_label, True, True, 0)
-        self.top_hbox.pack_start(self.time_label, True, True, 0)
-
-
-    def init_controls(self):
-        # Player.init_controls()
-        self.prev_btn = Gtk.Button()
-        prev_img = Gtk.Image.new_from_stock(
-            Gtk.STOCK_MEDIA_PREVIOUS, Gtk.IconSize.BUTTON)
-        self.prev_btn.set_image(prev_img)
-
-        self.pause_btn = Gtk.Button()
-        self.play_img = Gtk.Image.new_from_stock(
-            Gtk.STOCK_MEDIA_PLAY, Gtk.IconSize.BUTTON)
-        self.pause_img = Gtk.Image.new_from_stock(
-            Gtk.STOCK_MEDIA_PAUSE, Gtk.IconSize.BUTTON)
-        
-        self.pause_btn.set_image(self.play_img)
-
-        self.next_btn = Gtk.Button()
-        next_img = Gtk.Image.new_from_stock(
-            Gtk.STOCK_MEDIA_NEXT, Gtk.IconSize.BUTTON)
-        self.next_btn.set_image(next_img)
-
-        self.pause_btn.connect("clicked", self.pause)
-        self.connect('state-changed', self.on_state_changed)
-
     def push_status(self, msg):
         # Player.push_status()
         self.log_debug(".push_status:%s", msg)
-        self.alt_drawingarea_vbox_label.set_text(msg)
+        # self.alt_drawingarea_vbox_label.set_text(msg)
         context_id = self.status_bar.get_context_id(msg)
         self.status_bar.push(context_id, msg)
         msg = "%s %s " % (datetime.now(), msg)
@@ -666,6 +679,9 @@ class Player(GObject.GObject, Log):
             self.playbin.set_property('uri', self.uri)
             self.state = PLAYING
 
+        self.connect('artist-title-changed', self.on_artist_title_changed)
+        self.connect("state-changed", self.on_state_change)
+
     def quit(self, *args, **kwargs):
         # Player.quit()
         Gdk.threads_leave()
@@ -682,7 +698,11 @@ class Player(GObject.GObject, Log):
     @uri.setter
     def uri(self, value):
         # Player.uri()
+        if not value:
+            return
         self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+        self.temp_width = 0
+        self.temp_height = 0
         self.on_check_resize()
         Gdk.threads_leave()
         if value is None:
@@ -705,8 +725,12 @@ class Player(GObject.GObject, Log):
             self.playbin.set_property('uri', self.uri)
             Gdk.threads_leave()
             self.push_status("uri:%s" % urllib.unquote(self.uri))
+            self.artist = ""
+            self.title = ""
+            self.artist_title = urllib.unquote(os.path.basename(self.uri))
             self.emit('uri-changed', self.uri)
-
+            self.emit('artist-title-changed', self.artist_title)
+            self.on_check_resize()
 
     @property
     def state(self):
@@ -748,13 +772,13 @@ class Player(GObject.GObject, Log):
         state = self.state
         Gdk.threads_enter()
         if state in(PAUSED, STOPPED, READY):
-            print "SET IMAGE: PLAY"
+            logger.debug("SET IMAGE: PLAY")
             self.pause_btn.set_image(self.play_img)
         elif state == PLAYING:
-            print "SET IMAGE: PAUSE"
+            logger.debug("SET IMAGE: PAUSE")
             self.pause_btn.set_image(self.pause_img)
         else:
-            print "INVALID STATE"
+            logger.debug("INVALID STATE: %s" % state)
         Gdk.threads_leave()
         self.push_status("state-changed:%s" % self.state_to_string(value))
 
@@ -838,6 +862,20 @@ class Player(GObject.GObject, Log):
 
     def print_tag(self, tag_list, tag_name):
         # Player.print_tag()
+        if tag_name == 'artist':
+            res, artist = tag_list.get_string(tag_name)
+            if res and artist:
+                self.artist = artist
+
+        if tag_name == 'title':
+            res, title = tag_list.get_string(tag_name)
+            if res and title:
+                self.title = title
+
+        if tag_name in ('artist', 'title') and self.artist and self.title:
+            self.artist_title = "%s - %s" % (self.artist, self.title)
+            self.emit('artist-title-changed', self.artist_title)
+
         if tag_name == 'image':
             if os.path.exists(self.filename):
                 media_tags = MediaTags(self.filename)
@@ -856,7 +894,8 @@ class Player(GObject.GObject, Log):
                     self.set_image()
         else:
             try:
-                print "tag_list.get_string(%s):%s" % (tag_name, tag_list.get_string(tag_name))
+                print "tag_list.get_string(%s):%s" % (tag_name, 
+                    tag_list.get_string(tag_name))
             except Exception as e:
                 print "Exception:", e
                 
@@ -883,7 +922,7 @@ class Player(GObject.GObject, Log):
         
 
 class Playlist(Log):
-    __name__ == 'Playilst'
+    __name__ == 'Playlist'
     logger = logger
     def __init__(self, files=[], player=None, index=0):
         self.index = index
@@ -1038,6 +1077,8 @@ class TrayIcon(Log):
         self.init_icon(state)
         self.init_menu(state)
         self.player.connect("state-changed", self.on_state_change)
+        self.player.connect('artist-title-changed', 
+            self.on_artist_title_changed)
 
     def init_icon(self, state="PLAYING"):
         self.ind = Gtk.StatusIcon()
@@ -1049,7 +1090,11 @@ class TrayIcon(Log):
         self.ind.set_title("player.py")
         self.ind.connect("button-press-event", self.on_button_press)
         self.ind.connect("scroll-event", self.player.on_scroll)
+        self.ind.set_tooltip_text(self.player.artist_title)
         
+
+    def on_artist_title_changed(self, player, artist_title):
+        self.ind.set_tooltip_text(artist_title)
         
     def on_state_change(self, player, state):
         self.log_debug('.on_state_change: player:%s  state:%s', player, state)
@@ -1072,8 +1117,16 @@ class TrayIcon(Log):
         if event.button == 1:
             self.menu.popup(None, None, None, None, event.button, event.time)
 
-    def init_menu(self, state):
-        self.menu = Gtk.Menu()
+    def init_menu_next(self):
+        next_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_NEXT, 
+                                            Gtk.IconSize.BUTTON)
+        next_item = Gtk.ImageMenuItem("Next")
+        next_item.set_image(next_img)
+        next_item.connect("activate", self.on_menuitem_clicked)
+        next_item.show()
+        self.menu.append(next_item)
+
+    def init_menu_play(self, state):
         self.play_pause_item = Gtk.ImageMenuItem("Pause")
         if state == 'PLAYING':
             img = self.pause_img
@@ -1083,14 +1136,8 @@ class TrayIcon(Log):
         self.play_pause_item.connect("activate", self.on_menuitem_clicked)
         self.play_pause_item.show()
         self.menu.append(self.play_pause_item)
-        next_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_NEXT, 
-                                            Gtk.IconSize.BUTTON)
-        next_item = Gtk.ImageMenuItem("Next")
-        next_item.set_image(next_img)
-        next_item.connect("activate", self.on_menuitem_clicked)
-        next_item.show()
-        self.menu.append(next_item)
 
+    def init_menu_prev(self):
         prev_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PREVIOUS, 
                                             Gtk.IconSize.BUTTON)
         prev_item = Gtk.ImageMenuItem("Prev")
@@ -1099,6 +1146,7 @@ class TrayIcon(Log):
         prev_item.show()
         self.menu.append(prev_item)
 
+    def init_menu_quit(self):
         quit_item = Gtk.ImageMenuItem("Quit")
         quit_item.connect("activate", self.on_menuitem_clicked)
         img = Gtk.Image.new_from_stock(Gtk.STOCK_QUIT, 
@@ -1106,6 +1154,13 @@ class TrayIcon(Log):
         quit_item.set_image(img)
         quit_item.show()
         self.menu.append(quit_item)
+
+    def init_menu(self, state):
+        self.menu = Gtk.Menu()
+        self.init_menu_play(state)
+        self.init_menu_next()
+        self.init_menu_prev()
+        self.init_menu_quit()
 
     def on_menuitem_clicked(self, item):
         label = item.get_label()

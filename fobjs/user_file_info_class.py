@@ -13,7 +13,7 @@ from copy import deepcopy
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
 
-from misc import format_sql
+from misc import format_sql, jsonize
 import sqlparse
 
 class UserFileInfo(UserFile, Log):
@@ -26,19 +26,31 @@ class UserFileInfo(UserFile, Log):
 
     @property
     def rating(self):
+        self.check_file_info()
         # UserFileInfo.rating
         return self.userFileDbInfo.get('rating', 6)
+
+    def check_file_info(self):
+        if self.userFileDbInfo == {}:
+            self.load_user_file_db_info()
 
     @rating.setter
     def rating(self, value):
         # UserFileInfo.rating
-
-        logger.debug("UserFileInfo.rating user:%(uname)s fid:%(fid)s" % 
-                     kwargs)
+        self.check_file_info()
+        self.log_debug(".rating:%s for uname:%s" % (value, self.uname))
         value = int(value)
         if value > -1 and value < 6 and value != self.rating:
             self.userFileDbInfo['rating'] = value
             self.save()
+        else:
+            self.log_error(".rating:%s for uname:%s out of range." % 
+                           (value, self.uname))
+
+    @property
+    def true_score(self):
+        self.calculate_true_score()
+        return self.userFileDbInfo.get('true_score', -1)
 
     @property
     def percent_played(self):
@@ -47,6 +59,8 @@ class UserFileInfo(UserFile, Log):
 
     @percent_played.setter
     def percent_played(self, value):
+        # UserFileInfo.score
+        self.check_file_info()
         # UserFileInfo.percent_played
         value = float(value)
         if value > 0 and value < 100 and value != self.percent_played:
@@ -63,12 +77,14 @@ class UserFileInfo(UserFile, Log):
 
     @property
     def score(self):
+        self.check_file_info()
         # UserFileInfo.score
         return self.userFileDbInfo.get('score', 5)
 
     @score.setter
     def score(self, value):
         # UserFileInfo.score
+        self.check_file_info()
         value = int(value)
         if value != self.score and value <= 15 and value >= -15:
             self.userFileDbInfo['score'] = value
@@ -96,9 +112,7 @@ class UserFileInfo(UserFile, Log):
     def mark_as_played(self, **sql_args):
         # UserFileInfo.mark_as_played
         self.log_debug('.mark_as_played()')
-        if self.userFileDbInfo == {}:
-            self.load_user_file_db_info()
-
+        self.load_user_file_db_info()
         self.userFileDbInfo['percent_played'] = sql_args.get('percent_played', 0)
         self.userFileDbInfo['ultp'] = self.get_now(**sql_args)
         res = self.save()
@@ -107,8 +121,7 @@ class UserFileInfo(UserFile, Log):
 
     def mark_as_completed(self, **sql_args):
         # UserFileInfo.mark_as_completed
-        if self.userFileDbInfo == {}:
-            self.load_user_file_db_info()
+        self.check_file_info()
         self.userFileDbInfo['percent_played'] = 100
         self.userFileDbInfo['ultp'] = self.get_now(**sql_args)
         self.inc_score()
@@ -129,12 +142,16 @@ class UserFileInfo(UserFile, Log):
                  LIMIT 1"""
         self.userFileDbInfo = get_assoc_dict(sql, sql_args)
 
+    def json(self):
+        self.check_file_info()
+        return jsonize(self.userFileDbInfo)
+
 
 class UserNetcastInfo(UserFileInfo):
     __name__ = 'UserNetcastInfo'
     logger = logger
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(UserNetcastInfo, self).__init__(*args, **kwargs)
         self.netcastInfo = kwargs.get('netcastInfo', {})
         self.episodeInfo = kwargs.get('episodeInfo', {})
@@ -144,25 +161,108 @@ class UserNetcastInfo(UserFileInfo):
     @property
     def nid(self):
         # UserNetcastInfo.nid
-        return self.episodeInfo.get('nid',
-                    self.netcastInfo.get('nid',
-                        self.subscriptionInfo.get('nid',
-                            self.kwargs.get('nid'))))
+        nid = self.netcastInfo.get('nid')
+        if nid:
+            return nid
+
+        nid = self.episodeInfo.get('nid')
+        if nid:
+            return nid
+        
+        nid = self.subscriptionInfo.get('nid')
+        if nid:
+            return nid
+
+        nid = self.kwargs.get('nid')
+        if nid:
+            return nid
+
+        return None
+
+    @property
+    def eid(self):
+        # UserFile.eid
+        eid = None
+        if hasattr(self.parent, 'eid'):
+            eid = self.parent.eid
+        
+        if eid:
+            return eid
+
+        eid = self.episodeInfo.get('eid')
+        if eid:
+            return eid
+        
+        eid = self.subscriptionInfo.get('eid')
+        if eid:
+            return eid
+
+        eid = self.kwargs.get('eid')
+        if eid:
+            return eid
+
+        return None
+
+    @property
+    def true_score(self):
+        return -1
+
+    def load_user_file_db_info(self):
+        # UserNetcastInfo.load_user_file_db_info
+        self.load_episode()
+        self.load_netcast()
+        self.load_subscription()
+        self.load_listened()
+
+        attrs = ('netcastInfo', 'episodeInfo', 'subscriptionInfo',
+                 'listenedInfo', 'userDbInfo')
+        
+        for attr in attrs:
+            data = getattr(self,  attr, {})
+            if data != {}:
+                self.log_debug("updated:%s" % data)
+                self.userFileDbInfo.update(data)
+        self.log_debug("self.userFileDbInfo:%s" % self.userFileDbInfo)
+
+    def load_netcast(self):
+        # UserNetcastInfo.load_netcast
+        nid = self.nid
+        if nid == self.netcastInfo.get('nid'):
+            self.log_debug(".load_netcast nid:%s" % (nid,))
+            return
+        sql = """SELECT * 
+                 FROM netcasts
+                 WHERE nid = %(nid)s
+                 LIMIT 1"""
+        sql_args = {'nid': nid}
+        self.log_debug(".load_netcast sql_args:%s" % (sql_args))
+        self.netcastInfo = get_assoc_dict(sql, sql_args)
 
     def load_episode(self):
         # UserNetcastInfo.load_episode
-        if self.eid == self.episodeInfo.get('eid'):
+        eid = self.eid
+        if eid == self.episodeInfo.get('eid'):
+            self.log_debug(".load_episode eid:%s" % (eid,))
             return
+
         sql = """SELECT *
-                 FROM netcast_episodes ne,
+                 FROM netcast_episodes ne
                  WHERE eid = %(eid)s
                  LIMIT 1"""
         sql_args = {
             'eid': self.eid
         }
+        self.log_debug(".load_episode sql_args:%s" % (sql_args,))
         self.episodeInfo = get_assoc_dict(sql, sql_args)
 
     def load_subscription(self):
+        nid = self.nid
+        uid = self.uid
+        if nid == self.subscriptionInfo.get('nid') and \
+           uid == self.subscriptionInfo.get('uid'):
+            self.log_debug(".load_subscription nid:%s uid:%s" % (nid, uid))
+            return
+
         # UserNetcastInfo.load_subscription
         sql = """SELECT *
                  FROM netcast_subscribers
@@ -170,26 +270,32 @@ class UserNetcastInfo(UserFileInfo):
                        nid = %(nid)s
                  LIMIT 1"""
         sql_args = {
-            'nid': self.nid,
-            'uid': self.uid
+            'nid': nid,
+            'uid': uid
         }
+        self.log_debug(".load_subscription sql_args:%s" % (sql_args,))
         self.subscriptionInfo = get_assoc_dict(sql, sql_args)
 
     def load_listened(self):
         # UserNetcastInfo.load_listened
+        # Always load this one.
         sql = """SELECT *
                  FROM netcast_listend_episodes
                  WHERE uid = %(uid)s AND
-                       nid = %(eid)s"""
+                       eid = %(eid)s
+                 LIMIT 1"""
         sql_args = {
             'eid': self.eid,
             'uid': self.uid
         }
+        self.log_debug(".load_listened sql_args:%s" % (sql_args,))
         self.listenedInfo = get_assoc_dict(sql, sql_args)
+        self.log_debug("/.load_listened: %s" % self.listenedInfo)
 
     @property
     def subscribed(self):
         # UserNetcastInfo.subscribed
+        self.load_subscription()
         return self.subscriptionInfo != {}
 
     @subscribed.setter
@@ -232,17 +338,24 @@ class UserNetcastInfo(UserFileInfo):
         sql_args = {
             'uid': self.uid,
             'eid': self.eid,
-            'percent_played': 0
+            'percent_played': self.percent_played
         }
+        self.log_debug(".listened() value:%s sql_args:%s " % (value, sql_args))
         if value and not listened:
-            sql = """INSERT INTO netcast_listened (eid, uid, percent_played)
-                     VALUES(%(eid)s, %(uid)s, %(percent_played)s)"""
+            sql = """INSERT INTO netcast_listend_episodes 
+                                 (eid, uid, percent_played)
+                     VALUES(%(eid)s, %(uid)s, %(percent_played)s)
+                     RETURNING *"""
+            self.listenedInfo = get_assoc_dict(sql, sql_args)
         elif not value and listened:
-            sql = """DELETE FROM netcast_listened
+            sql = """DELETE FROM netcast_listend_episodes
                      WHERE eid = %(eid)s AND
                            uid = %(uid)s"""
+            query(sql, sql_args)
+            self.load_listened()
 
-        self.listenedInfo = get_assoc_dict(sql, sql_args)
+
+        
 
     @property
     def percent_played(self):
@@ -254,16 +367,10 @@ class UserNetcastInfo(UserFileInfo):
         # UserNetcastInfo.percent_played
         value = float(value)
         if not self.listened:
+            self.listenedInfo['percent_played']  = value
             self.listened = True
         self.listenedInfo['percent_played']  = value
         self.save()
-
-    def load_user_file_db_info(self):
-        # UserNetcastInfo.load_user_file_db_info
-        self.load_netcast()
-        self.load_episode()
-        self.load_subscription()
-        self.load_listened()
 
     def mark_as_played(self, **sql_args):
         # UserNetcastInfo.mark_as_played
@@ -280,12 +387,18 @@ class UserNetcastInfo(UserFileInfo):
 
     def save_listened(self):
         # UserNetcastInfo.save_listened()
-        sql = """UPDATE netcast_listened
+        if self.listenedInfo == {}:
+            self.log_warn(".save_listened can't:%s" % (self.listenedInfo,))
+            return {}
+
+        sql = """UPDATE netcast_listend_episodes
                  SET percent_played = %(percent_played)s
                  WHERE uid = %(uid)s AND eid = %(eid)s
                  RETURNING *"""
 
         self.listenedInfo = get_assoc_dict(sql, self.listenedInfo)
+        return self.listenedInfo
+
 
 
     def save_subscribed(self):
@@ -297,7 +410,7 @@ class UserNetcastInfo(UserFileInfo):
     def save_user_file_info(self):
         # UserNetcastInfo.save_user_file_info
         updated = deepcopy(self.episodeInfo)
-        updated = deepcopy(self.netcastInfo)
+        updated.update(self.netcastInfo)
         updated.update(self.save_listened())
         updated.update(self.subscriptionInfo)
-        return self.updated
+        return updated

@@ -45,12 +45,16 @@ home = os.path.expanduser('~')
 config_dir = os.path.join(home, ".fmp")
 config_file = os.path.join(config_dir, "config")
 cache_dir = os.path.join(config_dir,"cache")
+feed_cache_dir = os.path.join(config_dir,"feed-cache")
 
 if not os.path.isdir(config_dir):
     os.mkdir(config_dir, 0775)
 
 if not os.path.isdir(cache_dir):
     os.mkdir(cache_dir, 0775)
+
+if not os.path.isdir(feed_cache_dir):
+    os.mkdir(feed_cache_dir, 0775)
 
 cfg = cfg_wrapper.ConfigWrapper(config_file, DEFAULTS)
 

@@ -2,12 +2,19 @@ from fobj_class import FObj_Class
 import os
 import sys
 from datetime import datetime, timedelta
+from time import localtime, time, timezone
 from pprint import pprint
 import urllib
+import urllib2
 import feedparser
 import socket
 import pytz
 import subprocess
+from log_class import Log, logging
+import re
+logger = logging.getLogger(__name__)
+
+USER_AGENT = "Family Media Player"
 
 print "IMPORTED netcast_episode_class.py"
 try:
@@ -23,12 +30,15 @@ from misc import _listeners, get_unlistend_episode, get_expired_netcasts
 from episode_downloader import downloader
 from utils import utcnow
 
-class Netcast_Listeners(Listeners):
+class Netcast_Listeners(Listeners, Log):
+    __name__ = 'Netcast_Listeners'
+    logger = logger
     def __init__(self, *args, **kwargs):
         print "Netcast_Listeners.init()"
         self.kwargs = kwargs
         self.listeners = _listeners(kwargs.get('listeners', None))
         self.parent = kwargs.get('parent')
+        super(Netcast_Listeners, self).__init__(*args, **kwargs)
 
     def init_mark_as_played_sql_args(self, sql_args):
         ultp = sql_args.get('ltp', 
@@ -43,8 +53,10 @@ class Netcast_Listeners(Listeners):
         })
 
     def mark_as_played_for_listener(self, **sql_args):
+        self.log_debug(".mark_as_played_for_listener()")
         self.mark_episode_as_played_listened(**sql_args)
         self.update_most_recent(**sql_args)
+        self.log_debug("MADE IT PAST")
 
     def mark_episode_as_played_listened(self, **sql_args):
         sql = """SELECT * 
@@ -72,7 +84,9 @@ class Netcast_Listeners(Listeners):
     def deinc_score(self, **sql_args):
         return {}
 
-class Netcast_FObj(FObj_Class):
+class Netcast_FObj(FObj_Class, Log):
+    __name__ = 'Netcast_FObj'
+    logger = logger
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
@@ -163,7 +177,12 @@ class Netcast_FObj(FObj_Class):
         sql = """SELECT *
                  FROM netcast_episodes
                  WHERE episode_url = %(episode_url)s"""
-        self.dbInfo = get_assoc_dict(sql, {'episode_url': episode_url})
+        dbInfo = get_assoc_dict(sql, {'episode_url': episode_url})
+        if not dbInfo:
+            self.insert()
+
+        self.dbInfo = dbInfo
+            
 
     def get_eid_from_dict(self, _dict):
         eid = _dict.get('eid')
@@ -202,16 +221,17 @@ class Netcast_FObj(FObj_Class):
 
         self.dbInfo['local_file'] = local_file
         self.dbInfo['pub_date'] = self.kwargs.get('pub_date')
-        if not self.insert_new:
-            return
+        
 
-        sql = """INSERT INTO netcast_episodes (episode_title, episode_url
+        sql = """INSERT INTO netcast_episodes (episode_title, episode_url,
                                                nid, local_file, pub_date)
                  VALUES(%(episode_title)s, %(episode_url)s, 
                         %(nid)s, %(local_file)s, %(pub_date)s)
                  RETURNING *"""
-        print "INSERT:", self.dbInfo
+
+        self.log_debug("INSERT:%s" % self.dbInfo)
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
+        self.log_debug("RESULT:%s" % self.dbInfo)
 
     def save(self):
         eid = self.eid
@@ -238,7 +258,7 @@ class Netcast_FObj(FObj_Class):
     def deinc_score(self, **sql_args):
         return {}
 
-class Netcast(object):
+class Netcast(Log):
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
@@ -292,6 +312,11 @@ class Netcast(object):
     def rss_url(self, value):
         if value != self.rss_url:
             self.load_from_rss_url(value)
+    
+    @property
+    def rss_feed_cache_file(self):
+        return os.path.join(config.feed_cache_dir,
+                            safe_filename(self.rss_url))
 
     @property
     def netcast_name(self):
@@ -329,21 +354,50 @@ class Netcast(object):
                  LIMIT 1"""
         self.dbInfo = get_assoc_dict(sql, {"netcast_name": netcast_name})
 
+    def download_feed(self):
+        if os.path.exists(self.rss_feed_cache_file):
+            mtime = os.path.getmtime(self.rss_feed_cache_file)
+            now = time()
+            self.log_debug("now:%s now:%s mtime:%s  mtime:%s" % (
+                now, datetime.fromtimestamp(now), mtime, 
+                datetime.fromtimestamp(mtime)
+            ))
+            if mtime > now - (60 * 30):
+                self.log_debug("USING CACHE")
+                fp = open(self.rss_feed_cache_file, 'r')
+                xml = fp.read()
+                fp.close()
+                return xml
+
+        headers = { 'User-Agent' : USER_AGENT }
+        try:
+            req = urllib2.Request(self.rss_url, headers=headers)
+            response = urllib2.urlopen(req)
+            xml = response.read()
+            fp = open(self.rss_feed_cache_file, 'w')
+            fp.write(xml)
+            fp.close()
+        except Exception, e:
+            print "Exception:", e
+        return ""
+
     def refresh_feed(self):
-        if self.too_soon_to_refresh:
-            print "too_soon_to_refresh:", self.too_soon_to_refresh
-            return
+        #if self.too_soon_to_refresh:
+        #   print "too_soon_to_refresh:", self.too_soon_to_refresh
+        #   return
         print "Netcast dbInfo:", self.dbInfo
         socket.setdefaulttimeout(30)
         print "refreshing:", self.rss_url
+
         try:
-            feed = feedparser.parse(self.rss_url)
+            feed = feedparser.parse(self.download_feed())
         except socket.error, msg:
             self.set_update_for_near_future()
             self.emit('update-error', msg)
             return
         title = feed.get('feed',{}).get('title',  "")
         if not title:
+            self.log_debug("NO TITLE")
             self.set_update_for_near_future()
             return
 
@@ -431,7 +485,8 @@ class Netcast(object):
 
 
 def refresh_and_download_all_netcasts():
-    print "refresh_and_download_all_netcasts"
+    logger.debug("REFRESHING AND DOWNLOADING ALL NETCASTS")
+    
     sql = """SELECT * 
              FROM netcasts"""
     netcasts = get_results_assoc_dict(sql)
@@ -440,11 +495,18 @@ def refresh_and_download_all_netcasts():
         obj.refresh_feed_and_download_episodes()
 
 def refresh_and_download_expired_netcasts():
-    print "refresh_and_download_expired_netcasts"
+    # wait()
+    logger.debug("REFRESHING AND DOWNLOADING EXPIRED NETCASTS")
     netcasts = get_expired_netcasts()
     for n in netcasts:
+        # wait()
         obj = Netcast(**n)
         obj.refresh_feed_and_download_episodes()
+
+def safe_filename(filename):
+    if not filename:
+        return ""
+    return re.sub('(\W+)', "-", filename)
 
 if __name__ == "__main__":
     from time import sleep

@@ -75,7 +75,7 @@ class Local_FObj(FObj_Class):
 
     def load_from_fid(self, fid):
         if not fid:
-            return fid
+            return {}
         sql = """SELECT *
                  FROM files
                  WHERE fid = %(fid)s"""
@@ -102,7 +102,11 @@ class Local_FObj(FObj_Class):
         self.dbInfo['ltp'] = kwargs.get('ltp', 
                                 kwargs.get('now', utcnow())
                              )
-        self.save()
+        fid = self.fid
+        if fid:
+            self.load_from_fid(fid)
+        else:
+            self.save()
         kwargs.update(self.dbInfo)
         kwargs.update({'reason': self.reason})
         self.listeners.mark_as_played(**kwargs)
@@ -117,9 +121,6 @@ class Local_FObj(FObj_Class):
 
     def dict(self):
         return self.dbInfo
-
-    def json(self):
-        return json.dumps(self.dbInfo)
 
 if __name__ == "__main__":
     files = get_results_assoc_dict("""SELECT * FROM files LIMIT 100""")

@@ -1,6 +1,10 @@
 
 import os
 from urllib import quote
+from copy import deepcopy
+from datetime import datetime, date
+from time import time
+from misc import jsonize
 
 class FObj_Class(object):
     def __init__(self, *args, **kwargs):
@@ -40,5 +44,12 @@ class FObj_Class(object):
         if self.exists:
             return os.path.getmtime(self.filename)
         return -1
+
+    def json(self):
+        dbInfo = jsonize(self.dbInfo)
+        if hasattr(self, 'listeners'):
+            dbInfo['Listeners'] = self.listeners.json()
+        return dbInfo
+
 
 

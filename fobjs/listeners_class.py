@@ -7,7 +7,7 @@ except:
 
 from user_file_info_class import UserFileInfo, UserNetcastInfo
 from utils import utcnow
-from misc import _listeners
+from misc import _listeners, jsonize
 
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
@@ -20,8 +20,13 @@ class Listeners(Log):
         super(Listeners, self).__init__(*args, **kwargs)
         self.listeners = _listeners(kwargs.get('listeners', None))
         self.parent = kwargs.get('parent')
+        self.load_user_file_info(**self.kwargs)
+
+    def load_user_file_info(self, **kwargs):
         self.user_file_info = []
-        
+        if kwargs == {}:
+            kwargs = self.kwargs
+
         if kwargs.get('fid'):
             for l in self.listeners:
                 kwargs.update(l)
@@ -47,9 +52,15 @@ class Listeners(Log):
         })
 
     def mark_as_played(self, **sql_args):
-        self.log_debug(".mark_as_played")
+        self.log_debug(".mark_as_played()")
         self.init_mark_as_played_sql_args(sql_args)
+        self.log_debug("self.user_file_info:%s" % self.user_file_info)
+        if not self.user_file_info:
+            self.log_debug("RELOADING")
+            self.load_user_file_info(**sql_args)
+
         for user_file_info in self.user_file_info:
+            
             user_file_info.mark_as_played(**sql_args)
         return
 
@@ -66,3 +77,18 @@ class Listeners(Log):
     def deinc_score(self, **sql_args):
         for user_file_info in self.user_file_info:
             user_file_info.deinc_score(**sql_args)
+
+    def json(self):
+        user_file_infos = []
+        for ufi in self.user_file_info:
+            user_file_infos.append(ufi.json())
+        listeners = []
+        for listener in self.listeners:
+            listeners.append(jsonize(listener))
+        
+        dbInfo = {
+            'listeners': listeners,
+            'user_file_info': user_file_infos
+        }
+        dbInfo = jsonize(dbInfo)
+        return dbInfo

@@ -32,7 +32,7 @@ from ws4py.websocket import WebSocket
 from ws4py.messaging import TextMessage, BinaryMessage
 import json
 
-preload = []
+from time import time
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -92,14 +92,17 @@ class FmpServer(object):
         cherrypy.log("Handler created: %s" % repr(cherrypy.request.ws_handler))
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
     def satellite(self):
-        preload_list = []
-        for p in preload:
-            preload_list.append(p.json())
+        start = time()
         response = {
-            'preload': preload_list
+            'preload': preload.json(),
+            'utcnow:': utcnow().isoformat()
         }
-        return json.dumps(response)
+        gen_time = time() - start
+        cherrypy.log("gen_time: %s", str(gen_time))
+        response['gen_time'] = "%s" % gen_time
+        return response
 
 
 
