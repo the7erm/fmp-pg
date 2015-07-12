@@ -18,6 +18,12 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+import os
+import sys
+
+from setproctitle import setproctitle
+setproctitle(os.path.basename(sys.argv[0]))
+
 import threading
 Thread = threading.Thread
 from player1 import *
@@ -33,7 +39,7 @@ from time import sleep
 from config import cfg
 from copy import deepcopy
 import cherry_py_server.server as server
-import sys
+
 from time import time
 server.wait = wait
 
@@ -92,6 +98,21 @@ class UserFileInfoTreeview():
             {'score': Gtk.TreeViewColumn('Score')},
             {'true_score': Gtk.TreeViewColumn('True Score')}
         ]
+        self.treeview_column_labels = {
+            'uname': Gtk.Label(),
+            'rating': Gtk.Label(),
+            'score': Gtk.Label(),
+            'true_score': Gtk.Label()
+        }
+        self.treeview_column_labels['uname'].set_markup(TOP_SPAN % "User")
+        self.treeview_column_labels['rating'].set_markup(TOP_SPAN % "Rating")
+        self.treeview_column_labels['score'].set_markup(TOP_SPAN % "Score")
+        self.treeview_column_labels['true_score'].set_markup(
+            TOP_SPAN % "True Score")
+        for item in self.treeview_columns:
+            for k, col in item.items():
+                col.set_widget(self.treeview_column_labels[k])
+                self.treeview_column_labels[k].show()
 
     def col_idx(self, key):
         return self.store_col_indexes[key]
@@ -99,6 +120,8 @@ class UserFileInfoTreeview():
     def cell_text(self, editable=False):
         cell = Gtk.CellRendererText()
         cell.set_property("editable", editable)
+        font = Pango.FontDescription('FreeSans bold 15')
+        cell.set_property('font-desc', font)
         return cell
 
     def init_cells(self):
@@ -120,6 +143,8 @@ class UserFileInfoTreeview():
         self.rating_combo.set_property("text-column", 0)
         self.rating_combo.set_property("has-entry", False)
         self.rating_combo.connect("edited", self.on_rating_combo_change)
+        font = Pango.FontDescription('FreeSans bold 15')
+        self.rating_combo.set_property('font-desc', font)
         return self.rating_combo
 
     def on_rating_combo_change(self, cell, path, text):
@@ -224,6 +249,11 @@ class FmpPlayer(Player):
     __name__ = 'FmpPlayer'
     def __init__(self, *args, **kwargs):
         super(FmpPlayer, self).__init__(*args, **kwargs)
+        self.window.set_title("Family Media Player")
+
+    def init_window_image(self):
+        img_path = self.get_img_path()
+        self.window.set_icon_from_file(os.path.join(img_path, "fmp-logo.svg"))
 
 class FmpPlaylist(Playlist):
     __name__ = 'FmpPlaylist'
@@ -262,9 +292,12 @@ class FmpPlaylist(Playlist):
             return
         else:
             filename = self.files[self.index].filename
+        print "fid:", self.files[self.index].fid
+        print "eid:", self.files[self.index].eid
         print "filename:", filename
-        self.player.uri = self.files[self.index].filename
-        self.update_treeview()
+        if filename:
+            self.player.uri = self.files[self.index].filename
+            self.update_treeview()
 
     def init_connections(self):
         self.player.connect('time-status', self.mark_as_played)

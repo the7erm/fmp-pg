@@ -163,9 +163,9 @@
        y2="979.66833" />
     <filter
        id="filter3262"
-       inkscape:menu-tooltip="Draws a black outline around"
+       inkscape:menu-tooltip="Small-scale roughening to edges and content"
        inkscape:menu="ABCs"
-       inkscape:label="Black outline"
+       inkscape:label="Roughen"
        color-interpolation-filters="sRGB">
       <feGaussianBlur
          id="feGaussianBlur3264"
@@ -186,7 +186,27 @@
          k2="1"
          operator="in"
          in="result3"
-         result="result4" />
+         result="fbSourceGraphic" />
+      <feColorMatrix
+         result="fbSourceGraphicAlpha"
+         in="fbSourceGraphic"
+         values="0 0 0 -1 0 0 0 0 -1 0 0 0 0 -1 0 0 0 0 1 0"
+         id="feColorMatrix3270" />
+      <feTurbulence
+         id="feTurbulence3272"
+         numOctaves="3"
+         seed="0"
+         type="turbulence"
+         baseFrequency="0.04"
+         result="result91"
+         in="fbSourceGraphic" />
+      <feDisplacementMap
+         id="feDisplacementMap3274"
+         in2="result91"
+         scale="6.6"
+         yChannelSelector="G"
+         xChannelSelector="R"
+         in="fbSourceGraphic" />
     </filter>
   </defs>
   <sodipodi:namedview
@@ -196,9 +216,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.8"
-     inkscape:cx="92.849301"
-     inkscape:cy="82.051765"
+     inkscape:zoom="1.4"
+     inkscape:cx="96.642686"
+     inkscape:cy="70.226649"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -217,7 +237,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>

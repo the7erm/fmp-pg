@@ -469,12 +469,18 @@ class Netcast(Log):
     def download_unlistened_netcasts(self):
         unlistened_episodes = self.get_unlistened_episodes()
         for e in unlistened_episodes:
+            if not e.get('local_file'):
+                print "NO LOCAL FILE:", e
+                continue
             if not os.path.exists(e['local_file']):
                 print "******"
                 print "not exists: e['local_file']:", e['local_file']
                 # downloader.append(e['episode_url'], e['local_file'])
-                subprocess.Popen(['wget', '-c', e['episode_url'], '-O', 
-                                  e['local_file']])
+                args = ['wget', '-c', e['episode_url'], '-O', 
+                         e['local_file']]
+
+                p = subprocess.Popen(args)
+                p.wait()
 
     def save(self):
         sql = """UPDATE netcasts
@@ -511,6 +517,3 @@ def safe_filename(filename):
 if __name__ == "__main__":
     from time import sleep
     refresh_and_download_all_netcasts()
-    while True:
-        print "SLEEP"
-        sleep(1)

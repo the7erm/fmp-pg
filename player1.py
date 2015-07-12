@@ -97,6 +97,8 @@ def threads_leave(*args):
     if debug_threads:
         print "LEAVE " + " ".join(map(str, args))
 
+TOP_SPAN = '<span foreground="black" size="x-large"><b>%s</b></span>'
+PACK_PADDING = 3
 
 class PlayerError(Exception):
     def __init__(self, value):
@@ -175,16 +177,7 @@ class Player(GObject.GObject, Log):
         self.drawingarea.hide()
 
     def init_window_image(self):
-        img_path = ""
-        possible_paths = [
-            os.path.join(sys.path[0],"images"),
-            os.path.join(sys.path[0], "..", "images"),
-            os.path.join(sys.path[0], "..")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                img_path = p
-                break
+        img_path = self.get_img_path()
 
         self.window.set_icon_from_file(os.path.join(img_path, "tv.png"))
 
@@ -203,9 +196,9 @@ class Player(GObject.GObject, Log):
         self.time_label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self.time_label.set_alignment(1, 0)
         self.time_label.set_ellipsize(Pango.EllipsizeMode.START)
-        self.top_hbox.pack_start(self.file_label, True, True, 0)
-        self.top_hbox.pack_start(self.time_label, False, True, 0)
-        self.main_vbox.pack_start(self.top_hbox, False, True, 0)
+        self.top_hbox.pack_start(self.file_label, True, True, PACK_PADDING)
+        self.top_hbox.pack_start(self.time_label, False, True, PACK_PADDING)
+        self.main_vbox.pack_start(self.top_hbox, False, True, PACK_PADDING)
 
     def init_stack(self):
         self.stack = Gtk.Stack()
@@ -213,8 +206,9 @@ class Player(GObject.GObject, Log):
             Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         self.stack_switcher = Gtk.StackSwitcher()
         self.stack_switcher.set_stack(self.stack)
-        self.main_vbox.pack_start(self.stack_switcher, False, True, 0)
-        self.main_vbox.pack_start(self.stack, True, True, 1)
+        self.main_vbox.pack_start(self.stack_switcher, False, True,
+                                  PACK_PADDING)
+        self.main_vbox.pack_start(self.stack, True, True, PACK_PADDING)
 
     def init_drawing_area(self):
         self.drawingarea = Gtk.DrawingArea()
@@ -222,8 +216,9 @@ class Player(GObject.GObject, Log):
 
         self.video_area_vbox = Gtk.VBox()
         self.video_area_vbox.pack_start(
-            self.alt_drawingarea_vbox, True, True, 0)
-        self.video_area_vbox.pack_start(self.drawingarea, True, True, 0)
+            self.alt_drawingarea_vbox, True, True, PACK_PADDING)
+        self.video_area_vbox.pack_start(self.drawingarea, True, True, 
+                                        PACK_PADDING)
         self.video_area_vbox.show_all()
         self.stack.add_titled(self.video_area_vbox, "Video", "Video")
 
@@ -239,7 +234,7 @@ class Player(GObject.GObject, Log):
         self.playing_image = Gtk.Image()
         self.playing_image_sbox.add_with_viewport(self.playing_image)
         self.alt_drawingarea_vbox.pack_start(
-            self.playing_image_sbox, True, True, 0)
+            self.playing_image_sbox, True, True, PACK_PADDING)
 
     def init_debug_window(self):
         self.debug_text_view = Gtk.TextView()
@@ -258,12 +253,12 @@ class Player(GObject.GObject, Log):
         
         self.bottom_hbox = Gtk.HBox()
         self.status_bar = Gtk.Statusbar()
-        self.bottom_hbox.pack_start(self.prev_btn, False, True, 0)
-        self.bottom_hbox.pack_start(self.pause_btn, False, True, 0)
-        self.bottom_hbox.pack_start(self.next_btn, False, True, 0)
+        self.bottom_hbox.pack_start(self.prev_btn, False, True, PACK_PADDING)
+        self.bottom_hbox.pack_start(self.pause_btn, False, True, PACK_PADDING)
+        self.bottom_hbox.pack_start(self.next_btn, False, True, PACK_PADDING)
 
-        self.bottom_hbox.pack_start(self.status_bar, False, True, 0)
-        self.main_vbox.pack_start(self.bottom_hbox, False, True, 0)
+        self.bottom_hbox.pack_start(self.status_bar, False, True, PACK_PADDING)
+        self.main_vbox.pack_start(self.bottom_hbox, False, True, PACK_PADDING)
         self.push_status("Started")
 
     def init_controls(self):
@@ -304,7 +299,8 @@ class Player(GObject.GObject, Log):
             print "AttributeError:", e
 
     def on_artist_title_changed(self, player, artist_title):
-        self.file_label.set_text(artist_title)
+        # self.file_label.set_text(artist_title)
+        self.file_label.set_markup(TOP_SPAN % self.escape(artist_title))
 
     def on_state_change(self, player, state):
         # Player.on_state_change()
@@ -347,6 +343,9 @@ class Player(GObject.GObject, Log):
         # print "self.state_string:",self.state_string
         return obj
 
+    def escape(self, string):
+        return string.replace("<", '&lt;').replace(">","&gt;")
+
     def time_status(self):
         # Player.time_status()
         Gdk.threads_leave()
@@ -366,7 +365,9 @@ class Player(GObject.GObject, Log):
                 obj['duration_str']
             );
             Gdk.threads_enter()
-            self.time_label.set_text(obj['str'])
+            
+            self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
+
             Gdk.threads_leave()
             # print "time status obj:", obj
             obj['now'] = utcnow()
@@ -409,7 +410,7 @@ class Player(GObject.GObject, Log):
 
     def resizeImage(self, allocation_width, allocation_height, force=False):
         # Player.resizeImage()
-        allocation_height = allocation_height - 40
+        # allocation_height = allocation_height - 40
         if self.temp_height != allocation_height or self.temp_width != allocation_width or force:
             pb_width = self.pixbuf.get_width()
             pb_height = self.pixbuf.get_height()
@@ -695,12 +696,29 @@ class Player(GObject.GObject, Log):
         # Player.uri()
         return self.uri_path
 
+    def get_img_path(self):
+        img_path = ""
+        possible_paths = [
+            os.path.join(sys.path[0],"static"),
+            os.path.join(sys.path[0], "..", "static"),
+            os.path.join(sys.path[0], "..")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                img_path = p
+                break
+        return img_path
+
     @uri.setter
     def uri(self, value):
         # Player.uri()
         if not value:
             return
-        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+        
+        img_path = self.get_img_path()
+        svg_path = os.path.join(img_path, "fmp-logo.svg")
+        self.pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+            svg_path, 800, 600, preserve_aspect_ratio=True)
         self.temp_width = 0
         self.temp_height = 0
         self.on_check_resize()
