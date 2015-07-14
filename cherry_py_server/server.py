@@ -97,7 +97,8 @@ class FmpServer(object):
         start = time()
         response = {
             'preload': preload.json(),
-            'utcnow:': utcnow().isoformat()
+            'utcnow:': utcnow().isoformat(),
+            'playlist': playlist.json()
         }
         gen_time = time() - start
         cherrypy.log("gen_time: %s", str(gen_time))

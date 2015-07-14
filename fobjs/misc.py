@@ -81,6 +81,13 @@ def time_to_cue_netcast(listeners=None):
     logger.debug("TIME TO CUE NETCAST:%s", cue)
     return cue
 
+def get_users():
+    sql = """SELECT uid, uname, listening, admin
+             FROM users
+             ORDER BY admin DESC, uname"""
+
+    return get_results_assoc_dict(sql)
+
 def get_listeners():
     sql = """SELECT uid, uname, listening, admin
              FROM users
@@ -149,29 +156,41 @@ def get_uids(listeners=None):
         uids.append(str(int(listener['uid'])))
     return uids
 
-def get_unlistend_episode(listeners=None):
+def get_unlistend_episode(listeners=None, limit=1):
     logger.debug("GET_unlistend_episode")
     listeners = _listeners(listeners)
     uids = get_uids(listeners)
+    limit = int(limit)
 
     if not uids:
         return None
 
-    sql = """SELECT *
+    sql = """SELECT ne.*, n.*
              FROM netcast_episodes ne 
                   LEFT JOIN netcast_listend_episodes nle ON 
                             nle.eid = ne.eid,
-                  netcast_subscribers ns
+                  netcast_subscribers ns,
+                  netcasts n
              WHERE ns.uid IN ({uids}) AND
                    ne.nid = ns.nid AND
-                   nle.uid IS NULL
+                   nle.uid IS NULL AND
+                   n.nid = ne.nid
              ORDER BY ne.pub_date DESC
-             LIMIT 1""".format(uids=",".join(uids))
-    res = get_assoc_dict(sql)
-    if res != {}:
-        from netcast_episode_class import Netcast_FObj
-        return Netcast_FObj(**res)
-    return None
+             LIMIT {limit}""".format(uids=",".join(uids), limit=limit)
+
+    from netcast_episode_class import Netcast_FObj
+    if limit == 1:
+        res = get_assoc_dict(sql)
+        if res != {}:
+            return Netcast_FObj(**res)
+        return None
+
+    res = get_results_assoc_dict(sql)
+    results = []
+    for r in res:
+        results.append(Netcast_FObj(**r))
+    return results
+    
 
 def get_expired_netcasts():
     sql = """SELECT * 
@@ -254,6 +273,8 @@ JSON_WHITE_LIST = [
     'netcast_name',
     'nid',
     'percent_played',
+    'plid',
+    'preload',
     'rating',
     'reason',
     'score',
@@ -279,6 +300,8 @@ def jsonize(dbInfo):
             continue
         if isinstance(item, (datetime, date)):
             dbInfo[key] = item.isoformat()
+        #if isinstance(dbInfo[key], dict):
+        #    dbInfo[key] = jsonize(dbInfo[key])
     for key in remove_keys:
         del dbInfo[key]
     return dbInfo

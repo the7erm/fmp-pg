@@ -255,6 +255,17 @@ class FmpPlayer(Player):
         img_path = self.get_img_path()
         self.window.set_icon_from_file(os.path.join(img_path, "fmp-logo.svg"))
 
+    def json(self):
+        res = {
+            'artist_title': self.artist_title,
+            'artist': self.artist,
+            'title': self.title,
+            'uri': self.uri,
+            'last_time_status': self.last_time_status
+        }
+        print "PLAYER:", res
+        return res
+
 class FmpPlaylist(Playlist):
     __name__ = 'FmpPlaylist'
     def __init__(self, *args, **kwargs):
@@ -392,6 +403,26 @@ class FmpPlaylist(Playlist):
         except AttributeError:
             sys.exit()
         self.inc_index()
+
+    def json(self):
+        files = []
+        for file_obj in self.files:
+            files.append(file_obj.json())
+        
+        # TODO add config variable
+        unlistened_episodes = get_unlistend_episode(limit=10)
+        netcasts = []
+        for n in unlistened_episodes:
+            netcasts.append(n.json())
+
+        return {
+            'index': self.index,
+            'player': self.player.json(),
+            'player_playing': self.files[self.index].json(),
+            'files': files,
+            'netcasts': netcasts,
+            'users': get_users()
+        }
 
 def refresh_netcasts_once():
     refresh_netcasts()

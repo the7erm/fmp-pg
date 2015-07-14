@@ -20,8 +20,12 @@ class UserFileInfo(UserFile, Log):
     __name__ = 'UserFileInfo'
     logger = logger
     def __init__(self, *args, **kwargs):
+        if 'eid' not in kwargs:
+            kwargs['eid'] = None
+        if 'fid'  not in kwargs:
+            kwargs['fid'] = None
         super(UserFileInfo, self).__init__(*args, **kwargs)
-        self.log_debug(".__init__() user:%(uname)s fid:%(fid)s" % 
+        self.log_debug(".__init__() user:%(uname)s fid:%(fid)s eid:%(eid)s" % 
                      kwargs)
 
     @property

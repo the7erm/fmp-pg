@@ -65,7 +65,6 @@ class Preload(Log):
     def json(self):
         results = []
         for obj in self.preload:
-            wait()
             results.append(obj.json())
         # self.log_debug("preload:%s", results)
         return results

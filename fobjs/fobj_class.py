@@ -8,6 +8,7 @@ from misc import jsonize
 
 class FObj_Class(object):
     def __init__(self, *args, **kwargs):
+        self.kwargs = kwargs
         self.filename = kwargs.get('filename', "")
         self.percent_played = kwargs.get("percent_played", -1)
         if self.percent_played is None:
@@ -49,7 +50,13 @@ class FObj_Class(object):
         dbInfo = jsonize(self.dbInfo)
         if hasattr(self, 'listeners'):
             dbInfo['Listeners'] = self.listeners.json()
+        if 'plid' in self.kwargs:
+            dbInfo['preloadInfo'] = jsonize(self.kwargs)
+        elif 'nid' in self.kwargs and 'eid' in self.kwargs and \
+            self.kwargs.get('eid'):
+                dbInfo['netcastInfo'] = jsonize(self.kwargs)
+        elif 'fid' in self.kwargs and self.kwargs.get('fid'):
+            dbInfo['fileInfo'] = jsonize(self.kwargs)
+        else:
+            dbInfo['kwargs'] = jsonize(self.kwargs)
         return dbInfo
-
-
-
