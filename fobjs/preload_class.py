@@ -6,8 +6,9 @@ except:
     path.append("../")
     from db.db import *
 
+from time import time
 from utils import utcnow
-from misc import _listeners
+from misc import _listeners, get_users
 
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
@@ -28,11 +29,13 @@ class Preload(Log):
     def refresh(self, *args, **kwargs):
         if self.refresh_lock:
             return True
+        refresh_start = time()
+        users = get_users()
         self.refresh_lock = True
         self.log_debug(".refresh")
         sql = """SELECT *
-             FROM preload
-             ORDER BY plid, uid"""
+                 FROM preload
+                 ORDER BY plid, uid"""
         results = get_results_assoc_dict(sql)
         self.plids = []
         seen_plids = []
@@ -44,6 +47,7 @@ class Preload(Log):
             if r['plid'] in self.plids:
                 continue
             self.plids.append(r['plid'])
+            r['listeners'] = users
             fobj = get_fobj(**r)
             if fobj:
                 self.preload.append(fobj)
@@ -59,6 +63,7 @@ class Preload(Log):
         for fobj in to_remove:
             self.preload.remove(fobj)
         self.refresh_lock = True
+        self.log_debug(".refresh - running_time:%s" % (time() - refresh_start))
         return True
 
 

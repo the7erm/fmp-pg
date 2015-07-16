@@ -153,7 +153,7 @@ def populate_pick_from(listeners=None):
     remove_rated_zero(listeners)
     remove_recently_played(listeners)
     remove_preload_from_pick_from(listeners)
-    
+    remove_disabled_genres_from_pick_from()
 
 def clear_pick_from():
     sql = """TRUNCATE pick_from"""
@@ -255,6 +255,15 @@ def totals_in_preload():
 
 def clear_preload():
     sql = """TRUNCATE preload"""
+    query(sql)
+
+def remove_disabled_genres_from_pick_from():
+    sql = """DELETE FROM pick_from 
+             WHERE fid IN (
+                SELECT fid 
+                FROM genres g, file_genres fg 
+                WHERE enabled = false AND fg.gid = g.gid
+             )"""
     query(sql)
 
 true_scores = make_true_scores_list()

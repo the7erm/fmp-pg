@@ -139,9 +139,10 @@ class UserFileInfo(UserFile, Log):
             'uid': self.uid,
             'fid': self.fid
         }
-        sql = """SELECT *
-                 FROM user_song_info
-                 WHERE uid = %(uid)s AND
+        sql = """SELECT usi.*, u.uname
+                 FROM user_song_info usi, users u
+                 WHERE usi.uid = %(uid)s AND
+                       u.uid = usi.uid AND
                        fid = %(fid)s
                  LIMIT 1"""
         self.userFileDbInfo = get_assoc_dict(sql, sql_args)

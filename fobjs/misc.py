@@ -272,6 +272,7 @@ JSON_WHITE_LIST = [
     'ltp',
     'netcast_name',
     'nid',
+    'non_listeners',
     'percent_played',
     'plid',
     'preload',
@@ -292,6 +293,11 @@ JSON_WHITE_LIST = [
 
 
 def jsonize(dbInfo):
+    if isinstance(dbInfo, list):
+        result = []
+        for item in dbInfo:
+            result.append(jsonize(item))
+        return result
     dbInfo = deepcopy(dbInfo)
     remove_keys = []
     for key, item in dbInfo.iteritems():

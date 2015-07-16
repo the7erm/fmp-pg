@@ -98,6 +98,7 @@ class UserFileInfoTreeview():
             {'score': Gtk.TreeViewColumn('Score')},
             {'true_score': Gtk.TreeViewColumn('True Score')}
         ]
+
         self.treeview_column_labels = {
             'uname': Gtk.Label(),
             'rating': Gtk.Label(),
@@ -111,8 +112,13 @@ class UserFileInfoTreeview():
             TOP_SPAN % "True Score")
         for item in self.treeview_columns:
             for k, col in item.items():
-                col.set_widget(self.treeview_column_labels[k])
-                self.treeview_column_labels[k].show()
+                label = self.treeview_column_labels[k]
+                label.set_ellipsize(Pango.EllipsizeMode.END)
+                label.show()
+                col.set_widget(label)
+                col.set_property('resizable', True)
+                col.set_property('expand', True)
+                # col.set_property('sizing', Gtk.TreeViewColumnSizing.AUTOSIZE )
 
     def col_idx(self, key):
         return self.store_col_indexes[key]
@@ -122,6 +128,8 @@ class UserFileInfoTreeview():
         cell.set_property("editable", editable)
         font = Pango.FontDescription('FreeSans bold 15')
         cell.set_property('font-desc', font)
+        cell.set_property('ellipsize-set', True)
+        cell.set_property('ellipsize', Pango.EllipsizeMode.MIDDLE)
         return cell
 
     def init_cells(self):
@@ -268,6 +276,8 @@ class FmpPlayer(Player):
 
 class FmpPlaylist(Playlist):
     __name__ = 'FmpPlaylist'
+    logger = logger
+
     def __init__(self, *args, **kwargs):
         kwargs['player'] = FmpPlayer()
         self.user_file_info_treeview = UserFileInfoTreeview(self)
@@ -287,7 +297,6 @@ class FmpPlaylist(Playlist):
         self.user_file_info_treeview.update(self)
         return True
 
-    logger = logger
     def set_player_uri(self):
         try:
             print "self.index:",self.index
@@ -330,10 +339,10 @@ class FmpPlaylist(Playlist):
             # The file was seeked.  Force a mark_as_played
             self.last_marked_as_played = 0
 
-        self.log_debug("drifted:%s seconds" % drifted)
+        # self.log_debug("drifted:%s seconds" % drifted)
         self.last_position = position
         if self.last_marked_as_played > now - 5:
-            self.log_debug("!.mark_as_played()")
+            # self.log_debug("!.mark_as_played()")
             return
         self.last_marked_as_played = now
         try:

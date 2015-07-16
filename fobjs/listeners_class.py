@@ -7,10 +7,12 @@ except:
 
 from user_file_info_class import UserFileInfo, UserNetcastInfo
 from utils import utcnow
-from misc import _listeners, jsonize
+from misc import _listeners, jsonize, get_users
 
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
+
+users = get_users()
 
 class Listeners(Log):
     __name__ = 'Listeners'
@@ -24,20 +26,21 @@ class Listeners(Log):
 
     def load_user_file_info(self, **kwargs):
         self.user_file_info = []
+        self.non_listening_user_file_info = []
         if kwargs == {}:
             kwargs = self.kwargs
 
-        if kwargs.get('fid'):
-            for l in self.listeners:
-                kwargs.update(l)
-                kwargs['userDbInfo'] = l
-                self.user_file_info.append(UserFileInfo(**kwargs))
-
+        ufi_class = UserFileInfo
         if kwargs.get('eid'):
-            for l in self.listeners:
-                kwargs.update(l)
-                kwargs['userDbInfo'] = l
-                self.user_file_info.append(UserNetcastInfo(**kwargs))
+            ufi_class = UserNetcastInfo
+
+        for l in users:
+            kwargs.update(l)
+            kwargs['userDbInfo'] = l
+            if l.get('listening'):
+                self.user_file_info.append(ufi_class(**kwargs))
+            else:
+                self.non_listening_user_file_info.append(ufi_class(**kwargs))
 
     def init_mark_as_played_sql_args(self, sql_args):
         ultp = sql_args.get('ltp', 
@@ -80,15 +83,16 @@ class Listeners(Log):
 
     def json(self):
         user_file_infos = []
+        non_listeners_ufi = []
         for ufi in self.user_file_info:
             user_file_infos.append(ufi.json())
-        listeners = []
-        for listener in self.listeners:
-            listeners.append(jsonize(listener))
+
+        for ufi in self.non_listening_user_file_info:
+            non_listeners_ufi.append(ufi.json())
         
         dbInfo = {
-            'listeners': listeners,
-            'user_file_info': user_file_infos
+            'listeners': user_file_infos,
+            'non_listeners': non_listeners_ufi
         }
         dbInfo = jsonize(dbInfo)
         return dbInfo

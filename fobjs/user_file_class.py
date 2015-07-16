@@ -155,10 +155,11 @@ class UserFile(Log):
 
         fid_query, eid_query = self.get_history_query(**sql_args)
         
-        sql = """SELECT * 
+        sql = """SELECT uh.*, uname 
                  FROM
-                 user_history
-                 WHERE uid = %(uid)s AND
+                 user_history uh, users u
+                 WHERE uh.uid = %(uid)s AND
+                       u.uid = uh.uid AND
                        {fid_query} AND
                        {eid_query}
                  ORDER BY time_played DESC""".format(fid_query=fid_query,
@@ -183,8 +184,7 @@ class UserFile(Log):
         self.most_recent_expire = utcnow() + timedelta(minutes=1)
         most_recent_item = None
         if not self.history:
-            self.most_recent = UserHistoryItem(parent=self.parent,
-                **self.kwargs)
+            self.most_recent = UserHistoryItem(**self.kwargs)
             # Put it at the top of the list.
             self.userHistoryItems.insert(0, self.most_recent)
             return self.most_recent
@@ -303,9 +303,11 @@ class UserHistoryItem(UserFile):
         self.load_from_uhid(value)
 
     def load_from_uhid(self, uhid):
-        sql = """SELECT *
-                 FROM user_history
-                 WHERE uhid = %(uhid)s"""
+        sql = """SELECT uh.*, uname
+                 FROM user_history uh,
+                      users u
+                 WHERE uhid = %(uhid)s AND
+                       u.uid = uh.uid"""
         sql_args = {
             'uhid': uhid
         }
@@ -375,9 +377,11 @@ class UserHistoryItem(UserFile):
         # This one makes sure it hasn't been played today.
         fid_query, eid_query = self.get_history_query(**sql_args)
 
-        sql = """SELECT *
-                 FROM user_history
-                 WHERE uid = %(uid)s AND
+        sql = """SELECT uh.*, uname
+                 FROM user_history uh,
+                      users u
+                 WHERE uh.uid = %(uid)s AND
+                       u.uid = uh.uid AND
                        {fid_query} AND
                        {eid_query} AND
                        date_played = %(date_played)s

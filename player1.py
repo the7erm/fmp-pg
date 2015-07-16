@@ -97,7 +97,7 @@ def threads_leave(*args):
     if debug_threads:
         print "LEAVE " + " ".join(map(str, args))
 
-TOP_SPAN = '<span foreground="black" size="x-large"><b>%s</b></span>'
+TOP_SPAN = '<span foreground="black" size="large"><b>%s</b></span>'
 PACK_PADDING = 3
 
 class PlayerError(Exception):

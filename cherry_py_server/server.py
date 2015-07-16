@@ -54,6 +54,7 @@ class ChatWebSocketHandler(WebSocket):
 
 cherrypy.config.update({
     'server.socket_port': 5050,
+    'server.socket_host': '0.0.0.0',
     '/ws': {
         'tools.websocket.on': True,
         'tools.websocket.handler_cls': ChatWebSocketHandler
@@ -92,18 +93,21 @@ class FmpServer(object):
         cherrypy.log("Handler created: %s" % repr(cherrypy.request.ws_handler))
 
     @cherrypy.expose
-    @cherrypy.tools.json_out()
+    # @cherrypy.tools.json_out(content_type='application/json')
     def satellite(self):
+        response = cherrypy.response
+        response.headers['Content-Type'] = 'application/json'
         start = time()
-        response = {
+        json_response = {
             'preload': preload.json(),
             'utcnow:': utcnow().isoformat(),
             'playlist': playlist.json()
         }
         gen_time = time() - start
         cherrypy.log("gen_time: %s", str(gen_time))
-        response['gen_time'] = "%s" % gen_time
-        return response
+        json_response['gen_time'] = "%s" % gen_time
+        
+        return json.dumps(json_response)
 
 
 

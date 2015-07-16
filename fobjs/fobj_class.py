@@ -49,9 +49,13 @@ class FObj_Class(object):
     def json(self):
         dbInfo = jsonize(self.dbInfo)
         if hasattr(self, 'listeners'):
-            dbInfo['Listeners'] = self.listeners.json()
+            dbInfo['user_file_info'] = self.listeners.json()
+
         if 'plid' in self.kwargs:
-            dbInfo['preloadInfo'] = jsonize(self.kwargs)
+            kwargs = deepcopy(self.kwargs)
+            if 'listeners' in kwargs:
+                del kwargs['listeners']
+            dbInfo['preloadInfo'] = jsonize(kwargs)
         elif 'nid' in self.kwargs and 'eid' in self.kwargs and \
             self.kwargs.get('eid'):
                 dbInfo['netcastInfo'] = jsonize(self.kwargs)
