@@ -142,7 +142,7 @@ class Player(GObject.GObject, Log):
         self.init_player(uri=uri)
         
         self.state = state
-        GObject.timeout_add(1000, self.time_status)
+        GObject.timeout_add_seconds(1, self.time_status)
 
     def init_window(self):
         # Player.init_window()
@@ -307,18 +307,12 @@ class Player(GObject.GObject, Log):
         self.show_video_window()
 
     def show_video_window(self):
-        # Player.show_video_window()
-        # Gdk.threads_leave()
-        # Gdk.threads_enter()
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
         else:
             self.drawingarea.hide()
             self.alt_drawingarea_vbox.show()
-        # self.window.show_all()
-        # self.top_hbox.hide()
-        # Gdk.threads_leave()
 
     def get_time_status(self):
         # Player.get_time_status()
@@ -344,7 +338,15 @@ class Player(GObject.GObject, Log):
         return obj
 
     def escape(self, string):
-        return string.replace("<", '&lt;').replace(">","&gt;")
+        find_replace = (
+            ("&","&amp;"),
+            ("<","&lt;"),
+            (">","&gt;"),
+        )
+        for find, replace in find_replace:
+            string = string.replace(find, replace)
+        
+        return string
 
     def time_status(self):
         # Player.time_status()
@@ -356,25 +358,24 @@ class Player(GObject.GObject, Log):
             # self.file_label.set_text(self.filename)
             #if not self.seek_lock:
             #  self.emit('state-changed', self.state)
+        if obj == self.last_time_status:
+            return True
         
-        if obj != self.last_time_status:
-            self.last_time_status = deepcopy(obj)
-            obj['str'] = "%s %s/%s" % (
-                obj['remaining_str'], 
-                obj['position_str'], 
-                obj['duration_str']
-            );
-            Gdk.threads_enter()
-            
-            self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
-
-            Gdk.threads_leave()
-            # print "time status obj:", obj
-            obj['now'] = utcnow()
-            obj['now_iso'] = obj['now'].isoformat()
-            self.emit('time-status', obj)
-            GObject.idle_add(self.show_video_window)
-            # self.show_video_window()
+        self.last_time_status = deepcopy(obj)
+        obj['str'] = "%s %s/%s" % (
+            obj['remaining_str'], 
+            obj['position_str'], 
+            obj['duration_str']
+        );
+        Gdk.threads_enter()
+        self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
+        Gdk.threads_leave()
+        # print "time status obj:", obj
+        obj['now'] = utcnow()
+        obj['now_iso'] = obj['now'].isoformat()
+        self.emit('time-status', obj)
+        GObject.idle_add(self.show_video_window)
+        # self.show_video_window()
         
         return True
 
@@ -529,6 +530,10 @@ class Player(GObject.GObject, Log):
         if position < 0:
             position = 0
 
+        if self.duration == 0:
+            self.log_error("DURATION IS 0")
+            self.seek_lock = False
+            return
         """
         
 
@@ -591,6 +596,8 @@ class Player(GObject.GObject, Log):
             raise PlayerError('invalid percent %r' % position)
         duration = self.duration
         print "DURATION:", duration
+        if duration == 0:
+            return 0
         seek_to = duration * percent
         print "SEEK_TO:", seek_to
         return seek_to

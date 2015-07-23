@@ -110,6 +110,8 @@ class UserFileInfo(UserFile, Log):
         sets = ['rating', 'score', 'percent_played', 'ultp', 'true_score']
         wheres = ['uid', 'fid']
         sql = format_sql(sql, self.userFileDbInfo, sets=sets, wheres=wheres)
+        self.log_debug(".save_user_file_info():%s" % 
+                       mogrify(sql, self.userFileDbInfo))
         self.userFileDbInfo = get_assoc_dict(sql, self.userFileDbInfo)
         return self.userFileDbInfo
 

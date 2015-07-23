@@ -256,10 +256,20 @@ class UserFile(Log):
         return fid_query, eid_query
 
     def get_now(self, **sql_args):
+        self.log_debug(".get_now()  from:%s" % sql_args)
         # UserFile.get_now
-        return sql_args.get('ltp', 
-                                sql_args.get('now', utcnow())
-                           )
+        keys = ['now', 'ltp', 'ultp', 'time_played']
+        now = None
+        for k in keys:
+            now = sql_args.get(k)
+            if now:
+                self.log_debug("now using:%s", k)
+                break;
+        if not now:
+            now = utcnow()
+            self.log_debug("using utcnow():%s" % now)
+        self.log_debug(".get_now() result:%s" %  now)
+        return now
 
     def calculate_true_score(self):
         # UserFile.calculate_true_score

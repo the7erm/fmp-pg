@@ -99,14 +99,11 @@ class Local_FObj(FObj_Class):
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
     def mark_as_played(self, *args, **kwargs):
-        self.dbInfo['ltp'] = kwargs.get('ltp', 
-                                kwargs.get('now', utcnow())
-                             )
         fid = self.fid
         if fid:
             self.load_from_fid(fid)
-        else:
-            self.save()
+        self.dbInfo['ltp'] = kwargs.get('now', utcnow())
+        self.save()
         kwargs.update(self.dbInfo)
         kwargs.update({'reason': self.reason})
         self.listeners.mark_as_played(**kwargs)

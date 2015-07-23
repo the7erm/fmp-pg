@@ -16,7 +16,7 @@ class Downloader(GObject.GObject):
         GObject.GObject.__init__(self)
         self.files = []
         self.downloading = False
-        GObject.timeout_add(3000, self.check_download_cue)
+        GObject.timeout_add_seconds(3, self.check_download_cue)
 
     def check_download_cue(self):
         if not self.files or self.downloading:

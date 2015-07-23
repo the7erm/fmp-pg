@@ -311,3 +311,40 @@ def jsonize(dbInfo):
     for key in remove_keys:
         del dbInfo[key]
     return dbInfo
+
+def get_seconds_to_next_expire_time():
+    sql = """SELECT expire_time 
+             FROM netcasts 
+             ORDER BY expire_time ASC
+             LIMIT 1"""
+    res = get_assoc_dict(sql)
+    expire_time = res.get('expire_time')
+    if not expire_time:
+        expire_time = utcnow()
+    delta = expire_time - utcnow()
+    total_seconds = delta.total_seconds()
+    return int(total_seconds)
+
+def delete_fid(fid):
+    sql = """SELECT * FROM file_locations WHERE fid = %(fid)s"""
+    spec = {'fid': fid}
+    file_locations = get_results_assoc_dict(sql, spec)
+    if file_locations:
+        return
+
+    
+    sql = """DELETE FROM user_song_info WHERE fid = %(fid)s"""
+    query(sql, spec)
+    sql = """DELETE FROM user_history WHERE fid = %(fid)s"""
+    query(sql, spec)
+
+    sql = """DELETE FROM file_genres WHERE fid = %(fid)s"""
+    query(sql, spec)
+
+    sql = """DELETE FROM file_artists WHERE fid = %(fid)s"""
+    query(sql, spec)
+
+    sql = """DELETE FROM files WHERE fid = %(fid)s"""
+    query(sql, spec)
+
+    

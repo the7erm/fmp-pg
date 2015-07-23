@@ -143,7 +143,7 @@ class UserFileInfoTreeview():
 
     def init_rating_combo(self):
         self.liststore_ratings = Gtk.ListStore(str)
-        for i in range(5, 0, -1):
+        for i in range(5, -1, -1):
             self.liststore_ratings.append([str(i)])
         self.rating_combo = Gtk.CellRendererCombo()
         self.rating_combo.set_property("editable", True)
@@ -153,6 +153,14 @@ class UserFileInfoTreeview():
         self.rating_combo.connect("edited", self.on_rating_combo_change)
         font = Pango.FontDescription('FreeSans bold 15')
         self.rating_combo.set_property('font-desc', font)
+
+        store = Gtk.ListStore(str, GdkPixbuf.Pixbuf)
+        pb = GdkPixbuf.Pixbuf.new_from_file_at_size("images/rate.6.svg", 32, 32)
+        store.append(["Test", pb])
+        renderer = Gtk.CellRendererPixbuf()
+        # self.rating_combo.pack_start(renderer, False)
+        # self.rating_combo.add_attribute(renderer, "pixbuf", 1)
+
         return self.rating_combo
 
     def on_rating_combo_change(self, cell, path, text):
@@ -290,7 +298,7 @@ class FmpPlaylist(Playlist):
         self.user_file_info_treeview.treeview.show()
         self.update_treeview()
 
-        GObject.timeout_add(5000, self.update_treeview)
+        GObject.timeout_add_seconds(5, self.update_treeview)
 
     def update_treeview(self):
         print "="*100
@@ -314,10 +322,26 @@ class FmpPlaylist(Playlist):
             filename = self.files[self.index].filename
         print "fid:", self.files[self.index].fid
         print "eid:", self.files[self.index].eid
-        print "filename:", filename
+        print "FILENAME:", filename
         if filename:
             self.player.uri = self.files[self.index].filename
             self.update_treeview()
+        else:
+            fid = self.files[self.index].fid
+            if fid:
+                print "HAS FID:", fid
+                self.fid_sanity_check(fid)
+            print "NO FILENAME"
+
+    def fid_sanity_check(self, fid):
+        sql = """SELECT * FROM file_locations WHERE fid = %(fid)s"""
+        spec = {'fid': fid}
+        file_locations = get_results_assoc_dict(sql, spec)
+        if not file_locations:
+            print "NO FILE LOCATIONS wiping."
+            fid = deepcopy(fid)
+            self.inc_index()
+            delete_fid(fid)
 
     def init_connections(self):
         self.player.connect('time-status', self.mark_as_played)
@@ -325,11 +349,13 @@ class FmpPlaylist(Playlist):
         self.player.connect('time-status', self.broadcast_time)
 
     def save_config(self, player, state):
+        Gdk.threads_leave()
         state = player.state_to_string(state)
         cfg.set('player_state', 'state', state , str)
         server.broadcast({"state-changed": state})
 
     def mark_as_played(self, player, time_status):
+        Gdk.threads_leave()
         now = time()
 
         position = time_status['position']
@@ -344,6 +370,7 @@ class FmpPlaylist(Playlist):
         if self.last_marked_as_played > now - 5:
             # self.log_debug("!.mark_as_played()")
             return
+        self.log_debug(".mark_as_played()")
         self.last_marked_as_played = now
         try:
             self.files[self.index].mark_as_played(**time_status)
@@ -352,6 +379,7 @@ class FmpPlaylist(Playlist):
         
         
     def broadcast_time(self, player, time_status):
+        Gdk.threads_leave()
         if not hasattr(self, 'last_time_status'):
             self.last_time_status = {}
         if time_status == self.last_time_status:
@@ -361,6 +389,8 @@ class FmpPlaylist(Playlist):
         server.broadcast({"time-status": time_status})
 
     def next(self, *args, **kwargs):
+        Gdk.threads_leave()
+        self.log_debug(".next()")
         self.files[self.index].deinc_score()
         super(FmpPlaylist, self).next(*args, **kwargs)
 
@@ -435,10 +465,17 @@ class FmpPlaylist(Playlist):
 
 def refresh_netcasts_once():
     refresh_netcasts()
+    seconds_to_next_expire = get_seconds_to_next_expire_time()
+    if not seconds_to_next_expire or seconds_to_next_expire < 60:
+        # At the minimum we want to wait 60 seconds to the next time we call
+        # this def
+        seconds_to_next_expire = 60
+    logger.debug("MINUTES TO NEXT EXPIRE:%s" % (seconds_to_next_expire / 60))
+    GObject.timeout_add_seconds(seconds_to_next_expire, refresh_netcasts_once)
 
 def refresh_netcasts():
     logger.debug("STARTING REFRESH NETCASTS")
-    t = Thread(target=refresh_and_download_expired_netcasts)
+    t = Thread(target=refresh_and_download_all_netcasts)
     #t = Thread(target=myfunc2)
     t.start()
     return True
@@ -446,9 +483,9 @@ def refresh_netcasts():
 preload = Preload()
 server.preload = preload
 picker.initial_picker()
-GObject.timeout_add(60000, preload.refresh)
-GObject.timeout_add(60000, picker.populate_preload)
-GObject.timeout_add(60000, refresh_netcasts)
+GObject.timeout_add_seconds(60, preload.refresh)
+GObject.timeout_add_seconds(60, picker.populate_preload_for_all_users)
+# refresh_netcasts_timeout = GObject.timeout_add_seconds(120, refresh_netcasts)
 GObject.idle_add(preload.refresh_once)
 GObject.idle_add(refresh_netcasts_once)
 

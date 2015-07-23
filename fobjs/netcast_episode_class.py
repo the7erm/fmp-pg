@@ -12,6 +12,7 @@ import pytz
 import subprocess
 from log_class import Log, logging
 import re
+import shutil
 logger = logging.getLogger(__name__)
 
 USER_AGENT = "Family Media Player"
@@ -259,6 +260,7 @@ class Netcast_FObj(FObj_Class, Log):
         return {}
 
 class Netcast(Log):
+    __name__ = 'Netcast'
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
@@ -270,16 +272,34 @@ class Netcast(Log):
 
     def refresh_feed_and_download_episodes(self):
         if self.time_for_update:
-            print "updating:", self.dbInfo.get('rss_url')
+            self.log_debug("updating:%s" % (self.dbInfo.get('rss_url'),))
             self.refresh_feed()
-            self.download_unlistened_netcasts()
+        self.download_unlistened_netcasts()
 
     @property
     def is_expired(self):
         expire_time = self.dbInfo.get('expire_time')
         if not expire_time:
             return True
-        return utcnow() > expire_time
+        now = utcnow()
+        res = utcnow() > expire_time
+        sym = "<="
+        if res:
+            sym = '>'
+
+        spec = {
+            'netcast_name': self.netcast_name,
+            'now': now.astimezone(pytz.utc),
+            'expire_time': expire_time.astimezone(pytz.utc),
+            'sym': sym,
+            'res': res,
+        }
+            
+        self.log_debug(".is_expired %(res)s \"%(netcast_name)s\" "
+                       "now %(sym)s expire_time "
+                       "%(now)s %(sym)s %(expire_time)s" % spec)
+
+        return res
 
     @property
     def time_for_update(self):
@@ -293,7 +313,23 @@ class Netcast(Log):
         if not last_updated:
             return False
         min_dt = utcnow() - timedelta(minutes=30)
-        return last_updated > min_dt
+        res = last_updated > min_dt
+        sym = '<='
+        if res:
+            sym = '>'
+
+        spec = {
+            'netcast_name': self.netcast_name,
+            'last_updated': last_updated.astimezone(pytz.utc),
+            'sym': sym,
+            'res': res,
+            'min_dt': min_dt.astimezone(pytz.utc)
+        }
+            
+        self.log_debug(".too_soon_to_refresh %(res)s \"%(netcast_name)s\" "
+                       "last_updated %(sym)s min_dt  "
+                       "%(last_updated)s %(sym)s %(min_dt)s" % spec)
+        return res
 
     @property
     def nid(self):
@@ -385,9 +421,9 @@ class Netcast(Log):
         #if self.too_soon_to_refresh:
         #   print "too_soon_to_refresh:", self.too_soon_to_refresh
         #   return
-        print "Netcast dbInfo:", self.dbInfo
+        self.log_debug(".refresh_feed() Netcast dbInfo:%s" % (self.dbInfo,))
+        self.log_debug("refreshing:%s" % (self.rss_url,))
         socket.setdefaulttimeout(30)
-        print "refreshing:", self.rss_url
 
         try:
             feed = feedparser.parse(self.download_feed())
@@ -399,6 +435,7 @@ class Netcast(Log):
         if not title:
             self.log_debug("NO TITLE")
             self.set_update_for_near_future()
+            pprint(feed)
             return
 
         self.dbInfo['netcast_name'] = title
@@ -415,13 +452,13 @@ class Netcast(Log):
                 continue
             if len(entry['enclosures']) == 0:
                 continue
-            print "==================="
+            self.log_debug("===================")
             for enclosure in entry['enclosures']:
                 self.process_enclosure(entry, enclosure)
-            print "==================="
+            self.log_debug("===================")
 
     def process_enclosure(self, entry, enclosure):
-        print "---------------------"
+        self.log_debug("---------------------")
         pprint(enclosure)
         pub_date = datetime(*entry['updated_parsed'][0:7])
         
@@ -433,7 +470,7 @@ class Netcast(Log):
 
         self.episodes.append(episode)
         
-        print "---------------------"
+        self.log_debug("---------------------")
 
     def set_update_for_near_future(self):
         sql = """UPDATE netcasts 
@@ -473,14 +510,16 @@ class Netcast(Log):
                 print "NO LOCAL FILE:", e
                 continue
             if not os.path.exists(e['local_file']):
+                tmp = e['local_file']+".tmp"
                 print "******"
                 print "not exists: e['local_file']:", e['local_file']
                 # downloader.append(e['episode_url'], e['local_file'])
                 args = ['wget', '-c', e['episode_url'], '-O', 
-                         e['local_file']]
+                         tmp]
 
                 p = subprocess.Popen(args)
                 p.wait()
+                shutil.move(tmp, e['local_file'])
 
     def save(self):
         sql = """UPDATE netcasts
@@ -508,6 +547,7 @@ def refresh_and_download_expired_netcasts():
         # wait()
         obj = Netcast(**n)
         obj.refresh_feed_and_download_episodes()
+        
 
 def safe_filename(filename):
     if not filename:

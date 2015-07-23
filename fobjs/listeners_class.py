@@ -63,7 +63,7 @@ class Listeners(Log):
             self.load_user_file_info(**sql_args)
 
         for user_file_info in self.user_file_info:
-            
+            self.log_debug(".mark_as_played() user_file_info.mark_as_played()")
             user_file_info.mark_as_played(**sql_args)
         return
 

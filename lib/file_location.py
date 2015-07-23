@@ -145,7 +145,7 @@ class FileLocation:
         print "--updating fingerprint"
         try:
             main, front, end, middle = calculate_file_fingerprint(
-                dself.filename)
+                self.filename)
         except ValueError, e:
             main = "%s" % e
             front = "%s" % e

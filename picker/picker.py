@@ -24,22 +24,30 @@ from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
 GObject.threads_init()
 
 import os
+import sys
+
 try:
     from db.db import *
 except:
-    from sys import path
-    path.append("../")
+    sys.path.append("../")
     from db.db import *
 
 from fobjs.fobj import get_fobj
 from fobjs.misc import get_listeners, _listeners
 from random import shuffle
+from log_class import Log, logging
+from time import time
+
+logger = logging.getLogger(__name__)
+log = logger
+populate_preload_all_locked = False
 
 def wait():
     Gdk.threads_leave()
     return
 
 def get_files_from_preload(listeners=None):
+    logger.debug("get_files_from_preload()")
     listeners = _listeners(listeners)
 
     select_sql = """SELECT *
@@ -72,12 +80,53 @@ def get_users():
 def initial_picker():
     totals = totals_in_preload()
     run = False
+    if not totals:
+        run = True
     for total in totals:
         if total['total'] < target_preload_length:
             run = True
 
     if run:
         populate_preload()
+
+def move_to_preload(uid):
+    sql = """INSERT INTO
+             preload (fid, uid, reason)
+             SELECT fid, uid, reason
+             FROM preload_cache
+             WHERE fid NOT IN (SELECT DISTINCT fid FROM preload) AND
+                   uid = %(uid)s"""
+    query(sql, {'uid': uid})
+
+    sql = """DELETE FROM preload_cache WHERE uid = %(uid)s"""
+    query(sql, {'uid': uid})
+
+def move_to_preload_cache(uid):
+    sql = """INSERT INTO
+             preload_cache (fid, uid, reason)
+             SELECT fid, uid, reason
+             FROM preload
+             WHERE fid NOT IN (SELECT DISTINCT fid FROM preload_cache) AND
+                   uid = %(uid)s"""
+    query(sql, {'uid': uid})
+
+    sql = """DELETE FROM preload WHERE uid = %(uid)s"""
+    query(sql, {'uid': uid})
+
+def populate_preload_for_all_users():
+    global populate_preload_all_locked
+    if populate_preload_all_locked:
+        return True
+    populate_preload_all_locked = True
+    try:
+        populate_preload()
+    except Exception as e:
+      log.error("Exception:%s" % e)
+      print sys.exc_info()[0]
+
+    populate_preload_all_locked = False
+    return True
+
 
 def populate_preload(uid=None, listeners=None):
     wait()
@@ -86,9 +135,18 @@ def populate_preload(uid=None, listeners=None):
     listeners = _listeners(listeners)
 
     if uid is None:
+        start = time()
+        for l in listeners:
+            populate_preload(l['uid'], listeners)
         users = get_users()
         for u in users:
-            populate_preload(u['uid'], users)
+            populate_preload(u['uid'], [u])
+            if u['listening']:
+                move_to_preload(u['uid'])
+            else:
+                move_to_preload_cache(u['uid'])
+        logger.debug("populate_preload outer loop running_time:%s" % 
+                     (time() - start))
         return True
 
     for total in totals:
@@ -103,47 +161,138 @@ def populate_preload(uid=None, listeners=None):
     for u in listeners:
         if u['uid'] == uid:
             uname = u['uname']
+
+    out_of = []
     for true_score in true_scores:
         wait()
-        dbInfos = get_files_for_true_score(uid=uid, true_score=true_score, 
-                                           uname=uname)
+        dbInfos = get_random_unplayed(uid=uid, uname=uname)
         for dbInfo in dbInfos:
             wait()
-            insert_into_preload(dbInfo)
+            insert_into_preload(dbInfo, listeners)
             wait()
             remove_from_pick_from(**dbInfo)
             wait()
 
+        if true_score in out_of:
+            continue
+        dbInfos = get_files_for_true_score(uid=uid, true_score=true_score, 
+                                           uname=uname)
+        if not dbInfos:
+            out_of.append(true_score)
+
+        for dbInfo in dbInfos:
+            wait()
+            insert_into_preload(dbInfo, listeners)
+            wait()
+            remove_from_pick_from(**dbInfo)
+            wait()
+
+        
+
 
     return True
 
-def get_files_for_true_score(uid, true_score, covert_to_fobj=False,
-                             limit=1, uname=""):
+def get_files_for_true_score(uid, true_score, convert_to_fobj=False,
+                             limit=1, uname="", remove=True):
+    log.debug("get_files_for_true_score uid:%s true_score:%s "
+              "convert_to_fobj:%s limit:%s uname:%s" % 
+              (uid, true_score, convert_to_fobj, limit, uname))
     sql = """SELECT *
              FROM user_song_info usi,
                   pick_from pf
              WHERE pf.fid = usi.fid AND
                    usi.uid = %(uid)s AND
                    true_score >= %(true_score)s
-             ORDER BY ultp
+             ORDER BY ultp NULLS FIRST, RANDOM()
              LIMIT {limit}""".format(limit=limit)
     sql_args = {
         'uid': uid,
         'true_score': true_score
     }
+    log.debug("get_files_for_true_score:%s", mogrify(sql, sql_args))
     dbInfos = get_results_assoc_dict(sql, sql_args)
+    sample = []
+    if limit == 1:
+        sample = get_files_for_true_score(uid, true_score, convert_to_fobj=False,
+                                          limit=10, uname=uname, remove=False)
+        log.debug("== Samples for %s %s ==" % (uname, true_score))
+        for s in sample:
+            sql = """SELECT basename 
+                     FROM file_locations 
+                     WHERE fid = %(fid)s
+                     LIMIT 1"""
+            r = get_assoc_dict(sql, s)
+            log.debug("sample: %s %s" % (s['ultp'], r['basename'], ))
+
 
     for dbInfo in dbInfos:
         dbInfo['reason'] = 'chosen for %s true_score >= %s' % (
             uname, true_score)
+        if limit == 1:
+            sql = """SELECT basename 
+                         FROM file_locations 
+                         WHERE fid = %(fid)s
+                         LIMIT 1"""
+            r = get_assoc_dict(sql, dbInfo)
+            log.debug("sample PICKED: %s %s" % (dbInfo['ultp'], r['basename'], ))
+        if remove:
+            remove_from_pick_from(**dbInfo)
 
+    if not convert_to_fobj:
+        return dbInfos
+    fobjs = []
+    for dbInfo in dbInfos:
+        fobj = get_fobj(**dbInfo)
+        if fobJ:
+            fobjs.append(fobj)
+    return fobjs
+
+
+def get_random_unplayed(uid, convert_to_fobj=False,
+                        limit=1, uname=""):
+    log.debug("get_random_unplayed uname:%s" % uname)
+    sql = """SELECT *
+             FROM user_song_info usi,
+                  pick_from pf
+             WHERE pf.fid = usi.fid AND
+                   usi.uid = %(uid)s AND
+                   usi.ultp IS NULL
+             ORDER BY RANDOM()
+             LIMIT {limit}""".format(limit=limit)
+    sql_args = {
+        'uid': uid,
+    }
+    dbInfos = get_results_assoc_dict(sql, sql_args)
+    for dbInfo in dbInfos:
+        dbInfo['reason'] = 'chosen for %s random unplayed' % (
+            uname)
+        remove_from_pick_from(**dbInfo)
     return dbInfos
 
-def remove_from_pick_from(fid, reason="", **kwargs):
+def remove_from_pick_from(fid, **kwargs):
+    log.debug("remove_from_pick_from:%s", fid)
+    sql_args = {'fid': fid}
     sql = """DELETE FROM pick_from WHERE fid = %(fid)s"""
-    query(sql, {'fid': fid, 'reason': reason})
+    # It's IMPORTANT to EXPLICITLY remove the fid, because 
+    # not all files have an artist.
+    query(sql, sql_args)
+
+
+    sql = """DELETE FROM pick_from 
+             WHERE fid IN (
+                     SELECT fid
+                     FROM file_artists
+                     WHERE aid IN (
+                             SELECT aid 
+                             FROM file_artists
+                             WHERE fid = %(fid)s
+                    )
+             )"""
+    logger.debug("remove_from_pick_from:%s" % mogrify(sql, sql_args))
+    query(sql, sql_args)
 
 def populate_pick_from(listeners=None):
+    logger.debug("populate_pick_from()")
     listeners = _listeners(listeners)
     clear_pick_from()
     listeners = _listeners(listeners)
@@ -154,12 +303,46 @@ def populate_pick_from(listeners=None):
     remove_recently_played(listeners)
     remove_preload_from_pick_from(listeners)
     remove_disabled_genres_from_pick_from()
+    remove_artists_already_in_preload()
+    remove_missing_files_from_pick_from()
+    logger.debug("/populate_pick_from()")
+
+def remove_artists_already_in_preload():
+    log.debug("remove_artists_already_in_preload()")
+    sql = """DELETE FROM pick_from 
+             WHERE fid IN (
+                     SELECT fid
+                     FROM file_artists
+                     WHERE aid IN (
+                             SELECT aid 
+                             FROM file_artists
+                             WHERE fid IN (
+                                    SELECT fid
+                                    FROM preload
+                             )
+                     )
+             )"""
+    query(sql)
+
+def remove_missing_files_from_pick_from():
+    log.debug("remove_missing_files_from_pick_from()")
+    sql = """DELETE FROM pick_from
+             WHERE fid IN (
+                        SELECT DISTINCT fid 
+                        FROM pick_from 
+                        WHERE fid NOT IN (
+                            SELECT DISTINCT fid FROM file_locations
+                        )
+                   )"""
+    query(sql)
+    log.debug("done")
 
 def clear_pick_from():
     sql = """TRUNCATE pick_from"""
     query(sql)
 
 def remove_rated_zero(listeners=None):
+    log.debug("remove_rated_zero()")
     listeners = _listeners(listeners)
 
     for listener in listeners:
@@ -175,25 +358,32 @@ def count_files():
     return get_assoc_dict(sql)['total']
 
 def remove_recently_played(listeners=None):
+
     listeners = _listeners(listeners)
     total = count_files()
     limit = int(total * 0.01)
     for listener in listeners:
+        log.debug("remove_recently_played:%s" % listener)
         sql = """DELETE FROM pick_from 
                  WHERE fid IN (
                            SELECT uh.fid
                            FROM user_history uh
                            WHERE uh.uid = %(uid)s AND
-                                 time_played IS NOT NULL
+                                 time_played IS NOT NULL AND
+                                 uh.fid IS NOT NULL
                            ORDER BY time_played DESC
                            LIMIT {limit}
                        )""".format(limit=limit)
+        log.debug('recently_played:%s' % listener)
+        log.debug(mogrify(sql, listener))
         query(sql, listener)
 
 def remove_preload_from_pick_from(listeners=None):
+
     listeners = _listeners(listeners)
 
     for listener in listeners:
+        log.debug("remove_preload_from_pick_from:%s" % listener)
         sql = """DELETE FROM pick_from 
                  WHERE fid IN (
                         SELECT fid 
@@ -232,8 +422,8 @@ def gen_true_score_list(scores, whole=True):
 
 def make_true_scores_list():
 
-    by_tens = [0, 10, 20, 30, 40, 50, 60, 70]
-    by_fives = [80, 85, 90, 95, 105, 110]
+    by_tens = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    by_fives = []
 
     # shuffle(scores)
 
@@ -244,14 +434,48 @@ def make_true_scores_list():
     # print "true_scores:", true_scores
     return true_scores
 
-def insert_into_preload(dbInfo):
-    sql = """INSERT INTO preload (fid, uid, reason)
-             VALUES(%(fid)s, %(uid)s, %(reason)s)"""
+def insert_into_preload(dbInfo, listeners=None):
+    listeners = _listeners(listeners)
+    table = 'preload_cache'
+    for l in listeners:
+        if l['uid'] == dbInfo['uid']:
+          table = 'preload'
+
+    sql = """INSERT INTO {table} (fid, uid, reason)
+             VALUES(%(fid)s, %(uid)s, %(reason)s)""".format(table=table)
     query(sql, dbInfo)
 
 def totals_in_preload():
+    """ Table "public.preload_cache"
+     Column |  Type   | Modifiers 
+    --------+---------+-----------
+     fid    | integer | not null
+     uid    | integer | not null
+     reason | text    | 
+    """
     sql = """SELECT uid, count(*) as total FROM preload GROUP BY uid"""
-    return get_results_assoc_dict(sql)
+    totals1 = get_results_assoc_dict(sql)
+    sql = """SELECT uid, count(*) as total FROM preload_cache GROUP BY uid"""
+    totals2 = get_results_assoc_dict(sql)
+
+    totals = totals1 + totals2
+    print "TOTALS:"
+    pprint(totals)
+    listeners = _listeners()
+    for l in listeners:
+        found = False
+        for t in totals:
+            if t['uid'] == l['uid']:
+                found = True
+        if not found:
+            total_data = {
+                'uid': l['uid'],
+                'total': 0
+            }
+            totals.append(total_data)
+    print "TOTALS:"
+    pprint(totals)
+    return totals
 
 def clear_preload():
     sql = """TRUNCATE preload"""
@@ -271,6 +495,8 @@ target_preload_length = len(true_scores)
 
 if __name__ == "__main__":
     # clear_preload()
+    sql = """DELETE FROM preload WHERE uid = 1"""
+    query(sql)
     populate_preload()
     preload = get_preload(True)
     for p in preload:
