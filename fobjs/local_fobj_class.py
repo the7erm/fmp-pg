@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from fobj_class import FObj_Class
 from location_class import Locations
 from listeners_class import Listeners
+from player1 import SUPPORTED_EXTENSIONS
 
+import pytz
 import os
 
 from pprint import pprint
@@ -23,6 +25,7 @@ from utils import utcnow, convert_to_dt
 
 
 class Local_FObj(FObj_Class):
+    __name__ == "Local_FObj"
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.clean()
@@ -54,6 +57,9 @@ class Local_FObj(FObj_Class):
         if os.path.exists(value):
             self.real_filename = value
             self.locations = Locations(self)
+            if not self.fid:
+                self.log_debug("Using fid from locations:%s" % self.locations.fid)
+                self.fid = self.locations.fid
 
     @property
     def fid(self):
@@ -65,7 +71,12 @@ class Local_FObj(FObj_Class):
 
     @fid.setter
     def fid(self, value):
-        value = int(value)
+        try:
+            value = int(value)
+        except:
+            self.log_debug("TRIED TO SET FID TO:%s" % value)
+            return
+
         if value != self.fid:
             self.load_from_fid(value)
 
@@ -96,6 +107,7 @@ class Local_FObj(FObj_Class):
         mtime = self.mtime
         if mtime != -1:
             self.dbInfo['mtime'] = datetime.fromtimestamp(mtime)
+            self.dbInfo['mtime'].replace(tzinfo=pytz.utc)
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
     def mark_as_played(self, *args, **kwargs):
@@ -119,8 +131,99 @@ class Local_FObj(FObj_Class):
     def dict(self):
         return self.dbInfo
 
+already_scanned = []
+
+skip = [
+    '.crazycraft',
+    '.fellowship',
+    '.minecraft',
+    '.technic',
+    '/assets/',
+    '/resources/',
+    '/sound',
+]
+
+def scan_file(filename):
+    filename = os.path.realpath(filename)
+    for s in skip:
+        if s in filename:
+            return
+    
+    if not os.path.exists(filename):
+        return
+    is_readable = os.access(filename, os.R_OK)
+    if not is_readable:
+        return
+    base, ext  = os.path.splitext(filename)
+    ext = ext.lower()
+    if ext not in SUPPORTED_EXTENSIONS or ext == '':
+        return
+    obj = Local_FObj(filename=filename)
+    print "filename:",obj.filename
+
+def scan_dir(directory):
+    for s in skip:
+        if s in directory:
+            return
+    
+    directory = os.path.realpath(directory)
+    if not os.path.exists(directory):
+        return
+    if directory in already_scanned:
+        return
+    already_scanned.append(directory)
+    
+    for root, dirs, files in os.walk(directory):
+        skip_it = False
+        for s in skip:
+            if s in root:
+                skip_it = True
+                break
+        if skip_it:
+            continue
+        print "scanning:", root
+        for basename in files:
+            filename = os.path.join(root, basename)
+            scan_file(filename)
+
 if __name__ == "__main__":
-    files = get_results_assoc_dict("""SELECT * FROM files LIMIT 100""")
-    for f in files:
-        obj = Local_FObj(**f)
-        print obj.filename
+    import sys
+    
+    from pprint import pprint
+    for arg in sys.argv:
+        print "arg:", arg
+        if os.path.isfile(arg):
+            scan_file(arg)
+            continue
+        if os.path.isdir(arg):
+            scan_dir(arg)
+
+    if "--folders" in sys.argv:
+        sql = """SELECT dirname 
+                 FROM file_locations
+                 ORDER BY dirname"""
+
+        dirs = get_results_assoc_dict(sql)
+        for d in dirs:
+            skip_it = False
+            for s in skip:
+                if s in d['dirname']:
+                    skip_it = True
+            if skip_it:
+                continue
+            if not os.path.exists(d['dirname']):
+                dirname = d['dirname']
+
+                if dirname.startswith("/home/erm/") and not \
+                   dirname.startswith("/home/erm/disk2/"):
+                   print "before dirname:%s" % dirname
+                   dirname = dirname.replace("/home/erm/", 
+                                             "/home/erm/disk2/acer-home/")
+
+                   print "after dirname:%s" % dirname
+                   if os.path.exists(dirname):
+                        scan_dir(dirname)
+
+
+                
+

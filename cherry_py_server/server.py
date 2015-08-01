@@ -72,6 +72,15 @@ class FmpServer(object):
         }
 
     @cherrypy.expose
+    def seek(self, seek):
+        GObject.idle_add(self.do_seek,(seek))
+        return "Seek"
+
+    def do_seek(self, value):
+        print("SEEK:", value)
+        playlist.player.position = value
+
+    @cherrypy.expose
     def next(self):
         GObject.idle_add(playlist.next)
         return "Next"

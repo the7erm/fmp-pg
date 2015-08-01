@@ -234,7 +234,8 @@ def get_files_for_true_score(uid, true_score, convert_to_fobj=False,
                          WHERE fid = %(fid)s
                          LIMIT 1"""
             r = get_assoc_dict(sql, dbInfo)
-            log.debug("sample PICKED: %s %s" % (dbInfo['ultp'], r['basename'], ))
+            log.debug("sample PICKED: %s %s %s" % (
+                true_score, dbInfo['ultp'], r['basename'], ))
         if remove:
             remove_from_pick_from(**dbInfo)
 
@@ -494,6 +495,7 @@ true_scores = make_true_scores_list()
 target_preload_length = len(true_scores)
 
 if __name__ == "__main__":
+
     # clear_preload()
     sql = """DELETE FROM preload WHERE uid = 1"""
     query(sql)

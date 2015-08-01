@@ -2,11 +2,11 @@
 import os
 from urllib import quote
 from copy import deepcopy
-from datetime import datetime, date
-from time import time
 from misc import jsonize
+from log_class import Log
 
-class FObj_Class(object):
+class FObj_Class(Log):
+    __name__ == "FObj_Class"
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.filename = kwargs.get('filename', "")

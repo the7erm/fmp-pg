@@ -62,7 +62,7 @@ SUPPORTED_EXTENSIONS = (
     '.mpeg',
     '.mpg',
     '.ogg',
-    '.vorb'
+    '.vorb',
     '.vorbis',
     '.wav',
     '.wma',

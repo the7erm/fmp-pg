@@ -1,4 +1,5 @@
 
+import sqlparse
 try:
     from db.db import *
 except:
@@ -110,8 +111,13 @@ class UserFileInfo(UserFile, Log):
         sets = ['rating', 'score', 'percent_played', 'ultp', 'true_score']
         wheres = ['uid', 'fid']
         sql = format_sql(sql, self.userFileDbInfo, sets=sets, wheres=wheres)
+
         self.log_debug(".save_user_file_info():%s" % 
-                       mogrify(sql, self.userFileDbInfo))
+                       sqlparse.format(
+                            mogrify(sql, self.userFileDbInfo),
+                            reindent=True, 
+                            keyword_case='upper'
+                       ))
         self.userFileDbInfo = get_assoc_dict(sql, self.userFileDbInfo)
         return self.userFileDbInfo
 
