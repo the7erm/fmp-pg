@@ -21,6 +21,8 @@
 import os
 import sys
 
+os.chdir(sys.path[0])
+
 from setproctitle import setproctitle
 setproctitle(os.path.basename(sys.argv[0]))
 
@@ -33,6 +35,7 @@ Preload = fobjs.preload_class.Preload
 from picker import picker
 picker.wait = wait
 fobjs.preload_class.wait = wait
+from gui.RatingTrayIcon import RatingTrayIcon
 
 from pprint import pprint
 from time import sleep
@@ -292,6 +295,7 @@ class FmpPlaylist(Playlist):
         self.last_marked_as_played = 0
         self.last_position = -1
         super(FmpPlaylist, self).__init__(*args, **kwargs)
+        self.user_file_info_tray = RatingTrayIcon(self)
 
         self.player.video_area_vbox.pack_start(
             self.user_file_info_treeview.treeview, False, False, 0)
@@ -471,6 +475,7 @@ def refresh_netcasts_once():
         # this def
         seconds_to_next_expire = 60
     logger.debug("MINUTES TO NEXT EXPIRE:%s" % (seconds_to_next_expire / 60))
+    seconds_to_next_expire = 60
     GObject.timeout_add_seconds(seconds_to_next_expire, refresh_netcasts_once)
 
 def refresh_netcasts():

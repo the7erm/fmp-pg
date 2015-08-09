@@ -1201,7 +1201,6 @@ class TrayIcon(Log):
             self.player.quit()
         print "CLICKED:%s " % (item.get_label())
 
-
 reported_ext = []
 
 def get_files_in_dir(folder):

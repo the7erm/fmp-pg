@@ -3,7 +3,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from time import localtime, time, timezone
-from pprint import pprint
+from pprint import pprint, pformat
 import urllib
 import urllib2
 import feedparser
@@ -427,11 +427,15 @@ class Netcast(Log):
 
         try:
             feed = feedparser.parse(self.download_feed())
+            
         except socket.error, msg:
             self.set_update_for_near_future()
             self.emit('update-error', msg)
             return
-        title = feed.get('feed',{}).get('title',  "")
+        feed_feed = feed.get('feed',{})
+        self.log_debug("feed_feed:%s" % pformat(feed_feed))
+        title = feed_feed.get('title',  "")
+        self.log_debug("feed title:%s" % title)
         if not title:
             self.log_debug("NO TITLE")
             self.set_update_for_near_future()
@@ -504,6 +508,7 @@ class Netcast(Log):
         return get_results_assoc_dict(sql, self.dbInfo)
 
     def download_unlistened_netcasts(self):
+        self.log_debug(".download_unlistened_netcasts()")
         unlistened_episodes = self.get_unlistened_episodes()
         for e in unlistened_episodes:
             if not e.get('local_file'):
@@ -514,8 +519,7 @@ class Netcast(Log):
                 print "******"
                 print "not exists: e['local_file']:", e['local_file']
                 # downloader.append(e['episode_url'], e['local_file'])
-                args = ['wget', '-c', e['episode_url'], '-O', 
-                         tmp]
+                args = ['wget', '-c', e['episode_url'], '-O', tmp]
 
                 p = subprocess.Popen(args)
                 p.wait()
@@ -529,15 +533,31 @@ class Netcast(Log):
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
 
+global refresh_and_download_all_netcasts_lock
+refresh_and_download_all_netcasts_lock = False
+
 def refresh_and_download_all_netcasts():
+
+    logger.debug("+"*100)
     logger.debug("REFRESHING AND DOWNLOADING ALL NETCASTS")
-    
+    global refresh_and_download_all_netcasts_lock
+
+    if refresh_and_download_all_netcasts_lock:
+        logger.debug("LOCKED")
+        return
+    refresh_and_download_all_netcasts_lock = True
     sql = """SELECT * 
              FROM netcasts"""
     netcasts = get_results_assoc_dict(sql)
     for n in netcasts:
-        obj = Netcast(**n)
-        obj.refresh_feed_and_download_episodes()
+        try:
+            obj = Netcast(**n)
+            obj.refresh_feed_and_download_episodes()
+        except:
+            e = sys.exc_info()[0]
+            log.debug("Exception: %r" % e)
+
+    refresh_and_download_all_netcasts_lock = False
 
 def refresh_and_download_expired_netcasts():
     # wait()
