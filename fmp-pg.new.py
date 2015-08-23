@@ -60,10 +60,9 @@ def quit():
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
 
-
-
 class UserFileInfoTreeview():
     def __init__(self, playlist=None):
+        self.fullscreen = False
         self.playlist = playlist
         self.init_store()
         self.init_treeview()
@@ -222,10 +221,11 @@ class UserFileInfoTreeview():
                 obj[key] = getattr(file_info, key, -100000)
             playlist_rows.append(obj)
 
-        if len(playlist_rows) == 0:
-            self.treeview.hide()
-        else:
-            self.treeview.show()
+        if not self.fullscreen:
+            if len(playlist_rows) == 0:
+                self.treeview.hide()
+            else:
+                self.treeview.show()
 
         if playlist_rows == store_rows:
             logger.debug("Nothing has changed not updating treeview.")
@@ -303,6 +303,16 @@ class FmpPlaylist(Playlist):
         self.update_treeview()
 
         GObject.timeout_add_seconds(5, self.update_treeview)
+        self.player.window.connect('key-press-event', self.on_key_press)
+
+    def on_key_press(self, widget, event):
+        keyname = Gdk.keyval_name(event.keyval)
+        if self.player.fullscreen:
+            self.user_file_info_treeview.treeview.hide()
+        else:
+            self.user_file_info_treeview.treeview.show()
+        
+        self.user_file_info_treeview.fullscreen = self.player.fullscreen
 
     def update_treeview(self):
         print "="*100

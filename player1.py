@@ -98,7 +98,7 @@ def threads_leave(*args):
         print "LEAVE " + " ".join(map(str, args))
 
 TOP_SPAN = '<span foreground="black" size="large"><b>%s</b></span>'
-PACK_PADDING = 3
+PACK_PADDING = 0
 
 class PlayerError(Exception):
     def __init__(self, value):
@@ -122,6 +122,7 @@ class Player(GObject.GObject, Log):
     def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
         # Player.__init__()
         GObject.GObject.__init__(self)
+        self.fullscreen = False
         self.debug_messages = []
         self.artist_title = ""
         self.artist = ""
@@ -481,6 +482,20 @@ class Player(GObject.GObject, Log):
         if keyname in ("q", "Escape"):
             self.quit()
             return True
+
+        if keyname in ('f', 'F'):
+            if self.fullscreen:
+                self.window.unfullscreen()
+                self.bottom_hbox.show()
+                self.stack_switcher.show()
+                self.top_hbox.show()
+                self.fullscreen = False
+            else:
+                self.window.fullscreen()
+                self.bottom_hbox.hide()
+                self.stack_switcher.hide()
+                self.top_hbox.hide()
+                self.fullscreen = True
 
         return False
 

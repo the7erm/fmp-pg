@@ -33,6 +33,14 @@ from ws4py.messaging import TextMessage, BinaryMessage
 import json
 
 from time import time
+import os
+
+try:
+    from db.db import *
+except:
+    from sys import path
+    path.append("../")
+    from db.db import *
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -117,6 +125,35 @@ class FmpServer(object):
         json_response['gen_time'] = "%s" % gen_time
         
         return json.dumps(json_response)
+
+    @cherrypy.expose
+    def download(self, fid=None, eid=None):
+        if fid is not None:
+            sql = """SELECT dirname, basename
+                     FROM file_locations
+                     WHERE fid = %(fid)s"""
+            files = get_results_assoc_dict(sql, {"fid": fid})
+            for f in files:
+                filename = os.path.join(f['dirname'], f['basename'])
+                if os.path.exists(filename):
+                    return cherrypy.lib.static.serve_file(
+                        filename, "application/x-download",
+                        "attachment", f['basename'])
+
+        if eid is not None:
+            sql = """SELECT episode_url, local_file
+                     FROM netcast_episodes
+                     WHERE eid = %(eid)s"""
+            files = get_results_assoc_dict(sql, {"eid": eid})
+            for f in files:
+                filename = f['local_file']
+                if os.path.exists(filename):
+                    return cherrypy.lib.static.serve_file(
+                        filename, "application/x-download",
+                        "attachment", os.path.basename(filename))
+
+        return cherrypy.NotFound()
+        
 
 
 
