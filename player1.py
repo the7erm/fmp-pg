@@ -471,7 +471,7 @@ class Player(GObject.GObject, Log):
             self.position = "+30"
             return True
 
-        if keyname in ('Page_Down','KP_Page_Down', 'KP_Next'):
+        if keyname in ('Page_Down','KP_Page_Down'):
             self.position = "-15"
             return True
 

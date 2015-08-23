@@ -306,13 +306,14 @@ class FmpPlaylist(Playlist):
         self.player.window.connect('key-press-event', self.on_key_press)
 
     def on_key_press(self, widget, event):
+        res = super(FmpPlaylist, self).on_key_press(widget, event)
         keyname = Gdk.keyval_name(event.keyval)
-        if self.player.fullscreen:
-            self.user_file_info_treeview.treeview.hide()
-        else:
-            self.user_file_info_treeview.treeview.show()
-        
-        self.user_file_info_treeview.fullscreen = self.player.fullscreen
+        if keyname in ('f', 'F'):
+            if self.player.fullscreen:
+                self.user_file_info_treeview.treeview.hide()
+            else:
+                self.user_file_info_treeview.treeview.show()
+            self.user_file_info_treeview.fullscreen = self.player.fullscreen
 
     def update_treeview(self):
         print "="*100
