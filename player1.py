@@ -123,6 +123,7 @@ class Player(GObject.GObject, Log):
         # Player.__init__()
         GObject.GObject.__init__(self)
         self.fullscreen = False
+        self.is_video = False
         self.debug_messages = []
         self.artist_title = ""
         self.artist = ""
@@ -311,9 +312,21 @@ class Player(GObject.GObject, Log):
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
+            self.is_video = True
         else:
             self.drawingarea.hide()
             self.alt_drawingarea_vbox.show()
+            self.is_video = False
+
+        if self.is_video and self.fullscreen:
+            self.bottom_hbox.hide()
+            self.stack_switcher.hide()
+            self.top_hbox.hide()
+        else:
+            self.bottom_hbox.show()
+            self.stack_switcher.show()
+            self.top_hbox.show()
+
 
     def get_time_status(self):
         # Player.get_time_status()
@@ -485,17 +498,13 @@ class Player(GObject.GObject, Log):
 
         if keyname in ('f', 'F'):
             if self.fullscreen:
-                self.window.unfullscreen()
-                self.bottom_hbox.show()
-                self.stack_switcher.show()
-                self.top_hbox.show()
                 self.fullscreen = False
+                self.window.unfullscreen()
             else:
-                self.window.fullscreen()
-                self.bottom_hbox.hide()
-                self.stack_switcher.hide()
-                self.top_hbox.hide()
                 self.fullscreen = True
+                self.window.fullscreen()
+            self.show_video_window()
+                
 
         return False
 

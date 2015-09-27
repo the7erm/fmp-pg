@@ -36,6 +36,7 @@ from picker import picker
 picker.wait = wait
 fobjs.preload_class.wait = wait
 from gui.RatingTrayIcon import RatingTrayIcon
+import gui.ListenersTable as ListenersTable
 
 from pprint import pprint
 from time import sleep
@@ -63,6 +64,7 @@ logger = logging.getLogger(__name__)
 class UserFileInfoTreeview():
     def __init__(self, playlist=None):
         self.fullscreen = False
+        self.is_video = False
         self.playlist = playlist
         self.init_store()
         self.init_treeview()
@@ -221,11 +223,10 @@ class UserFileInfoTreeview():
                 obj[key] = getattr(file_info, key, -100000)
             playlist_rows.append(obj)
 
-        if not self.fullscreen:
-            if len(playlist_rows) == 0:
-                self.treeview.hide()
-            else:
-                self.treeview.show()
+        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video):
+            self.treeview.hide()
+        else:
+            self.treeview.show()
 
         if playlist_rows == store_rows:
             logger.debug("Nothing has changed not updating treeview.")
@@ -274,6 +275,18 @@ class FmpPlayer(Player):
         img_path = self.get_img_path()
         self.window.set_icon_from_file(os.path.join(img_path, "fmp-logo.svg"))
 
+    def init_debug_window(self):
+        self.init_listeners_window()
+        super(FmpPlayer, self).init_debug_window()
+
+    def init_listeners_window(self):
+        self.listeners_scrolled_window = Gtk.ScrolledWindow()
+        self.listeners_scrolled_window.add(ListenersTable.treeview)
+        self.stack.add_titled(self.listeners_scrolled_window, 
+                              "Listeners",
+                              "Listeners")
+        return
+
     def json(self):
         res = {
             'artist_title': self.artist_title,
@@ -309,11 +322,9 @@ class FmpPlaylist(Playlist):
         res = super(FmpPlaylist, self).on_key_press(widget, event)
         keyname = Gdk.keyval_name(event.keyval)
         if keyname in ('f', 'F'):
-            if self.player.fullscreen:
-                self.user_file_info_treeview.treeview.hide()
-            else:
-                self.user_file_info_treeview.treeview.show()
+            self.user_file_info_treeview.is_video = self.player.is_video
             self.user_file_info_treeview.fullscreen = self.player.fullscreen
+            self.user_file_info_treeview.update(self)
 
     def update_treeview(self):
         print "="*100
@@ -526,4 +537,7 @@ playlist.player.state = state
 cherry_py_thread = threading.Thread(target=server.cherry_py_worker)
 cherry_py_thread.start()
 
+print "**** TEST ****"
+res = get_unlistend_episode()
+print "TEST:", res
 Gtk.main()

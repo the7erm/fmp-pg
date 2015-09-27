@@ -95,7 +95,7 @@ class RatingTrayIcon(Log):
         self.menu.append(quit_item)
 
     def init_menu_ratings(self):
-        for i in range(5, 0, -1):
+        for i in range(5, -1, -1):
             item = Gtk.ImageMenuItem("%s" % i)
             item.connect("activate", self.on_menuitem_clicked)
             img = Gtk.Image.new_from_file(os.path.join(IMAGE_PATH, "rate.%s.svg" % i))

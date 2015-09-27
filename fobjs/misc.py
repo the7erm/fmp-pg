@@ -175,7 +175,7 @@ def get_unlistend_episode(listeners=None, limit=1):
                    ne.nid = ns.nid AND
                    nle.uid IS NULL AND
                    n.nid = ne.nid
-             ORDER BY ne.pub_date DESC
+             ORDER BY ne.pub_date ASC
              LIMIT {limit}""".format(uids=",".join(uids), limit=limit)
 
     from netcast_episode_class import Netcast_FObj

@@ -42,9 +42,52 @@ logger = logging.getLogger(__name__)
 log = logger
 populate_preload_all_locked = False
 
+
+DEFAULT_RATING = 6
+DEFAULT_SCORE = 10
+DEFAULT_TRUE_SCORE = (
+                        (DEFAULT_RATING * 2 * 10) + 
+                        (DEFAULT_SCORE * 10)
+                     ) / 2.0
+DEFAULT_PERCENT_PLAYED = 0
+
 def wait():
     Gdk.threads_leave()
     return
+
+def insert_missing_files_for_uid(uid):
+    insert_spec = {
+        'default_rating': DEFAULT_RATING,
+        'default_score': DEFAULT_SCORE,
+        'default_true_score': DEFAULT_TRUE_SCORE,
+        'default_percent_played': DEFAULT_PERCENT_PLAYED,
+        'uid': uid
+    }
+    insert_sql = """INSERT INTO user_song_info (uid, fid, rating, score, 
+                                                true_score, percent_played) """
+
+    sql = """SELECT DISTINCT %(uid)s AS uid, 
+                    f.fid AS fid, 
+                    %(default_rating)s AS rating, 
+                    %(default_score)s AS score, 
+                    %(default_true_score)s AS true_score,
+                    %(default_percent_played)s AS percent_played
+             FROM file_locations f LEFT JOIN user_song_info usi ON 
+                                    usi.uid = %(uid)s AND
+                                    usi.fid = f.fid
+             WHERE usi.fid IS NULL"""
+
+    results = get_results_assoc_dict(sql, insert_spec)
+    for r in results:
+        print "MISSING:", r
+
+    print sql % insert_spec
+    print "INSERTING"
+    inserted = get_results_assoc_dict(insert_sql + sql + " RETURNING * ",
+                                      insert_spec)
+    for r in inserted:
+        print "INSERTED:", r
+
 
 def get_files_from_preload(listeners=None):
     logger.debug("get_files_from_preload()")
@@ -297,6 +340,9 @@ def populate_pick_from(listeners=None):
     listeners = _listeners(listeners)
     clear_pick_from()
     listeners = _listeners(listeners)
+    for l in listeners:
+        insert_missing_files_for_uid(l['uid'])
+
     sql = """INSERT INTO pick_from (fid)
              SELECT fid FROM files"""
     query(sql)

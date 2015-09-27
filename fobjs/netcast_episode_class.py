@@ -103,6 +103,9 @@ class Netcast_FObj(FObj_Class, Log):
         super(Netcast_FObj, self).__init__(*args, **kwargs)
         if self.dbInfo == {}:
             self.insert()
+
+    def __repr__(self):
+        return ('<Netcast_FObj filename=%r>\n' % self.filename)
         
     def mark_as_played(self, **sql_args):
         self.listeners.mark_as_played(**sql_args)
