@@ -28,6 +28,7 @@ class Local_FObj(FObj_Class):
     __name__ == "Local_FObj"
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
+        self.artistDbInfo = []
         self.clean()
         self.real_filename = kwargs.get('filename', "")
         self.insert_new = kwargs.get("insert", False)
@@ -87,10 +88,15 @@ class Local_FObj(FObj_Class):
     def load_from_fid(self, fid):
         if not fid:
             return {}
+        spec = {'fid': fid}
         sql = """SELECT *
-                 FROM files
+                 FROM files f
                  WHERE fid = %(fid)s"""
-        self.dbInfo = get_assoc_dict(sql, {'fid': fid})
+        self.dbInfo = get_assoc_dict(sql, spec)
+        sql = """SELECT *
+                 FROM artists a, file_artists fa
+                 WHERE fa.aid = a.aid AND fa.fid = %(fid)s"""
+        self.artistDbInfo = get_results_assoc_dict(sql, spec)
 
     def insert(self):
         print "TODO INSERT"

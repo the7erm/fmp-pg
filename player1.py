@@ -151,7 +151,7 @@ class Player(GObject.GObject, Log):
         self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
         self.temp_height = 0
         self.temp_width = 0
-        
+        self.show_controls_time = 0
         self.window = Gtk.Window()
         self.init_window_image()
         self.window.set_default_size(400, 300)
@@ -159,10 +159,11 @@ class Player(GObject.GObject, Log):
         self.window.set_title("Video-Player")
         
         self.window.add_events(Gdk.EventMask.KEY_PRESS_MASK |
-                               Gdk.EventMask.POINTER_MOTION_MASK |
                                Gdk.EventMask.BUTTON_PRESS_MASK |
                                Gdk.EventMask.SCROLL_MASK |
-                               Gdk.EventMask.SMOOTH_SCROLL_MASK )
+                               Gdk.EventMask.SMOOTH_SCROLL_MASK | 
+                               Gdk.EventMask.POINTER_MOTION_MASK |
+                               Gdk.EventMask.POINTER_MOTION_HINT_MASK)
         
         self.main_vbox = Gtk.VBox()
         self.window.add(self.main_vbox)
@@ -213,6 +214,7 @@ class Player(GObject.GObject, Log):
         self.main_vbox.pack_start(self.stack, True, True, PACK_PADDING)
 
     def init_drawing_area(self):
+
         self.drawingarea = Gtk.DrawingArea()
         self.init_alt_drawing_area()
 
@@ -223,6 +225,10 @@ class Player(GObject.GObject, Log):
                                         PACK_PADDING)
         self.video_area_vbox.show_all()
         self.stack.add_titled(self.video_area_vbox, "Video", "Video")
+        self.drawingarea.add_events(Gdk.EventMask.POINTER_MOTION_MASK |
+                                    Gdk.EventMask.POINTER_MOTION_HINT_MASK)
+
+        self.drawingarea.connect("motion-notify-event", self.show_controls)
 
     def init_alt_drawing_area(self):
         self.alt_drawingarea_vbox = Gtk.VBox()
@@ -293,12 +299,15 @@ class Player(GObject.GObject, Log):
         self.window.connect("scroll-event", self.on_scroll)
         self.window.connect('destroy', self.quit)
         self.window.connect("check_resize", self.on_check_resize)
+        # self.window.connect("motion_notify_event", self.on_motion_notify)
         self.window.show_all()
 
         try:
             self.xid = self.drawingarea.get_property('window').get_xid()
         except AttributeError, e:
             print "AttributeError:", e
+
+    
 
     def on_artist_title_changed(self, player, artist_title):
         # self.file_label.set_text(artist_title)
@@ -318,14 +327,7 @@ class Player(GObject.GObject, Log):
             self.alt_drawingarea_vbox.show()
             self.is_video = False
 
-        if self.is_video and self.fullscreen:
-            self.bottom_hbox.hide()
-            self.stack_switcher.hide()
-            self.top_hbox.hide()
-        else:
-            self.bottom_hbox.show()
-            self.stack_switcher.show()
-            self.top_hbox.show()
+        self.hide_controls()
 
 
     def get_time_status(self):
@@ -466,6 +468,7 @@ class Player(GObject.GObject, Log):
         # Player.on_key_press()
         Gdk.threads_leave()
         keyname = Gdk.keyval_name(event.keyval)
+        self.show_controls()
         self.log_debug(".on_key_press:%s", keyname)
         self.push_status("Player.on_key_press:"+keyname)
         if keyname in ('space', 'Return'):
@@ -505,17 +508,30 @@ class Player(GObject.GObject, Log):
                 self.window.fullscreen()
             self.show_video_window()
                 
-
         return False
 
     def show_controls(self, *args, **kwargs):
-        # Player.show_controls()
-        return
+        if self.is_video and self.fullscreen:
+            self.bottom_hbox.show()
+            self.stack_switcher.show()
+            self.top_hbox.show()
+            self.show_controls_time = time()
+
+    def hide_controls(self, *args, **kwargs):
+        if self.is_video and self.fullscreen and self.show_controls_time < (time() - 5):
+            self.bottom_hbox.hide()
+            self.stack_switcher.hide()
+            self.top_hbox.hide()
+        else:
+            self.bottom_hbox.show()
+            self.stack_switcher.show()
+            self.top_hbox.show()
 
     def pause(self, *args, **kwargs):
         # Player.pause()
         Gdk.threads_leave()
         self.state = 'TOGGLE'
+        self.show_controls()
 
     def on_scroll(self, widget, event):
         # Player.on_scroll()
@@ -524,6 +540,7 @@ class Player(GObject.GObject, Log):
             self.position = "+5"
         if event.direction == Gdk.ScrollDirection.DOWN:
             self.position = "-5"
+        self.show_controls()
 
     @property
     def position(self):

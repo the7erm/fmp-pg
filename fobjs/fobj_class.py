@@ -51,6 +51,9 @@ class FObj_Class(Log):
         if hasattr(self, 'listeners'):
             dbInfo['user_file_info'] = self.listeners.json()
 
+        if hasattr(self, 'artistDbInfo'):
+            dbInfo['artists'] = jsonize(self.artistDbInfo)
+
         if 'plid' in self.kwargs:
             kwargs = deepcopy(self.kwargs)
             if 'listeners' in kwargs:

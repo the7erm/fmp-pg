@@ -55,15 +55,25 @@
                     if (typeof obj['player-playing']  != 'undefined') {
                         var artist_title = "",
                             aritst = "",
-                            title = "";
+                            title = obj['player-playing']['title'] || "";
+                        
                         if (typeof obj['player-playing']['episode_title'] != 'undefined') {
                             artist = obj['player-playing']['netcast_name'] || "";
                             title = obj['player-playing']['episode_title'] || "";
                         }
+                        if (typeof obj['player-playing']['artists'] != 'undefined' && obj['player-playing']['artists']) {
+                            artist = obj['player-playing']['artists'][0]['artist'] || "";
+                        }
+
+
                         if (artist) {
                             artist_title = artist;
                         }
-                        artist_title += " - "+ title;
+                        if (artist) {
+                            artist_title += " - "+ title;
+                        } else {
+                            artist_title = title;
+                        }
                         $("#artist_title").text(artist_title);
                         console.log("artist-title:", artist_title)
                     }
