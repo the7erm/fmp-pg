@@ -39,12 +39,11 @@ from gui.RatingTrayIcon import RatingTrayIcon
 import gui.ListenersTable as ListenersTable
 
 from pprint import pprint
-from time import sleep
+from time import sleep, time
 from config import cfg
 from copy import deepcopy
 import cherry_py_server.server as server
 
-from time import time
 server.wait = wait
 
 
@@ -71,6 +70,40 @@ class UserFileInfoTreeview():
         self.init_treeview_cols()
         self.init_cells()
         self.pack_treeview_cols()
+
+    def on_fullscreen(self, *args, **kwargs):
+        print "on_fullscreen:", args, kwargs
+        """self.player.connect("fullscreen", 
+                            self.user_file_info_treeview.on_fullscreen)
+        self.player.connect("hide-controls", 
+                            self.user_file_info_treeview.on_hide_controls)
+        self.player.connect("show-controls", 
+                            self.user_file_info_treeview.on_show_controls)"""
+        self.show_hide_controls()
+
+    def show_hide_controls(self, *args, **kwargs):
+        playlist_rows = []
+        playlist = self.playlist
+        for file_info in playlist.files[playlist.index].listeners.user_file_info:
+            if not file_info.fid:
+                continue
+            obj = {}
+            for key in self.store_col_indexes.keys():
+                obj[key] = getattr(file_info, key, -100000)
+            playlist_rows.append(obj)
+        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and 
+           not self.playlist.player.showing_controls):
+            self.treeview.hide()
+        else:
+            self.treeview.show()
+
+    def on_hide_controls(self, *args, **kwargs):
+        print "on_hide_controls:", args, kwargs
+        self.show_hide_controls()
+
+    def on_show_controls(self, *args, **kwargs):
+        print "on_show_controls:", args, kwargs
+        self.show_hide_controls()
 
     def init_store(self):
         # uid, uname, fid, rating, score, true_score
@@ -223,7 +256,8 @@ class UserFileInfoTreeview():
                 obj[key] = getattr(file_info, key, -100000)
             playlist_rows.append(obj)
 
-        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video):
+        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and 
+           not self.playlist.player.showing_controls):
             self.treeview.hide()
         else:
             self.treeview.show()
@@ -304,12 +338,17 @@ class FmpPlaylist(Playlist):
 
     def __init__(self, *args, **kwargs):
         kwargs['player'] = FmpPlayer()
-        self.user_file_info_treeview = UserFileInfoTreeview(self)
         self.last_marked_as_played = 0
         self.last_position = -1
+        self.user_file_info_treeview = UserFileInfoTreeview(self)
         super(FmpPlaylist, self).__init__(*args, **kwargs)
         self.user_file_info_tray = RatingTrayIcon(self)
-
+        self.player.connect("fullscreen", 
+                            self.user_file_info_treeview.show_hide_controls)
+        self.player.connect("hide-controls", 
+                            self.user_file_info_treeview.show_hide_controls)
+        self.player.connect("show-controls", 
+                            self.user_file_info_treeview.show_hide_controls)
         self.player.video_area_vbox.pack_start(
             self.user_file_info_treeview.treeview, False, False, 0)
         self.user_file_info_treeview.treeview.show()

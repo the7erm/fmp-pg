@@ -117,13 +117,20 @@ class Player(GObject.GObject, Log):
         'time-status': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
                         (object,)),
         'artist-title-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
-                                (object,)),
+                                 (object,)),
+        'hide-controls': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+                          (object,)),
+        'fullscreen': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+                          (object,)),
+        'show-controls': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+                          (object,)),
     }
     def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
         # Player.__init__()
         GObject.GObject.__init__(self)
         self.fullscreen = False
         self.is_video = False
+        self.showing_controls = True
         self.debug_messages = []
         self.artist_title = ""
         self.artist = ""
@@ -507,25 +514,32 @@ class Player(GObject.GObject, Log):
                 self.fullscreen = True
                 self.window.fullscreen()
             self.show_video_window()
+            self.show_controls()
+            self.emit('fullscreen', self.fullscreen)
                 
         return False
 
     def show_controls(self, *args, **kwargs):
         if self.is_video and self.fullscreen:
+            self.show_controls_time = time()
             self.bottom_hbox.show()
             self.stack_switcher.show()
             self.top_hbox.show()
-            self.show_controls_time = time()
+            self.emit('show-controls', {})
 
     def hide_controls(self, *args, **kwargs):
         if self.is_video and self.fullscreen and self.show_controls_time < (time() - 5):
+            self.showing_controls = False
             self.bottom_hbox.hide()
             self.stack_switcher.hide()
             self.top_hbox.hide()
+            self.emit('hide-controls', {})
         else:
+            self.showing_controls = True
             self.bottom_hbox.show()
             self.stack_switcher.show()
             self.top_hbox.show()
+            self.emit('show_controls', {})
 
     def pause(self, *args, **kwargs):
         # Player.pause()
