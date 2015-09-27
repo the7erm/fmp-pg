@@ -5,6 +5,8 @@
               type="image/svg+xml" 
               href="/static/fmp-logo.svg">
         <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+        <script src="/static/js/angular.min.js"></script>
+        <script src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
         <script type="text/javascript">
 
             function connecWs() {
@@ -56,7 +58,7 @@
                         var artist_title = "",
                             aritst = "",
                             title = obj['player-playing']['title'] || "";
-                        
+
                         if (typeof obj['player-playing']['episode_title'] != 'undefined') {
                             artist = obj['player-playing']['netcast_name'] || "";
                             title = obj['player-playing']['episode_title'] || "";

@@ -44,7 +44,7 @@ populate_preload_all_locked = False
 
 
 DEFAULT_RATING = 6
-DEFAULT_SCORE = 10
+DEFAULT_SCORE = 5
 DEFAULT_TRUE_SCORE = (
                         (DEFAULT_RATING * 2 * 10) + 
                         (DEFAULT_SCORE * 10)

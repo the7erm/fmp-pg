@@ -168,7 +168,10 @@ class TableSkel:
         for s in self.subqueries:
             self.perform_subquery(r, s)
         for c in self.cols:
-            key = c['table_col']
+            try:
+                key = c['table_col']
+            except KeyError:
+                continue
             try:
                 cast = c['typ'](r[key])
             except TypeError, e:
@@ -177,6 +180,8 @@ class TableSkel:
                     cast = 0
                 if 'float()' in e and 'NoneType' in e:
                     cast = 0
+            except KeyError:
+                continue
             row.append(cast)
         return row
 
