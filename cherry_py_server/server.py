@@ -48,17 +48,24 @@ cherrypy.tools.websocket = WebSocketTool()
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
         print "received_message:", m
-        return
-        # cherrypy.engine.publish('websocket-broadcast', m)
-
-    def opened(self):
         broadcast({
             "CONNECTED": "OK", 
             "time": "%s" % utcnow().isoformat() 
         })
+        broadcast({
+            "player-playing": playlist.files[playlist.index].json()
+        })
+        playlist.force_broadcast_time()
+        return
+        # cherrypy.engine.publish('websocket-broadcast', m)
+
+    def opened(self):
+        print "OPENED"
+        
 
     def closed(self, code, reason="A client left the room without a proper explanation."):
-        cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
+        return
+        # cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
 
 cherrypy.config.update({
     'server.socket_port': 5050,
@@ -73,6 +80,8 @@ class FmpServer(object):
     @cherrypy.expose
     def index(self):
         print "cherrypy.request.local:", cherrypy.request.local
+
+
         return open('templates/index.html', 'r').read() % {
             'host': 'localhost', 
             'port': 5050, 
@@ -153,8 +162,6 @@ class FmpServer(object):
                         "attachment", os.path.basename(filename))
 
         return cherrypy.NotFound()
-        
-
 
 
 def cherry_py_worker():

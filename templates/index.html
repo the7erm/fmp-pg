@@ -26,7 +26,11 @@
                     setTimeout(connecWs, 10000);
                     return;
                 }
+                ws.onopen = function(evt) {
+                    ws.send(JSON.stringify({"connected": "ok"}));
+                };
                 ws.onmessage = function (evt) {
+                    console.log("EVT:", evt);
                     var obj = JSON.parse(evt.data);
                     console.log("evt.data:", obj);
                     if (typeof obj['time-status'] != 'undefined') {
@@ -47,11 +51,27 @@
                             $(".play-pause").text('Play');
                         }
                     }
+
+                    if (typeof obj['player-playing']  != 'undefined') {
+                        var artist_title = "",
+                            aritst = "",
+                            title = "";
+                        if (typeof obj['player-playing']['episode_title'] != 'undefined') {
+                            artist = obj['player-playing']['netcast_name'] || "";
+                            title = obj['player-playing']['episode_title'] || "";
+                        }
+                        if (artist) {
+                            artist_title = artist;
+                        }
+                        artist_title += " - "+ title;
+                        $("#artist_title").text(artist_title);
+                        console.log("artist-title:", artist_title)
+                    }
                 };
 
                 ws.onclose = function(evt) {
                     $('#time-status').text("Server closed");
-                    setTimeout(connecWs, 3000);
+                    setTimeout(connecWs, 5000);
                 };
             }
             $(document).ready(function() {
@@ -73,14 +93,21 @@
                 
             });
         </script>
+        <style>
+            #conneted {
+                bottom:0px;
+                position: absolute;
+            }
+        </style>
     </head>
     <body>
-       <div id="conneted"></div>
-       <button id="prev">Prev</button>
-       <button class="play-pause">Pause</button>
-       <button id="next">Next</button>
-       <span id="time-status"></span>
+        <div id="artist_title"></div>
+        
+        <button id="prev">Prev</button>
+        <button class="play-pause">Pause</button>
+        <button id="next">Next</button>
+        <span id="time-status"></span>
 
-
+        <div id="conneted"></div>
     </body>
 </html>

@@ -138,10 +138,12 @@ class Netcast_FObj(FObj_Class, Log):
         if not local_file:
             return
         sql = """SELECT *
-                 FROM netcast_episodes
+                 FROM netcast_episodes ne 
+                      LEFT JOIN netcasts ns ON ns.nid = ne.nid
                  WHERE local_file = %(local_file)s
                  LIMIT 1"""
         self.dbInfo = get_assoc_dict(sql, {'local_file': local_file})
+
 
     @property
     def eid(self):
@@ -161,7 +163,8 @@ class Netcast_FObj(FObj_Class, Log):
         if not eid:
             return
         sql = """SELECT *
-                 FROM netcast_episodes
+                 FROM netcast_episodes ne
+                      LEFT JOIN netcasts ns ON ns.nid = ne.nid
                  WHERE eid = %(eid)s"""
         self.dbInfo = get_assoc_dict(sql, {'eid': eid})
 
@@ -179,7 +182,8 @@ class Netcast_FObj(FObj_Class, Log):
         if not episode_url:
             return
         sql = """SELECT *
-                 FROM netcast_episodes
+                 FROM netcast_episodes ne
+                      LEFT JOIN netcasts ns ON ns.nid = ne.nid
                  WHERE episode_url = %(episode_url)s"""
         dbInfo = get_assoc_dict(sql, {'episode_url': episode_url})
         if not dbInfo:

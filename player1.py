@@ -472,11 +472,11 @@ class Player(GObject.GObject, Log):
             self.pause()
             return True
 
-        if keyname in ('Up', 'KP_Up'):
+        if keyname in ('Up', 'KP_Up', 'AudioForward'):
             self.position = "+5"
             return True
 
-        if keyname in ('Down', 'KP_Down'):
+        if keyname in ('Down', 'KP_Down', 'AudioRewind'):
             self.position = "-5"
             return True
 
@@ -1001,11 +1001,11 @@ class Playlist(Log):
         keyname = Gdk.keyval_name(event.keyval)
         self.log_debug(".on_key_press keyname:%s", keyname)
         
-        if keyname in ('Right', 'KP_Right'):
+        if keyname in ('Right', 'KP_Right', 'AudioNext'):
             self.next()
             return True
 
-        if keyname in ('Left', 'KP_Left'):
+        if keyname in ('Left', 'KP_Left', 'AudioPrev'):
             self.prev()
             return True
 

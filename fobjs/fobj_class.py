@@ -56,9 +56,10 @@ class FObj_Class(Log):
             if 'listeners' in kwargs:
                 del kwargs['listeners']
             dbInfo['preloadInfo'] = jsonize(kwargs)
-        elif 'nid' in self.kwargs and 'eid' in self.kwargs and \
+        elif 'eid' in self.kwargs and \
             self.kwargs.get('eid'):
-                dbInfo['netcastInfo'] = jsonize(self.kwargs)
+                kwargs = deepcopy(self.kwargs)
+                dbInfo['netcastInfo'] = jsonize(kwargs)
         elif 'fid' in self.kwargs and self.kwargs.get('fid'):
             dbInfo['fileInfo'] = jsonize(self.kwargs)
         else:

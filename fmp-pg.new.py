@@ -379,6 +379,7 @@ class FmpPlaylist(Playlist):
         state = player.state_to_string(state)
         cfg.set('player_state', 'state', state , str)
         server.broadcast({"state-changed": state})
+        server.broadcast({"player-playing": self.files[self.index].json()})
 
     def mark_as_played(self, player, time_status):
         Gdk.threads_leave()
@@ -403,15 +404,20 @@ class FmpPlaylist(Playlist):
         except AttributeError:
             sys.exit()
         
+    def force_broadcast_time(self):
+        if not hasattr(self, 'last_time_status'):
+            self.last_time_status = {}
+        self.broadcast_time(self.player, self.last_time_status, True)
         
-    def broadcast_time(self, player, time_status):
+    def broadcast_time(self, player, time_status, force=False):
         Gdk.threads_leave()
         if not hasattr(self, 'last_time_status'):
             self.last_time_status = {}
-        if time_status == self.last_time_status:
+        if time_status == self.last_time_status and not force:
             return
         self.last_time_status = deepcopy(time_status)
         time_status['now'] = "%s" % time_status['now']
+
         server.broadcast({"time-status": time_status})
 
     def next(self, *args, **kwargs):
