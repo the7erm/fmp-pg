@@ -48,6 +48,9 @@ class FObj_Class(Log):
 
     def json(self):
         dbInfo = jsonize(self.dbInfo)
+        if hasattr(self, 'reason'):
+            dbInfo['reason'] = self.reason
+            
         if hasattr(self, 'listeners'):
             dbInfo['user_file_info'] = self.listeners.json()
 

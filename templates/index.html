@@ -1,104 +1,39 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="fmpApp">
     <head>
         <link rel="icon" 
               type="image/svg+xml" 
               href="/static/fmp-logo.svg">
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+        
         <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+        <!-- Latest compiled and minified JavaScript -->
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+        
         <script src="/static/js/angular.min.js"></script>
+        <script src="/static/js/angular-websocket.js"></script>
         <script src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
+        
+        <script src="/static/js/fmp.js"></script>
         <script type="text/javascript">
-
-            function connecWs() {
-                console.log("connecting....");
-                websocket = 'ws://localhost:5050/ws';
-                try {
-                    if (window.WebSocket) {
-                        ws = new WebSocket(websocket);
-                    }
-                    else if (window.MozWebSocket) {
-                        ws = MozWebSocket(websocket);
-                    }
-                    else {
-                        $('#time-status').text("WebSocket Not Supported");
-                        return;
-                    }
-                } catch (e) {
-                    console.log("Catch:", e)
-                    setTimeout(connecWs, 10000);
-                    return;
-                }
-                ws.onopen = function(evt) {
-                    ws.send(JSON.stringify({"connected": "ok"}));
-                };
-                ws.onmessage = function (evt) {
-                    console.log("EVT:", evt);
-                    var obj = JSON.parse(evt.data);
-                    console.log("evt.data:", obj);
-                    if (typeof obj['time-status'] != 'undefined') {
-                        $('#time-status').text(obj['time-status']['str']);
-                        return;
-                    }
-
-                    if (typeof obj['CONNECTED'] != 'undefined') {
-                        $('#conneted').text(evt.data);
-                        return;
-                    }
-
-                    if (typeof obj['state-changed'] != 'undefined') {
-                        if (obj['state-changed'] == 'PLAYING') {
-                            $(".play-pause").text('Pause');
-                        }
-                        if (obj['state-changed'] == 'PAUSED') {
-                            $(".play-pause").text('Play');
-                        }
-                    }
-
-                    if (typeof obj['player-playing']  != 'undefined') {
-                        var artist_title = "",
-                            aritst = "",
-                            title = obj['player-playing']['title'] || "";
-
-                        if (typeof obj['player-playing']['episode_title'] != 'undefined') {
-                            artist = obj['player-playing']['netcast_name'] || "";
-                            title = obj['player-playing']['episode_title'] || "";
-                        }
-                        if (typeof obj['player-playing']['artists'] != 'undefined' && obj['player-playing']['artists']) {
-                            artist = obj['player-playing']['artists'][0]['artist'] || "";
-                        }
-
-
-                        if (artist) {
-                            artist_title = artist;
-                        }
-                        if (artist) {
-                            artist_title += " - "+ title;
-                        } else {
-                            artist_title = title;
-                        }
-                        $("#artist_title").text(artist_title);
-                        console.log("artist-title:", artist_title)
-                    }
-                };
-
-                ws.onclose = function(evt) {
-                    $('#time-status').text("Server closed");
-                    setTimeout(connecWs, 5000);
-                };
-            }
             $(document).ready(function() {
-                connecWs();
-                $("#next").click(function(e) {
+                $("#next").on('click', function(e) {
                     e.preventDefault();
                     $.get("/next/");
                 });
 
-                $(".play-pause").click(function(e) {
+                $(".play-pause").on('click', function(e) {
                     e.preventDefault();
                     $.get("/pause/");
+                    console.log("pause");
                 });
 
-                $("#prev").click(function(e) {
+                $("#prev").on('click', function(e) {
+                    console.log("clicked");
                     e.preventDefault();
                     $.get("/prev/");
                 });
@@ -110,16 +45,65 @@
                 bottom:0px;
                 position: absolute;
             }
+            #time-status {
+                float:right;
+            }
+            .yellow-star  {
+                color:yellow;
+                -webkit-text-stroke: 1px black;
+                text-shadow: 1px 1px 0 #000,
+                            /* Simulated effect for Firefox and Opera
+                               and nice enhancement for WebKit */
+                           -1px -1px 0px #000,  
+                            1px -1px 0px #000,
+                           -1px  1px 0px #000,
+                            1px  1px 0px #000;
+            }
+            .grey-star  {
+                -webkit-text-stroke: 1px black;
+                color:#888;
+                text-shadow: 1px 1px 0 #000,
+                            /* Simulated effect for Firefox and Opera
+                               and nice enhancement for WebKit */
+                           -1px -1px 0px #000,  
+                            1px -1px 0px #000,
+                           -1px  1px 0px #000,
+                            1px  1px 0px #000;
+            }
         </style>
     </head>
     <body>
-        <div id="artist_title"></div>
-        
-        <button id="prev">Prev</button>
-        <button class="play-pause">Pause</button>
-        <button id="next">Next</button>
-        <span id="time-status"></span>
+        <section ng-controller="PlayerController">
+            <span id="time-status">{{PlayerData.collection.time_status}}</span>
+            <div>{{PlayerData.collection.artist_title}}</div>
+            <div>{{ PlayerData.collection.reason }}</div>
+            <button class="btn btn-default" id="prev">Prev</button>
+            <button class="btn btn-default play-pause">{{ PlayerData.collection.play_pause }}</button>
+            <button class="btn btn-default" id="next">Next</button>
+           
+            <table class="table">
+                <tr>
+                    <td>User</td>
+                    <td>Rating</td>
+                    <td>Score</td>
+                </tr>
+                <tr ng-repeat="(key, data) in PlayerData.collection.ratings">
+                    <td>{{data.uname}}</td>
+                    <td>
+                        <div ng-controller="RatingDemoCtrl">
+                            <rating ng-model="data.rating" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" state-on="'glyphicon-star yellow-star'" state-off="'glyphicon-star grey-star'" ></rating>
+                        </div>
 
-        <div id="conneted"></div>
+                    </td>
+                    <td>{{data.true_score}}</td>
+                </tr>
+            </table>
+            <div id="conneted"></div>
+            <ul>
+              <li ng-repeat="(key, data) in PlayerData.collection track by key">
+                {{key}}:{{ data }}
+              </li>
+            </ul>
+          </section>
     </body>
 </html>

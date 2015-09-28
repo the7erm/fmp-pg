@@ -34,12 +34,12 @@ import json
 
 from time import time
 import os
+import sys
 
 try:
     from db.db import *
 except:
-    from sys import path
-    path.append("../")
+    sys.path.append("../")
     from db.db import *
 
 WebSocketPlugin(cherrypy.engine).subscribe()
@@ -165,6 +165,7 @@ class FmpServer(object):
 
 
 def cherry_py_worker():
+    static_path = os.path.realpath(sys.path[0])
     cherrypy.quickstart(FmpServer(), '/', config={
         '/ws': {
             'tools.websocket.on': True,
@@ -177,6 +178,11 @@ def cherry_py_worker():
         '/static/fmp-logo.svg': {
             'tools.staticfile.on': True,
             'tools.staticfile.filename': "/home/erm/fmp-pg/static/fmp-logo.svg"
+        },
+        '/static/js': {
+            'tools.staticdir.root': static_path,
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': "static/js"
         }
     })
 

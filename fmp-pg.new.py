@@ -221,6 +221,7 @@ class UserFileInfoTreeview():
                 logger.debug("uid:%s rating:%s"  % (uid, rating))
                 file_info.rating = rating
                 self.ufi_store[path][true_score_idx] = file_info.true_score
+        self.playlist.broadcast_change()
 
     def pack_treeview_cols(self):
         for col_data in self.treeview_columns:
@@ -235,7 +236,7 @@ class UserFileInfoTreeview():
                 col.add_attribute(cell, "text", idx)
                 self.treeview.append_column(col)
 
-    def update(self, playlist):
+    def update(self, playlist, broadcast_change=True):
         store_rows = []
         for store_row in self.ufi_store:
             obj = {}
@@ -296,7 +297,8 @@ class UserFileInfoTreeview():
                 logger.debug("treeiter:%s" % treeiter)
         except Exception, e:
             logger.debug("Exception:%s" % e)
-
+        if broadcast_change:
+            server.broadcast({"player-playing": playlist.files[playlist.index].json()})
 
 
 class FmpPlayer(Player):
@@ -365,6 +367,14 @@ class FmpPlaylist(Playlist):
             self.user_file_info_treeview.fullscreen = self.player.fullscreen
             self.user_file_info_treeview.update(self)
 
+
+    def broadcast_change(self,  *args, **kwargs):
+        server.broadcast({"state-changed": self.player.state_string})
+        server.broadcast({"player-playing": self.files[self.index].json()})
+        self.user_file_info_treeview.update(self, broadcast_change=False)
+        if hasattr(self, 'user_file_info_tray'):
+            self.user_file_info_tray.on_artist_title_changed(broadcast_change=False)
+
     def update_treeview(self):
         print "="*100
         self.user_file_info_treeview.update(self)
@@ -417,8 +427,7 @@ class FmpPlaylist(Playlist):
         Gdk.threads_leave()
         state = player.state_to_string(state)
         cfg.set('player_state', 'state', state , str)
-        server.broadcast({"state-changed": state})
-        server.broadcast({"player-playing": self.files[self.index].json()})
+        self.broadcast_change()
 
     def mark_as_played(self, player, time_status):
         Gdk.threads_leave()
@@ -498,6 +507,7 @@ class FmpPlaylist(Playlist):
         except:
             pass
         preload.refresh()
+        server.broadcast({"player-playing": self.files[self.index].json()})
 
 
     def on_eos(self, bus, msg):

@@ -36,7 +36,7 @@ class UserFileInfo(UserFile, Log):
         return self.userFileDbInfo.get('rating', 6)
 
     def check_file_info(self):
-        if self.userFileDbInfo == {}:
+        if self.userFileDbInfo == {} or not self.userFileDbInfo.get('uname'):
             self.load_user_file_db_info()
 
     @rating.setter
@@ -154,6 +154,7 @@ class UserFileInfo(UserFile, Log):
                        fid = %(fid)s
                  LIMIT 1"""
         self.userFileDbInfo = get_assoc_dict(sql, sql_args)
+
 
     def json(self):
         self.check_file_info()

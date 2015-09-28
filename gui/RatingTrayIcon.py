@@ -49,12 +49,13 @@ class RatingTrayIcon(Log):
         self.ind = Gtk.StatusIcon()
         self.ind.connect("button-press-event", self.on_button_press)
 
-    def set_rating(self, rating, update=False):
+    def set_rating(self, rating, update=False, broadcast_change=True):
         self.ind.set_from_file(os.path.join(IMAGE_PATH, "rate.%s.svg" % rating))
 
         if update:
             self.log_debug("UPDATING")
             index = self.playlist.index
+            broadcast_change = True
             for file_info in self.playlist.files[index].listeners.user_file_info:
                 pprint(file_info)
                 if not file_info.fid:
@@ -64,6 +65,8 @@ class RatingTrayIcon(Log):
                 pprint(file_info)
                 file_info.rating = rating
                 break
+        if broadcast_change:
+            self.playlist.broadcast_change()
 
     def on_artist_title_changed(self, *args, **kwargs):
         print "*"*100
@@ -71,12 +74,13 @@ class RatingTrayIcon(Log):
         playlist = self.playlist
         index = self.playlist.index
         for file_info in self.playlist.files[index].listeners.user_file_info:
+            self.log_debug("<<<<<<<<<<<<<<<<<<<< THIS ")
             pprint(file_info)
             if not file_info.fid:
                 self.ind.set_visible(False)
                 continue
             self.ind.set_visible(True)
-            self.set_rating(file_info.rating)
+            self.set_rating(file_info.rating, **kwargs)
             break
         
     def on_button_press(self, icon, event, **kwargs):
