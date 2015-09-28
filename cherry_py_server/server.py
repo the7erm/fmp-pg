@@ -80,13 +80,27 @@ class FmpServer(object):
     @cherrypy.expose
     def index(self):
         print "cherrypy.request.local:", cherrypy.request.local
-
-
         return open('templates/index.html', 'r').read() % {
             'host': 'localhost', 
             'port': 5050, 
             'scheme': 'ws'
         }
+
+    @cherrypy.expose
+    def rate(self, *args, **kwargs):
+        spec = {
+            'uid': cherrypy.request.params.get('uid'),
+            'fid': cherrypy.request.params.get('fid'),
+            'rating': cherrypy.request.params.get('rating')
+        }
+        print "***************** CALLED RATE ********"
+        sql = """UPDATE user_song_info usi
+                 SET rating = %(rating)s
+                 WHERE fid = %(fid)s AND uid = %(uid)s"""
+        print sql % spec
+        query(sql, spec)
+        playlist.reload_current()
+        return "rate"
 
     @cherrypy.expose
     def seek(self, seek):
@@ -113,6 +127,8 @@ class FmpServer(object):
     def prev(self):
         GObject.idle_add(playlist.prev)
         return "prev"
+
+
 
     @cherrypy.expose
     def ws(self):
@@ -179,10 +195,10 @@ def cherry_py_worker():
             'tools.staticfile.on': True,
             'tools.staticfile.filename': "/home/erm/fmp-pg/static/fmp-logo.svg"
         },
-        '/static/js': {
+        '/static': {
             'tools.staticdir.root': static_path,
             'tools.staticdir.on': True,
-            'tools.staticdir.dir': "static/js"
+            'tools.staticdir.dir': "static"
         }
     })
 

@@ -81,6 +81,11 @@ class Local_FObj(FObj_Class):
         if value != self.fid:
             self.load_from_fid(value)
 
+    def reload(self):
+        self.log_debug(".reload()")
+        self.load_from_fid(self.fid)
+        self.listeners.reload()
+
     @property
     def eid(self):
         return self.dbInfo.get('eid')

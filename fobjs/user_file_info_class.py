@@ -133,6 +133,7 @@ class UserFileInfo(UserFile, Log):
 
     def mark_as_completed(self, **sql_args):
         # UserFileInfo.mark_as_completed
+        self.load_user_file_db_info()
         self.check_file_info()
         self.userFileDbInfo['percent_played'] = 100
         self.userFileDbInfo['ultp'] = self.get_now(**sql_args)
@@ -154,7 +155,6 @@ class UserFileInfo(UserFile, Log):
                        fid = %(fid)s
                  LIMIT 1"""
         self.userFileDbInfo = get_assoc_dict(sql, sql_args)
-
 
     def json(self):
         self.check_file_info()

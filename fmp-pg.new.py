@@ -359,6 +359,10 @@ class FmpPlaylist(Playlist):
         GObject.timeout_add_seconds(5, self.update_treeview)
         self.player.window.connect('key-press-event', self.on_key_press)
 
+    def reload_current(self):
+        self.files[self.index].reload()
+        self.broadcast_change()
+
     def on_key_press(self, widget, event):
         res = super(FmpPlaylist, self).on_key_press(widget, event)
         keyname = Gdk.keyval_name(event.keyval)

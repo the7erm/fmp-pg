@@ -24,6 +24,11 @@ class Listeners(Log):
         self.parent = kwargs.get('parent')
         self.load_user_file_info(**self.kwargs)
 
+    def reload(self):
+        self.log_debug(".reload()")
+        self.listeners = _listeners()
+        self.load_user_file_info(**self.kwargs)
+
     def load_user_file_info(self, **kwargs):
         self.user_file_info = []
         self.non_listening_user_file_info = []
@@ -34,6 +39,7 @@ class Listeners(Log):
         if kwargs.get('eid'):
             ufi_class = UserNetcastInfo
 
+        users = get_users()
         for l in users:
             kwargs.update(l)
             kwargs['userDbInfo'] = l
@@ -56,6 +62,7 @@ class Listeners(Log):
 
     def mark_as_played(self, **sql_args):
         self.log_debug(".mark_as_played()")
+        self.reload()
         self.init_mark_as_played_sql_args(sql_args)
         self.log_debug("self.user_file_info:%s" % self.user_file_info)
         if not self.user_file_info:

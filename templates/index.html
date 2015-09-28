@@ -49,26 +49,46 @@
                 float:right;
             }
             .yellow-star  {
-                color:yellow;
-                -webkit-text-stroke: 1px black;
-                text-shadow: 1px 1px 0 #000,
-                            /* Simulated effect for Firefox and Opera
-                               and nice enhancement for WebKit */
-                           -1px -1px 0px #000,  
-                            1px -1px 0px #000,
-                           -1px  1px 0px #000,
-                            1px  1px 0px #000;
+                background-image: url("/static/star.hover.png");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
+            }
+            .red-no  {
+                background-image: url("/static/no.star.png");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
+            }
+            .grey-no  {
+                background-image: url("/static/no.star.grey.png");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
             }
             .grey-star  {
-                -webkit-text-stroke: 1px black;
-                color:#888;
-                text-shadow: 1px 1px 0 #000,
-                            /* Simulated effect for Firefox and Opera
-                               and nice enhancement for WebKit */
-                           -1px -1px 0px #000,  
-                            1px -1px 0px #000,
-                           -1px  1px 0px #000,
-                            1px  1px 0px #000;
+                background-image: url("/static/star.grey.png");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
+            }
+            .question-mark-on {
+                background-image: url("/static/question.mark.svg");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
+            }
+            .question-mark-off {
+                background-image: url("/static/question.mark.grey.svg");
+                background-size: 20px 20px;
+                background-repeat: no-repeat;
+                min-height: 20px;
+                min-width: 20px;
             }
         </style>
     </head>
@@ -91,7 +111,7 @@
                     <td>{{data.uname}}</td>
                     <td>
                         <div ng-controller="RatingDemoCtrl">
-                            <rating ng-model="data.rating" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" state-on="'glyphicon-star yellow-star'" state-off="'glyphicon-star grey-star'" ></rating>
+                            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
                         </div>
 
                     </td>

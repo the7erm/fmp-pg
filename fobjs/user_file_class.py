@@ -53,7 +53,10 @@ class UserFile(Log):
             return
         if self.uid != value or self.userDbInfo == {}:
             self.load_from_uid(self, value)
-            
+    
+    def reload(self):
+        self.log_debug(".reload()")
+        self.load_from_uid(self.uid)
 
     def load_from_uid(self, value):
         # UserFile.load_from_uid

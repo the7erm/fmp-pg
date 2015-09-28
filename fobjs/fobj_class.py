@@ -46,6 +46,9 @@ class FObj_Class(Log):
             return os.path.getmtime(self.filename)
         return -1
 
+    def reload(self):
+        return;
+
     def json(self):
         dbInfo = jsonize(self.dbInfo)
         if hasattr(self, 'reason'):
