@@ -16,7 +16,8 @@ window.prev_click = function(e) {
 var fmpApp = angular.module('fmpApp', [
     'ngWebSocket', // you may also use 'angular-websocket' if you prefer
     'ui.bootstrap',
-    'ngRoute'
+    'ngRoute',
+    'mgcrea.ngStrap'
   ])
   .factory('PlayerData', function($websocket) {
     console.log("OPENING SOCKET")
@@ -135,10 +136,49 @@ var fmpApp = angular.module('fmpApp', [
         $.get("/pause/");
     };
   })
-  .controller('HeaderController', function($scope, $location){
-    $scope.isActive = function (viewLocation) { 
-        return viewLocation === $location.path();
+  .controller('ListenerCtrl', function($scope, $http){
+    $scope.getUserForUid = function (uid)  {
+      for(var i=0;i<$scope.listeners.length; i++) {
+          var user = $scope.listeners[i];
+          if (user.uid == uid) {
+            return user;
+          }
+      }
+      return null;
+    }
+    $scope.set_listening = function(uid) {
+      console.log('uid:', uid);
+      var user = $scope.getUserForUid(uid);
+      console.log(user);
+      if (user) {
+        $http({
+          method: 'GET',
+          url: '/set_listening/?uid='+user.uid+'&listening='+user.listening
+        }).then(function successCallback(response) {
+          $scope.listeners = response.data;
+          console.log(response);
+        }, function errorCallback(response) {
+          
+        });
+      }
     };
+
+    $scope.set_admin = function(uid) {
+      console.log('uid:', uid);
+      var user = $scope.getUserForUid(uid);
+      console.log(user);
+    };
+    
+    $scope.listeners = [];
+    $http({
+      method: 'GET',
+      url: '/listeners'
+    }).then(function successCallback(response) {
+      $scope.listeners = response.data;
+      console.log(response);
+    }, function errorCallback(response) {
+      
+    });
   })
   .controller('RatingCtrl', function ($scope) {
     $scope.isReadonly = false;
@@ -174,7 +214,7 @@ var fmpApp = angular.module('fmpApp', [
       })
       .when('/listeners', {
         templateUrl: '/static/templates/listeners.html',
-        controller: 'PlayerController'
+        controller: 'ListenerCtrl'
       })
       .otherwise({
         redirectTo: '/home'

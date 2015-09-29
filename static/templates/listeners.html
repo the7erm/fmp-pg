@@ -1,0 +1,19 @@
+<h3>Listeners</h3>
+<div class="table-responsive">
+	<table class="table table-hover table-striped">
+		<thead>
+			<tr>
+				<th>uid</th>
+				<th>uname</th>
+				<th>admin</th>
+				<th>listening</th>
+			</tr>
+		</thead>
+		<tr ng-repeat="(key, data) in listeners">
+			<td>{{data.uid}}</td>
+			<td>{{data.uname}}</td>
+			<td><input type="checkbox" ng-model="data.admin" ng-change="set_admin(data.uid);"></td>
+			<td><input type="checkbox" ng-model="data.listening" ng-change="set_listening(data.uid);"></td>
+		</tr>
+	</table>
+</div>

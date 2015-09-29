@@ -134,7 +134,29 @@ class FmpServer(object):
         GObject.idle_add(playlist.prev)
         return "prev"
 
+    @cherrypy.expose
+    def listeners(self):
+        sql = """SELECT uid, uname, admin, listening
+                 FROM users
+                 ORDER BY listening DESC, admin DESC, uname"""
 
+        return json.dumps(get_results_assoc_dict(sql))
+
+
+    @cherrypy.expose
+    def set_listening(self, *args, **kwargs):
+        spec = {
+            'uid': cherrypy.request.params.get('uid'),
+            'listening': cherrypy.request.params.get('listening')
+        }
+        sql = """UPDATE users 
+                 SET listening = %(listening)s
+                 WHERE uid = %(uid)s"""
+
+        query(sql, spec)
+        cherrypy.log(sql % spec)
+        playlist.reload_current()
+        return self.listeners()
 
     @cherrypy.expose
     def ws(self):
