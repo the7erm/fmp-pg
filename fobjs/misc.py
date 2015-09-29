@@ -259,6 +259,7 @@ JSON_WHITE_LIST = [
     'altp',
     'artist',
     'artists',
+    'basename',
     'date_played',
     'eid',
     'enabled',

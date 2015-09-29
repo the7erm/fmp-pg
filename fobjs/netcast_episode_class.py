@@ -10,14 +10,13 @@ import feedparser
 import socket
 import pytz
 import subprocess
-from log_class import Log, logging
+from log_class import Log, logging, log_failure
 import re
 import shutil
 logger = logging.getLogger(__name__)
 
 USER_AGENT = "Family Media Player"
-
-print "IMPORTED netcast_episode_class.py"
+logger.debug("IMPORTED netcast_episode_class.py")
 try:
     from db.db import *
 except:
@@ -34,8 +33,10 @@ from utils import utcnow
 class Netcast_Listeners(Listeners, Log):
     __name__ = 'Netcast_Listeners'
     logger = logger
+    
+    @log_failure
     def __init__(self, *args, **kwargs):
-        print "Netcast_Listeners.init()"
+        self.log_debug("Netcast_Listeners.init()")
         self.kwargs = kwargs
         self.listeners = _listeners(kwargs.get('listeners', None))
         self.parent = kwargs.get('parent')
@@ -257,7 +258,7 @@ class Netcast_FObj(FObj_Class, Log):
                      nid = %(nid)s
                  WHERE eid = %(eid)s
                  RETURNING *"""
-        print "SAVE:", self.dbInfo
+        self.log_debug("SAVE:", self.dbInfo)
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
     def inc_score(self, **sql_args):
@@ -289,7 +290,8 @@ class Netcast(Log):
         if not expire_time:
             return True
         now = utcnow()
-        res = utcnow() > expire_time
+        res = now > expire_time
+        self.log_debug("expire_time:%s" % expire_time)
         sym = "<="
         if res:
             sym = '>'
@@ -304,7 +306,7 @@ class Netcast(Log):
             
         self.log_debug(".is_expired %(res)s \"%(netcast_name)s\" "
                        "now %(sym)s expire_time "
-                       "%(now)s %(sym)s %(expire_time)s" % spec)
+                       "now=%(now)s %(sym)s expire_time=%(expire_time)s" % spec)
 
         return res
 
@@ -317,6 +319,9 @@ class Netcast(Log):
     @property
     def too_soon_to_refresh(self):
         last_updated = self.dbInfo.get('last_updated')
+        self.log_debug("*-"*50)
+        self.log_debug("last_updated:%s" % last_updated)
+
         if not last_updated:
             return False
         min_dt = utcnow() - timedelta(minutes=30)
@@ -420,8 +425,9 @@ class Netcast(Log):
             fp = open(self.rss_feed_cache_file, 'w')
             fp.write(xml)
             fp.close()
-        except Exception, e:
-            print "Exception:", e
+        except:
+            e = sys.exc_info()[0]
+            self.log_error("Exception:%s", e)
         return ""
 
     def refresh_feed(self):
@@ -446,7 +452,7 @@ class Netcast(Log):
         if not title:
             self.log_debug("NO TITLE")
             self.set_update_for_near_future()
-            pprint(feed)
+            self.log_debug("%s", feed)
             return
 
         self.dbInfo['netcast_name'] = title
@@ -470,7 +476,7 @@ class Netcast(Log):
 
     def process_enclosure(self, entry, enclosure):
         self.log_debug("---------------------")
-        pprint(enclosure)
+        self.log_debug("enclosure:%s", enclosure)
         pub_date = datetime(*entry['updated_parsed'][0:7])
         
         episode = Netcast_FObj(nid=self.nid, 
@@ -484,13 +490,16 @@ class Netcast(Log):
         self.log_debug("---------------------")
 
     def set_update_for_near_future(self):
+        self.log_debug(".set_update_for_near_future()")
         sql = """UPDATE netcasts 
                  SET expire_time = (current_timestamp + interval '1 hour') 
                  WHERE nid = %(nid)s
                  RETURNING *"""
         self.dbInfo = get_assoc_dict(sql, {'nid': self.nid })
+        self.log_debug(".dbInfo:%s", self.dbInfo)
 
     def mark_updated(self):
+        self.log_debug(".mark_updated()")
         sql = """UPDATE netcasts 
                  SET expire_time = (current_timestamp + interval '1 day'),
                      last_updated = current_timestamp,
@@ -498,9 +507,8 @@ class Netcast(Log):
                      rss_url = %(rss_url)s
                  WHERE nid = %(nid)s
                  RETURNING *"""
-        print "mark_updated"
-        pprint(self.dbInfo)
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
+        self.log_debug(".dbInfo: %s", self.dbInfo)
 
     def get_unlistened_episodes(self):
         sql = """SELECT n.*, ne.*, nl.*, u.* 
@@ -519,12 +527,12 @@ class Netcast(Log):
         unlistened_episodes = self.get_unlistened_episodes()
         for e in unlistened_episodes:
             if not e.get('local_file'):
-                print "NO LOCAL FILE:", e
+                self.log_debug("NO LOCAL FILE:", e)
                 continue
             if not os.path.exists(e['local_file']):
                 tmp = e['local_file']+".tmp"
-                print "******"
-                print "not exists: e['local_file']:", e['local_file']
+                self.log_debug("******")
+                self.log_debug("missing: e['local_file']:%s", e['local_file'])
                 # downloader.append(e['episode_url'], e['local_file'])
                 args = ['wget', '-c', e['episode_url'], '-O', tmp]
 
@@ -536,7 +544,8 @@ class Netcast(Log):
         sql = """UPDATE netcasts
                  SET netcast_name = %(netcast_name)s,
                      rss_url = %(rss_url)s
-                 WHERE nid = %(nid)s"""
+                 WHERE nid = %(nid)s
+                 RETURNING *"""
         self.dbInfo = get_assoc_dict(sql, self.dbInfo)
 
 
@@ -544,7 +553,6 @@ global refresh_and_download_all_netcasts_lock
 refresh_and_download_all_netcasts_lock = False
 
 def refresh_and_download_all_netcasts():
-
     logger.debug("+"*100)
     logger.debug("REFRESHING AND DOWNLOADING ALL NETCASTS")
     global refresh_and_download_all_netcasts_lock
@@ -562,7 +570,7 @@ def refresh_and_download_all_netcasts():
             obj.refresh_feed_and_download_episodes()
         except:
             e = sys.exc_info()[0]
-            log.debug("Exception: %r" % e)
+            logger.debug("Exception: %r" % e)
 
     refresh_and_download_all_netcasts_lock = False
 

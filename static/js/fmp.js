@@ -1,11 +1,28 @@
-angular.module('fmpApp', [
+
+window.next_click = function(e) {
+    e.preventDefault();
+    $.get("/next/");
+};
+window.pause_click = function(e) {
+    alert("CALLED");
+    e.preventDefault();
+    $.get("/pause/");
+};
+window.prev_click = function(e) {
+    e.preventDefault();
+    $.get("/prev/");
+};
+
+var fmpApp = angular.module('fmpApp', [
     'ngWebSocket', // you may also use 'angular-websocket' if you prefer
-    'ui.bootstrap'
+    'ui.bootstrap',
+    'ngRoute'
   ])
   .factory('PlayerData', function($websocket) {
     console.log("OPENING SOCKET")
     // Open a WebSocket connection
     var dataStream = $websocket('ws://localhost:5050/ws');
+
 
     var collection = {
 
@@ -40,7 +57,7 @@ angular.module('fmpApp', [
       if (typeof obj['player-playing']  != 'undefined') {
           var artist_title = "",
               artist = "",
-              title = obj['player-playing']['title'] || "";
+              title = obj['player-playing']['title'] || obj['player-playing']['basename'] || "";
 
           if (typeof obj['player-playing']['episode_title'] != 'undefined') {
               artist = obj['player-playing']['netcast_name'] || "";
@@ -100,12 +117,30 @@ angular.module('fmpApp', [
       methods.get();
     });
 
+    dataStream.onClose(function(){
+      
+    });
+
     return methods;
   })
   .controller('PlayerController', function ($scope, PlayerData) {
     $scope.PlayerData = PlayerData;
+    $scope.next = function(e) {
+        $.get("/next/");
+    };
+    $scope.prev = function(e) {
+        $.get("/prev/");
+    };
+    $scope.pause = function(e) {
+        $.get("/pause/");
+    };
   })
-  .controller('RatingDemoCtrl', function ($scope) {
+  .controller('HeaderController', function($scope, $location){
+    $scope.isActive = function (viewLocation) { 
+        return viewLocation === $location.path();
+    };
+  })
+  .controller('RatingCtrl', function ($scope) {
     $scope.isReadonly = false;
 
     $scope.setRating = function() {
@@ -130,7 +165,22 @@ angular.module('fmpApp', [
       {stateOn: 'yellow-star', stateOff: 'grey-star'},
       {stateOn: 'question-mark-on', stateOff: 'question-mark-off'}
     ];
-});
+}).config(['$routeProvider',
+  function($routeProvider) {
+    $routeProvider
+      .when('/home', {
+        templateUrl: '/static/templates/player.html',
+        controller: 'PlayerController'
+      })
+      .when('/listeners', {
+        templateUrl: '/static/templates/listeners.html',
+        controller: 'PlayerController'
+      })
+      .otherwise({
+        redirectTo: '/home'
+      });
+  }]);
+
 angular.module("template/rating/rating.html",[]).run(["$templateCache",function(a){
     a.put("template/rating/rating.html",'<span ng-mouseleave="reset()" ng-keydown="onKeydown($event)" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="{{range.length}}" aria-valuenow="{{value}}">\n    <span ng-repeat-start="r in range track by $index" class="sr-only">({{ $index < value ? \'*\' : \' \' }})</span>\n    <i ng-repeat-end ng-mouseenter="enter($index)" ng-click="rate($index)" class="glyphicon" ng-class="$index <= value && (r.stateOn || \'glyphicon-star\') || (r.stateOff || \'glyphicon-star-empty\')" ng-attr-title="{{r.title}}" ></i>\n</span>\n')
-  }])
+  }]);

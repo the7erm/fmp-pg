@@ -99,6 +99,12 @@ class FmpServer(object):
                  WHERE fid = %(fid)s AND uid = %(uid)s"""
         print sql % spec
         query(sql, spec)
+        sql = """UPDATE user_song_info usi
+                 SET true_score = (
+                        (rating * 2 * 10) + 
+                        (score * 10)
+                     ) / 2.0
+                 WHERE fid = %(fid)s AND uid = %(uid)s"""
         playlist.reload_current()
         return "rate"
 

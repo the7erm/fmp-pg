@@ -15,31 +15,11 @@
         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
         
         <script src="/static/js/angular.min.js"></script>
+        <script src="/static/js/angular-route.min.js"></script>
         <script src="/static/js/angular-websocket.js"></script>
         <script src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
         
         <script src="/static/js/fmp.js"></script>
-        <script type="text/javascript">
-            $(document).ready(function() {
-                $("#next").on('click', function(e) {
-                    e.preventDefault();
-                    $.get("/next/");
-                });
-
-                $(".play-pause").on('click', function(e) {
-                    e.preventDefault();
-                    $.get("/pause/");
-                    console.log("pause");
-                });
-
-                $("#prev").on('click', function(e) {
-                    console.log("clicked");
-                    e.preventDefault();
-                    $.get("/prev/");
-                });
-                
-            });
-        </script>
         <style>
             #conneted {
                 bottom:0px;
@@ -93,37 +73,28 @@
         </style>
     </head>
     <body>
-        <section ng-controller="PlayerController">
-            <span id="time-status">{{PlayerData.collection.time_status}}</span>
-            <div>{{PlayerData.collection.artist_title}}</div>
-            <div>{{ PlayerData.collection.reason }}</div>
-            <button class="btn btn-default" id="prev">Prev</button>
-            <button class="btn btn-default play-pause">{{ PlayerData.collection.play_pause }}</button>
-            <button class="btn btn-default" id="next">Next</button>
-           
-            <table class="table">
-                <tr>
-                    <td>User</td>
-                    <td>Rating</td>
-                    <td>Score</td>
-                </tr>
-                <tr ng-repeat="(key, data) in PlayerData.collection.ratings">
-                    <td>{{data.uname}}</td>
-                    <td>
-                        <div ng-controller="RatingDemoCtrl">
-                            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
-                        </div>
-
-                    </td>
-                    <td>{{data.true_score}}</td>
-                </tr>
-            </table>
-            <div id="conneted"></div>
-            <ul>
-              <li ng-repeat="(key, data) in PlayerData.collection track by key">
-                {{key}}:{{ data }}
-              </li>
-            </ul>
-          </section>
+        <nav class="navbar navbar-fixed-top navbar-default" ng-controller="HeaderController">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">FMP</a>
+            </div>
+            <div id="navbar" class="collapse navbar-collapse">
+              <ul class="nav navbar-nav">
+                <li ng-class="{ active: isActive('#/home')}" ><a href="#/home">Home</a></li>
+                <li ng-class="{ active: isActive('#/listeners')}"><a href="#/listeners">Listeners</a></li>
+              </ul>
+            </div><!-- /.nav-collapse -->
+          </div><!-- /.container -->
+        </nav><!-- /.navbar -->
+        <br clear="all" />
+        <br clear="all" />
+        <br clear="all" />
+        <div ng-view></div>
     </body>
 </html>

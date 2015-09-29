@@ -51,6 +51,7 @@ class FObj_Class(Log):
 
     def json(self):
         dbInfo = jsonize(self.dbInfo)
+        dbInfo['basename'] = self.basename
         if hasattr(self, 'reason'):
             dbInfo['reason'] = self.reason
             
