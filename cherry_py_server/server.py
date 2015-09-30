@@ -209,9 +209,15 @@ class FmpServer(object):
             del skip_countdown[_fid]
 
         listeners = _listeners()
-        if voted_to_skip_count >= (len(listeners) * 0.5) and \
+        len_listeners = len(listeners)
+        if voted_to_skip_count >= (len_listeners * 0.5) and \
            not skip_countdown.get(fid):
-            skip_countdown[fid] = time() + 5
+            skip_countdown[fid] = time() + len_listeners
+            if len_listeners < 5:
+                skip_countdown[fid] = time() + 5
+            elif len_listeners > 10:
+                skip_countdown[fid] = time() + 10
+                
         elif skip_countdown.get(fid):
             del skip_countdown[fid]
 
