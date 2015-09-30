@@ -33,6 +33,14 @@ class Preload(Log):
         users = get_users()
         self.refresh_lock = True
         self.log_debug(".refresh")
+        sql = """DELETE FROM preload p 
+                 WHERE fid IN (
+                    SELECT p.fid 
+                    FROM user_song_info usi, users u, preload p
+                    WHERE u.listening = true AND u.uid = usi.uid AND
+                          usi.rating = 0 AND p.fid = usi.fid
+                )"""
+        query(sql)
         sql = """SELECT *
                  FROM preload
                  ORDER BY plid, uid"""

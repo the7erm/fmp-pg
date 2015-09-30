@@ -76,14 +76,19 @@ class Log(object):
 
     @log_failure
     def log(self, funct, message, *args, **kwargs):
+        if (isinstance(message, dict)):
+            message = pformat(message)
+
+        formatted_args = []
         for arg in args:
-            arg = pformat(arg)
+            formatted_args.append(pformat(arg))
+
         if not message.startswith(" ") and not message.startswith("."):
             message = " "+message
-        if "%" not in message and args:
-            message = message + " ".join(args)
-            args = []
-        funct(self.__name__+message, *args)
+        if "%" not in message and formatted_args:
+            message = message + " ".join(formatted_args)
+            formatted_args = formatted_args
+        funct(self.__name__+message, *formatted_args)
             
     def log_debug(self, message, *args, **kwargs):
         self.log(self.logger.debug, message, *args, **kwargs)

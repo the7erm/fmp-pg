@@ -86,6 +86,9 @@ class Netcast_Listeners(Listeners, Log):
     def deinc_score(self, **sql_args):
         return {}
 
+    def majority_deinc_score(self, **sql_args):
+        return {}
+
 class Netcast_FObj(FObj_Class, Log):
     __name__ = 'Netcast_FObj'
     logger = logger

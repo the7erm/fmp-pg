@@ -478,6 +478,14 @@ class FmpPlaylist(Playlist):
         self.files[self.index].deinc_score()
         super(FmpPlaylist, self).next(*args, **kwargs)
 
+    def majority_next(self, *args, **kwargs):
+        Gdk.threads_leave()
+        self.log_debug(".majority_next()")
+        self.files[self.index].majority_deinc_score()
+        self.inc_index()
+        self.broadcast_change()
+        return False
+
     def inc_index(self, *args, **kwargs):
         last_index = len(self.files) - 1
         if self.index == last_index:
@@ -521,7 +529,7 @@ class FmpPlaylist(Playlist):
         time_status = self.player.get_time_status()
         time_status['percent_played'] = 100
         time_status['decimal_played'] = 1
-        self.files[self.index].inc_score()
+        self.files[self.index].inc_score(eos=True)
         try:
             self.files[self.index].mark_as_played(**time_status)
         except AttributeError:

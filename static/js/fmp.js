@@ -20,14 +20,77 @@ var fmpApp = angular.module('fmpApp', [
     'mgcrea.ngStrap'
   ])
   .factory('PlayerData', function($websocket) {
-    console.log("OPENING SOCKET")
     // Open a WebSocket connection
-    var dataStream = $websocket('ws://localhost:5050/ws');
+    var collection = {},
+        dataStream = $websocket('ws://localhost:5050/ws');
 
-
-    var collection = {
-
+    var methods = {
+      collection: collection,
+      get: function() {
+        dataStream.send(JSON.stringify({"connected": "ok"}));
+      }
     };
+
+    methods.votedToSkip = function(uid) {
+      if (!collection) {
+        collection = methods.collection;
+      }
+      var fid = collection.fid;
+      
+      if (!uid || !fid) {
+        return false;
+      }
+      if (!collection.vote_data) {
+        collection.vote_data = {};
+      }
+      if (!collection.vote_data[fid]) {
+          collection.vote_data[fid] = {};
+      }
+      if (!collection.vote_data[fid][uid]) {
+          collection.vote_data[fid][uid] = false;
+      }
+      return collection.vote_data[fid][uid];
+    }
+
+    methods.voteToSkip = function(uid) {
+      var vote = !methods.votedToSkip(uid);
+      console.log("***********************voteToSkip:", uid, vote);
+      if (!collection.vote_data[collection.fid]) {
+        collection.vote_data[collection.fid] = {};
+      }
+      if (!collection.vote_data[collection.fid][uid]) {
+        collection.vote_data[collection.fid][uid] = false;
+      }
+      collection.vote_data[collection.fid][uid] = vote;
+      $.ajax({
+          'url': "/vote_to_skip/",
+          'data': {
+            'fid': collection.fid,
+            'uid': collection.iam,
+            'vote': vote
+          },
+          'method': 'GET',
+          'cache': false,
+          'type': 'json'
+      }).done(function(data){
+          console.log("VOTE DATA:",data);
+      });
+    };
+
+    dataStream.onOpen(function(){
+      collection.CONNECTION = "OPEN";
+      setTimeout(methods.get, 1);
+    });
+
+    dataStream.onClose(function(){
+      collection.CONNECTION = "LOST";
+      collection.RECONNECTING = "true";
+      // dataStream.reconnect();
+    });
+
+    dataStream.initialTimeout = 500;
+    dataStream.maxTimeout = 5000;
+    dataStream.reconnectIfNotNormalClose = true;
 
     dataStream.onMessage(function(message) {
       var obj = JSON.parse(message.data);
@@ -42,6 +105,10 @@ var fmpApp = angular.module('fmpApp', [
           return;
       }
 
+      if (typeof obj['vote_data'] != 'undefined') {
+          collection.vote_data = obj['vote_data'];
+      }
+
       if (typeof obj['CONNECTED'] != 'undefined') {
           return;
       }
@@ -53,6 +120,10 @@ var fmpApp = angular.module('fmpApp', [
           if (obj['state-changed'] == 'PAUSED') {
               collection.play_pause = 'Play';
           }
+      }
+
+      if (typeof obj['seconds_left_to_skip'] != 'undefined') {
+          collection.seconds_left_to_skip = obj['seconds_left_to_skip'];
       }
 
       if (typeof obj['player-playing']  != 'undefined') {
@@ -79,6 +150,7 @@ var fmpApp = angular.module('fmpApp', [
           } else {
               artist_title = title;
           }
+          collection.fid = obj['player-playing']['fid'];
           collection.artist_title = artist_title;
           if (typeof obj['player-playing']['preloadInfo'] != 'undefined') {
             collection.reason = obj['player-playing']['preloadInfo']['reason'];
@@ -102,25 +174,14 @@ var fmpApp = angular.module('fmpApp', [
           } else {
             collection.ratings = [];
           }
+
+
       }
       // collection.push(JSON.parse(message.data));
       console.log("collection:",collection)
     });
 
-    var methods = {
-      collection: collection,
-      get: function() {
-        dataStream.send(JSON.stringify({"connected": "ok"}));
-      }
-    };
-
-    dataStream.onOpen(function(){
-      methods.get();
-    });
-
-    dataStream.onClose(function(){
-      
-    });
+    
 
     return methods;
   })

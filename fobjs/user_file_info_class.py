@@ -78,7 +78,12 @@ class UserFileInfo(UserFile, Log):
 
     def deinc_score(self, *args, **kwargs):
         # UserFileInfo.inc_score
-        self.score = self.score - 1
+        by = 1
+        vote_data = kwargs.get('vote_data', {})
+        voted_to_skip = vote_data.get('uid', False)
+        if voted_to_skip and kwargs.get('eos'):
+            by = 2
+        self.score = self.score - by
 
     @property
     def score(self):

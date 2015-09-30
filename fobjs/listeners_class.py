@@ -81,12 +81,38 @@ class Listeners(Log):
 
     def inc_score(self, **sql_args):
         sql_args['edited'] = sql_args.get('edited', False)
+        
+        down_voted = []
+        for uid, vote in sql_args.get('vote_data', {}).items():
+            if not vote:
+                down_voted.append(uid)
+
+        sql_args['down_voted'] = down_voted
         for user_file_info in self.user_file_info:
-            user_file_info.inc_score(**sql_args)
+            if user_file_info.uid not in down_voted:
+                user_file_info.inc_score(**sql_args)
+            else:
+                user_file_info.deinc_score(**sql_args)
 
     def deinc_score(self, **sql_args):
         for user_file_info in self.user_file_info:
             user_file_info.deinc_score(**sql_args)
+
+    def majority_deinc_score(self, **sql_args):
+        self.log_debug(".majority_deinc_score()")
+        down_voted = []
+        vote_data = sql_args.get('vote_data', {})
+        self.log_debug("vote_data:%s", vote_data)
+        for uid, vote in vote_data.items():
+            if vote:
+                down_voted.append(uid)
+
+        sql_args['down_voted'] = down_voted
+        self.log_debug("sql_args:%s", sql_args)
+        for user_file_info in self.user_file_info:
+            if user_file_info.uid in down_voted:
+                self.log_debug("majority_deinc_score uid:%s uname:%s" % (user_file_info.uid, user_file_info.uname))
+                user_file_info.deinc_score(**sql_args)
 
     def json(self):
         user_file_infos = []

@@ -93,6 +93,15 @@ def get_files_from_preload(listeners=None):
     logger.debug("get_files_from_preload()")
     listeners = _listeners(listeners)
 
+    sql = """DELETE FROM preload p 
+             WHERE fid IN (
+                SELECT p.fid 
+                FROM user_song_info usi, users u, preload p
+                WHERE u.listening = true AND u.uid = usi.uid AND
+                      usi.rating = 0 AND p.fid = usi.fid
+            )"""
+    query(sql)
+
     select_sql = """SELECT *
              FROM preload
              WHERE uid = %(uid)s

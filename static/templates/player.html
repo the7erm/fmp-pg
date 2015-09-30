@@ -2,19 +2,32 @@
 <span id="time-status">{{PlayerData.collection.time_status}}</span>
 <div>{{PlayerData.collection.artist_title}}</div>
 <div>{{ PlayerData.collection.reason }}</div>
-<button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
-<button class="btn btn-default play-pause" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
-<button class="btn btn-default" id="next" ng-click="next();">Next</button>
+<div ng-if="PlayerData.collection.CONNECTION == 'OPEN'">
+    <button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
+    <button class="btn btn-default play-pause" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
+    <button class="btn btn-default" id="next" ng-click="next();">Next</button>
+    
+</div>
+<div ng-if="PlayerData.collection.CONNECTION != 'OPEN'">
+    <b>No connection to server.</b>
+</div>
 <div class="table-responsive">
     <table class="table table-hover table-striped">
         <thead>
             <tr>
+                <th></th>
                 <th>User</th>
                 <th>Rating</th>
                 <th>Score</th>
             </tr>
         </thead>
         <tr ng-repeat="(key, data) in PlayerData.collection.ratings">
+            <td><button class="btn" ng-click="PlayerData.collection.iam=data.uid" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
+            </td>
+            <td>
+                <button class="btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(data.uid))}" 
+                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(data.uid))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip"><b>{{PlayerData.collection.seconds_left_to_skip}}</b></span></button>
+            </td>
             <td>{{data.uname}}</td>
             <td>
                 <div ng-controller="RatingCtrl">

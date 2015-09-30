@@ -29,6 +29,7 @@ class Local_FObj(FObj_Class):
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.artistDbInfo = []
+        self.vote_data = {}
         self.clean()
         self.real_filename = kwargs.get('filename', "")
         self.insert_new = kwargs.get("insert", False)
@@ -133,11 +134,18 @@ class Local_FObj(FObj_Class):
 
     def inc_score(self, *args, **kwargs):
         kwargs.update(self.dbInfo)
+        kwargs.update({'vote_data': self.vote_data})
         self.listeners.inc_score(**kwargs)
 
     def deinc_score(self, *args, **kwargs):
         kwargs.update(self.dbInfo)
+        kwargs.update({'vote_data': self.vote_data})
         self.listeners.deinc_score(**kwargs)
+
+    def majority_deinc_score(self, *args, **kwargs):
+        kwargs.update(self.dbInfo)
+        kwargs.update({'vote_data': self.vote_data})
+        self.listeners.majority_deinc_score(**kwargs)
 
     def dict(self):
         return self.dbInfo
