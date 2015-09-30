@@ -66,7 +66,7 @@ var fmpApp = angular.module('fmpApp', [
           'url': "/vote_to_skip/",
           'data': {
             'fid': collection.fid,
-            'uid': collection.iam,
+            'uid': uid,
             'vote': vote
           },
           'method': 'GET',

@@ -5,8 +5,9 @@
 <div ng-if="PlayerData.collection.CONNECTION == 'OPEN'">
     <button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
     <button class="btn btn-default play-pause" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
-    <button class="btn btn-default" id="next" ng-click="next();">Next</button>
-    
+    <!-- <button class="btn btn-default" id="next" ng-click="next();">Next</button> -->
+    <button class="btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}" 
+                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
 </div>
 <div ng-if="PlayerData.collection.CONNECTION != 'OPEN'">
     <b>No connection to server.</b>
@@ -26,7 +27,7 @@
             </td>
             <td>
                 <button class="btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(data.uid))}" 
-                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(data.uid))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip"><b>{{PlayerData.collection.seconds_left_to_skip}}</b></span></button>
+                    ng-click="PlayerData.voteToSkip(data.uid)">Vote<span ng-if="(PlayerData.votedToSkip(data.uid))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
             </td>
             <td>{{data.uname}}</td>
             <td>
