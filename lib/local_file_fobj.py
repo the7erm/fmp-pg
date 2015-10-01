@@ -69,6 +69,7 @@ class Local_File(fobj.FObj):
         self.edited = False
         self.rating_callback = None
         self.plid = plid
+        self.process_tags_lock = False
 
         self.init_db_info(fid=fid, sha512=sha512, fingerprint=fingerprint, 
                           dirname=dirname, basename=basename, 
@@ -629,6 +630,9 @@ class Local_File(fobj.FObj):
         pp.pprint(self.db_info)
 
     def process_tags(self):
+        if self.process_tags_lock:
+            return
+        self.process_tags_lock = True
         if self.db_info['edited']:
             return
         self.get_tags()
@@ -637,6 +641,7 @@ class Local_File(fobj.FObj):
         self.process_artist()
         self.process_genre()
         self.process_album()
+        self.process_tags_lock = False
 
     def process_artist(self):
         if self.tags_easy:
@@ -934,6 +939,8 @@ class Local_File(fobj.FObj):
             albums = self.tags_combined.get('album')
             if albums:
                 for al in albums:
+                    if not al:
+                        continue
                     for a in self.artists:
                         self.add_album(al, a['aid'])
 

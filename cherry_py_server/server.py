@@ -156,10 +156,16 @@ class FmpServer(object):
 
     @cherrypy.expose
     def set_listening(self, *args, **kwargs):
+        listening = cherrypy.request.params.get('listening')
+        if not listening or listening == 'false' or listening == '0':
+            listening = False
+        else:
+            listening = True
         spec = {
             'uid': cherrypy.request.params.get('uid'),
-            'listening': cherrypy.request.params.get('listening')
+            'listening': listening
         }
+        
         sql = """UPDATE users 
                  SET listening = %(listening)s
                  WHERE uid = %(uid)s"""

@@ -22,7 +22,7 @@ var fmpApp = angular.module('fmpApp', [
   .factory('PlayerData', function($websocket) {
     // Open a WebSocket connection
     var collection = {},
-        dataStream = $websocket('ws://localhost:5050/ws');
+        dataStream = $websocket('ws://erm76:5050/ws');
 
     var methods = {
       collection: collection,
@@ -79,7 +79,7 @@ var fmpApp = angular.module('fmpApp', [
 
     dataStream.onOpen(function(){
       collection.CONNECTION = "OPEN";
-      setTimeout(methods.get, 1);
+      setTimeout(methods.get, 100);
     });
 
     dataStream.onClose(function(){
@@ -207,14 +207,30 @@ var fmpApp = angular.module('fmpApp', [
       }
       return null;
     }
-    $scope.set_listening = function(uid) {
-      console.log('uid:', uid);
-      var user = $scope.getUserForUid(uid);
+    $scope.set_listening = function(uid, checkbox) {
+      var user = $scope.getUserForUid(uid),
+          listening = 'true';
+
+      if (checkbox) {
+        listening = user.listening;
+        if (listening) {
+          listening = 'true';
+        } else {
+          listening = 'false';
+        }
+      } else {
+        if (user.listening) {
+          listening = 'false';
+          user.listening = false;
+        } else {
+          user.listening = true;
+        }
+      }
       console.log(user);
       if (user) {
         $http({
           method: 'GET',
-          url: '/set_listening/?uid='+user.uid+'&listening='+user.listening
+          url: '/set_listening/?uid='+user.uid+'&listening='+listening
         }).then(function successCallback(response) {
           $scope.listeners = response.data;
           console.log(response);

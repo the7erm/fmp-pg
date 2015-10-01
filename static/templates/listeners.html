@@ -11,9 +11,9 @@
 		</thead>
 		<tr ng-repeat="(key, data) in listeners">
 			<td>{{data.uid}}</td>
-			<td>{{data.uname}}</td>
+			<td><button class="btn" ng-class="{'btn-info':data.listening}" ng-click="data.uiddata.listening=!!data.listening;set_listening(data.uid);">{{data.uname}}</button></td>
 			<td><input type="checkbox" ng-model="data.admin" ng-change="set_admin(data.uid);"></td>
-			<td><input type="checkbox" ng-model="data.listening" ng-change="set_listening(data.uid);"></td>
+			<td><input type="checkbox" ng-model="data.listening" ng-change="set_listening(data.uid, true);"></td>
 		</tr>
 	</table>
 </div>

@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html ng-app="fmpApp">
     <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" 
               type="image/svg+xml" 
               href="/static/fmp-logo.svg">
         <!-- Latest compiled and minified CSS -->
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
 
         <!-- Optional theme -->
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+        <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
         
-        <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+        <script src="/static/js/jquery-2.0.3.min.js"></script>
         <!-- Latest compiled and minified JavaScript -->
-        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+        <script src="static/js/bootstrap-3.3.5-dist/js/bootstrap.min.js"></script>
         
         <script src="/static/js/angular.min.js"></script>
         <script src="/static/js/angular-route.min.js"></script>
@@ -32,45 +33,50 @@
             }
             .yellow-star  {
                 background-image: url("/static/star.hover.png");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
             }
             .red-no  {
                 background-image: url("/static/no.star.png");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
             }
             .grey-no  {
                 background-image: url("/static/no.star.grey.png");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
             }
             .grey-star  {
                 background-image: url("/static/star.grey.png");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
             }
             .question-mark-on {
                 background-image: url("/static/question.mark.svg");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
             }
             .question-mark-off {
                 background-image: url("/static/question.mark.grey.svg");
-                background-size: 20px 20px;
+                background-size: 30px 30px;
                 background-repeat: no-repeat;
-                min-height: 20px;
-                min-width: 20px;
+                min-height: 30px;
+                min-width: 30px;
+            }
+            
+            body { font-size:2em !important; }
+            .rating-div {
+                padding:5px;
             }
         </style>
     </head>
@@ -92,7 +98,6 @@
               </ul>
             </div><!-- /.nav-collapse -->
         </nav><!-- /.navbar -->
-        <br clear="all" />
         <br clear="all" />
         <br clear="all" />
         <div ng-view class="container-fluid"></div>
