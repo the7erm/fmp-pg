@@ -468,7 +468,10 @@ class FmpPlaylist(Playlist):
         if time_status == self.last_time_status and not force:
             return
         self.last_time_status = deepcopy(time_status)
-        time_status['now'] = "%s" % time_status['now']
+        try:
+            time_status['now'] = "%s" % time_status['now']
+        except:
+            pass
 
         server.broadcast({"time-status": time_status})
 
@@ -583,6 +586,14 @@ GObject.timeout_add_seconds(60, picker.populate_preload_for_all_users)
 GObject.idle_add(preload.refresh_once)
 GObject.idle_add(refresh_netcasts_once)
 
+def insert_missing_files_for_all_users():
+    print "HERE"*10
+    print "+++insert_missing_files_for_all_users"
+    users = picker.get_users()
+    for u in users:
+        print "+++insert_missing_files_for_all_users:%s" % u
+        picker.insert_missing_files_for_uid(u['uid'])
+
 recently_played = get_recently_played(convert_to_fobj=True)
 
 recently_played.reverse()
@@ -607,4 +618,5 @@ cherry_py_thread.start()
 print "**** TEST ****"
 res = get_unlistend_episode()
 print "TEST:", res
+GObject.idle_add(insert_missing_files_for_all_users)
 Gtk.main()

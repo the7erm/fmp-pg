@@ -22,7 +22,9 @@
         <script src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
         <script src="/static/js/angular-strap/angular-strap.min.js"></script>
         <script src="/static/js/angular-strap/angular-strap.tpl.min.js"></script>
+        <script>window.ws_url = "ws://%(host)s/ws";</script>
         <script src="/static/js/fmp.js"></script>
+
         <style>
             #conneted {
                 bottom:0px;
@@ -77,6 +79,12 @@
             body { font-size:2em !important; }
             .rating-div {
                 padding:5px;
+                font-size:1.80em;
+            }
+            code {
+                color:black;
+                background: #DDD;
+                font-size: 0.7em;
             }
         </style>
     </head>
@@ -94,6 +102,7 @@
             <div id="navbar" class="collapse navbar-collapse">
               <ul class="nav navbar-nav">
                 <li data-match-route="/home*" ><a href="#/home">Home</a></li>
+                <li data-match-route="/search*"><a href="#/search">Search</a></li>
                 <li data-match-route="/listeners"><a href="#/listeners">Listeners</a></li>
               </ul>
             </div><!-- /.nav-collapse -->

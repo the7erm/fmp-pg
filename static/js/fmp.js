@@ -17,12 +17,18 @@ var fmpApp = angular.module('fmpApp', [
     'ngWebSocket', // you may also use 'angular-websocket' if you prefer
     'ui.bootstrap',
     'ngRoute',
-    'mgcrea.ngStrap'
+    'mgcrea.ngStrap',
+    'ngCookies'
   ])
-  .factory('PlayerData', function($websocket) {
+  .factory('PlayerData', ['$websocket', '$cookies', '$http', function($websocket, $cookies, $http) {
     // Open a WebSocket connection
-    var collection = {},
-        dataStream = $websocket('ws://erm76:5050/ws');
+    var collection = {
+          'ws_url': window.ws_url,
+          "iam": $cookies.get('iam') || null
+        },
+        dataStream = $websocket(collection.ws_url);
+
+
 
     var methods = {
       collection: collection,
@@ -73,9 +79,28 @@ var fmpApp = angular.module('fmpApp', [
           'cache': false,
           'type': 'json'
       }).done(function(data){
-          console.log("VOTE DATA:",data);
+          // console.log("VOTE DATA:",data);
       });
     };
+
+    methods.setIam = function(uid) {
+      collection.iam = uid;
+      var expires = new Date();
+      expires.setFullYear(parseInt(expires.getFullYear()) + 1);
+      $cookies.put('iam', uid, {
+          'expires': expires
+      });
+      $http({
+        method: 'GET',
+        url: '/set_listening/?uid='+uid+'&listening=true'
+      }).then(function successCallback(response) {
+      }, function errorCallback(response) {
+      });
+    };
+
+    if (collection.iam) {
+        methods.setIam(collection.iam);
+    }
 
     dataStream.onOpen(function(){
       collection.CONNECTION = "OPEN";
@@ -184,7 +209,7 @@ var fmpApp = angular.module('fmpApp', [
     
 
     return methods;
-  })
+  }])
   .controller('PlayerController', function ($scope, PlayerData) {
     $scope.PlayerData = PlayerData;
     $scope.next = function(e) {
@@ -257,6 +282,119 @@ var fmpApp = angular.module('fmpApp', [
       
     });
   })
+  .controller('SearchController', function($scope, $location, $route, $routeParams, $http, $cookies, PlayerData) {
+      console.log("Loaded SearchController");
+      $scope.params = $routeParams;
+      $scope.loadedParams = "";
+      $scope.$location = $location;
+      $scope.$route = $route;
+      $scope.maxSize = 5;
+      $scope.bigTotalItems = 0;
+      $scope.loadPageLocked = false;
+      $scope.calledWhileLocked = false;
+
+      console.log("$scope.params:", $scope.params);
+      $scope.loadPage = function() {
+        console.log("LOAD PAGE");
+       
+        $scope.params.s = ($scope.bigCurrentPage - 1) * 10;
+        if (!$scope.params.q) {
+          $scope.params.q = "";
+        }
+        if ($scope.params.oc) {
+          $scope.params.oc = true;
+        }
+        if ($scope.loadedParams == JSON.stringify($scope.params)) {
+          console.log("scope params == loadedParams not searching.");
+          return;
+        }
+        if ($scope.loadPageLocked) {
+          $scope.calledWhileLocked = true;
+          return;
+        }
+        $scope.loadPageLocked = true;
+        console.log("loading:", $scope.params);
+        $scope.loadedParams = JSON.stringify($scope.params);
+        $location.path("/search").search($scope.params);
+        $http({
+          method: 'GET',
+          url: '/search',
+          params: $scope.params
+        }).then(function successCallback(response) {
+          $cookies.put('search', $scope.loadedParams);
+          $scope.response = response.data;
+          $scope.bigTotalItems = response.data['total']['total'] || 0;
+          $scope.loadPageLocked = false;
+          if ($scope.calledWhileLocked) {
+            $scope.calledWhileLocked = false;
+            $scope.loadPage();
+          }
+        }, function errorCallback(response) {
+          $scope.loadPageLocked = false;
+          if ($scope.calledWhileLocked) {
+            $scope.calledWhileLocked = false;
+            $scope.loadPage();
+          }
+        });
+      }
+
+      if ($.isEmptyObject($scope.params) || !$scope.params) {
+        console.log("loading cookie?")
+        var stored = $cookies.get('search');
+        if (stored) {
+            console.log("stored");
+            $scope.params = JSON.parse(stored);
+            $scope.bigCurrentPage = $scope.params.s / 10;
+            $scope.bigTotalItems = $scope.params.s + 10;
+        }
+      }
+
+      if ($scope.params.s) {
+        $scope.bigCurrentPage = ($scope.params.s / 10) + 1;
+        $scope.bigTotalItems = $scope.params.s + 10;
+        console.log("$scope.params.s", $scope.params.s);
+      } else {
+        $scope.bigCurrentPage = 1;
+      }
+      
+
+      $scope.$watchCollection('params', function(newValue, oldValue) {
+          $scope.loadPage();
+      });
+      
+
+      $scope.pageChanged = function() {
+        console.log("bigCurrentPage:",$scope.bigCurrentPage);
+        $scope.loadPage();
+      };
+
+      
+      $scope.cue = function(data) {
+        if (!data.cued) {
+          data.cued = data.fid;
+          if (PlayerData.collection.iam) {
+            data.uid = PlayerData.collection.iam
+          } else {
+            data.uid = null;
+          }
+        } else {
+          data.cued = null;
+          data.cued_for = null;
+        }
+        
+        $http({
+            method: 'GET',
+            url: '/cue',
+            params: data
+          }).then(function successCallback(response) {
+          }, function errorCallback(response) {
+
+          });
+      }
+      
+      
+
+  })
   .controller('RatingCtrl', function ($scope) {
     $scope.isReadonly = false;
 
@@ -282,7 +420,7 @@ var fmpApp = angular.module('fmpApp', [
       {stateOn: 'yellow-star', stateOff: 'grey-star'},
       {stateOn: 'question-mark-on', stateOff: 'question-mark-off'}
     ];
-}).config(['$routeProvider',
+}).config(['$routeProvider', '$locationProvider',
   function($routeProvider) {
     $routeProvider
       .when('/home', {
@@ -292,6 +430,11 @@ var fmpApp = angular.module('fmpApp', [
       .when('/listeners', {
         templateUrl: '/static/templates/listeners.html',
         controller: 'ListenerCtrl'
+      })
+      .when('/search', {
+        templateUrl: '/static/templates/search.html',
+        controller: 'SearchController',
+        reloadOnSearch: false
       })
       .otherwise({
         redirectTo: '/home'

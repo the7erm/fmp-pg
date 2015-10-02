@@ -89,10 +89,10 @@ cherrypy.config.update({
 class FmpServer(object):
     @cherrypy.expose
     def index(self):
-        print "cherrypy.request.local:", cherrypy.request.local
+        print "cherrypy.request.headers:", cherrypy.request.headers
+        print "cherrypy.request:", cherrypy.request.remote
         return open('templates/index.html', 'r').read() % {
-            'host': 'localhost', 
-            'port': 5050, 
+            'host': cherrypy.request.headers['Host'],
             'scheme': 'ws'
         }
 
@@ -172,7 +172,7 @@ class FmpServer(object):
 
         query(sql, spec)
         cherrypy.log(sql % spec)
-        playlist.reload_current()
+        GObject.idle_add(playlist.reload_current)
         return self.listeners()
 
     @cherrypy.expose
@@ -284,6 +284,151 @@ class FmpServer(object):
                         "attachment", os.path.basename(filename))
 
         return cherrypy.NotFound()
+
+    @cherrypy.expose
+    def cue(self, *args, **kwargs):
+        params = cherrypy.request.params
+        params['reason'] = 'FROM Search'
+        if not params.get('uid'):
+            params['uid'] = _listeners()[0]['uid']
+
+        if params.get('cued'):
+            sql = """INSERT INTO preload (uid, fid, reason)
+                     VALUES(%(uid)s, %(fid)s, %(reason)s)"""
+        else:
+            sql = """DELETE FROM preload WHERE fid = %(fid)s"""
+        try:
+            query(sql, params)
+            result = {"RESULT": "OK"}
+        except Exception, e:
+            query("COMMIT;")
+            result = {"RESULT": "ERROR",}
+        print "query:", pg_cur.mogrify(sql, params)
+        print result
+        print params
+        return json.dumps(result)
+
+    @cherrypy.expose
+    def search(self, *args, **kwargs):
+        params = cherrypy.request.params
+        cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
+        cherrypy.log("search: kwargs:%s" % ( kwargs,))
+        start = int(params.get("s", 0))
+        limit = int(params.get("l", 10))
+        only_cued = params.get('oc', False)
+        if only_cued == 'true':
+            only_cued = True
+        else:
+            only_cued = False
+
+        q = params.get("q", None)
+
+        query_offset = "LIMIT %d OFFSET %d" % (limit, start)
+        query_args = {}
+        query_spec = {
+          "SELECT": ["""DISTINCT f.fid, 
+                        string_agg(DISTINCT a.artist, ',') AS artists,
+                        string_agg(DISTINCT fl.basename, ',') AS basenames, 
+                        title, sha512, p.fid AS cued, f.fid AS id, 
+                        'f' AS id_type"""],
+          "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid
+                              LEFT JOIN file_locations  fl ON fl.fid = f.fid
+                              LEFT JOIN file_artists fa ON fa.fid = f.fid
+                              LEFT JOIN artists a ON a.aid = fa.aid"""],
+          "COUNT_FROM": ["files f"],
+          "ORDER_BY": [],
+          "WHERE": [],
+          "WHERERATINGSCORE": [],
+          "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
+        }
+
+        if only_cued:
+            query_spec['WHERE'].append("p.fid = f.fid")
+            query_spec['COUNT_FROM'].append("preload p")
+
+        query_base = """SELECT {SELECT}
+                        FROM {FROM}
+                        WHERE {WHERE}
+                        GROUP BY {GROUP_BY}
+                        ORDER BY {ORDER_BY}
+                        {query_offset}"""
+
+        query_base_count = """SELECT count(DISTINCT f.fid) AS total
+                              FROM {COUNT_FROM}
+                              WHERE {WHERE}"""
+        if q is not None:
+            q = q.strip()
+        if q:
+            query_spec["SELECT"].append("ts_rank(tsv, query) AS rank")
+            count_from = """keywords kw,
+                            plainto_tsquery('english', %(q)s) query"""
+            query_spec["FROM"].append(count_from)
+            query_spec["COUNT_FROM"].append(count_from)
+            query_spec["WHERE"].append("kw.fid = f.fid AND tsv @@ query")
+            query_spec['GROUP_BY'].append("rank")
+            query_args['q'] = q
+            query_spec['ORDER_BY'].append("rank DESC")
+        
+        query_spec['ORDER_BY'].append("artists, title")
+
+        search_query = query_base.format(
+            SELECT=",".join(query_spec['SELECT']),
+            FROM=",".join(query_spec['FROM']),
+            WHERE=" AND ".join(query_spec['WHERE']),
+            ORDER_BY=",".join(query_spec['ORDER_BY']),
+            GROUP_BY=",".join(query_spec['GROUP_BY']),
+            query_offset=query_offset
+        )
+
+        search_query = search_query.format(
+            WHERERATINGSCORE=" OR ".join(query_spec['WHERERATINGSCORE']))
+
+        count_query = query_base_count.format(
+            SELECT=",".join(query_spec['SELECT']),
+            COUNT_FROM=",".join(query_spec['COUNT_FROM']),
+            WHERE=" AND ".join(query_spec['WHERE']),
+            ORDER_BY=",".join(query_spec['ORDER_BY']),
+            GROUP_BY=",".join(query_spec['GROUP_BY'])
+        )
+
+        count_query = count_query.format(
+            WHERERATINGSCORE=" OR ".join(query_spec['WHERERATINGSCORE']))
+
+        if not query_spec['WHERE']:
+            search_query = search_query.replace("WHERE", '')
+            count_query = count_query.replace("WHERE", '')
+
+        results = []
+        try:
+            print "query:", pg_cur.mogrify(search_query, query_args)
+            try:
+              results = get_results_assoc_dict(search_query, query_args)
+            except Exception, err:
+              print "ERR", err
+              query("COMMIT;")
+        except psycopg2.IntegrityError, err:
+            query("COMMIT;")
+            print "*****ERROR"
+            print "(server) psycopg2.IntegrityError:",err
+        except psycopg2.InternalError, err:
+            query("COMMIT;")
+            print "(server) psycopg2.InternalError:",err
+
+        print "count_query:", pg_cur.mogrify(count_query, query_args)
+        total = 0
+        try:
+          print "total query:", pg_cur.mogrify(count_query, query_args)
+          total = get_assoc_dict(count_query, query_args)
+        except Exception, err:
+          print "ERR", err
+          query("COMMIT;")
+            
+        response = {
+            "RESULT": "OK",
+            "results": results,
+            "total": total
+        }
+        return json.dumps(response)
 
 
 def cherry_py_worker():

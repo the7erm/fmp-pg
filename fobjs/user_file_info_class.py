@@ -109,6 +109,10 @@ class UserFileInfo(UserFile, Log):
     def save_user_file_info(self):
         # UserFileInfo.save_user_file_info
         self.calculate_true_score()
+        insert_info = deepcopy(self.userFileDbInfo)
+        insert_info['fid'] = self.fid
+        insert_sql = """INSERT INTO user_song_info ({cols})
+                                    VALUES({values})"""
         sql = """UPDATE user_song_info
                  SET {sets}
                  WHERE {wheres}
@@ -116,6 +120,7 @@ class UserFileInfo(UserFile, Log):
         sets = ['rating', 'score', 'percent_played', 'ultp', 'true_score']
         wheres = ['uid', 'fid']
         sql = format_sql(sql, self.userFileDbInfo, sets=sets, wheres=wheres)
+        insert_sql = format_sql(insert_sql, values=insert_info)
 
         self.log_debug(".save_user_file_info():%s" % 
                        sqlparse.format(
@@ -123,7 +128,18 @@ class UserFileInfo(UserFile, Log):
                             reindent=True, 
                             keyword_case='upper'
                        ))
-        self.userFileDbInfo = get_assoc_dict(sql, self.userFileDbInfo)
+        userFileDbInfo = get_assoc_dict(sql, self.userFileDbInfo)
+        if userFileDbInfo:
+            self.userFileDbInfo = userFileDbInfo
+        else:
+            self.log_debug(".save_user_file_info() INSERTING:%s" % 
+                           sqlparse.format(
+                                mogrify(insert_sql, self.userFileDbInfo),
+                                reindent=True, 
+                                keyword_case='upper'
+                           ))
+            self.userFileDbInfo = get_assoc_dict(sql, self.userFileDbInfo)
+        
         return self.userFileDbInfo
 
     def mark_as_played(self, **sql_args):

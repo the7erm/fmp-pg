@@ -562,8 +562,9 @@ class UserHistoryItem(UserFile):
             self.log_crit("UNABLE TO UPDATE HISTORY:%s" % self.historyDbInfo)
 
     def mark_as_played(self, **sql_args):
-        self.log_debug(".mark_as_played:%s", sql_args['percent_played'])
-        self.historyDbInfo['percent_played'] = sql_args.get('percent_played', 0)
+        percent_played = sql_args.get('percent_played', 0)
+        self.log_debug(".mark_as_played:%s", percent_played)
+        self.historyDbInfo['percent_played'] = percent_played
         ultp = self.get_now(**sql_args)
         self.historyDbInfo['time_played'] = ultp
         self.historyDbInfo['date_played'] = ultp.date()

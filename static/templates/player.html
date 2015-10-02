@@ -1,6 +1,6 @@
 <h3>Player</h3>
 <span id="time-status">{{PlayerData.collection.time_status}}</span>
-<div>{{PlayerData.collection.artist_title}}</div>
+<div>{{ PlayerData.collection.artist_title }}</div>
 <div>{{ PlayerData.collection.reason }}</div>
 <div ng-if="PlayerData.collection.CONNECTION == 'OPEN'">
     <button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
@@ -19,7 +19,7 @@
 <div class="visible-lg-block">lg</div>
 <div class="row" ng-repeat="(key, data) in PlayerData.collection.ratings">
     <div class="col-xs-2 col-sm-1 col-md-1 col-lg-1">
-        <button class="btn" ng-click="PlayerData.collection.iam=data.uid" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
+        <button class="btn" ng-click="PlayerData.setIam(data.uid)" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
     </div>
     <div class="col-xs-4 col-sm-3 col-md-2 col-lg-2">
         <button class="btn" ng-class="{'btn-info':(PlayerData.votedToSkip(data.uid))}" 

@@ -102,24 +102,33 @@ def get_files_from_preload(listeners=None):
             )"""
     query(sql)
 
-    select_sql = """SELECT *
-             FROM preload
-             WHERE uid = %(uid)s
-             ORDER BY plid
-             LIMIT 1"""
+    qued_sql = """SELECT *
+                  FROM preload
+                  WHERE uid = %(uid)s AND reason LIKE '%%FROM Search%%'
+                  ORDER BY plid
+                  LIMIT 1"""
 
+    select_sql = """SELECT *
+                    FROM preload
+                    WHERE uid = %(uid)s
+                    ORDER BY plid
+                    LIMIT 1"""
+
+    queries = [qued_sql, select_sql]
+    delete_sql = """DELETE FROM preload 
+                    WHERE plid = %(plid)s"""
     items = []
     for listener in listeners:
-        dbInfo = get_assoc_dict(select_sql, listener)
-        if dbInfo and dbInfo != {}:
-            delete_sql = """DELETE FROM preload 
-                            WHERE plid = %(plid)s"""
-            query(delete_sql, dbInfo)
-            print "+"*100
-            print "get_file_from_preload:", dbInfo
-            item = get_fobj(**dbInfo)
-            print "ITEM:", item.filename
-            items.append(item)
+        for q in queries:
+            dbInfo = get_assoc_dict(q, listener)
+            if dbInfo and dbInfo != {}:
+                query(delete_sql, dbInfo)
+                print "+"*100
+                print "get_file_from_preload:", dbInfo
+                item = get_fobj(**dbInfo)
+                print "ITEM:", item.filename
+                items.append(item)
+                break # for query in queries
     return items
 
 def get_users():
