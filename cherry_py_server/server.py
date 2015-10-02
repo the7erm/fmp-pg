@@ -216,6 +216,9 @@ class FmpServer(object):
 
         listeners = _listeners()
         len_listeners = len(listeners)
+        print "voted_to_skip_count:", voted_to_skip_count
+        print "len_listeners:", len_listeners
+        print "skip_countdown.get(fid):",skip_countdown.get(fid)
         if voted_to_skip_count >= (len_listeners * 0.5) and \
            not skip_countdown.get(fid):
             skip_countdown[fid] = time() + len_listeners
@@ -224,11 +227,13 @@ class FmpServer(object):
             elif len_listeners > 10:
                 skip_countdown[fid] = time() + 10
                 
-        elif skip_countdown.get(fid):
+        elif skip_countdown.get(fid) and (voted_to_skip_count == 0 or
+                                          voted_to_skip_count < (len_listeners * 0.5)):
             del skip_countdown[fid]
 
         cherrypy.engine.publish('websocket-broadcast', TextMessage(
-            json.dumps({'vote_data': vote_data, 'voted_to_skip_count': voted_to_skip_count})))
+            json.dumps({'vote_data': vote_data, 
+                        'voted_to_skip_count': voted_to_skip_count})))
 
         playlist.files[playlist.index].vote_data = vote_data[fid]
         print "*"* 20
