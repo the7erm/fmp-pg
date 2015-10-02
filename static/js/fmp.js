@@ -21,7 +21,7 @@ var fmpApp = angular.module('fmpApp', [
     'ngCookies',
     'ngSanitize'
   ])
-  .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', function($websocket, $cookies, $http, $sce) {
+  .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter', function($websocket, $cookies, $http, $sce, $filter) {
     // Open a WebSocket connection
     var collection = {
           'ws_url': window.ws_url,
@@ -128,9 +128,7 @@ var fmpApp = angular.module('fmpApp', [
       });
     }
 
-    var searchLink = function(str) {
-      return "<a href='#/search?q="+fixedEncodeURIComponent(str)+"&s=0'>"+htmlEntities(str)+"</a>"
-    }
+    var searchLink = $filter('searchLink');
 
     dataStream.onMessage(function(message) {
       var obj = JSON.parse(message.data);
@@ -452,7 +450,50 @@ var fmpApp = angular.module('fmpApp', [
       .otherwise({
         redirectTo: '/home'
       });
+  }]).filter('encodeURIComponent', function() {
+      return window.encodeURIComponent;
+  }).filter('htmlEntities', function() {
+        var htmlEntities = function(str) {
+            return str.replace("<","&lt;").replace(">", "&gt;");
+        };
+        return htmlEntities;
+  }).filter('fixedEncodeURIComponent', function(){
+      var fixedEncodeURIComponent = function (text) {
+        return encodeURIComponent(text).replace(/[!'()*]/g, function(c) {
+          return '%' + c.charCodeAt(0).toString(16);
+        });
+      };
+      return fixedEncodeURIComponent;
+  }).filter('searchLink', ['$sce', function($sce){
+    
+    var searchLink = function(text) {
+      var fixedEncodeURIComponent = function (text) {
+        return encodeURIComponent(text).replace(/[!'()*]/g, function(c) {
+          return '%' + c.charCodeAt(0).toString(16);
+        });
+      };
+      var htmlEntities = function(text) {
+          return text.replace("<","&lt;").replace(">", "&gt;");
+      };
+      var parts = text.split(","),
+          res = [];
+      for (var i=0;i<parts.length;i++) {
+          if (parts[i]) {
+            res.push("<a href='#/search?q="+fixedEncodeURIComponent(parts[i])+"&s=0'>"+htmlEntities(parts[i])+"</a>")
+          }
+      }
+      return $sce.trustAsHtml(res.join(", "));
+    }
+    return searchLink;
+  }]).filter('html', ['$sce', function ($sce) { 
+    return function (text) {
+        return $sce.trustAsHtml(text);
+    }
   }]);
+
+    
+
+    
 
 angular.module("template/rating/rating.html",[]).run(["$templateCache",function(a){
     a.put("template/rating/rating.html",'<span ng-mouseleave="reset()" ng-keydown="onKeydown($event)" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="{{range.length}}" aria-valuenow="{{value}}">\n    <span ng-repeat-start="r in range track by $index" class="sr-only">({{ $index < value ? \'*\' : \' \' }})</span>\n    <i ng-repeat-end ng-mouseenter="enter($index)" ng-click="rate($index)" class="glyphicon" ng-class="$index <= value && (r.stateOn || \'glyphicon-star\') || (r.stateOff || \'glyphicon-star-empty\')" ng-attr-title="{{r.title}}" ></i>\n</span>\n')

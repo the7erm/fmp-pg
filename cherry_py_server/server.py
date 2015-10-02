@@ -379,30 +379,7 @@ class FmpServer(object):
             query_spec['GROUP_BY'].append("rank")
             query_args['q'] = q
             query_spec['ORDER_BY'].append("rank DESC")
-        """
-        SELECT DISTINCT f.fid, 
-string_agg(DISTINCT a.artist, ',' ) AS artists,
-string_agg(DISTINCT fl.basename, ',') AS basenames, 
-CASE WHEN p.reason = 'FROM Search' THEN 0 ELSE 1 END AS p_reason,
-title, sha512, p.fid AS cued, f.fid AS id, 
-'f' AS id_type,usi.uid, usi.rating, usi.fid AS usi_fid, plid
-FROM files f LEFT JOIN preload p ON p.fid = f.fid
-      LEFT JOIN file_locations  fl ON fl.fid = f.fid
-      LEFT JOIN file_artists fa ON fa.fid = f.fid
-      LEFT JOIN artists a ON a.aid = fa.aid,user_song_info usi
-WHERE usi.fid = f.fid AND usi.uid = 1 AND p.fid = f.fid
-GROUP BY f.fid, f.title, f.sha512, p.fid, id, id_type,usi.uid, usi.rating, usi_fid, p.reason, plid
-ORDER BY p_reason, plid, artists, title
-LIMIT 10 OFFSET 0;"""
 
-        """
-        SELECT name, function, phone_number FROM team
-        ORDER BY CASE WHEN function = 'CEO' THEN 1
-                      WHEN function = 'COO' THEN 2
-                      WHEN function = 'CFO' THEN 3
-                      WHEN function = 'CTO' THEN 4
-                      WHEN function = 'CIO' THEN 5
-                 END;"""
         if only_cued:
             query_spec['SELECT'].append("CASE WHEN p.reason = 'FROM Search' "                         "THEN 0 ELSE 1 END AS p_reason, plid")
             query_spec['ORDER_BY'].append("""p_reason, plid""")

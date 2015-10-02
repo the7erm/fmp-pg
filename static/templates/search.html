@@ -13,8 +13,9 @@ ng-show="!loadPageLocked"></pagination>
 	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
 	    </div>
 		<div class="col-xs-9 col-sm-11 col-md-11 col-lg-11">
-			{{data.artists}} - {{data.title}}<br>
-			<code>{{data.basenames}}</code>
+			<span ng-bind-html="data.artists | searchLink"></span> -
+			<span ng-bind-html="data.title | searchLink"></span><br>
+			<code ng-bind-html="data.basenames | searchLink"></code>
 		</div>
 		<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
 	</div>
