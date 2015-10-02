@@ -316,6 +316,11 @@ class FmpServer(object):
         start = int(params.get("s", 0))
         limit = int(params.get("l", 10))
         only_cued = params.get('oc', False)
+        try:
+            uid = int(params.get('uid', 0))
+        except:
+            uid = 0
+
         if only_cued == 'true':
             only_cued = True
         else:
@@ -342,10 +347,6 @@ class FmpServer(object):
           "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
         }
 
-        if only_cued:
-            query_spec['WHERE'].append("p.fid = f.fid")
-            query_spec['COUNT_FROM'].append("preload p")
-
         query_base = """SELECT {SELECT}
                         FROM {FROM}
                         WHERE {WHERE}
@@ -356,6 +357,15 @@ class FmpServer(object):
         query_base_count = """SELECT count(DISTINCT f.fid) AS total
                               FROM {COUNT_FROM}
                               WHERE {WHERE}"""
+
+        if uid:
+            query_args['uid'] = uid
+            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid")
+            query_spec["FROM"].append("user_song_info usi")
+            query_spec["WHERE"].append("usi.fid = f.fid AND usi.uid = %(uid)s")
+            query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid')
+            query_spec['COUNT_FROM'].append("user_song_info usi")
+
         if q is not None:
             q = q.strip()
         if q:
@@ -368,7 +378,13 @@ class FmpServer(object):
             query_spec['GROUP_BY'].append("rank")
             query_args['q'] = q
             query_spec['ORDER_BY'].append("rank DESC")
+
         
+
+        if only_cued:
+            query_spec['WHERE'].append("p.fid = f.fid")
+            query_spec['COUNT_FROM'].append("preload p")
+
         query_spec['ORDER_BY'].append("artists, title")
 
         search_query = query_base.format(

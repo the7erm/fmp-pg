@@ -4,15 +4,14 @@ Search: <input type="text" placeholder="keywords" ng-model="params.q">
 <div ng-if="loadPageLocked">Loading page: {{bigCurrentPage}}<br><br><br><br></div>
 <pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()" 
 ng-show="!loadPageLocked"></pagination>
-<div class="visible-xs-block">xs</div>
-<div class="visible-sm-block">sm</div>
-<div class="visible-md-block">md</div>
-<div class="visible-lg-block">lg</div>
 <div class="container-fliud">
 	<div class="row" ng-repeat="(key, data) in response.results">
 		<div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
 			<button class="btn" ng-class="{'btn-default':!data.cued, 'btn-info':data.cued}" ng-click="cue(data)">cued</button>
 		</div>
+		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3">
+	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+	    </div>
 		<div class="col-xs-9 col-sm-11 col-md-11 col-lg-11">
 			{{data.artists}} - {{data.title}}<br>
 			<code>{{data.basenames}}</code>

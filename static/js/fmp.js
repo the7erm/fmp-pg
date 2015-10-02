@@ -18,17 +18,16 @@ var fmpApp = angular.module('fmpApp', [
     'ui.bootstrap',
     'ngRoute',
     'mgcrea.ngStrap',
-    'ngCookies'
+    'ngCookies',
+    'ngSanitize'
   ])
-  .factory('PlayerData', ['$websocket', '$cookies', '$http', function($websocket, $cookies, $http) {
+  .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', function($websocket, $cookies, $http, $sce) {
     // Open a WebSocket connection
     var collection = {
           'ws_url': window.ws_url,
           "iam": $cookies.get('iam') || null
         },
         dataStream = $websocket(collection.ws_url);
-
-
 
     var methods = {
       collection: collection,
@@ -117,6 +116,22 @@ var fmpApp = angular.module('fmpApp', [
     dataStream.maxTimeout = 5000;
     dataStream.reconnectIfNotNormalClose = true;
 
+    
+
+    var htmlEntities = function(str) {
+        return str.replace("<","&lt;").replace(">", "&gt;");
+    };
+
+    var fixedEncodeURIComponent = function (str) {
+      return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
+        return '%' + c.charCodeAt(0).toString(16);
+      });
+    }
+
+    var searchLink = function(str) {
+      return "<a href='#/search?q="+fixedEncodeURIComponent(str)+"&s=0'>"+htmlEntities(str)+"</a>"
+    }
+
     dataStream.onMessage(function(message) {
       var obj = JSON.parse(message.data);
       console.log("message.data:", obj);
@@ -168,12 +183,12 @@ var fmpApp = angular.module('fmpApp', [
           }
 
           if (artist) {
-              artist_title = artist;
+              artist_title = searchLink(artist);
           }
           if (artist) {
-              artist_title += " - "+ title;
+              artist_title += " - " + searchLink(title);
           } else {
-              artist_title = title;
+              artist_title = searchLink(title);
           }
           collection.fid = obj['player-playing']['fid'];
           collection.artist_title = artist_title;
@@ -304,6 +319,9 @@ var fmpApp = angular.module('fmpApp', [
         if ($scope.params.oc) {
           $scope.params.oc = true;
         }
+        if (PlayerData.collection.iam) {
+          $scope.params.uid = PlayerData.collection.iam;
+        }
         if ($scope.loadedParams == JSON.stringify($scope.params)) {
           console.log("scope params == loadedParams not searching.");
           return;
@@ -391,17 +409,12 @@ var fmpApp = angular.module('fmpApp', [
 
           });
       }
-      
-      
 
   })
   .controller('RatingCtrl', function ($scope) {
     $scope.isReadonly = false;
 
     $scope.setRating = function() {
-        if ($scope.data.rating >= 6) {
-          $scope.data.rating = 5;
-        }
         console.log("data.rating:", $scope.data.rating);
         $(".play-pause").focus().blur();
         $.ajax({

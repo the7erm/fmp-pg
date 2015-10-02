@@ -1,6 +1,6 @@
 <h3>Player</h3>
 <span id="time-status">{{PlayerData.collection.time_status}}</span>
-<div>{{ PlayerData.collection.artist_title }}</div>
+<div ng-bind-html="PlayerData.collection.artist_title"></div>
 <div>{{ PlayerData.collection.reason }}</div>
 <div ng-if="PlayerData.collection.CONNECTION == 'OPEN'">
     <button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
@@ -13,10 +13,6 @@
     <b>No connection to server.</b>
 </div>
 <br clear="all">
-<div class="visible-xs-block">xs</div>
-<div class="visible-sm-block">sm</div>
-<div class="visible-md-block">md</div>
-<div class="visible-lg-block">lg</div>
 <div class="row" ng-repeat="(key, data) in PlayerData.collection.ratings">
     <div class="col-xs-2 col-sm-1 col-md-1 col-lg-1">
         <button class="btn" ng-click="PlayerData.setIam(data.uid)" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
