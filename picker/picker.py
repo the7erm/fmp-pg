@@ -75,7 +75,7 @@ def insert_missing_files_for_uid(uid):
              FROM file_locations f LEFT JOIN user_song_info usi ON 
                                     usi.uid = %(uid)s AND
                                     usi.fid = f.fid
-             WHERE usi.fid IS NULL"""
+             WHERE usi.fid IS NULL AND usi.uid = %(uid)s"""
 
     results = get_results_assoc_dict(sql, insert_spec)
     for r in results:
@@ -83,7 +83,9 @@ def insert_missing_files_for_uid(uid):
 
     print sql % insert_spec
     print "INSERTING"
-    inserted = get_results_assoc_dict(insert_sql + sql + " RETURNING * ",
+    full_insert_sql = insert_sql + sql + " RETURNING * "
+    print mogrify(full_insert_sql, insert_spec)
+    inserted = get_results_assoc_dict(full_insert_sql,
                                       insert_spec)
     for r in inserted:
         print "INSERTED:", r

@@ -43,7 +43,7 @@ except:
     sys.path.append("../")
     from db.db import *
 
-from fobjs.misc import _listeners
+from fobjs.misc import _listeners, get_words_from_string
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -314,6 +314,51 @@ class FmpServer(object):
         return json.dumps(result)
 
     @cherrypy.expose
+    def artist_letters(self, *args, **kwargs):
+        cherrypy.log(("+"*20)+" artists letters "+("+"*20))
+        sql = """SELECT DISTINCT lower(substr(artist, 1, 1)) AS letter 
+                 FROM artists a, files f, file_artists fa 
+                 WHERE fa.aid = a.aid AND f.fid = fa.fid ORDER BY letter"""
+
+        letters = get_results_assoc_dict(sql)
+        letters = [v['letter'] for v in letters]
+        return json.dumps(letters)
+
+    @cherrypy.expose
+    def artists(self, *args, **kwargs):
+        params = cherrypy.request.params
+        sql = """SELECT DISTINCT lower(artist) AS artist
+                 FROM artists
+                 WHERE artist ILIKE %(l)s
+                 ORDER BY artist"""
+
+        spec = {
+            'l': params.get('l', '')+"%"
+        }
+        if spec['l'] == '_%':
+            spec['l'] = '\_%'
+        if spec['l'] == '%%':
+            spec['l'] = '\%%'
+
+        artists = get_results_assoc_dict(sql, spec)
+        return json.dumps([v['artist'].title()
+                                      .replace("'S","'s")
+                                      .replace("_S","_s")
+                                      .replace(" Of ", " of ")
+                                      .replace("Of ", "of ")
+                                      .replace(" The ", " the ")
+                                      .replace(" And ", " and ")
+                                      .replace(" Vs ", " vs ")
+                                      .replace(" Vs. ", " vs. ")
+                                      .replace(" A ", " a ")
+                                      .replace(" You ", " you ")
+                                      .replace(" To ", " to ")
+                                      .replace(" With ", " with ")
+                                      for v in artists])
+
+
+
+    @cherrypy.expose
     def search(self, *args, **kwargs):
         params = cherrypy.request.params
         cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
@@ -374,6 +419,10 @@ class FmpServer(object):
 
         if q is not None:
             q = q.strip()
+            q += " "
+            words = get_words_from_string(q)
+            q += " ".join(words)
+            q = q.strip()
         if q:
             query_spec["SELECT"].append("ts_rank(tsv, query) AS rank")
             count_from = """keywords kw,
@@ -386,7 +435,8 @@ class FmpServer(object):
             query_spec['ORDER_BY'].append("rank DESC")
 
         if only_cued:
-            query_spec['SELECT'].append("CASE WHEN p.reason = 'FROM Search' "                         "THEN 0 ELSE 1 END AS p_reason, plid")
+            query_spec['SELECT'].append("CASE WHEN p.reason = 'FROM Search' "                         "THEN 0 ELSE 1 END AS p_reason, "
+                                         "p.reason, plid")
             query_spec['ORDER_BY'].append("""p_reason, plid""")
             query_spec['GROUP_BY'].append("p.reason, plid")
 
@@ -459,6 +509,7 @@ class FmpServer(object):
 
 def cherry_py_worker():
     static_path = os.path.realpath(sys.path[0])
+    static_img_path = os.path.join(static_path, "images")
     cherrypy.quickstart(FmpServer(), '/', config={
         '/ws': {
             'tools.websocket.on': True,
@@ -466,11 +517,8 @@ def cherry_py_worker():
         },
         '/favicon.ico': {
             'tools.staticfile.on': True,
-            'tools.staticfile.filename': "/home/erm/fmp-pg/static/favicon.ico"
-        },
-        '/static/fmp-logo.svg': {
-            'tools.staticfile.on': True,
-            'tools.staticfile.filename': "/home/erm/fmp-pg/static/fmp-logo.svg"
+            'tools.staticfile.filename': os.path.join(static_img_path,
+                                                      "favicon.ico")
         },
         '/static': {
             'tools.staticdir.root': static_path,

@@ -13,6 +13,7 @@ class FObj_Class(Log):
         self.percent_played = kwargs.get("percent_played", -1)
         if self.percent_played is None:
             self.percent_played = 0
+        super(FObj_Class, self).__init__(*args, **kwargs)
 
     @property
     def exists(self):

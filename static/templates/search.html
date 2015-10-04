@@ -1,22 +1,28 @@
 <h3>Search</h3>
-Search: <input type="text" placeholder="keywords" ng-model="params.q">
+<a href="/#artists?l={{params.q[0]}}" class="btn">Browse by artists</a><br>
+Search: <input type="text" placeholder="keywords" ng-model="params.q" style="width:60%">
 <button class='btn' ng-class="{'btn-default': !params.oc, 'btn-info': params.oc}" ng-click="params.oc=!params.oc" >Only Cued</button><br>
 <div ng-if="loadPageLocked">Loading page: {{bigCurrentPage}}<br><br><br><br></div>
 <pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()" 
-ng-show="!loadPageLocked"></pagination>
+ng-show="!loadPageLocked" items-per-page="10"></pagination>
 <div class="container-fliud">
 	<div class="row" ng-repeat="(key, data) in response.results">
 		<div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
 			<button class="btn" ng-class="{'btn-default':!data.cued, 'btn-info':data.cued}" ng-click="cue(data)">cued</button>
 		</div>
-		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3">
+		<div class="col-xs-9 col-sm-4 col-md-3 col-lg-3">
+			<span ng-if="data.artists">
+				<span ng-bind-html="data.artists | searchLink"></span> -
+			</span>
+			<span ng-if="data.title" ng-bind-html="data.title | searchLink"></span>
+			<span ng-if="!data.title" ng-bind-html="data.basenames | searchLink"></span><br>
+			<code ng-bind-html="data.basenames | searchLink"></code><br>
+			<span class="reason" ng-if="data.reason">{{data.reason}}</span>
+		</div>
+		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-6 col-md-4 col-lg-3">
 	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
 	    </div>
-		<div class="col-xs-9 col-sm-11 col-md-11 col-lg-11">
-			<span ng-bind-html="data.artists | searchLink"></span> -
-			<span ng-bind-html="data.title | searchLink"></span><br>
-			<code ng-bind-html="data.basenames | searchLink"></code>
-		</div>
+		
 		<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
 	</div>
 </div>

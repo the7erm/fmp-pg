@@ -235,6 +235,27 @@ var fmpApp = angular.module('fmpApp', [
         $.get("/pause/");
     };
   })
+  .controller('ArtistCtrl', function($scope, $http, $routeParams) {
+      $scope.params = $routeParams;
+      $http({
+        method: 'GET',
+        url: '/artist_letters'
+      }).then(function successCallback(response) {
+          $scope.artist_letters = response.data;
+      }, function errorCallback(response) {
+      });
+
+      if ($scope.params.l) {
+        $http({
+          method: 'GET',
+          url: '/artists/',
+          params: $scope.params
+        }).then(function successCallback(response){
+          $scope.artists = response.data;
+        }, function errorCallback(response){
+        });
+      }
+  })
   .controller('ListenerCtrl', function($scope, $http){
     $scope.getUserForUid = function (uid)  {
       for(var i=0;i<$scope.listeners.length; i++) {
@@ -447,26 +468,39 @@ var fmpApp = angular.module('fmpApp', [
         controller: 'SearchController',
         reloadOnSearch: false
       })
+      .when('/artists', {
+        templateUrl: '/static/templates/artists.html',
+        controller: 'ArtistCtrl',
+        reloadOnSearch: false
+      })
       .otherwise({
         redirectTo: '/home'
       });
   }]).filter('encodeURIComponent', function() {
       return window.encodeURIComponent;
   }).filter('htmlEntities', function() {
-        var htmlEntities = function(str) {
-            return str.replace("<","&lt;").replace(">", "&gt;");
-        };
-        return htmlEntities;
+      if (!text) {
+        return '';
+      }
+      var htmlEntities = function(str) {
+          return str.replace("<","&lt;").replace(">", "&gt;");
+      };
+      return htmlEntities;
   }).filter('fixedEncodeURIComponent', function(){
       var fixedEncodeURIComponent = function (text) {
+        if (!text) {
+          return '';
+        }
         return encodeURIComponent(text).replace(/[!'()*]/g, function(c) {
           return '%' + c.charCodeAt(0).toString(16);
         });
       };
       return fixedEncodeURIComponent;
   }).filter('searchLink', ['$sce', function($sce){
-    
     var searchLink = function(text) {
+      if (!text) {
+        return '';
+      }
       var fixedEncodeURIComponent = function (text) {
         return encodeURIComponent(text).replace(/[!'()*]/g, function(c) {
           return '%' + c.charCodeAt(0).toString(16);
@@ -479,7 +513,7 @@ var fmpApp = angular.module('fmpApp', [
           res = [];
       for (var i=0;i<parts.length;i++) {
           if (parts[i]) {
-            res.push("<a href='#/search?q="+fixedEncodeURIComponent(parts[i])+"&s=0'>"+htmlEntities(parts[i])+"</a>")
+            res.push("<a href='#/search?q="+fixedEncodeURIComponent(parts[i])+"&s=0' class='search-link'>"+htmlEntities(parts[i])+"</a>")
           }
       }
       return $sce.trustAsHtml(res.join(", "));

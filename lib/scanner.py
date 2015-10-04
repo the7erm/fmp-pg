@@ -18,6 +18,7 @@
 #
 
 import os
+import sys
 from os.path import join, getsize
 from lib.local_file_fobj import Local_File, CreationFailed
 from file_location import FileLocation, audio_ext, video_ext, is_supported_file
@@ -29,9 +30,16 @@ print "scanner.py called"
 
 already_scanned = []
 SKIP_DIRS = ["/.minecraft", "/resources/", "/minecraft/", '/.crazycraft/',
-             "/.electriciansjourney/", "/.fellowship/", '/.technic',]
+             "/.electriciansjourney/", "/.fellowship/", '/.technic',
+             '/CrazyCraft']
 
-def scan_file(root=None, name=None, filename=None, hash=True):
+audio_ext = ['.mp3','.wav','.ogg','.wma','.flac', '.m4a']
+audio_with_tags = ['.mp3','.ogg','.wma','.flac', '.m4a']
+video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
+             '.mp4', '.mov', '.m4v']
+valid_exts = audio_ext + audio_with_tags + video_ext
+
+def scan_file(root=None, name=None, filename=None, hash=True, dirname=None):
     if filename is None:
         filename = join(root, name)
         
@@ -78,7 +86,11 @@ def scan_file(root=None, name=None, filename=None, hash=True):
     associate_devices()
 
 def scan_dir(directory, hash=True):
+    directory = os.path.realpath(os.path.expanduser(directory))
+    if not directory or not os.path.exists(directory):
+        return
 
+    print "directory:", directory
     for folder in SKIP_DIRS:
         if folder in directory:
             print "skipping:", directory
@@ -88,6 +100,17 @@ def scan_dir(directory, hash=True):
         return
 
     _files = {}
+    dir_files = {}
+    folder_sql = """SELECT * 
+                    FROM folders
+                    WHERE dirname = %(dirname)s
+                    LIMIT 1"""
+    folder_update_sql = """UPDATE folders
+                           SET mtime = %(mtime)s,
+                               scan_mtime = %(scan_mtime)s
+                           WHERE dirname = %(dirname)s
+                           RETURNING * """
+    force = "--force" in sys.argv
     for root, dirs, files in os.walk(directory):
         if root in already_scanned:
             continue
@@ -101,15 +124,45 @@ def scan_dir(directory, hash=True):
             print "skipping:", root
             continue
         print "scanning:", root
+        dirname = os.path.realpath(root)
+        mtime = int(os.path.getmtime(dirname))
+        folder_info = get_assoc(folder_sql, {'dirname': dirname})
+        try:
+            folder_info = dict(folder_info)
+        except:
+            folder_info = {}
+        
+        if folder_info and folder_info.get('mtime') == mtime and \
+           mtime == folder_info.get('scan_mtime') and not force:
+            folder_info = dict(folder_info)
+            print "SKIPPING NOTHING'S CHANGED in %s" % dirname
+            continue
+        print "NOT SKIPPING %s folder_info:%s mtime:%s" % (dirname, folder_info, mtime)
+
+        dir_files[dirname] = []
         for f in files:
+            base, ext = os.path.splitext(f)
+            ext = ext.lower()
+            if ext not in valid_exts:
+                continue
             filename = os.path.join(root, f)
+            dir_files[dirname].append(filename)
             _files[filename] = {
                 "root": root, 
                 "name": f,
-                "hash": hash
+                "hash": hash,
+                "dirname": dirname
             }
-    
-    
+        if not files:
+            folder_info = get_assoc(folder_sql, {'dirname': dirname})
+            if folder_info:
+                mtime = int(os.path.getmtime(dirname))
+                folder_info = dict(folder_info)
+                folder_info['scan_mtime'] = mtime
+                folder_info['mtime'] = mtime
+                folder_info = get_assoc(folder_update_sql, folder_info)
+                print "SKIPPING DIR (no files)",dict(folder_info)
+
     len_files = float(len(_files.keys()))
     i = 0
     keys = sorted(_files.keys())
@@ -117,6 +170,30 @@ def scan_dir(directory, hash=True):
         f = _files[filename]
         print "PROGRESS: %s %.02f%% %s:%s %s %s" % (directory, (i / len_files) * 100, i, int(len_files), (i / len_files), filename)
         scan_file(**f)
+        
+        dirname = f['dirname']
+        while filename in dir_files[dirname]:
+            dir_files[dirname].remove(filename)
+        if not dir_files[dirname] and len(dir_files[dirname]) == 0:
+            folder_info = get_assoc(folder_sql, {'dirname': dirname})
+            if folder_info:
+                mtime = int(os.path.getmtime(dirname))
+                folder_info = dict(folder_info)
+                folder_info['scan_mtime'] = mtime
+                folder_info['mtime'] = mtime
+                folder_info = get_assoc(folder_update_sql, folder_info)
+                print "UPDATED DIR",dict(folder_info)
         i += 1
+
+    for dirname, dir_files in dir_files.items():
+        if not dir_files:
+            folder_info = get_assoc(folder_sql, {'dirname': dirname})
+            if folder_info:
+                mtime = int(os.path.getmtime(dirname))
+                folder_info = dict(folder_info)
+                folder_info['scan_mtime'] = mtime
+                folder_info['mtime'] = mtime
+                folder_info = get_assoc(folder_update_sql, folder_info)
+                print "UPDATED DIR",dict(folder_info)
 
     already_scanned.append(directory)

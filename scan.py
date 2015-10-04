@@ -61,18 +61,31 @@ if "--no-hash" in args:
     do_hash = False
 
 if "--folders" in args:
+    folder_list = []
     sql = """SELECT DISTINCT dirname 
              FROM file_locations
-             WHERE last_scan != current_date OR last_scan IS NULL
              ORDER BY dirname"""
     folders = get_results_assoc(sql)
-    len_folders = float(len(folders))
-    cnt = 0
     for f in folders:
+        folder_list.append(f['dirname'])
+
+    sql = """SELECT DISTINCT dirname 
+             FROM folders
+             ORDER BY dirname"""
+    folders = get_results_assoc(sql)
+    for f in folders:
+        folder_list.append(f['dirname'])
+
+    len_folders = float(len(folders))
+    folder_list = list(set(folder_list))
+    folder_list.sort()
+    
+    cnt = 0
+    for dirname in folder_list:
         cnt += 1
         print "FOLDER PROGRESS: %s%% %s:%s" % ((cnt / len_folders) * 100, 
                                                cnt, int(len_folders ))
-        scanner.scan_dir(f['dirname'], hash=do_hash)
+        scanner.scan_dir(dirname, hash=do_hash)
 
 
 for arg in args:

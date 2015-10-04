@@ -449,7 +449,10 @@ class Local_File(fobj.FObj):
                                             RETURNING *;""",
                                             (self.tags_combined['title'][0], 
                                              self.db_info['fid'],))
-                print "SET TITLE:%s" % self.tags_combined['title'][0]
+                try:
+                    print "SET TITLE:%s" % self.tags_combined['title'][0]
+                except UnicodeEncodeError:
+                    pass
 
     def calculate_true_score(self):
         self.ratings_and_scores.calculate_true_score()
@@ -661,16 +664,31 @@ class Local_File(fobj.FObj):
     def get_aids_by_artist_string(self, artists, insert=True):
         if not artists:
             return []
-        print "get_aids_by_artist_string:",artists
+
+        if type(artists) == unicode:
+            artists = artists.encode("utf8")
+
+        try:
+            print "get_aids_by_artist_string:",artists
+        except UnicodeEncodeError:
+            print "SKIP TYPE:", type(artists)
+            print "SKIP FIXED IT get_aids_by_artist_string: %s" % artists
+            sys.exit()
         aids = []
-        print "type:",type(artists)
         if type(artists) == str or type(artists) == unicode:
             artists = self.parse_artist_string(artists)
 
         print "artists:",artists
         if artists:
             for a in artists:
-                print "A:",a
+                if type(a) == unicode:
+                    a = a.encode("utf8")
+                try:
+                    print "A:",a
+                except UnicodeEncodeError:
+                    if type(a) == unicode:
+                        a = a.encode("utf8")
+                    print "SKIP IT FIXED a:", a
                 self.add_artist(a)
         
         if self.artists:
@@ -886,7 +904,14 @@ class Local_File(fobj.FObj):
         if len(combos) > 1:
             print "combos:",combos
         for c in combos:
-            print "C:",c
+            try:
+                print "C:",c
+            except UnicodeEncodeError:
+                if type(c) == unicode:
+                    c = c.encode('utf8')
+                    print "C: UPDATED", c 
+                else:
+                    return
             self.add_artist(c)
 
     def add_album(self, album_name, aid=None):
@@ -915,6 +940,8 @@ class Local_File(fobj.FObj):
                              (album_name, aid))
 
         if not album:
+            if type(album_name) == unicode:
+                album_name = album_name.encode('utf8')
             print "associating album:", album_name
             album = get_assoc("""INSERT INTO albums (album_name, aid) 
                                  VALUES(%s,%s) RETURNING *""",
@@ -982,7 +1009,11 @@ class Local_File(fobj.FObj):
                              WHERE genre = %s""",
                              (genre_name,))
         if not genre:
+            if type(genre_name) == unicode:
+                genre_name = genre_name.encode('utf8')
+            
             print "inserting genre:",genre_name
+
             genre = get_assoc("""INSERT INTO genres (genre, enabled) 
                                  VALUES(%s, %s) RETURNING *""", 
                                  (genre_name, True))

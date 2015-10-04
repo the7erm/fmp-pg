@@ -2,9 +2,7 @@
 <html ng-app="fmpApp">
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" 
-              type="image/svg+xml" 
-              href="/static/fmp-logo.svg">
+        <link rel="icon" href="/favicon.ico">
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
 
@@ -35,42 +33,42 @@
                 float:right;
             }
             .yellow-star  {
-                background-image: url("/static/star.hover.png");
+                background-image: url("/static/images/star.hover.png");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
                 min-width: 30px;
             }
             .red-no  {
-                background-image: url("/static/no.star.png");
+                background-image: url("/static/images/no.star.png");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
                 min-width: 30px;
             }
             .grey-no  {
-                background-image: url("/static/no.star.grey.png");
+                background-image: url("/static/imagesno.star.grey.png");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
                 min-width: 30px;
             }
             .grey-star  {
-                background-image: url("/static/star.grey.png");
+                background-image: url("/static/images/star.grey.png");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
                 min-width: 30px;
             }
             .question-mark-on {
-                background-image: url("/static/question.mark.svg");
+                background-image: url("/static/images/question.mark.svg");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
                 min-width: 30px;
             }
             .question-mark-off {
-                background-image: url("/static/question.mark.grey.svg");
+                background-image: url("/static/images/question.mark.grey.svg");
                 background-size: 30px 30px;
                 background-repeat: no-repeat;
                 min-height: 30px;
@@ -90,6 +88,32 @@
             .pad-badge {
                 margin: 15px;
             }
+            .reason {
+                font-size: 0.6em;
+            }
+            ol.breadcrumb li a {
+
+            }
+            ol.breadcrumb li.active a {
+                font-weight: bold;
+                padding-left: 6px;
+                padding-right: 6px;
+                background: #DDD;
+            }
+            a.search-link {
+                word-break: keep-all;
+                color: black;
+                border-bottom: 1px dashed #000;
+            }
+            a.search-link:visited {
+                color: #555;
+                border-bottom: 1px dashed #555;
+            }
+            a.search-link:hover {
+                color: blue;
+                border-bottom: 1px dashed blue;
+                text-decoration: none;
+            }
         </style>
     </head>
     <body>
@@ -104,6 +128,8 @@
                 <a class="navbar-brand" href="#/home">FMP</a>
 
             </div>
+            
+            <span class="visible-xs-inline badge pull-right pad-badge">xs</span>
             <span class="visible-sm-inline badge pull-right pad-badge">sm</span>
             <span class="visible-md-inline badge pull-right pad-badge">md</span>
             <span class="visible-lg-inline badge pull-right pad-badge">lg</span>

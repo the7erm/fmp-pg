@@ -32,30 +32,36 @@ fh = logging.handlers.RotatingFileHandler(LOGFILE, maxBytes=(1048576*5), backupC
 fh.setFormatter(format)
 logger.addHandler(fh)
 
+def outer_applicator(func, *args, **kwargs):
+    try:
+        # print "outer_applicator:", func, "args:", args, "kwargs:", kwargs
+        func(*args,**kwargs)
+    except:
+        exc_info = sys.exc_info()
+        stack = traceback.extract_stack()
+        tb = traceback.extract_tb(exc_info[2])
+        full_tb = stack[:-1] + tb
+        exc_line = traceback.format_exception_only(*exc_info[:2])
+        spec = {
+            "func": func.__name__,
+            "error_type": exc_info[0].__name__,
+            "error_message": exc_info[1],
+            "traceback": ("Traceback (most recent call last):\n"
+                          "".join(traceback.format_list(full_tb))+"\n"
+                          "".join(exc_line)),
+            "args": "%s" % pformat(args),
+            "kwargs": "%s" % pformat(kwargs)
+        }
+        msg = "ERROR func:%(func)r error_type:%(error_type)s error_message:%(error_message)s\n%(traceback)s args:%(args)r kwargs:%(kwargs)s" % spec
+        try:
+            logger.error(msg)
+        except:
+            print msg
+            raise
+
 def log_failure(func):
     def applicator(*args, **kwargs):
-        try:
-            func(*args,**kwargs)
-        except:
-            exc_info = sys.exc_info()
-            stack = traceback.extract_stack()
-            tb = traceback.extract_tb(exc_info[2])
-            full_tb = stack[:-1] + tb
-            exc_line = traceback.format_exception_only(*exc_info[:2])
-            spec = {
-                "func": func.__name__,
-                "error_type": exc_info[0].__name__,
-                "error_message": exc_info[1],
-                "traceback": ("Traceback (most recent call last):\n"
-                              "".join(traceback.format_list(full_tb))+"\n"
-                              "".join(exc_line))
-            }
-            msg = "ERROR func:%(func)r error_type:%(error_type)s error_message:%(error_message)s\n%(traceback)s" % spec
-            try:
-                logger.error(msg)
-            except:
-                print msg
-                raise
+        outer_applicator(func, *args, **kwargs)
     
     return applicator
 

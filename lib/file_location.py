@@ -66,6 +66,7 @@ class FileLocation:
                  insert=True, *args, **kwargs):
         self.db_info = None
         self.cache_file_info = None
+        self.folder_info = {}
         if flid is not None:
             self.set_data_by_flid(flid)
 
@@ -88,6 +89,7 @@ class FileLocation:
 
         self.sync_db_info()
         self.sync_files_info()
+        self.sync_folder_info()
         print "self.db_info:", 
         pprint.pprint(dict(self.db_info))
         print "self.file_info:", 
@@ -134,10 +136,29 @@ class FileLocation:
                                     VALUES(%s, %s) 
                                     RETURNING *""", 
                                 (dirname, basename))
+        self.sync_folder_info()
 
     def sync_db_info(self):
         if self.changed:
             self.update_fingerprint()
+
+    def sync_folder_info(self):
+        dirname = self.dirname
+        if not self.db_info.get('dirname'):
+            return
+        sql = """SELECT * 
+                 FROM folders
+                 WHERE dirname = %(dirname)s LIMIT 1"""
+        self.folder_info = get_assoc(sql, dict(self.db_info))
+        if self.folder_info:
+            return
+        sql = """INSERT INTO folders (dirname)
+                 VALUES (%(dirname)s)
+                 RETURNING *"""
+        self.folder_info = get_assoc(sql, dict(self.db_info))
+        if not self.folder_info:
+            self.folder_info = {}
+
 
     def update_fingerprint(self):
         if not self.exists:
@@ -231,7 +252,8 @@ class FileLocation:
                         (fingerprint,))
 
     def get_file_info_by_other_fingerprints(self, front_fingerprint,
-                                            middle_fingerprint, end_fingerprint):
+                                            middle_fingerprint, 
+                                            end_fingerprint):
         return get_assoc("""SELECT *
                             FROM files 
                             WHERE front_fingerprint = %s OR 

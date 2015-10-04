@@ -13,6 +13,7 @@ import logging
 import sqlparse
 from copy import deepcopy
 from datetime import date, datetime
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -355,3 +356,32 @@ def delete_fid(fid):
     query(sql, spec)
 
     
+def get_words_from_string(string):
+    if string is None:
+        return []
+
+    if not string or not isinstance(string,(str, unicode)):
+        print "NOT VALID:",string
+        print "TYPE:",type(string)
+        return []
+
+    string = string.strip().lower()
+    final_words = string.split()
+    dash_splitted = string.split("-")
+    for p in dash_splitted:
+        p = p.strip()
+        final_words.append(p)
+
+    # replace any non-word characters
+    # This would replace "don't say a word" with "don t say a word"
+    replaced_string = re.sub("[\W]", " ", string)
+    final_words += replaced_string.split()
+    # replace any non words characters and leave spaces.
+    # To change phrases like "don't say a word" to "dont say a word"
+    # so I'm will become "im"
+    # P.O.D. will become pod
+    removed_string = re.sub("[^\w\s]", "", string)
+    final_words += removed_string.split()
+    final_words = list(set(final_words))
+
+    return final_words

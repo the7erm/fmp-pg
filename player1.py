@@ -146,6 +146,7 @@ class Player(GObject.GObject, Log):
         self.last_good_duration = 0
         self.last_state = None
         self.seek_lock = False
+        self.svg_path = self.get_svg_path()
         self.init_window()
         
         self.init_player(uri=uri)
@@ -155,7 +156,8 @@ class Player(GObject.GObject, Log):
 
     def init_window(self):
         # Player.init_window()
-        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file("/home/erm/fmp-pg/static/fmp-logo.svg")
+
+        self.pixbuf = GdkPixbuf.Pixbuf().new_from_file(self.svg_path)
         self.temp_height = 0
         self.temp_width = 0
         self.show_controls_time = 0
@@ -761,9 +763,9 @@ class Player(GObject.GObject, Log):
     def get_img_path(self):
         img_path = ""
         possible_paths = [
-            os.path.join(sys.path[0],"static"),
-            os.path.join(sys.path[0], "..", "static"),
-            os.path.join(sys.path[0], "..")
+            os.path.join(sys.path[0],"static", "images"),
+            os.path.join(sys.path[0], "..", "static", "images"),
+            os.path.join(sys.path[0], "..", "images")
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -771,16 +773,18 @@ class Player(GObject.GObject, Log):
                 break
         return img_path
 
+    def get_svg_path(self):
+        img_path = self.get_img_path()
+        svg_path = os.path.join(img_path, "fmp-logo.svg")
+        return svg_path
+
     @uri.setter
     def uri(self, value):
         # Player.uri()
         if not value:
             return
-        
-        img_path = self.get_img_path()
-        svg_path = os.path.join(img_path, "fmp-logo.svg")
         self.pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-            svg_path, 800, 600, preserve_aspect_ratio=True)
+            self.svg_path, 800, 600, preserve_aspect_ratio=True)
         self.temp_width = 0
         self.temp_height = 0
         self.on_check_resize()

@@ -307,10 +307,11 @@ class Netcast(Log):
             'res': res,
         }
             
-        self.log_debug(".is_expired %(res)s \"%(netcast_name)s\" "
-                       "now %(sym)s expire_time "
-                       "now=%(now)s %(sym)s expire_time=%(expire_time)s" % spec)
-
+        self.log_debug(".is_expired %(res)s \"%(netcast_name)s\" \n"
+                       "now %(sym)s expire_time \n"
+                       "now =       %(now)s %(sym)s \n"
+                       "expire_time=%(expire_time)s" % 
+                       spec)
         return res
 
     @property
@@ -328,7 +329,7 @@ class Netcast(Log):
         if not last_updated:
             return False
         min_dt = utcnow() - timedelta(minutes=30)
-        res = last_updated > min_dt
+        res = False
         sym = '<='
         if res:
             sym = '>'
@@ -413,7 +414,7 @@ class Netcast(Log):
                 now, datetime.fromtimestamp(now), mtime, 
                 datetime.fromtimestamp(mtime)
             ))
-            if mtime > now - (60 * 30):
+            if mtime > now - (60 * 60):
                 self.log_debug("USING CACHE")
                 fp = open(self.rss_feed_cache_file, 'r')
                 xml = fp.read()
