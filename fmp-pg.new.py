@@ -457,6 +457,7 @@ class FmpPlaylist(Playlist):
             sys.exit()
         
     def force_broadcast_time(self):
+        self.log_debug(".force_broadcast_time()")
         if not hasattr(self, 'last_time_status'):
             self.last_time_status = {}
         self.broadcast_time(self.player, self.last_time_status, True)

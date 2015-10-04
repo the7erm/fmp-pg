@@ -50,6 +50,9 @@ class FObj_Class(Log):
     def reload(self):
         return;
 
+    def majority_deinc_score(self,*args, **kwargs):
+        return
+
     def json(self):
         dbInfo = jsonize(self.dbInfo)
         dbInfo['basename'] = self.basename

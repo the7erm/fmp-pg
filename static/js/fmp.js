@@ -40,37 +40,38 @@ var fmpApp = angular.module('fmpApp', [
       if (!collection) {
         collection = methods.collection;
       }
-      var fid = collection.fid;
-      
-      if (!uid || !fid) {
-        return false;
+      var watch_id = collection.fid || collection.eid;
+
+      if (!uid || !watch_id) {
+          return false;
       }
       if (!collection.vote_data) {
         collection.vote_data = {};
       }
-      if (!collection.vote_data[fid]) {
-          collection.vote_data[fid] = {};
+      if (!collection.vote_data[watch_id]) {
+          collection.vote_data[watch_id] = {};
       }
-      if (!collection.vote_data[fid][uid]) {
-          collection.vote_data[fid][uid] = false;
+      if (!collection.vote_data[watch_id][uid]) {
+          collection.vote_data[watch_id][uid] = false;
       }
-      return collection.vote_data[fid][uid];
+      return collection.vote_data[watch_id][uid];
     }
 
     methods.voteToSkip = function(uid) {
       var vote = !methods.votedToSkip(uid);
       console.log("***********************voteToSkip:", uid, vote);
-      if (!collection.vote_data[collection.fid]) {
-        collection.vote_data[collection.fid] = {};
+      var _id = collection.fid || collection.eid;
+      if (!collection.vote_data[_id]) {
+        collection.vote_data[_id] = {};
       }
-      if (!collection.vote_data[collection.fid][uid]) {
-        collection.vote_data[collection.fid][uid] = false;
+      if (!collection.vote_data[_id][uid]) {
+        collection.vote_data[_id][uid] = false;
       }
-      collection.vote_data[collection.fid][uid] = vote;
+      collection.vote_data[_id][uid] = vote;
       $.ajax({
           'url': "/vote_to_skip/",
           'data': {
-            'fid': collection.fid,
+            'watch_id': _id,
             'uid': uid,
             'vote': vote
           },
@@ -189,6 +190,7 @@ var fmpApp = angular.module('fmpApp', [
               artist_title = searchLink(title);
           }
           collection.fid = obj['player-playing']['fid'];
+          collection.eid = obj['player-playing']['eid'];
           collection.artist_title = artist_title;
           if (typeof obj['player-playing']['preloadInfo'] != 'undefined') {
             collection.reason = obj['player-playing']['preloadInfo']['reason'];
@@ -216,7 +218,7 @@ var fmpApp = angular.module('fmpApp', [
 
       }
       // collection.push(JSON.parse(message.data));
-      console.log("collection:",collection)
+      // console.log("collection:",collection)
     });
 
     

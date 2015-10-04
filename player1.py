@@ -383,8 +383,8 @@ class Player(GObject.GObject, Log):
             # self.file_label.set_text(self.filename)
             #if not self.seek_lock:
             #  self.emit('state-changed', self.state)
-        if obj == self.last_time_status:
-            return True
+        #if obj == self.last_time_status:
+        #    return True
         
         self.last_time_status = deepcopy(obj)
         obj['str'] = "%s %s/%s" % (

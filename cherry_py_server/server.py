@@ -61,9 +61,7 @@ class ChatWebSocketHandler(WebSocket):
         broadcast({
             "player-playing": playlist.files[playlist.index].json()
         })
-        playlist.force_broadcast_time()
-
-    
+        GObject.idle_add(playlist.force_broadcast_time)
         return
         # cherrypy.engine.publish('websocket-broadcast', m)
 
@@ -176,69 +174,50 @@ class FmpServer(object):
         return self.listeners()
 
     @cherrypy.expose
-    def vote_to_skip(self, fid=None, uid=None, vote=None, *args,**kwargs):
-        if fid is not None:
-            fid = int(fid)
+    def vote_to_skip(self, watch_id=None, uid=None, vote=None,  
+                     *args,**kwargs):
+        if watch_id is not None:
+            watch_id = int(watch_id)
         if uid is not None:
             uid = int(uid)
-        if fid not in vote_data:
-            vote_data[fid] = {}
+        if watch_id not in vote_data:
+            vote_data[watch_id] = {}
 
         if not vote or vote == 'false':
             vote = False
         else:
             vote = True
 
-        vote_data[fid][uid] = vote
-
-        remove_old_votes = []
-        voted_to_skip_count = 0
-
-        for uid, voted in vote_data[fid].items():
-            if voted:
-                voted_to_skip_count += 1
-
-        for _fid, v in vote_data.items():
-            if _fid != fid:
-                remove_old_votes.append(_fid)
-
-        for _fid in remove_old_votes:
-            del vote_data[_fid]
-
-        remove_old_votes = []
-
-        for _fid, v in skip_countdown.items():
-            if _fid != fid:
-                remove_old_votes.append(_fid)
-
-        for _fid in remove_old_votes:
-            del skip_countdown[_fid]
+        vote_data[watch_id][uid] = vote
 
         listeners = _listeners()
         len_listeners = len(listeners)
-        print "voted_to_skip_count:", voted_to_skip_count
+        
         print "len_listeners:", len_listeners
-        print "skip_countdown.get(fid):",skip_countdown.get(fid)
+        print "skip_countdown.get(watch_id):", skip_countdown.get(watch_id)
+        voted_to_skip_count = remove_old_votes(watch_id)
+
         if voted_to_skip_count >= (len_listeners * 0.5) and \
-           not skip_countdown.get(fid):
-            skip_countdown[fid] = time() + len_listeners
+           not skip_countdown.get(watch_id):
+            skip_countdown[watch_id] = time() + len_listeners
             if len_listeners < 5:
-                skip_countdown[fid] = time() + 5
+                skip_countdown[watch_id] = time() + 5
             elif len_listeners > 10:
-                skip_countdown[fid] = time() + 10
+                skip_countdown[watch_id] = time() + 10
                 
-        elif skip_countdown.get(fid) and (voted_to_skip_count == 0 or
+        elif skip_countdown.get(watch_id) and (voted_to_skip_count == 0 or
                                           voted_to_skip_count < (len_listeners * 0.5)):
-            del skip_countdown[fid]
+            del skip_countdown[watch_id]
 
         cherrypy.engine.publish('websocket-broadcast', TextMessage(
             json.dumps({'vote_data': vote_data, 
                         'voted_to_skip_count': voted_to_skip_count})))
 
-        playlist.files[playlist.index].vote_data = vote_data[fid]
+        playlist.files[playlist.index].vote_data = vote_data[watch_id]
         print "*"* 20
-        print skip_countdown.get(fid)
-        
+        print skip_countdown.get(watch_id)
+
+        broadcast_countdown()
         return json.dumps(vote_data)
 
     @cherrypy.expose
@@ -527,6 +506,80 @@ def cherry_py_worker():
         }
     })
 
+def remove_old_votes(watch_id):
+    remove_old_votes = []
+    voted_to_skip_count = 0
+    if watch_id == -1:
+        return
+
+    if watch_id not in vote_data:
+        return 0
+
+    for uid, voted in vote_data[watch_id].items():
+        if voted:
+            voted_to_skip_count += 1
+
+    for _watch_id, v in vote_data.items():
+        if _watch_id != watch_id:
+            remove_old_votes.append(_watch_id)
+
+    for _watch_id in remove_old_votes:
+        del vote_data[_watch_id]
+
+    remove_old_votes = []
+
+    for _watch_id, v in skip_countdown.items():
+        if _watch_id != watch_id:
+            remove_old_votes.append(_fid)
+
+    for _watch_id in remove_old_votes:
+        del skip_countdown[_watch_id]
+
+
+    return voted_to_skip_count
+
+
+def broadcast_countdown():
+    watch_id = -1
+
+    try:
+        fid = playlist.files[playlist.index].fid
+        watch_id = fid
+    except:
+        fid = -1
+        
+    try:
+        eid = playlist.files[playlist.index].eid
+        watch_id = eid
+    except:
+        eid = -1
+
+    voted_to_skip_count = remove_old_votes(watch_id)
+
+    cherrypy.engine.publish('websocket-broadcast', TextMessage(
+        json.dumps({'fid': fid, 'eid': eid, 'watch_id': watch_id})))
+    seconds_left_to_skip = None
+    print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
+    if skip_countdown.get(watch_id) is not None:
+        if playlist.player.state_string != "PLAYING":
+            skip_countdown[watch_id] = time() + 5
+        seconds_left_to_skip = math.ceil(skip_countdown[watch_id] - time())
+        print "seconds_left_to_skip:", seconds_left_to_skip
+        if seconds_left_to_skip < 0:
+            print "*** DE INC ***"
+            playlist.files[playlist.index].vote_data = vote_data[watch_id]
+            GObject.idle_add(playlist.majority_next, ())
+            seconds_left_to_skip = 0
+            del skip_countdown[watch_id]
+
+    cherrypy.engine.publish('websocket-broadcast', TextMessage(
+        json.dumps({
+            'skip_countdown': skip_countdown,
+            'seconds_left_to_skip': seconds_left_to_skip
+        })))
+
+    
+
 def broadcast(data):
     if not data.get('time-status'):
         print "broadcast:", data
@@ -534,30 +587,9 @@ def broadcast(data):
             TextMessage(json.dumps(data)))
     cherrypy.engine.publish('websocket-broadcast', TextMessage(
         json.dumps({'vote_data': vote_data})))
-    try:
-        fid = playlist.files[playlist.index].fid
-    except:
-        fid = -1
+    broadcast_countdown()
 
-    cherrypy.engine.publish('websocket-broadcast', TextMessage(
-        json.dumps({'fid': fid})))
-    seconds_left_to_skip = None
-    print "skip_countdown:",skip_countdown, skip_countdown.get(fid)
-    if skip_countdown.get(fid) is not None:
-        seconds_left_to_skip = math.ceil(skip_countdown[fid] - time())
-        print "seconds_left_to_skip:", seconds_left_to_skip
-        if seconds_left_to_skip < 0:
-            print "*** DE INC ***"
-            playlist.files[playlist.index].vote_data = vote_data[fid]
-            GObject.idle_add(playlist.majority_next, ())
-            seconds_left_to_skip = 0
-            del skip_countdown[fid]
 
-    cherrypy.engine.publish('websocket-broadcast', TextMessage(
-        json.dumps({
-            'skip_countdown': skip_countdown,
-            'seconds_left_to_skip': seconds_left_to_skip
-        })))
 
 
 
