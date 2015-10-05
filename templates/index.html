@@ -9,7 +9,8 @@
         <!-- Optional theme -->
         <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
 
-        <link rel="stylesheet" href="/static/js/ivh-treeview/ivh-treeview.css">
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="/static/js/angular-ui-tree/angular-ui-tree.min.css">
         
         <script src="/static/js/jquery-2.0.3.min.js"></script>
         <!-- Latest compiled and minified JavaScript -->
@@ -23,7 +24,9 @@
         <script src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
         <script src="/static/js/angular-strap/angular-strap.min.js"></script>
         <script src="/static/js/angular-strap/angular-strap.tpl.min.js"></script>
-        <script src="/static/js/ivh-treeview/ivh-treeview.min.js"></script>
+
+        <script src="/static/js/angular-ui-tree/angular-ui-tree.min.js"></script>
+
         <script>window.ws_url = "ws://%(host)s/ws";</script>
         <script src="/static/js/fmp.js"></script>
 
@@ -117,6 +120,13 @@
                 border-bottom: 1px dashed blue;
                 text-decoration: none;
             }
+
+            .tree-node-content {
+                padding:30px;
+                background: #DDD;
+                margin-bottom: 5px;
+            }
+
         </style>
     </head>
     <body>

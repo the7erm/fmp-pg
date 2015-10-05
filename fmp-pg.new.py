@@ -30,6 +30,7 @@ import threading
 Thread = threading.Thread
 from player1 import *
 from fobjs.misc import *
+import fobjs.jobs_class
 import fobjs.preload_class
 Preload = fobjs.preload_class.Preload
 from picker import picker
@@ -340,6 +341,7 @@ class FmpPlaylist(Playlist):
 
     def __init__(self, *args, **kwargs):
         kwargs['player'] = FmpPlayer()
+        self.jobs = fobjs.jobs_class.Jobs()
         self.last_marked_as_played = 0
         self.last_position = -1
         self.user_file_info_treeview = UserFileInfoTreeview(self)
@@ -605,6 +607,8 @@ state = cfg.get('player_state', 'state', 'PLAYING', str)
 playlist = FmpPlaylist(files=recently_played, index=index)
 server.playlist = playlist
 server.wait = wait
+fobjs.jobs_class.server = server
+
 fobjs.netcast_episode_class.wait = wait
 
 tray_icon = TrayIcon(playlist=playlist, state=state)

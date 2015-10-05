@@ -19,13 +19,15 @@ var fmpApp = angular.module('fmpApp', [
     'ngRoute',
     'mgcrea.ngStrap',
     'ngCookies',
-    'ngSanitize'
+    'ngSanitize',
+    'ui.tree'
   ])
   .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter', function($websocket, $cookies, $http, $sce, $filter) {
     // Open a WebSocket connection
     var collection = {
           'ws_url': window.ws_url,
-          "iam": $cookies.get('iam') || null
+          "iam": $cookies.get('iam') || null,
+          "jobs": {}
         },
         dataStream = $websocket(collection.ws_url);
 
@@ -254,6 +256,7 @@ var fmpApp = angular.module('fmpApp', [
           params: $scope.params
         }).then(function successCallback(response){
           $scope.artists = response.data;
+
         }, function errorCallback(response){
         });
       }
@@ -432,6 +435,73 @@ var fmpApp = angular.module('fmpApp', [
       }
 
   })
+  .controller('FolderCtrl', function($scope){
+
+  })
+  .controller('FoldersTreeCtrl', function($scope, $routeParams, $http, 
+              PlayerData){
+
+    $scope.jobs = PlayerData.collection.jobs;
+    $scope.mtoggle = function(scope) {
+      console.log("CALLED:", scope);
+      scope.toggle();
+      $http({
+        method: 'GET',
+        url: '/folders',
+        params: scope['dir']
+      }).then(function successCallback(response) {
+
+          scope['dir']['children'] = response.data[0].children;
+      }, function errorCallback(response) {
+
+      });
+    }
+    $scope.applyToSubfolders = function(scope){
+        console.log("APPLY TO SUBFOLDERS", scope);
+        if (!$scope.jobs.folder_owner_progress) {
+          $scope.jobs.folder_owner_progress = {};
+        }
+        $scope.jobs.folder_owner_progress[scope.dir.folder_id] = {
+          'percent': '100%',
+          'text': 'Added to job cue',
+          'class': ''
+        };
+        $http({
+          method: 'GET',
+          url: '/set_owner_recursive',
+          params: {
+            'folder_id': scope.dir.folder_id
+          }
+        });
+    }
+    $scope.toggleOwner = function(scope) {
+      scope.user.owner = !scope.user.owner;
+      $http({
+        method: 'GET',
+        url: '/set_owner',
+        params: {
+          'folder_id': scope.dir.folder_id,
+          'uid': scope.user.uid, 
+          'owner': scope.user.owner
+        }
+      });
+    }
+    $scope.toggle = function (scope) {
+      console.log("SCOPE:", scope);
+      scope.toggle();
+      
+    };
+    $http({
+      method: 'GET',
+      url: '/folders',
+      params: {'folder_id': 0}
+    }).then(function successCallback(response) {
+
+        $scope.folders = response.data;
+    }, function errorCallback(response) {
+
+    });
+  })
   .controller('RatingCtrl', function ($scope) {
     $scope.isReadonly = false;
 
@@ -457,6 +527,16 @@ var fmpApp = angular.module('fmpApp', [
 }).config(['$routeProvider', '$locationProvider',
   function($routeProvider) {
     $routeProvider
+      .when('/artists', {
+        templateUrl: '/static/templates/artists.html',
+        controller: 'ArtistCtrl',
+        reloadOnSearch: false
+      })
+      .when('/folders', {
+        templateUrl: '/static/templates/folders.html',
+        controller: 'FoldersTreeCtrl',
+        reloadOnSearch: false
+      })
       .when('/home', {
         templateUrl: '/static/templates/player.html',
         controller: 'PlayerController'
@@ -468,11 +548,6 @@ var fmpApp = angular.module('fmpApp', [
       .when('/search', {
         templateUrl: '/static/templates/search.html',
         controller: 'SearchController',
-        reloadOnSearch: false
-      })
-      .when('/artists', {
-        templateUrl: '/static/templates/artists.html',
-        controller: 'ArtistCtrl',
         reloadOnSearch: false
       })
       .otherwise({

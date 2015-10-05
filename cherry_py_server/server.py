@@ -50,6 +50,7 @@ cherrypy.tools.websocket = WebSocketTool()
 
 vote_data = {}
 skip_countdown = {}
+job_data = {}
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
@@ -63,7 +64,6 @@ class ChatWebSocketHandler(WebSocket):
         })
         GObject.idle_add(playlist.force_broadcast_time)
         return
-        # cherrypy.engine.publish('websocket-broadcast', m)
 
     def opened(self):
         return json.dumps({
@@ -73,7 +73,6 @@ class ChatWebSocketHandler(WebSocket):
 
     def closed(self, code, reason="A client left the room without a proper explanation."):
         return
-        # cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
 
 cherrypy.config.update({
     'server.socket_port': 5050,
@@ -208,10 +207,8 @@ class FmpServer(object):
         elif skip_countdown.get(watch_id) and (voted_to_skip_count == 0 or
                                           voted_to_skip_count < (len_listeners * 0.5)):
             del skip_countdown[watch_id]
-
-        cherrypy.engine.publish('websocket-broadcast', TextMessage(
-            json.dumps({'vote_data': vote_data, 
-                        'voted_to_skip_count': voted_to_skip_count})))
+        json_broadcast({'vote_data': vote_data, 
+                        'voted_to_skip_count': voted_to_skip_count})
 
         playlist.files[playlist.index].vote_data = vote_data[watch_id]
         print "*"* 20
@@ -485,6 +482,76 @@ class FmpServer(object):
         }
         return json.dumps(response)
 
+    def getFolderOwners(self, folder_id):
+        sql = """SELECT u.uid, u.uname, fo.folder_id AS fo_folder_id, 
+                        fo.uid AS owner 
+                 FROM users u 
+                      LEFT JOIN folder_owners fo ON 
+                                fo.folder_id = %(folder_id)s AND fo.uid = u.uid
+                 ORDER BY admin DESC, listening DESC, uname;"""
+        return get_results_assoc_dict(sql, {'folder_id': folder_id})
+
+
+    @cherrypy.expose
+    def folders(self, *args, **kwargs):
+        folder_id = cherrypy.request.params.get('folder_id')
+        sql = """SELECT *
+                 FROM folders
+                 WHERE folder_id = %(folder_id)s
+                 LIMIT 1"""
+        spec = {'folder_id': folder_id}
+        folder = get_assoc_dict(sql, spec)
+        folder['owners'] = self.getFolderOwners(folder_id)
+
+        sql = """SELECT *
+                 FROM folders
+                 WHERE parent_folder_id = %(folder_id)s AND 
+                       folder_id != %(folder_id)s
+                 ORDER BY dirname"""
+        children = get_results_assoc_dict(sql, spec)
+        for child in children:
+            child['owners'] = self.getFolderOwners(child['folder_id'])
+
+        folder['loaded_children'] = True
+        folder['children'] = children
+
+        while len(children) == 1:
+            for child in children:
+                grand_children = get_results_assoc_dict(sql, child)
+                child['children'] = grand_children
+                child['loaded_children'] = True
+                child['owners'] = self.getFolderOwners(child['folder_id'])
+            children = grand_children
+        for child in children:
+            child['collapsed'] = True
+            child['owners'] = self.getFolderOwners(child['folder_id'])
+            
+        return json.dumps([folder])
+
+    @cherrypy.expose
+    def set_owner(self, *args, **kwargs):
+        params = cherrypy.request.params
+        
+        if not params.get('owner'):
+            sql = """DELETE FROM folder_owners
+                     WHERE uid = %(uid)s AND folder_id = %(folder_id)s"""
+            
+        else:
+            sql = """INSERT INTO folder_owners (uid, folder_id)
+                     VALUES(%(uid)s, %(folder_id)s)"""
+
+        query(sql, params)
+        return json.dumps({"RESULT": "OK"})
+
+    @cherrypy.expose
+    def set_owner_recursive(self, *args, **kwargs):
+        params = cherrypy.request.params
+        params['id'] = params.get('folder_id')
+        GObject.idle_add(playlist.jobs.cue, ({
+            'name': 'set_owner_recursive',
+            'params': params
+        }))
+        return json.dumps({"RESULT": "STARTED"})
 
 def cherry_py_worker():
     static_path = os.path.realpath(sys.path[0])
@@ -530,7 +597,7 @@ def remove_old_votes(watch_id):
 
     for _watch_id, v in skip_countdown.items():
         if _watch_id != watch_id:
-            remove_old_votes.append(_fid)
+            remove_old_votes.append(_watch_id)
 
     for _watch_id in remove_old_votes:
         del skip_countdown[_watch_id]
@@ -544,20 +611,23 @@ def broadcast_countdown():
 
     try:
         fid = playlist.files[playlist.index].fid
-        watch_id = fid
+        if fid:
+            watch_id = fid
     except:
+        print "FAILED FID"
         fid = -1
         
     try:
         eid = playlist.files[playlist.index].eid
-        watch_id = eid
+        if eid:
+            watch_id = eid
     except:
         eid = -1
 
+    print({'fid': fid, 'eid': eid, 'watch_id': watch_id})
     voted_to_skip_count = remove_old_votes(watch_id)
+    print({'fid': fid, 'eid': eid, 'watch_id': watch_id}, 'after')
 
-    cherrypy.engine.publish('websocket-broadcast', TextMessage(
-        json.dumps({'fid': fid, 'eid': eid, 'watch_id': watch_id})))
     seconds_left_to_skip = None
     print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
     if skip_countdown.get(watch_id) is not None:
@@ -572,21 +642,26 @@ def broadcast_countdown():
             seconds_left_to_skip = 0
             del skip_countdown[watch_id]
 
-    cherrypy.engine.publish('websocket-broadcast', TextMessage(
-        json.dumps({
-            'skip_countdown': skip_countdown,
-            'seconds_left_to_skip': seconds_left_to_skip
-        })))
+    json_broadcast({
+        'skip_countdown': skip_countdown,
+        'seconds_left_to_skip': seconds_left_to_skip
+    })
 
-    
+
+def JsonTextMessage(data):
+    return TextMessage(json.dumps(data))
+
+def broadcast_jobs():
+    json_broadcast(job_data)
+
+def json_broadcast(data):
+    cherrypy.engine.publish('websocket-broadcast', JsonTextMessage(data))
 
 def broadcast(data):
     if not data.get('time-status'):
         print "broadcast:", data
-    cherrypy.engine.publish('websocket-broadcast', 
-            TextMessage(json.dumps(data)))
-    cherrypy.engine.publish('websocket-broadcast', TextMessage(
-        json.dumps({'vote_data': vote_data})))
+    json_broadcast(data)
+    json_broadcast({'vote_data':vote_data})
     broadcast_countdown()
 
 
