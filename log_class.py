@@ -8,8 +8,7 @@ from pprint import pformat
 
 log_args = {
     'level': logging.DEBUG, 
-    'format':'%(asctime)s - %(name)s - %(levelname)s:%(message)s',
-    
+    'format':'%(asctime)s - %(name)s - %(levelname)s:%(message)s'
 }
 
 log_dir = os.path.expanduser("~/.fmp/logs")

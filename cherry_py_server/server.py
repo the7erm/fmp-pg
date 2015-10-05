@@ -531,7 +531,11 @@ class FmpServer(object):
     @cherrypy.expose
     def set_owner(self, *args, **kwargs):
         params = cherrypy.request.params
-        
+        owner = params.get('owner')
+        if not owner or owner in ('false', 'null', 'off', '0'):
+            owner = False
+        params['owner'] = owner
+        print "SET OWNER:", params
         if not params.get('owner'):
             sql = """DELETE FROM folder_owners
                      WHERE uid = %(uid)s AND folder_id = %(folder_id)s"""
@@ -539,8 +543,10 @@ class FmpServer(object):
         else:
             sql = """INSERT INTO folder_owners (uid, folder_id)
                      VALUES(%(uid)s, %(folder_id)s)"""
-
-        query(sql, params)
+        try:
+            query(sql, params)
+        except:
+            pass
         return json.dumps({"RESULT": "OK"})
 
     @cherrypy.expose
@@ -548,7 +554,7 @@ class FmpServer(object):
         params = cherrypy.request.params
         params['id'] = params.get('folder_id')
         GObject.idle_add(playlist.jobs.cue, ({
-            'name': 'set_owner_recursive',
+            'name': 'folder_owner_progress',
             'params': params
         }))
         return json.dumps({"RESULT": "STARTED"})
@@ -624,9 +630,9 @@ def broadcast_countdown():
     except:
         eid = -1
 
-    print({'fid': fid, 'eid': eid, 'watch_id': watch_id})
+    # print({'fid': fid, 'eid': eid, 'watch_id': watch_id})
     voted_to_skip_count = remove_old_votes(watch_id)
-    print({'fid': fid, 'eid': eid, 'watch_id': watch_id}, 'after')
+    #print({'fid': fid, 'eid': eid, 'watch_id': watch_id}, 'after')
 
     seconds_left_to_skip = None
     print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
@@ -652,7 +658,7 @@ def JsonTextMessage(data):
     return TextMessage(json.dumps(data))
 
 def broadcast_jobs():
-    json_broadcast(job_data)
+    json_broadcast({'jobs': job_data})
 
 def json_broadcast(data):
     cherrypy.engine.publish('websocket-broadcast', JsonTextMessage(data))

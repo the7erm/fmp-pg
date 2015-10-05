@@ -135,7 +135,7 @@ var fmpApp = angular.module('fmpApp', [
 
     dataStream.onMessage(function(message) {
       var obj = JSON.parse(message.data);
-      console.log("message.data:", obj);
+      // console.log("message.data:", obj);
       if (typeof obj['time-status'] != 'undefined') {
           collection.time_status = obj['time-status']['str'];
           if (obj['time-status']['state'] == 'PAUSED') {
@@ -144,6 +144,18 @@ var fmpApp = angular.module('fmpApp', [
             collection.play_pause = 'Pause';
           }
           return;
+      }
+
+      if (typeof obj['jobs'] != 'undefined') {
+        console.log("MESSAGE RECIEVED:", obj['jobs']);
+        if (obj['jobs']) {
+          for (var k in obj['jobs']) {
+            collection.jobs[k] = obj['jobs'][k];
+          }
+        } else {
+          collection.jobs =  {};
+        }
+        return;
       }
 
       if (typeof obj['vote_data'] != 'undefined') {

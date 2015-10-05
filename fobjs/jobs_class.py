@@ -58,7 +58,7 @@ class Process(Log):
         if job_params is None:
             job_params = {}
         self.params = job_params.get('params', {})
-        self.process_name = self.process_name+"->"+job_params.get('name','')
+        self.process_name = job_params.get('name','')
         self.kwargs = kwargs
         
         super(Process, self).__init__(*args, **kwargs)
@@ -66,7 +66,7 @@ class Process(Log):
         self.id = self.params.get('id', id_generator())
         
 
-        self.log_debug(".__init__() params:", self.params)
+        self.log_debug(".__init__() params:" % self.params)
         if not server.job_data.get(self.process_name):
             server.job_data[self.process_name] = {}
         
@@ -93,31 +93,36 @@ class Process(Log):
         self.done()
 
     def done(self):
-        self.log_debug("ran process")
+        self.log_debug("<<<<<<<<<<<<< DONE CALLED")
         self.update_params({
-            'status': 'done'
+            'status': 'done',
+            'percent': '100%',
+            'text': 'Done'
         })
-        GObject.timeout_add(60000, self.remove_job)
+        # GObject.timeout_add(5000, self.remove_job)
 
     def remove_job(self):
         try:
             del server.job_data[self.process_name][self.id]
         except:
             pass
+        server.broadcast_jobs()
         return False
-
-    
 
     def progress(self, percent):
         percent = int(percent)
         now = time()
-        if self.last_progress_time < now() - 1.5:
-            self.update_params({'percent': percent})
+        if self.last_progress_time < now - 0.5:
+            self.update_params({
+                'text': "%s%% complete" % percent,
+                'percent': "%s%%" % percent
+            })
+            self.last_progress_time = now
 
 
 class SetOwnerProcess(Process):
     __name__ = "SetOwnerProcess"
-    process_name = 'set_owner_recursive'
+    process_name = 'folder_owner_progress'
 
     def run(self):
         self.log_debug("RUN called process")
@@ -126,15 +131,16 @@ class SetOwnerProcess(Process):
             'text': 'Started, loading folders',
             'class':'progress-bar-info'
         })
-        server.broadcast_jobs()
+
         spec = {
-            'folder_id': self.params.folder_id
+            'folder_id': self.params['folder_id']
         }
         sql = """SELECT *
                  FROM folder_owners
                  WHERE folder_id = %(folder_id)s"""
 
         owners = get_results_assoc_dict(sql, spec)
+
 
         sql = """SELECT *
                  FROM folders
@@ -146,7 +152,7 @@ class SetOwnerProcess(Process):
                 'status': 'error',
                 'class': 'progress-bar-danger',
                 'text': 'No folder matching id',
-                'percent': 100
+                'percent': "100%"
             })
             return
 
@@ -156,34 +162,49 @@ class SetOwnerProcess(Process):
         spec = {
             'dirname': "%s%%" % folder.get('dirname')
         }
-        children = get_results_assoc_dict(sql)
-
         self.update_params({
-            'status': 'running',
-            'class': 'progress-bar-warning',
-            'percent': 0
+            'status': 'starting',
+            'text': 'Fetching children',
+            'class':'progress-bar-info'
         })
+        children = get_results_assoc_dict(sql, spec)
+        self.update_params({
+            'status': 'starting',
+            'text': 'DONE fetching children',
+            'class':'progress-bar-info'
+        })
+        if not children:
+            self.update_params({
+                'status': 'starting',
+                'text': 'NO CHILDREN',
+                'class':'progress-bar-info'
+            })
+            self.done()
+            return;
         delete_sql = """DELETE FROM folder_owners
                         WHERE folder_id = %(folder_id)s"""
         insert_sql = """INSERT INTO folder_owners (uid, folder_id)
-                        VALUES(%(uid)s, %(folder_id))"""
+                        VALUES(%(uid)s, %(folder_id)s)"""
         children_length = float(len(children))
-        for i, child in children.items():
-            # query(delete_sql, child)
+        for i, child in enumerate(children):
+            print "CHILD:", child
+            query(delete_sql, child)
             self.progress(i / children_length * 100)
             if not owners:
                 continue
             for owner in owners:
                 child['uid'] = owner['uid']
-                # query(insert_sql, child)
+                query(insert_sql, child)
 
-
+        print "+"*100
+        print "DONE SETTING CHILDREN"
         self.update_params({
-            'status': 'running',
             'class': 'progress-bar-success',
-            'percent': 100
+            'text': "Done",
+            'percent': "100%"
         })
         self.done()
+
 
 class Jobs(Log):
     __name__ = "Jobs"
@@ -193,7 +214,7 @@ class Jobs(Log):
         self.running = False
         self.process = None
         self.process_map = {
-            'set_owner_recursive': SetOwnerProcess
+            'folder_owner_progress': SetOwnerProcess
         }
 
     def cue(self, obj):
@@ -204,7 +225,7 @@ class Jobs(Log):
             self.log_debug("No name for job %s skipping" % job)
             return
 
-        process_class = self.process_map.get('set_owner_recursive')
+        process_class = self.process_map.get('folder_owner_progress')
         if not process_class:
             return
         process = self.spawn_process(process_class, obj)
@@ -251,8 +272,6 @@ class Jobs(Log):
     def run_process(self):
         self.log_debug("Running process: %s" % pformat(self.process))
         self.process.run()
-
-
     
     def spawn_process(self, process_class, job):
         self.log_debug(".spawn_process(%r, %r)" % (process_class, job))
