@@ -405,7 +405,8 @@ CREATE TABLE file_locations (
     middle_fingerprint character varying(255),
     end_fingerprint character varying(255),
     last_scan date,
-    device_id integer NOT NULL
+    device_id integer NOT NULL,
+    "exists" boolean DEFAULT false
 );
 
 
@@ -586,6 +587,129 @@ CREATE SEQUENCE fingerprint_history_fphid_seq
 
 ALTER SEQUENCE fingerprint_history_fphid_seq OWNED BY fingerprint_history.fphid;
 
+
+SET default_with_oids = false;
+
+--
+-- Name: folder_owners; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE folder_owners (
+    foid integer NOT NULL,
+    uid integer NOT NULL,
+    folder_id integer NOT NULL
+);
+
+
+--
+-- Name: folder_owners_folder_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE folder_owners_folder_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: folder_owners_folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE folder_owners_folder_id_seq OWNED BY folder_owners.folder_id;
+
+
+--
+-- Name: folder_owners_folder_owner_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE folder_owners_folder_owner_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: folder_owners_folder_owner_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE folder_owners_folder_owner_id_seq OWNED BY folder_owners.foid;
+
+
+--
+-- Name: folder_owners_uid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE folder_owners_uid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: folder_owners_uid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE folder_owners_uid_seq OWNED BY folder_owners.uid;
+
+
+--
+-- Name: folders; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE folders (
+    folder_id integer NOT NULL,
+    dirname text,
+    mtime bigint,
+    scan_mtime bigint,
+    parent_folder_id integer NOT NULL
+);
+
+
+--
+-- Name: folders_folder_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE folders_folder_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: folders_folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE folders_folder_id_seq OWNED BY folders.folder_id;
+
+
+--
+-- Name: folders_parent_folder_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE folders_parent_folder_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: folders_parent_folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE folders_parent_folder_id_seq OWNED BY folders.parent_folder_id;
+
+
+SET default_with_oids = true;
 
 --
 -- Name: genres; Type: TABLE; Schema: public; Owner: -; Tablespace: 
@@ -914,6 +1038,15 @@ ALTER SEQUENCE netcasts_nid_seq OWNED BY netcasts.nid;
 SET default_with_oids = false;
 
 --
+-- Name: pick_from; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE pick_from (
+    fid integer NOT NULL
+);
+
+
+--
 -- Name: preload; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -922,6 +1055,17 @@ CREATE TABLE preload (
     uid integer NOT NULL,
     reason text,
     plid integer NOT NULL
+);
+
+
+--
+-- Name: preload_cache; Type: TABLE; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE TABLE preload_cache (
+    fid integer NOT NULL,
+    uid integer NOT NULL,
+    reason text
 );
 
 
@@ -1196,35 +1340,16 @@ ALTER SEQUENCE user_artist_info_uid_seq OWNED BY user_artist_info.uid;
 CREATE TABLE user_history (
     uhid integer NOT NULL,
     uid integer NOT NULL,
-    id integer NOT NULL,
     percent_played integer,
     time_played timestamp with time zone,
     date_played date,
-    id_type character varying(2),
     true_score double precision DEFAULT 0 NOT NULL,
     score integer DEFAULT 0 NOT NULL,
     rating integer DEFAULT 0 NOT NULL,
-    reason text
+    reason text,
+    fid integer,
+    eid integer
 );
-
-
---
--- Name: user_history_fid_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE user_history_fid_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: user_history_fid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE user_history_fid_seq OWNED BY user_history.id;
 
 
 --
@@ -1347,10 +1472,11 @@ CREATE TABLE users (
     uname character varying(255),
     pword character varying(132),
     last_time_cued timestamp with time zone,
-    listening boolean,
-    selected boolean,
+    listening boolean DEFAULT true,
+    selected boolean DEFAULT false,
     admin boolean DEFAULT false,
-    preload_true_scores text
+    preload_true_scores text,
+    cue_netcasts boolean DEFAULT false NOT NULL
 );
 
 
@@ -1518,6 +1644,41 @@ ALTER TABLE ONLY fingerprint_history ALTER COLUMN fid SET DEFAULT nextval('finge
 --
 
 ALTER TABLE ONLY fingerprint_history ALTER COLUMN flid SET DEFAULT nextval('fingerprint_history_flid_seq'::regclass);
+
+
+--
+-- Name: foid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY folder_owners ALTER COLUMN foid SET DEFAULT nextval('folder_owners_folder_owner_id_seq'::regclass);
+
+
+--
+-- Name: uid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY folder_owners ALTER COLUMN uid SET DEFAULT nextval('folder_owners_uid_seq'::regclass);
+
+
+--
+-- Name: folder_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY folder_owners ALTER COLUMN folder_id SET DEFAULT nextval('folder_owners_folder_id_seq'::regclass);
+
+
+--
+-- Name: folder_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY folders ALTER COLUMN folder_id SET DEFAULT nextval('folders_folder_id_seq'::regclass);
+
+
+--
+-- Name: parent_folder_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY folders ALTER COLUMN parent_folder_id SET DEFAULT nextval('folders_parent_folder_id_seq'::regclass);
 
 
 --
@@ -1733,6 +1894,22 @@ ALTER TABLE ONLY fingerprint_history
 
 
 --
+-- Name: folder_owners_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY folder_owners
+    ADD CONSTRAINT folder_owners_pkey PRIMARY KEY (foid);
+
+
+--
+-- Name: folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY folders
+    ADD CONSTRAINT folders_pkey PRIMARY KEY (folder_id);
+
+
+--
 -- Name: genres_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -1786,6 +1963,30 @@ ALTER TABLE ONLY tags_binary
 
 ALTER TABLE ONLY tags_text
     ADD CONSTRAINT tags_pkey PRIMARY KEY (tid);
+
+
+--
+-- Name: uid_eid_fid_date_played; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY user_history
+    ADD CONSTRAINT uid_eid_fid_date_played UNIQUE (uid, eid, fid, date_played);
+
+
+--
+-- Name: uniq_idx_dirname; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY folders
+    ADD CONSTRAINT uniq_idx_dirname UNIQUE (dirname);
+
+
+--
+-- Name: uniq_idx_uid_folder_id; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace: 
+--
+
+ALTER TABLE ONLY folder_owners
+    ADD CONSTRAINT uniq_idx_uid_folder_id UNIQUE (uid, folder_id);
 
 
 --
@@ -2004,10 +2205,24 @@ CREATE INDEX idx_device_id ON file_locations USING btree (device_id);
 
 
 --
+-- Name: idx_dirname; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_dirname ON folders USING btree (dirname);
+
+
+--
 -- Name: idx_filesystem; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX idx_filesystem ON devices USING btree (filesystem);
+
+
+--
+-- Name: idx_ultp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_ultp ON user_song_info USING btree (ultp NULLS FIRST);
 
 
 --
@@ -2046,6 +2261,13 @@ CREATE INDEX percent_played ON user_song_info USING btree (percent_played);
 
 
 --
+-- Name: pick_from_fid_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX pick_from_fid_idx ON pick_from USING btree (fid);
+
+
+--
 -- Name: preload_fid_index; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -2078,6 +2300,13 @@ CREATE INDEX skip_count ON user_song_info USING btree (score);
 --
 
 CREATE INDEX tags_binary_fid_idx ON tags_binary USING btree (fid);
+
+
+--
+-- Name: time_played_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX time_played_idx ON user_history USING btree (time_played);
 
 
 --
@@ -2120,20 +2349,6 @@ CREATE UNIQUE INDEX uid_aid_date_played ON user_artist_history USING btree (uid,
 --
 
 CREATE UNIQUE INDEX uid_fid ON user_song_info USING btree (uid, fid);
-
-
---
--- Name: uid_id_id_type_date_played; Type: INDEX; Schema: public; Owner: -; Tablespace: 
---
-
-CREATE UNIQUE INDEX uid_id_id_type_date_played ON user_history USING btree (uid, id, id_type, date_played);
-
-
---
--- Name: ultp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
---
-
-CREATE INDEX ultp ON user_song_info USING btree (ultp);
 
 
 --
