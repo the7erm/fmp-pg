@@ -83,6 +83,18 @@ cherrypy.config.update({
     }
 })
 
+def to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (str, unicode)):
+        value = value.lower()
+        if value in ('t','true','1','on'):
+            return True
+        if not value or value in('f', '0', 'false', 'off', 'null', 
+                                 'undefined'):
+            return False
+    return bool(value)
+
 class FmpServer(object):
     @cherrypy.expose
     def index(self):
@@ -144,48 +156,60 @@ class FmpServer(object):
 
     @cherrypy.expose
     def listeners(self):
-        sql = """SELECT uid, uname, admin, listening
+        sql = """SELECT uid, uname, admin, listening, cue_netcasts
                  FROM users
                  ORDER BY listening DESC, admin DESC, uname"""
-
-        return json.dumps(get_results_assoc_dict(sql))
-
+        return json_dumps(get_results_assoc_dict(sql))
 
     @cherrypy.expose
     def set_listening(self, *args, **kwargs):
-        listening = cherrypy.request.params.get('listening')
-        if not listening or listening == 'false' or listening == '0':
-            listening = False
-        else:
-            listening = True
+        return self.set_user_bool_column('listening')
+
+    @cherrypy.expose
+    def set_cue_netcasts(self, *args, **kwargs):
+        return self.set_user_bool_column('cue_netcasts')
+
+    @cherrypy.expose
+    def set_admin(self, *args, **kwargs):
+        return self.set_user_bool_column('admin')
+
+    def set_user_bool_column(self, col):
+        uid = cherrypy.request.params.get('uid')
+        uid = int(uid)
+        value = cherrypy.request.params.get(col)
+        value = to_bool(value)
+        whitelist = ('listening', 'cue_netcasts', 'admin')
+        if col not in whitelist:
+            return self.listeners()
         spec = {
-            'uid': cherrypy.request.params.get('uid'),
-            'listening': listening
+            'uid': cherrypy.request.params.get('uid')
         }
-        
+        spec[col] = value
+
         sql = """UPDATE users 
-                 SET listening = %(listening)s
-                 WHERE uid = %(uid)s"""
+                 SET {col} = %({col})s
+                 WHERE uid = %(uid)s""".format(col=col)
 
         query(sql, spec)
         cherrypy.log(sql % spec)
         GObject.idle_add(playlist.reload_current)
         return self.listeners()
 
+
     @cherrypy.expose
     def vote_to_skip(self, watch_id=None, uid=None, vote=None,  
                      *args,**kwargs):
-        if watch_id is not None:
-            watch_id = int(watch_id)
+
+        vote = to_bool(vote)
+        if watch_id is None:
+            watch_id = current_watch_id()
+
+        watch_id = int(watch_id)
         if uid is not None:
             uid = int(uid)
+
         if watch_id not in vote_data:
             vote_data[watch_id] = {}
-
-        if not vote or vote == 'false':
-            vote = False
-        else:
-            vote = True
 
         vote_data[watch_id][uid] = vote
 
@@ -215,7 +239,7 @@ class FmpServer(object):
         print skip_countdown.get(watch_id)
 
         broadcast_countdown()
-        return json.dumps(vote_data)
+        return json_dumps(vote_data)
 
     @cherrypy.expose
     def ws(self):
@@ -236,7 +260,7 @@ class FmpServer(object):
         cherrypy.log("gen_time: %s", str(gen_time))
         json_response['gen_time'] = "%s" % gen_time
         
-        return json.dumps(json_response)
+        return json_dumps(json_response)
 
     @cherrypy.expose
     def download(self, fid=None, eid=None):
@@ -287,7 +311,7 @@ class FmpServer(object):
         print "query:", pg_cur.mogrify(sql, params)
         print result
         print params
-        return json.dumps(result)
+        return json_dumps(result)
 
     @cherrypy.expose
     def artist_letters(self, *args, **kwargs):
@@ -298,7 +322,7 @@ class FmpServer(object):
 
         letters = get_results_assoc_dict(sql)
         letters = [v['letter'] for v in letters]
-        return json.dumps(letters)
+        return json_dumps(letters)
 
     @cherrypy.expose
     def artists(self, *args, **kwargs):
@@ -317,7 +341,7 @@ class FmpServer(object):
             spec['l'] = '\%%'
 
         artists = get_results_assoc_dict(sql, spec)
-        return json.dumps([v['artist'].title()
+        return json_dumps([v['artist'].title()
                                       .replace("'S","'s")
                                       .replace("_S","_s")
                                       .replace(" Of ", " of ")
@@ -342,17 +366,23 @@ class FmpServer(object):
         start = int(params.get("s", 0))
         limit = int(params.get("l", 10))
         only_cued = params.get('oc', False)
+        owner = params.get("owner",'')
         try:
             uid = int(params.get('uid', 0))
         except:
             uid = 0
 
-        if only_cued == 'true':
-            only_cued = True
-        else:
-            only_cued = False
+        only_cued = to_bool(only_cued)
 
-        q = params.get("q", None)
+        q = params.get("q", '').strip()
+        if not q and not only_cued:
+            response = {
+                "RESULT": "OK",
+                "results": [],
+                "total": 0
+            }
+            return json_dumps(response)
+        
 
         query_offset = "LIMIT %d OFFSET %d" % (limit, start)
         query_args = {}
@@ -363,12 +393,12 @@ class FmpServer(object):
                         title, sha512, p.fid AS cued, f.fid AS id, 
                         'f' AS id_type"""],
           "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid
-                              LEFT JOIN file_locations  fl ON fl.fid = f.fid
                               LEFT JOIN file_artists fa ON fa.fid = f.fid
-                              LEFT JOIN artists a ON a.aid = fa.aid"""],
-          "COUNT_FROM": ["files f"],
+                              LEFT JOIN artists a ON a.aid = fa.aid,
+                      file_locations fl"""],
+          "COUNT_FROM": ["files f, file_locations fl"],
           "ORDER_BY": [],
-          "WHERE": [],
+          "WHERE": ["fl.fid = f.fid"],
           "WHERERATINGSCORE": [],
           "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
         }
@@ -387,11 +417,24 @@ class FmpServer(object):
 
         if uid:
             query_args['uid'] = uid
-            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid")
-            query_spec["FROM"].append("user_song_info usi")
-            query_spec["WHERE"].append("usi.fid = f.fid AND usi.uid = %(uid)s")
-            query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid')
-            query_spec['COUNT_FROM'].append("user_song_info usi")
+            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname")
+            query_spec["FROM"].append("user_song_info usi, users u")
+            query_spec["WHERE"].append("usi.fid = f.fid AND "
+                                       "usi.uid = %(uid)s AND "
+                                       "u.uid = usi.uid")
+            query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid, '
+                                          'u.uname')
+            query_spec['COUNT_FROM'].append("user_song_info usi, users u")
+
+        if owner:
+            query_args['owner'] = owner
+            query_spec["FROM"].append("folders fld, folder_owners fo")
+            query_spec['COUNT_FROM'].append("folders fld, folder_owners fo")
+            query_spec["WHERE"].append("""fo.uid = %(owner)s AND 
+                                          fld.folder_id = fo.folder_id AND
+                                          fl.folder_id = fld.folder_id AND
+                                          fl.fid = f.fid""")
+
 
         if q is not None:
             q = q.strip()
@@ -480,7 +523,7 @@ class FmpServer(object):
             "results": results,
             "total": total
         }
-        return json.dumps(response)
+        return json_dumps(response)
 
     def getFolderOwners(self, folder_id):
         sql = """SELECT u.uid, u.uname, fo.folder_id AS fo_folder_id, 
@@ -526,14 +569,14 @@ class FmpServer(object):
             child['collapsed'] = True
             child['owners'] = self.getFolderOwners(child['folder_id'])
             
-        return json.dumps([folder])
+        return json_dumps([folder])
 
     @cherrypy.expose
     def set_owner(self, *args, **kwargs):
         params = cherrypy.request.params
         owner = params.get('owner')
-        if not owner or owner in ('false', 'null', 'off', '0'):
-            owner = False
+        owner = to_bool(owner)
+        
         params['owner'] = owner
         print "SET OWNER:", params
         if not params.get('owner'):
@@ -547,7 +590,7 @@ class FmpServer(object):
             query(sql, params)
         except:
             pass
-        return json.dumps({"RESULT": "OK"})
+        return json_dumps({"RESULT": "OK"})
 
     @cherrypy.expose
     def set_owner_recursive(self, *args, **kwargs):
@@ -557,7 +600,7 @@ class FmpServer(object):
             'name': 'folder_owner_progress',
             'params': params
         }))
-        return json.dumps({"RESULT": "STARTED"})
+        return json_dumps({"RESULT": "STARTED"})
 
 def cherry_py_worker():
     static_path = os.path.realpath(sys.path[0])
@@ -611,8 +654,7 @@ def remove_old_votes(watch_id):
 
     return voted_to_skip_count
 
-
-def broadcast_countdown():
+def current_watch_id():
     watch_id = -1
 
     try:
@@ -629,6 +671,12 @@ def broadcast_countdown():
             watch_id = eid
     except:
         eid = -1
+
+    cherrypy.log("watch_id:%s" % watch_id)
+    return watch_id
+
+def broadcast_countdown():
+    watch_id = current_watch_id()
 
     # print({'fid': fid, 'eid': eid, 'watch_id': watch_id})
     voted_to_skip_count = remove_old_votes(watch_id)
@@ -653,6 +701,13 @@ def broadcast_countdown():
         'seconds_left_to_skip': seconds_left_to_skip
     })
 
+def json_headers():
+    response = cherrypy.response
+    response.headers['Content-Type'] = 'application/json'
+
+def json_dumps(obj):
+    json_headers()
+    return json.dumps(obj)
 
 def JsonTextMessage(data):
     return TextMessage(json.dumps(data))

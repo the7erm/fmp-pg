@@ -12,10 +12,12 @@ except:
     from db.db import *
 
 from fingerprint_util import calculate_file_fingerprint
+from folder_class import Folders
 
 class Locations(object):
     def __init__(self, parent=None):
         self.locations = []
+        self.owners = []
         self.parent = parent
         self.existing_filename = None
         self.existing_fid = None
@@ -36,8 +38,9 @@ class Locations(object):
         if self.parent.fingerprint:
             where.append("""fingerprint = %(fingerprint)s""")
 
-        sql = """SELECT *
-                 FROM file_locations 
+        sql = """SELECT *, fld.folder_id AS fld_folder_id
+                 FROM file_locations fl
+                      LEFT JOIN folders fld ON fld.dirname = fl.dirname
                  WHERE {WHERE}""".format(WHERE=" OR \n".join(where))
 
         sql_args = {
@@ -49,7 +52,50 @@ class Locations(object):
 
         print mogrify(sql, sql_args)
         self.locations = get_results_assoc_dict(sql, sql_args)
+        self.load_folders()
         self.check_records_integrity()
+        self.load_owners()
+
+    def load_folders(self):
+        self.folders = []
+        for loc in self.locations:
+            folder = Folders(**{'dirname':loc['dirname']})
+            if folder.folder_id != loc.get('folder_id') or not\
+               loc.get('fld_folder_id'):
+                sql = """UPDATE file_locations
+                         SET folder_id = %(folder_id)s
+                         WHERE flid = %(flid)s"""
+                loc = query(sql, loc)
+                loc['fld_folder_id'] = folder.folder_id
+                loc.update(folder.dbInfo)
+
+            self.folders.append(folder)
+
+
+    def load_owners(self):
+        # TODO FACTOR THIS TO USE folder_id
+        dirnames = [l['dirname'] for l in self.locations]
+        sql = """SELECT DISTINCT admin, listening, u.uid, uname, 
+                fo.uid AS owner
+                FROM users u
+                     LEFT JOIN folder_owners fo ON 
+                               fo.uid = u.uid AND folder_id IN 
+                    (
+                        SELECT folder_id
+                        FROM folders
+                        WHERE dirname in (
+                            SELECT DISTINCT dirname 
+                            FROM file_locations 
+                            WHERE fid = %(fid)s
+                        )
+                    )
+                ORDER BY admin DESC, listening DESC, uname"""
+
+        self.owners = get_results_assoc_dict(sql, {'fid': self.fid})
+        for o in self.owners:
+            del o['admin']
+            del o['listening']
+
 
     @property
     def filename(self):

@@ -7,13 +7,15 @@
 				<th>uname</th>
 				<th>admin</th>
 				<th>listening</th>
+				<th>cue netcasts</th>
 			</tr>
 		</thead>
 		<tr ng-repeat="(key, data) in listeners">
 			<td>{{data.uid}}</td>
 			<td><button class="btn" ng-class="{'btn-info':data.listening}" ng-click="data.uiddata.listening=!!data.listening;set_listening(data.uid);">{{data.uname}}</button></td>
-			<td><input type="checkbox" ng-model="data.admin" ng-change="set_admin(data.uid);"></td>
+			<td><input type="checkbox" ng-model="data.admin" ng-change="set_user_col(data.uid, 'admin');"></td>
 			<td><input type="checkbox" ng-model="data.listening" ng-change="set_listening(data.uid, true);"></td>
+			<td><input type="checkbox" ng-model="data.cue_netcasts" ng-change="set_user_col(data.uid, 'cue_netcasts');"></td>
 		</tr>
 	</table>
 </div>

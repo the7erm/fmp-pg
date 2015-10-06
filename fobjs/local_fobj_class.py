@@ -30,6 +30,7 @@ class Local_FObj(FObj_Class):
         self.kwargs = kwargs
         self.artistDbInfo = []
         self.vote_data = {}
+        self.genresDbInfo = {}
         self.clean()
         self.real_filename = kwargs.get('filename', "")
         self.insert_new = kwargs.get("insert", False)
@@ -101,8 +102,15 @@ class Local_FObj(FObj_Class):
         self.dbInfo = get_assoc_dict(sql, spec)
         sql = """SELECT *
                  FROM artists a, file_artists fa
-                 WHERE fa.aid = a.aid AND fa.fid = %(fid)s"""
+                 WHERE fa.aid = a.aid AND fa.fid = %(fid)s
+                 ORDER BY artist"""
         self.artistDbInfo = get_results_assoc_dict(sql, spec)
+
+        sql = """SELECT *
+                 FROM genres g, file_genres fg
+                 WHERE g.gid = fg.gid AND fg.fid = %(fid)s
+                 ORDER BY genre"""
+        self.genresDbInfo = get_results_assoc_dict(sql, spec)
 
     def insert(self):
         print "TODO INSERT"

@@ -65,6 +65,14 @@ class FObj_Class(Log):
         if hasattr(self, 'artistDbInfo'):
             dbInfo['artists'] = jsonize(self.artistDbInfo)
 
+        if hasattr(self, 'genresDbInfo'):
+            dbInfo['genres'] = jsonize(self.genresDbInfo)
+
+        if hasattr(self, 'locations'):
+            dbInfo['owners'] = jsonize(self.locations.owners);
+        else:
+            dbInfo['owners'] = []
+
         if 'plid' in self.kwargs:
             kwargs = deepcopy(self.kwargs)
             if 'listeners' in kwargs:
@@ -78,4 +86,6 @@ class FObj_Class(Log):
             dbInfo['fileInfo'] = jsonize(self.kwargs)
         else:
             dbInfo['kwargs'] = jsonize(self.kwargs)
+
+
         return dbInfo

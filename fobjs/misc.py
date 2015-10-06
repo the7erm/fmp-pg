@@ -72,6 +72,11 @@ def get_recently_played(limit=10, convert_to_fobj=False, listeners=None):
 
 def time_to_cue_netcast(listeners=None):
     listeners = _listeners(listeners)
+    for l in listeners:
+        if not l['cue_netcasts']:
+            logger.debug("%s doesn't want to listen to netcasts" % l['uname'])
+            return False
+
     recent = get_recently_played(listeners=listeners)
     cue = True
     for r in recent:
@@ -83,14 +88,14 @@ def time_to_cue_netcast(listeners=None):
     return cue
 
 def get_users():
-    sql = """SELECT uid, uname, listening, admin
+    sql = """SELECT uid, uname, listening, admin, cue_netcasts
              FROM users
              ORDER BY admin DESC, uname"""
 
     return get_results_assoc_dict(sql)
 
 def get_listeners():
-    sql = """SELECT uid, uname, listening, admin
+    sql = """SELECT uid, uname, listening, admin, cue_netcasts
              FROM users
              WHERE listening = True
              ORDER BY admin DESC, uname"""
@@ -101,9 +106,6 @@ def _listeners(listeners=None):
     if listeners is None:
         listeners = get_listeners()
     return listeners
-
-
-    
 
 def fid_eid_match(most_recent, sql_args):
     check_keys = ['fid', 'eid']
@@ -280,6 +282,8 @@ JSON_WHITE_LIST = [
     'netcastInfo',
     'nid',
     'non_listeners',
+    'owner',
+    'owners',
     'percent_played',
     'plid',
     'preload',

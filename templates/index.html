@@ -159,5 +159,17 @@
         <br clear="all" />
         <br clear="all" />
         <div ng-view class="container-fluid"></div>
+        <br clear="all" />
+        <br clear="all" />
+        <nav class="navbar navbar-fixed-bottom navbar-default " role="navigation" bs-navbar ng-controller="PlayerController">
+            <form style="width:100%%;">
+            <div class="btn-group btn-group-justified" role="group" aria-label="..." style="width:100%%;" >
+                <button class="btn  navbar-btn" id="prev" ng-click="prev();" style="width:33%%;">Prev</button>
+                <button style="width:33%%;" class="btn play-pause navbar-btn" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
+                <button style="width:33%%;"class="btn navbar-btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}" 
+                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
+            </div>
+            </form>
+        </nav>
     </body>
 </html>

@@ -1,36 +1,49 @@
 <h3>Player</h3>
 <span id="time-status">{{PlayerData.collection.time_status}}</span>
 <div ng-bind-html="PlayerData.collection.artist_title"></div>
-<div class="reason" ng-if="PlayerData.collection.reason">{{ PlayerData.collection.reason }}</div><br>
-<div ng-if="PlayerData.collection.CONNECTION == 'OPEN'">
-    <button class="btn btn-default" id="prev" ng-click="prev();">Prev</button>
-    <button class="btn btn-default play-pause" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
-    <!-- <button class="btn btn-default" id="next" ng-click="next();">Next</button> -->
-    <button class="btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}" 
-                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
-</div>
-<div ng-if="PlayerData.collection.CONNECTION != 'OPEN'">
-    <b>No connection to server.</b>
+<div class="reason" ng-if="PlayerData.collection.reason">{{ PlayerData.collection.reason }}</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4 col-lg-4" ng-if="PlayerData.collection.owners&&PlayerData.collection.owners.length>0">
+            Owners:
+            <span ng-repeat="(key, data) in PlayerData.collection.owners">
+                <a ng-if='data.owner' href="/#/search/?owner={{data.uid}}" class="badge" >{{data.uname}}</a>
+            </span>
+        </div>
+        <div class="col-md-3 col-lg-3">
+            <h4 ng-if="PlayerData.collection.genres&&PlayerData.collection.genres.length>0">Genres(s)</h4>
+            <div class="btn-group" ng-repeat="(key, data) in PlayerData.collection.genres">
+                <a ng-if='data.genre' href="/#/search/?q={{data.genre}}" class="btn btn-default">{{data.genre}}</a>
+            </div>
+        </div>
+        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
+    </div>
+
+    <div class="row" ng-repeat="(key, data) in PlayerData.collection.ratings">
+        <div class="col-xs-2 col-sm-1 col-md-1 col-lg-1">
+            <button class="btn" ng-click="PlayerData.setIam(data.uid)" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
+        </div>
+        <div class="col-xs-4 col-sm-3 col-md-2 col-lg-2">
+            <button class="btn" ng-class="{'btn-info':(PlayerData.votedToSkip(data.uid))}" 
+                ng-click="PlayerData.voteToSkip(data.uid)">{{data.uname}} vote to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button> 
+        </div>
+        <div ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3" ng-if="data.fid">
+            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+        </div>
+        
+        <div class="col-xs-1 col-sm-1 col-md-1 col-lg-1">{{data.true_score}}</div>
+        
+    </div>
+
+
 </div>
 <br clear="all">
-<div class="row" ng-repeat="(key, data) in PlayerData.collection.ratings">
-    <div class="col-xs-2 col-sm-1 col-md-1 col-lg-1">
-        <button class="btn" ng-click="PlayerData.setIam(data.uid)" ng-class="{'btn-default':(PlayerData.collection.iam!=data.uid), 'btn-info':(PlayerData.collection.iam==data.uid)}"></button>
-    </div>
-    <div class="col-xs-4 col-sm-3 col-md-2 col-lg-2">
-        <button class="btn" ng-class="{'btn-info':(PlayerData.votedToSkip(data.uid))}" 
-            ng-click="PlayerData.voteToSkip(data.uid)">{{data.uname}} vote to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button> 
-    </div>
-    <div ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3" ng-if="data.fid">
-        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
-    </div>
-    
-    <div class="col-xs-1 col-sm-1 col-md-1 col-lg-1">{{data.true_score}}</div>
-    
-</div>
-<div id="conneted"></div>
-<ul>
+<br clear="all">
+<!--
+<ul ng-if="PlayerData.collection.iam==1">
   <li ng-repeat="(key, data) in PlayerData.collection track by key">
     {{key}}:{{ data }}
   </li>
 </ul>
+-->

@@ -401,6 +401,9 @@ class FmpPlaylist(Playlist):
             return
         else:
             filename = self.files[self.index].filename
+        # Clear the voting data just before a song starts playing in the 
+        # event it's left over from last time.
+        self.files[self.index].vote_data = {}
         print "fid:", self.files[self.index].fid
         print "eid:", self.files[self.index].eid
         print "FILENAME:", filename
@@ -515,9 +518,8 @@ class FmpPlaylist(Playlist):
                     print f.filename
                 else:
                     print "<--------- WTF MAN?"
-
-        super(FmpPlaylist, self).inc_index(*args, **kwargs)
         
+        super(FmpPlaylist, self).inc_index(*args, **kwargs)
         try:
             for file_info in self.files[self.index].listeners.user_file_info:
                 self.log_info("uname:%s", file_info.uname)
@@ -526,6 +528,9 @@ class FmpPlaylist(Playlist):
             pass
         preload.refresh()
         server.broadcast({"player-playing": self.files[self.index].json()})
+
+    def deinc_index(self, *args, **kwargs):
+        super(FmpPlaylist, self).deinc_index(*args, **kwargs)
 
 
     def on_eos(self, bus, msg):

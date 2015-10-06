@@ -184,6 +184,9 @@ var fmpApp = angular.module('fmpApp', [
               artist = "",
               title = obj['player-playing']['title'] || obj['player-playing']['basename'] || "";
 
+          collection.owners = obj['player-playing']['owners'];
+          collection.genres = obj['player-playing']['genres'];
+          
           if (typeof obj['player-playing']['episode_title'] != 'undefined') {
               artist = obj['player-playing']['netcast_name'] || "";
               title = obj['player-playing']['episode_title'] || "";
@@ -283,6 +286,27 @@ var fmpApp = angular.module('fmpApp', [
       }
       return null;
     }
+    $scope.set_user_col = function(uid, col) {
+        var user = $scope.getUserForUid(uid),
+            url_map = {
+              'admin': '/set_admin/',
+              'cue_netcasts': '/set_cue_netcasts/',
+              'listening': '/set_listening/'
+            };
+        if (!user || typeof url_map[col] == 'undefined') {
+          // TODO display an alert or something.
+          return;
+        }
+        var value = user[col];
+        $http({
+          method: 'GET',
+          url: url_map[col]+'?uid='+uid+'&'+col+'='+value,
+        }).then(function successCallback(response) {
+          $scope.listeners = response.data;
+        }, function errorCallback(response) {
+          
+        });
+    }
     $scope.set_listening = function(uid, checkbox) {
       var user = $scope.getUserForUid(uid),
           listening = 'true';
@@ -303,25 +327,9 @@ var fmpApp = angular.module('fmpApp', [
         }
       }
       console.log(user);
-      if (user) {
-        $http({
-          method: 'GET',
-          url: '/set_listening/?uid='+user.uid+'&listening='+listening
-        }).then(function successCallback(response) {
-          $scope.listeners = response.data;
-          console.log(response);
-        }, function errorCallback(response) {
-          
-        });
-      }
+      $scope.set_user_col(user.uid, 'listening');
     };
 
-    $scope.set_admin = function(uid) {
-      console.log('uid:', uid);
-      var user = $scope.getUserForUid(uid);
-      console.log(user);
-    };
-    
     $scope.listeners = [];
     $http({
       method: 'GET',

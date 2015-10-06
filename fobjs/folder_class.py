@@ -85,6 +85,7 @@ class Folders(Log):
         self.kwargs = deepcopy(kwargs)
         self.dirname = kwargs.get("dirname")
         self.folder_id = kwargs.get("folder_id")
+        print "dirname:", self.dirname
 
     @property
     def folder_id(self):
@@ -249,6 +250,33 @@ class Folders(Log):
             self.scan_process.wait()
 
 if __name__ == "__main__":
+    sql = """SELECT DISTINCT dirname, folder_id
+             FROM file_locations
+             ORDER BY dirname"""
+    dirnames = get_results_assoc_dict(sql)
+
+    for f in dirnames:
+        sql = """SELECT *
+                 FROM folders
+                 WHERE dirname = %(dirname)s
+                 LIMIT 1"""
+        folder = get_assoc(sql, f)
+        if not folder:
+            sql = """INSERT INTO folders (dirname)
+                     VALUES (%(dirname)s)
+                     RETURNING *"""
+            folder = get_assoc(sql, f)
+        sql = """UPDATE file_locations 
+                 SET folder_id = %(folder_id)s
+                 WHERE dirname = %(dirname)s"""
+        spec = {
+            'folder_id':folder['folder_id'],
+            'dirname': f['dirname']
+        }
+        if f['folder_id'] != folder['folder_id']:
+            query(sql, spec)
+            print mogrify(sql, spec)
+
     folders = get_results_assoc_dict("""SELECT *
                                         FROM folders
                                         ORDER BY dirname DESC""")
@@ -258,9 +286,9 @@ if __name__ == "__main__":
 
     for dirname in folder_list:
         folder = Folders(dirname=dirname)
-        folder.save()
         dbInfo = folder.get_parent_from_dirname()
-
+        print "parent :",dbInfo['dirname']
+        folder.save()
     sys.exit()
 
     most_common_parent = find_common_parent(folder_list)

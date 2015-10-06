@@ -19,7 +19,8 @@ ng-show="!loadPageLocked" items-per-page="10"></pagination>
 			<code ng-bind-html="data.basenames | searchLink"></code><br>
 			<span class="reason" ng-if="data.reason">{{data.reason}}</span>
 		</div>
-		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-6 col-md-4 col-lg-3">
+		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-6 col-md-4 col-lg-4">
+			<span style="font-size:0.5em; vertical-align:middle;">{{data.uname}}</span>
 	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
 	    </div>
 		

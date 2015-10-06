@@ -75,8 +75,9 @@ def insert_missing_files_for_uid(uid):
              FROM file_locations f LEFT JOIN user_song_info usi ON 
                                     usi.uid = %(uid)s AND
                                     usi.fid = f.fid
-             WHERE usi.fid IS NULL AND usi.uid = %(uid)s"""
+             WHERE usi.fid IS NULL"""
 
+    print "<<<<<<<<<<<<<<<<<<<<<>>>>", mogrify(sql, insert_spec)
     results = get_results_assoc_dict(sql, insert_spec)
     for r in results:
         print "MISSING:", r
@@ -561,7 +562,8 @@ true_scores = make_true_scores_list()
 target_preload_length = len(true_scores)
 
 if __name__ == "__main__":
-
+    # insert_missing_files_for_uid(11)
+    # sys.exit()
     # clear_preload()
     sql = """DELETE FROM preload WHERE uid = 1"""
     query(sql)
