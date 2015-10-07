@@ -36,8 +36,9 @@ for path in paths:
 class RatingTrayIcon(Log):
     __name__ = 'RatingTrayIcon'
     logger = logger
-    def __init__(self, playlist=None):
+    def __init__(self, playlist=None, listener_watcher=None):
         self.playlist = playlist
+        self.listener_watcher = listener_watcher
         self.playlist.player.connect('artist-title-changed', 
             self.on_artist_title_changed)
         self.init_icon()

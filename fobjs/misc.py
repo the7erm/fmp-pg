@@ -1,3 +1,4 @@
+import os
 try:
     from db.db import *
 except:
@@ -15,7 +16,87 @@ from copy import deepcopy
 from datetime import date, datetime
 import re
 
+from log_class import Log, logging
+
+import gi
+from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
+                          GLib, Gio, GdkPixbuf
+
+GObject.threads_init()
+
 logger = logging.getLogger(__name__)
+
+class Listeners_Watcher(GObject.GObject, Log):
+    __name__ = 'Listeners_Watcher'
+    logger = logger
+    __gsignals__ = {
+        'listeners-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+                              (object,)),
+    }
+    def __init__(self, *args, **kwargs):
+        super(Listeners_Watcher, self).__init__(*args, **kwargs)
+        self.listeners = []
+        self.non_listeners = []
+        self.users = []
+        self.load_users()
+
+    def get_users(self):
+        sql = """SELECT uid, uname, listening, admin, cue_netcasts, sync_dir
+                 FROM users
+                 ORDER BY admin DESC, listening DESC, uname"""
+
+        return get_results_assoc_dict(sql)
+
+    def load_users(self):
+        pre_users = deepcopy(self.users)
+        self.listeners = []
+        self.non_listeners = []
+        self.users = self.get_users()
+        if self.users == pre_users:
+            return
+
+        for u in self.users:
+            if u.get('listening'):
+                self.listeners.append(u)
+            else:
+                self.non_listeners.append(u)
+        self.emit('listeners-changed', self.json())
+
+    def set_listening(self, uid, state):
+        self.set_user_bool_column(uid, 'listening', state)
+
+    def set_admin(self, uid, state):
+        self.set_user_bool_column(uid, 'admin', state)
+
+    def set_cue_netcasts(self, uid, state):
+        self.set_user_bool_column(uid, 'cue_netcasts', state)
+
+    def set_user_bool_column(self, uid, col, value):
+        Gdk.threads_leave()
+        uid = int(uid)
+        value = to_bool(value)
+        whitelist = ('listening', 'cue_netcasts', 'admin')
+        if col not in whitelist:
+            return
+
+        spec = {
+            'uid': uid
+        }
+        spec[col] = value
+
+        sql = """UPDATE users 
+                 SET {col} = %({col})s
+                 WHERE uid = %(uid)s""".format(col=col)
+
+        query(sql, spec)
+        self.load_users()
+
+    def json(self):
+        return {
+            'listeners': self.listeners,
+        }
+
+listener_watcher = Listeners_Watcher()
 
 def get_fobj(*args, **kwargs):
     from netcast_episode_class import Netcast_FObj
@@ -34,6 +115,9 @@ def get_fobj(*args, **kwargs):
     print "*"*20
     sys.exit()
     return None
+
+def get_users():
+    return listener_watcher.users
 
 def get_recently_played(limit=10, convert_to_fobj=False, listeners=None):
     user_history_sanity_check()
@@ -87,20 +171,8 @@ def time_to_cue_netcast(listeners=None):
     logger.debug("TIME TO CUE NETCAST:%s", cue)
     return cue
 
-def get_users():
-    sql = """SELECT uid, uname, listening, admin, cue_netcasts
-             FROM users
-             ORDER BY admin DESC, uname"""
-
-    return get_results_assoc_dict(sql)
-
 def get_listeners():
-    sql = """SELECT uid, uname, listening, admin, cue_netcasts
-             FROM users
-             WHERE listening = True
-             ORDER BY admin DESC, uname"""
-
-    return get_results_assoc_dict(sql)
+    return listener_watcher.listeners
 
 def _listeners(listeners=None):
     if listeners is None:
@@ -196,7 +268,6 @@ def get_unlistend_episode(listeners=None, limit=1):
     for r in res:
         results.append(Netcast_FObj(**r))
     return results
-    
 
 def get_expired_netcasts():
     sql = """SELECT * 
@@ -292,6 +363,7 @@ JSON_WHITE_LIST = [
     'reason',
     'score',
     'seq',
+    'sync_dir',
     'time_played',
     'title',
     'true_score',
@@ -302,7 +374,6 @@ JSON_WHITE_LIST = [
     'user_file_info',
     'users',
 ]
-
 
 def jsonize(dbInfo):
     if isinstance(dbInfo, list):
@@ -389,3 +460,117 @@ def get_words_from_string(string):
     final_words = list(set(final_words))
 
     return final_words
+
+def to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (str, unicode)):
+        value = value.lower()
+        if value in ('t','true','1','on'):
+            return True
+        if not value or value in('f', '0', 'false', 'off', 'null', 
+                                 'undefined'):
+            return False
+    return bool(value)
+
+
+def leave_threads():
+    Gdk.threads_leave()
+
+
+if __name__ == "__main__":
+
+    sql = """SELECT DISTINCT fg.fid, 
+                             string_agg(DISTINCT g.genre, ', ' ORDER BY g.genre) AS genres_agg
+             FROM file_genres fg
+                  LEFT JOIN genres g ON g.gid = fg.gid
+             GROUP BY fg.fid"""
+
+    aggs = get_results_assoc_dict(sql)
+    for agg in aggs:
+        sql = """UPDATE files SET genres_agg = %(genres_agg)s
+                 WHERE fid = %(fid)s
+                 RETURNING *"""
+        print get_assoc_dict(sql, agg)
+
+    sql = """SELECT DISTINCT f.fid, 
+                             string_agg(DISTINCT fl.basename, ', ' ORDER BY fl.basename) AS basename_agg
+             FROM files f
+                  LEFT JOIN file_locations fl ON fl.fid = f.fid
+             GROUP BY f.fid"""
+
+    aggs = get_results_assoc_dict(sql)
+    for agg in aggs:
+        sql = """UPDATE files SET basename_agg = %(basename_agg)s
+                 WHERE fid = %(fid)s
+                 RETURNING *"""
+        print get_assoc_dict(sql, agg)
+
+    sql = """SELECT DISTINCT fa.fid, 
+                             string_agg(DISTINCT a.artist, ', ' 
+                                        ORDER BY a.artist) AS artists_agg
+             FROM file_artists fa
+                  LEFT JOIN artists a ON a.aid = fa.aid
+             GROUP BY fa.fid"""
+
+    aggs = get_results_assoc_dict(sql)
+    for agg in aggs:
+        sql = """UPDATE files SET artists_agg = %(artists_agg)s
+                 WHERE fid = %(fid)s
+                 RETURNING *"""
+        print get_assoc_dict(sql, agg)
+
+
+    sys.exit()
+    sql = """SELECT *
+             FROM file_locations
+             ORDER BY dirname"""
+    files = get_results_assoc_dict(sql)
+    for fl in files:
+        filename = os.path.join(fl['dirname'], fl['basename'])
+        if not os.path.exists(filename):
+            print "MISSING:", filename
+            sql = """DELETE FROM file_locations
+                     WHERE dirname = %(dirname)s AND
+                           basename = %(basename)s"""
+            query(sql, fl)
+
+    sql = """SELECT f.fid
+             FROM files f
+                  LEFT JOIN file_locations fl ON f.fid = fl.fid
+             WHERE fl.fid IS NULL"""
+
+    null_files = get_results_assoc_dict(sql)
+    for f in null_files:
+        sql = """DELETE FROM user_history
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+        sql = """DELETE FROM user_song_info
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+        sql = """DELETE FROM file_genres
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+        sql = """DELETE FROM file_artists
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+
+        sql = """DELETE FROM keywords
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+
+        sql = """DELETE FROM album_files
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+        sql = """DELETE FROM files
+                 WHERE fid = %(fid)s"""
+        query(sql, f)
+
+        print "remove:", f
+

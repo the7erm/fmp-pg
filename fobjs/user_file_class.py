@@ -14,7 +14,7 @@ from datetime import timedelta
 
 from misc import get_most_recent, user_history_sanity_check,\
                  date_played_info_for_uid, get_most_recent_for_uid, \
-                 jsonize
+                 jsonize, listener_watcher, leave_threads
 from utils import utcnow
 
 from log_class import Log, logging
@@ -40,6 +40,19 @@ class UserFile(Log):
         self.uid = kwargs.get('uid')
         self.uname = kwargs.get('uname')
         self.log_debug("/.__init__()")
+        # listener_watcher.connect("listeners-changed", 
+        #                       self.on_listeners_changed)
+
+    def on_listeners_changed(self, *args, **kwargs):
+        leave_threads()
+        self.reload()
+
+    def reload(self):
+        if not self.parent.playing:
+            self.log_debug(".reload() fid:%s eid:%s - not reloading, not playing uname:%s" % (self.fid, self.eid, self.uname))
+            return
+        self.log_debug(".reload() fid:%s eid:%s" % (self.fid, self.eid))
+        self.load_from_uid(self.uid)
 
     @property
     def uid(self):
@@ -53,10 +66,6 @@ class UserFile(Log):
             return
         if self.uid != value or self.userDbInfo == {}:
             self.load_from_uid(self, value)
-    
-    def reload(self):
-        self.log_debug(".reload()")
-        self.load_from_uid(self.uid)
 
     def load_from_uid(self, value):
         # UserFile.load_from_uid
@@ -158,7 +167,7 @@ class UserFile(Log):
 
         fid_query, eid_query = self.get_history_query(**sql_args)
         
-        sql = """SELECT uh.*, uname 
+        sql = """SELECT uh.*, uname, sync_dir
                  FROM
                  user_history uh, users u
                  WHERE uh.uid = %(uid)s AND
@@ -390,7 +399,7 @@ class UserHistoryItem(UserFile):
         # This one makes sure it hasn't been played today.
         fid_query, eid_query = self.get_history_query(**sql_args)
 
-        sql = """SELECT uh.*, uname
+        sql = """SELECT uh.*, uname, u.sync_dir
                  FROM user_history uh,
                       users u
                  WHERE uh.uid = %(uid)s AND
@@ -483,8 +492,6 @@ class UserHistoryItem(UserFile):
                 all_good = False
                 self.log_error(".historyDbInfo STILL missing %s"+("<"*20), key)
         self.log_info("/.historyDbInfo ALL GOOD")
-
-
 
     def insert(self):
         self.log_debug(".insert()")

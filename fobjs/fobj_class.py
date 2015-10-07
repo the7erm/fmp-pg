@@ -8,6 +8,7 @@ from log_class import Log
 class FObj_Class(Log):
     __name__ == "FObj_Class"
     def __init__(self, *args, **kwargs):
+        self.playing = False
         self.kwargs = kwargs
         self.filename = kwargs.get('filename', "")
         self.percent_played = kwargs.get("percent_played", -1)

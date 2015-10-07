@@ -132,10 +132,11 @@ var fmpApp = angular.module('fmpApp', [
     }
 
     var searchLink = $filter('searchLink');
-
     dataStream.onMessage(function(message) {
+
       var obj = JSON.parse(message.data);
-      // console.log("message.data:", obj);
+      
+      console.log("message.data:", obj);
       if (typeof obj['time-status'] != 'undefined') {
           collection.time_status = obj['time-status']['str'];
           if (obj['time-status']['state'] == 'PAUSED') {
@@ -143,7 +144,7 @@ var fmpApp = angular.module('fmpApp', [
           } else {
             collection.play_pause = 'Pause';
           }
-          return;
+          //return;
       }
 
       if (typeof obj['jobs'] != 'undefined') {
@@ -155,7 +156,7 @@ var fmpApp = angular.module('fmpApp', [
         } else {
           collection.jobs =  {};
         }
-        return;
+        ///return;
       }
 
       if (typeof obj['vote_data'] != 'undefined') {
@@ -163,7 +164,7 @@ var fmpApp = angular.module('fmpApp', [
       }
 
       if (typeof obj['CONNECTED'] != 'undefined') {
-          return;
+          //return;
       }
 
       if (typeof obj['state-changed'] != 'undefined') {
@@ -224,7 +225,8 @@ var fmpApp = angular.module('fmpApp', [
                   'rating': listener.rating,
                   'score': listener.score,
                   'uname': listener.uname,
-                  'true_score': listener.true_score
+                  'true_score': listener.true_score,
+                  'sync_dir': listener.sync_dir
                 });
               }
               collection.ratings = ratings;

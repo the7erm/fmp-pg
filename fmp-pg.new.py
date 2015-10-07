@@ -62,7 +62,7 @@ from log_class import Log, logging
 logger = logging.getLogger(__name__)
 
 class UserFileInfoTreeview():
-    def __init__(self, playlist=None):
+    def __init__(self, playlist=None, listener_watcher=None):
         self.fullscreen = False
         self.is_video = False
         self.playlist = playlist
@@ -71,6 +71,12 @@ class UserFileInfoTreeview():
         self.init_treeview_cols()
         self.init_cells()
         self.pack_treeview_cols()
+        listener_watcher.connect("listeners-changed", 
+            self.on_listeners_changed)
+
+    def on_listeners_changed(self, *args, **kwargs):
+        Gdk.threads_leave()
+        self.update_treeview(self.playlist, False)
 
     def on_fullscreen(self, *args, **kwargs):
         print "on_fullscreen:", args, kwargs
@@ -258,11 +264,13 @@ class UserFileInfoTreeview():
                 obj[key] = getattr(file_info, key, -100000)
             playlist_rows.append(obj)
 
+        Gdk.threads_enter()
         if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and 
            not self.playlist.player.showing_controls):
             self.treeview.hide()
         else:
             self.treeview.show()
+        Gdk.threads_leave()
 
         if playlist_rows == store_rows:
             logger.debug("Nothing has changed not updating treeview.")
@@ -344,9 +352,10 @@ class FmpPlaylist(Playlist):
         self.jobs = fobjs.jobs_class.Jobs()
         self.last_marked_as_played = 0
         self.last_position = -1
-        self.user_file_info_treeview = UserFileInfoTreeview(self)
+        self.user_file_info_treeview = UserFileInfoTreeview(
+            self, listener_watcher)
         super(FmpPlaylist, self).__init__(*args, **kwargs)
-        self.user_file_info_tray = RatingTrayIcon(self)
+        self.user_file_info_tray = RatingTrayIcon(self, listener_watcher)
         self.player.connect("fullscreen", 
                             self.user_file_info_treeview.show_hide_controls)
         self.player.connect("hide-controls", 
@@ -360,8 +369,14 @@ class FmpPlaylist(Playlist):
 
         GObject.timeout_add_seconds(5, self.update_treeview)
         self.player.window.connect('key-press-event', self.on_key_press)
+        listener_watcher.connect('listeners-changed', 
+            self.on_listeners_changed)
+
+    def on_listeners_changed(self, *args, **kwargs):
+        self.reload_current()
 
     def reload_current(self):
+        Gdk.threads_leave()
         self.files[self.index].reload()
         self.broadcast_change()
 
@@ -382,6 +397,7 @@ class FmpPlaylist(Playlist):
             self.user_file_info_tray.on_artist_title_changed(broadcast_change=False)
 
     def update_treeview(self):
+        Gdk.threads_leave()
         print "="*100
         self.user_file_info_treeview.update(self)
         return True
@@ -404,10 +420,12 @@ class FmpPlaylist(Playlist):
         # Clear the voting data just before a song starts playing in the 
         # event it's left over from last time.
         self.files[self.index].vote_data = {}
+        server.vote_data = {}
         print "fid:", self.files[self.index].fid
         print "eid:", self.files[self.index].eid
         print "FILENAME:", filename
         if filename:
+            self.files[self.index].playing = True
             self.player.uri = self.files[self.index].filename
             self.update_treeview()
         else:
@@ -518,7 +536,7 @@ class FmpPlaylist(Playlist):
                     print f.filename
                 else:
                     print "<--------- WTF MAN?"
-        
+        self.files[self.index].playing = False
         super(FmpPlaylist, self).inc_index(*args, **kwargs)
         try:
             for file_info in self.files[self.index].listeners.user_file_info:
@@ -530,8 +548,8 @@ class FmpPlaylist(Playlist):
         server.broadcast({"player-playing": self.files[self.index].json()})
 
     def deinc_index(self, *args, **kwargs):
+        self.files[self.index].playing = False
         super(FmpPlaylist, self).deinc_index(*args, **kwargs)
-
 
     def on_eos(self, bus, msg):
         self.player.push_status("End of stream")
@@ -545,6 +563,7 @@ class FmpPlaylist(Playlist):
             self.files[self.index].mark_as_played(**time_status)
         except AttributeError:
             sys.exit()
+        self.files[self.index].playing = False
         self.inc_index()
 
     def json(self):

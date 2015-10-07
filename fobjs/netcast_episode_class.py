@@ -89,14 +89,17 @@ class Netcast_Listeners(Listeners, Log):
     def majority_deinc_score(self, **sql_args):
         return {}
 
+    def reload(self):
+        super(Netcast_Listeners, self).reload()
+
 class Netcast_FObj(FObj_Class, Log):
     __name__ = 'Netcast_FObj'
     logger = logger
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
-        self.listeners = Netcast_Listeners(parent=self, **kwargs)
         self.real_filename = kwargs.get('filename', "")
+        self.listeners = Netcast_Listeners(parent=self, **kwargs)
         self.insert_new = kwargs.get("insert", False)
         self.eid = kwargs.get("eid", None)
         if 'eid' not in kwargs and kwargs.get('id_type') == 'e':
@@ -269,6 +272,11 @@ class Netcast_FObj(FObj_Class, Log):
 
     def deinc_score(self, **sql_args):
         return {}
+
+    def reload(self):
+        print "*********************** NETCAST RELOAD **&J&"
+        self.listeners.reload()
+        self.load_from_eid(self.eid)
 
 class Netcast(Log):
     __name__ = 'Netcast'

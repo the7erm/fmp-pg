@@ -14,7 +14,7 @@ from copy import deepcopy
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
 
-from misc import format_sql, jsonize
+from misc import format_sql, jsonize, listener_watcher, leave_threads
 import sqlparse
 
 class UserFileInfo(UserFile, Log):
@@ -27,7 +27,7 @@ class UserFileInfo(UserFile, Log):
             kwargs['fid'] = None
         super(UserFileInfo, self).__init__(*args, **kwargs)
         self.log_debug(".__init__() user:%(uname)s fid:%(fid)s eid:%(eid)s" % 
-                     kwargs)
+                       kwargs)
 
     @property
     def rating(self):
@@ -169,7 +169,7 @@ class UserFileInfo(UserFile, Log):
             'uid': self.uid,
             'fid': self.fid
         }
-        sql = """SELECT usi.*, u.uname
+        sql = """SELECT usi.*, u.uname, u.sync_dir
                  FROM user_song_info usi, users u
                  WHERE usi.uid = %(uid)s AND
                        u.uid = usi.uid AND
@@ -192,6 +192,15 @@ class UserNetcastInfo(UserFileInfo):
         self.episodeInfo = kwargs.get('episodeInfo', {})
         self.subscriptionInfo = kwargs.get('subscriptionInfo', {})
         self.load_user_file_db_info()
+
+    def reload(self):
+        if not self.parent.playing:
+            self.log_debug(".reload() fid:%s eid:%s uname:%s- not playing" % (
+                self.fid, self.eid, self.uname))
+            return
+        self.log_debug(".reload() fid:%s eid:%s" % (self.fid, self.eid))
+        self.load_user_file_db_info(True)
+        super(UserNetcastInfo, self).reload()
 
     @property
     def nid(self):
@@ -242,12 +251,12 @@ class UserNetcastInfo(UserFileInfo):
     def true_score(self):
         return -1
 
-    def load_user_file_db_info(self):
+    def load_user_file_db_info(self, reload=False):
         # UserNetcastInfo.load_user_file_db_info
-        self.load_episode()
-        self.load_netcast()
-        self.load_subscription()
-        self.load_listened()
+        self.load_episode(reload)
+        self.load_netcast(reload)
+        self.load_subscription(reload)
+        self.load_listened(reload)
 
         attrs = ('netcastInfo', 'episodeInfo', 'subscriptionInfo',
                  'listenedInfo', 'userDbInfo')
@@ -259,12 +268,13 @@ class UserNetcastInfo(UserFileInfo):
                 self.userFileDbInfo.update(data)
         self.log_debug("self.userFileDbInfo:%s" % self.userFileDbInfo)
 
-    def load_netcast(self):
+    def load_netcast(self, reload=False):
         # UserNetcastInfo.load_netcast
         nid = self.nid
         if nid == self.netcastInfo.get('nid'):
             self.log_debug(".load_netcast nid:%s" % (nid,))
-            return
+            if not reload:
+                return
         sql = """SELECT * 
                  FROM netcasts
                  WHERE nid = %(nid)s
@@ -273,12 +283,13 @@ class UserNetcastInfo(UserFileInfo):
         self.log_debug(".load_netcast sql_args:%s" % (sql_args))
         self.netcastInfo = get_assoc_dict(sql, sql_args)
 
-    def load_episode(self):
+    def load_episode(self, reload=False):
         # UserNetcastInfo.load_episode
         eid = self.eid
         if eid == self.episodeInfo.get('eid'):
             self.log_debug(".load_episode eid:%s" % (eid,))
-            return
+            if not reload:
+                return
 
         sql = """SELECT *
                  FROM netcast_episodes ne
@@ -290,13 +301,14 @@ class UserNetcastInfo(UserFileInfo):
         self.log_debug(".load_episode sql_args:%s" % (sql_args,))
         self.episodeInfo = get_assoc_dict(sql, sql_args)
 
-    def load_subscription(self):
+    def load_subscription(self, reload=False):
         nid = self.nid
         uid = self.uid
         if nid == self.subscriptionInfo.get('nid') and \
            uid == self.subscriptionInfo.get('uid'):
             self.log_debug(".load_subscription nid:%s uid:%s" % (nid, uid))
-            return
+            if not reload:
+                return
 
         # UserNetcastInfo.load_subscription
         sql = """SELECT *
@@ -311,7 +323,7 @@ class UserNetcastInfo(UserFileInfo):
         self.log_debug(".load_subscription sql_args:%s" % (sql_args,))
         self.subscriptionInfo = get_assoc_dict(sql, sql_args)
 
-    def load_listened(self):
+    def load_listened(self, reload=True):
         # UserNetcastInfo.load_listened
         # Always load this one.
         sql = """SELECT *
@@ -389,9 +401,6 @@ class UserNetcastInfo(UserFileInfo):
             query(sql, sql_args)
             self.load_listened()
 
-
-        
-
     @property
     def percent_played(self):
         # UserNetcastInfo.percent_played
@@ -449,3 +458,4 @@ class UserNetcastInfo(UserFileInfo):
         updated.update(self.save_listened())
         updated.update(self.subscriptionInfo)
         return updated
+

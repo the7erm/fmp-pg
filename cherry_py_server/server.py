@@ -43,7 +43,8 @@ except:
     sys.path.append("../")
     from db.db import *
 
-from fobjs.misc import _listeners, get_words_from_string
+from fobjs.misc import _listeners, get_words_from_string, to_bool,\
+                       listener_watcher, leave_threads
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -83,19 +84,15 @@ cherrypy.config.update({
     }
 })
 
-def to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (str, unicode)):
-        value = value.lower()
-        if value in ('t','true','1','on'):
-            return True
-        if not value or value in('f', '0', 'false', 'off', 'null', 
-                                 'undefined'):
-            return False
-    return bool(value)
-
 class FmpServer(object):
+    def __init__(self, *args, **kwargs):
+        super(FmpServer, self).__init__(*args, **kwargs)
+        listener_watcher.connect('listeners-changed', self.on_listeners_change)
+
+    def on_listeners_change(self, *args, **kwargs):
+        leave_threads()
+        json_broadcast({"listeners": listener_watcher.listeners})
+
     @cherrypy.expose
     def index(self):
         print "cherrypy.request.headers:", cherrypy.request.headers
@@ -125,7 +122,7 @@ class FmpServer(object):
                      ) / 2.0
                  WHERE fid = %(fid)s AND uid = %(uid)s"""
         query(sql, spec)
-        playlist.reload_current()
+        GObject.idle_add(playlist.reload_current)
         return "rate"
 
     @cherrypy.expose
@@ -156,10 +153,7 @@ class FmpServer(object):
 
     @cherrypy.expose
     def listeners(self):
-        sql = """SELECT uid, uname, admin, listening, cue_netcasts
-                 FROM users
-                 ORDER BY listening DESC, admin DESC, uname"""
-        return json_dumps(get_results_assoc_dict(sql))
+        return json_dumps(listener_watcher.users)
 
     @cherrypy.expose
     def set_listening(self, *args, **kwargs):
@@ -181,20 +175,8 @@ class FmpServer(object):
         whitelist = ('listening', 'cue_netcasts', 'admin')
         if col not in whitelist:
             return self.listeners()
-        spec = {
-            'uid': cherrypy.request.params.get('uid')
-        }
-        spec[col] = value
-
-        sql = """UPDATE users 
-                 SET {col} = %({col})s
-                 WHERE uid = %(uid)s""".format(col=col)
-
-        query(sql, spec)
-        cherrypy.log(sql % spec)
-        GObject.idle_add(playlist.reload_current)
+        listener_watcher.set_user_bool_column(uid, col, value)
         return self.listeners()
-
 
     @cherrypy.expose
     def vote_to_skip(self, watch_id=None, uid=None, vote=None,  
@@ -213,7 +195,7 @@ class FmpServer(object):
 
         vote_data[watch_id][uid] = vote
 
-        listeners = _listeners()
+        listeners = listener_watcher.listeners
         len_listeners = len(listeners)
         
         print "len_listeners:", len_listeners
@@ -360,6 +342,7 @@ class FmpServer(object):
 
     @cherrypy.expose
     def search(self, *args, **kwargs):
+        start_time = time()
         params = cherrypy.request.params
         cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
         cherrypy.log("search: kwargs:%s" % ( kwargs,))
@@ -375,6 +358,7 @@ class FmpServer(object):
         only_cued = to_bool(only_cued)
 
         q = params.get("q", '').strip()
+        """
         if not q and not only_cued:
             response = {
                 "RESULT": "OK",
@@ -382,25 +366,24 @@ class FmpServer(object):
                 "total": 0
             }
             return json_dumps(response)
+        """
         
 
         query_offset = "LIMIT %d OFFSET %d" % (limit, start)
         query_args = {}
         query_spec = {
-          "SELECT": ["""DISTINCT f.fid, 
-                        string_agg(DISTINCT a.artist, ',') AS artists,
+          "SELECT": ["""DISTINCT f.fid, f.artists_agg AS artists,
                         string_agg(DISTINCT fl.basename, ',') AS basenames, 
                         title, sha512, p.fid AS cued, f.fid AS id, 
                         'f' AS id_type"""],
-          "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid
-                              LEFT JOIN file_artists fa ON fa.fid = f.fid
-                              LEFT JOIN artists a ON a.aid = fa.aid,
+          "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid,
                       file_locations fl"""],
           "COUNT_FROM": ["files f, file_locations fl"],
           "ORDER_BY": [],
           "WHERE": ["fl.fid = f.fid"],
           "WHERERATINGSCORE": [],
-          "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type"]
+          "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type",
+                       "f.artists_agg"]
         }
 
         query_base = """SELECT {SELECT}
@@ -523,6 +506,8 @@ class FmpServer(object):
             "results": results,
             "total": total
         }
+        cherrypy.log(">>>>>>>>>>>>> query running time:%s" % (
+            time() - start_time))
         return json_dumps(response)
 
     def getFolderOwners(self, folder_id):
@@ -651,7 +636,6 @@ def remove_old_votes(watch_id):
     for _watch_id in remove_old_votes:
         del skip_countdown[_watch_id]
 
-
     return voted_to_skip_count
 
 def current_watch_id():
@@ -692,9 +676,10 @@ def broadcast_countdown():
         if seconds_left_to_skip < 0:
             print "*** DE INC ***"
             playlist.files[playlist.index].vote_data = vote_data[watch_id]
+            del skip_countdown[watch_id]
             GObject.idle_add(playlist.majority_next, ())
             seconds_left_to_skip = 0
-            del skip_countdown[watch_id]
+
 
     json_broadcast({
         'skip_countdown': skip_countdown,
@@ -720,10 +705,11 @@ def json_broadcast(data):
 
 def broadcast(data):
     if not data.get('time-status'):
-        print "broadcast:", data
+        print "broadcast:", json.dumps(data, sort_keys=True,
+                            indent=4, separators=(',', ': '))
     json_broadcast(data)
-    json_broadcast({'vote_data':vote_data})
     broadcast_countdown()
+    json_broadcast({'vote_data':vote_data})
 
 
 

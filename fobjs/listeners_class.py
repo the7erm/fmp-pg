@@ -26,7 +26,10 @@ except:
 
 from user_file_info_class import UserFileInfo, UserNetcastInfo
 from utils import utcnow
-from misc import _listeners, jsonize, get_users
+from misc import _listeners, jsonize, get_users, to_bool,\
+                 listener_watcher, leave_threads
+
+from copy import deepcopy
 
 from log_class import Log, logging
 logger = logging.getLogger(__name__)
@@ -35,17 +38,26 @@ users = get_users()
 
 class Listeners(Log):
     __name__ = 'Listeners'
+    logger = logger
     def __init__(self, *args, **kwargs):
+        self.user_file_info_map = {}
         self.kwargs = kwargs
-        self.logger = logger
         super(Listeners, self).__init__(*args, **kwargs)
-        self.listeners = _listeners(kwargs.get('listeners', None))
+        self.listeners = listener_watcher.listeners
         self.parent = kwargs.get('parent')
         self.load_user_file_info(**self.kwargs)
+        listener_watcher.connect("listeners-changed", self.on_listener_change)
+
+    def on_listener_change(self, *args, **kwargs):
+        leave_threads()
+        self.reload()
 
     def reload(self):
+        if not self.parent.playing:
+            self.log_debug(".reload() - not reloading, not playing")
+            return
         self.log_debug(".reload()")
-        self.listeners = _listeners()
+        self.listeners = listener_watcher.listeners
         self.load_user_file_info(**self.kwargs)
 
     def load_user_file_info(self, **kwargs):
@@ -58,14 +70,20 @@ class Listeners(Log):
         if kwargs.get('eid'):
             ufi_class = UserNetcastInfo
 
-        users = get_users()
+        users = listener_watcher.users
         for l in users:
+            uid = l['uid']
             kwargs.update(l)
             kwargs['userDbInfo'] = l
+            if uid not in self.user_file_info_map:
+                self.user_file_info_map[uid] = ufi_class(**kwargs)
+
             if l.get('listening'):
-                self.user_file_info.append(ufi_class(**kwargs))
+                self.user_file_info_map[uid].reload()
+                self.user_file_info.append(self.user_file_info_map[uid])
             else:
-                self.non_listening_user_file_info.append(ufi_class(**kwargs))
+                self.non_listening_user_file_info.append(
+                    self.user_file_info_map[uid])
 
     def init_mark_as_played_sql_args(self, sql_args):
         ultp = sql_args.get('ltp', 
