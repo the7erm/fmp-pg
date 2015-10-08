@@ -2,7 +2,16 @@
 <span id="time-status">{{PlayerData.collection.time_status}}</span>
 <div ng-bind-html="PlayerData.collection.artist_title"></div>
 <div class="reason" ng-if="PlayerData.collection.reason">{{ PlayerData.collection.reason }}</div>
+<script type="text/ng-template" id="genre-template">
 
+  <div class="tag-template">
+    <div>
+      <a href="/#/search/?q={{data.genre}}">{{data.genre}}</a>
+      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
+    </div>
+  </div>
+
+</script>
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-4 col-lg-4" ng-if="PlayerData.collection.owners&&PlayerData.collection.owners.length>0">
@@ -12,10 +21,16 @@
             </span>
         </div>
         <div class="col-md-3 col-lg-3">
-            <h4 ng-if="PlayerData.collection.genres&&PlayerData.collection.genres.length>0">Genres(s)</h4>
-            <div class="btn-group" ng-repeat="(key, data) in PlayerData.collection.genres">
-                <a ng-if='data.genre' href="/#/search/?q={{data.genre}}" class="btn btn-default">{{data.genre}}</a>
-            </div>
+            <h4>Genre(s)</h4>
+            <tags-input ng-model="PlayerData.collection.genres" 
+                        display-property="genre" 
+                        placeholder="Add a genre" 
+                        class="bootstrap"
+                        template="genre-template"
+                        on-tag-added="onAddGenre(PlayerData.collection.fid, $tag)"
+                        on-tag-removed="onRemoveGenre(PlayerData.collection.fid, $tag)">
+              <auto-complete source="PlayerData.collection.loadGenres($query)"></auto-complete>
+            </tags-input>
         </div>
         <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
     </div>
@@ -27,13 +42,19 @@
         <div class="col-xs-4 col-sm-3 col-md-2 col-lg-3">
             <button class="btn" ng-class="{'btn-info':(PlayerData.votedToSkip(data.uid))}" 
                 ng-click="PlayerData.voteToSkip(data.uid)">{{data.uname}} vote to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
-            <button class="btn btn-default btn-xs" ng-if="data.sync_dir">Sync</button>
+            <button class="btn btn-default btn-xs" ng-if="data.sync_dir"
+                    ng-click="sync(PlayerData.collection.fid, data.uid)">Sync</button>
         </div>
         <div ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3" ng-if="data.fid">
-            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
+            
         </div>
         
-        <div class="col-xs-1 col-sm-1 col-md-1 col-lg-1">{{data.true_score}}</div>
+        <div class="col-xs-2 col-sm-2 col-md-2 col-lg-2" ng-controller="RatingCtrl" style="cursor:pointer;">
+            <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
+            <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
+             {{data.true_score}}
+        </div>
         
     </div>
   

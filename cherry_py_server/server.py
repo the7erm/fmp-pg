@@ -36,6 +36,7 @@ from time import time
 import os
 import sys
 import math
+import shutil
 
 try:
     from db.db import *
@@ -245,6 +246,130 @@ class FmpServer(object):
         return json_dumps(json_response)
 
     @cherrypy.expose
+    def genres(self, query=None, fetch_all=False):
+        if query is None:
+            query = ""
+
+        query = query+"%"
+        sql = """SELECT *
+                 FROM genres
+                 WHERE genre ILIKE %(genre)s
+                 ORDER BY genre"""
+        if not fetch_all:
+            sql +" LIMIT 10"
+        else:
+            query = "%"+query
+
+        result = get_results_assoc_dict(sql,{"genre": query})
+        return json_dumps(result)
+
+    @cherrypy.expose
+    def genre_enabled(self, *args, **kwargs):
+        gid = cherrypy.request.params.get('gid')
+        enabled = cherrypy.request.params.get("enabled")
+        enabled = to_bool(enabled)
+        sql = """UPDATE genres
+                 SET enabled = %(enabled)s
+                 WHERE gid = %(gid)s"""
+        spec = {
+            'gid': gid,
+            'enabled': enabled
+        }
+        query(sql, spec)
+
+    @cherrypy.expose
+    def set_score(self, *arg, **kwargs):
+        sql = """UPDATE user_song_info
+                 SET score = %(score)s,
+                     true_score = %(true_score)s
+                 WHERE uid = %(uid)s AND
+                       fid = %(fid)s"""
+        query(sql, kwargs)
+        print "SET_SCORE"
+        print mogrify(sql, kwargs)
+        sql = """UPDATE user_song_info usi
+                 SET true_score = (
+                        (rating * 2 * 10) + 
+                        (score * 10)
+                     ) / 2.0
+                 WHERE fid = %(fid)s AND uid = %(uid)s"""
+        query(sql, kwargs)
+        GObject.idle_add(playlist.reload_current)
+        print mogrify(sql, kwargs)
+
+    @cherrypy.expose
+    def add_genre(self, fid, genre):
+        fid = int(fid)
+        if not genre:
+            return json_dumps({
+                "RESULT": "Error",
+                "Error": "No genre"
+            })
+        sql = """SELECT *
+                 FROM genres
+                 WHERE genre = %(genre)s
+                 LIMIT 1"""
+
+        spec = {'genre': genre}
+        genreDbInfo = get_assoc_dict(sql, spec)
+        if not genreDbInfo:
+            sql = """INSERT INTO genres (genre)
+                     VALUES (%(genre)s)
+                     RETURNING *"""
+            genreDbInfo = get_assoc_dict(sql, spec)
+
+        
+        genreDbInfo['fid'] = fid
+        sql = """SELECT * FROM file_genres
+                 WHERE fid = %(fid)s AND gid = %(gid)s
+                 LIMIT 1"""
+
+        present = get_assoc_dict(sql, genreDbInfo)
+        if present:
+            return json_dumps(present)
+
+        sql = """INSERT INTO file_genres (fid, gid)
+                 VALUES(%(fid)s, %(gid)s)
+                 RETURNING *"""
+        res = get_assoc_dict(sql, genreDbInfo)
+        return json_dumps(res)
+
+
+    @cherrypy.expose
+    def remove_genre(self, fid, genre):
+        fid = int(fid)
+        if not genre:
+            return
+        sql = """SELECT *
+                 FROM genres
+                 WHERE genre = %(genre)s
+                 LIMIT 1"""
+
+        spec = {'genre': genre}
+        genreDbInfo = get_assoc_dict(sql, spec)
+        if not genreDbInfo:
+            return json_dumps({"RESULT": "OK", "MSG":"Not present"})
+
+        genreDbInfo['fid'] = fid
+        sql = """DELETE FROM file_genres
+                 WHERE fid = %(fid)s AND gid = %(gid)s"""
+
+        query(sql, genreDbInfo)
+
+        sql = """SELECT count(*) AS total
+                 FROM file_genres
+                 WHERE gid = %(gid)s"""
+
+        total = get_assoc_dict(sql, genreDbInfo)
+
+        if total['total'] == 0:
+            sql = """DELETE FROM genres WHERE gid = %(gid)s"""
+            query(sql, genreDbInfo)
+
+        return json_dumps({"RESULT": "OK"})
+
+
+    @cherrypy.expose
     def download(self, fid=None, eid=None):
         if fid is not None:
             sql = """SELECT dirname, basename
@@ -400,13 +525,13 @@ class FmpServer(object):
 
         if uid:
             query_args['uid'] = uid
-            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname")
+            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname, usi.true_score")
             query_spec["FROM"].append("user_song_info usi, users u")
             query_spec["WHERE"].append("usi.fid = f.fid AND "
                                        "usi.uid = %(uid)s AND "
                                        "u.uid = usi.uid")
             query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid, '
-                                          'u.uname')
+                                          'u.uname, usi.true_score')
             query_spec['COUNT_FROM'].append("user_song_info usi, users u")
 
         if owner:
@@ -509,6 +634,160 @@ class FmpServer(object):
         cherrypy.log(">>>>>>>>>>>>> query running time:%s" % (
             time() - start_time))
         return json_dumps(response)
+
+    @cherrypy.expose
+    def sync(self, fid, uid):
+        spec = {
+            'fid': int(fid),
+            'uid': int(uid)
+        }
+
+        sql = """SELECT * 
+                 FROM users 
+                 WHERE uid = %(uid)s
+                 LIMIT 1"""
+        user = get_assoc_dict(sql, spec)
+
+        if not user['sync_dir']:
+            return json_dumps({"RESULT": "Error",
+                               "Error": "That user does not have a sync dir."})
+
+        if not os.path.exists(user['sync_dir']):
+            try:
+                os.makedirs(user['sync_dir'], 0775)
+            except:
+                pass
+            if not os.path.exists(user['sync_dir']):
+                return json_dumps({"RESULT": "Error",
+                                   "Error": "The sync_dir %r doesn't exist "
+                                            "and couldn't be created." 
+                                            % user['sync_dir']})
+
+        sql = """SELECT * 
+                 FROM folders
+                 WHERE dirname = %(sync_dir)s
+                 LIMIT 1"""
+        user_folder = get_assoc_dict(sql, user)
+        if not user_folder:
+            sql = """INSERT INTO folders (dirname)
+                     VALUES(%(sync_dir)s)
+                     RETURNING *"""
+            user_folder = get_assoc_dict(sql, user)
+        user_folder['sync_dir'] = user_folder['dirname']
+
+        sql = """SELECT *
+                 FROM file_locations
+                 WHERE fid = %(fid)s"""
+        locations = get_results_assoc_dict(sql, spec)
+
+        sql = """SELECT *
+                 FROM folder_owners
+                 WHERE uid = %(uid)s AND 
+                       folder_id = %(folder_id)s"""
+
+        for l in locations:
+            spec['folder_id'] = l['folder_id']
+            is_owner = get_assoc_dict(sql, spec)
+            if is_owner and is_owner != {}:
+                return json_dumps({"RESULT": "Error",
+                                   "Error": "You already have this file"})
+
+        for l in locations:
+            src = os.path.join(l['dirname'], l['basename'])
+            dst = os.path.join(user['sync_dir'], l['basename'])
+            if not os.path.exists(src):
+                continue
+
+            if os.path.exists(dst):
+                return json_dumps({"RESULT": "OK",
+                                   "Message": "You already have this file."})
+
+            try:
+                os.link(src, dst)
+            except:
+                pass
+
+            if not os.path.exists(dst):
+                try:
+                    shutil.copy2(src, dst)
+                except:
+                    pass
+
+            if not os.path.exists(dst):
+                return json_dumps({
+                    "RESULT": "Error",
+                    "Error": "Unable to copy file to %r" % dst
+                })
+
+            insert_sql = """INSERT INTO file_locations
+                     (
+                        atime,
+                        basename, 
+                        dirname, 
+                        end_fingerprint,
+                        exists,
+                        fid, 
+                        fingerprint,
+                        fixed,
+                        folder_id,
+                        front_fingerprint,
+                        last_scan,
+                        middle_fingerprint,
+                        mtime,
+                        size
+                     )
+                     VALUES(
+                        %(atime)s,
+                        %(basename)s, 
+                        %(dirname)s,
+                        %(end_fingerprint)s,
+                        %(exists)s,
+                        %(fid)s, 
+                        %(fingerprint)s,
+                        %(fixed)s,
+                        %(folder_id)s, 
+                        %(front_fingerprint)s,
+                        %(last_scan)s,
+                        %(middle_fingerprint)s,
+                        %(mtime)s, 
+                        %(size)s
+                    )
+                    RETURNING *"""
+
+            spec.update(l)
+            print "USER FOLDER"
+            pprint(user_folder)
+            spec.update({
+                'sync_dir': user_folder['sync_dir'],
+                'dirname': user_folder['sync_dir'],
+                'folder_id': user_folder['folder_id']
+            })
+
+            sql = """SELECT * FROM file_locations 
+                     WHERE dirname = %(sync_dir)s AND 
+                           basename = %(basename)s
+                     LIMIT 1"""
+            record = get_assoc_dict(sql, spec)
+            if record:
+                return json_dumps({"RESULT": "OK",
+                                   "Message": "Already copied"})
+
+            print mogrify(insert_sql, spec)
+            record = get_assoc_dict(insert_sql, spec)
+            if record and record['dirname'] == user_folder['sync_dir']\
+               and record['folder_id'] == user_folder:
+                return json_dumps({"RESULT": "OK",
+                                   "Message": "Copied to sync dir."})
+            else:
+                return json_dumps({
+                    "RESULT": "Error",
+                    "Error": "Unable to insert new file_location record."
+                })
+
+        return json_dumps({"RESULT": "FAIL",
+                           "Message": 
+                           "The source file doesn't exist anywhere."})
+
 
     def getFolderOwners(self, folder_id):
         sql = """SELECT u.uid, u.uname, fo.folder_id AS fo_folder_id, 

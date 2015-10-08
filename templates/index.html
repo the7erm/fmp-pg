@@ -11,10 +11,14 @@
 
         <!-- Optional theme -->
         <link rel="stylesheet" href="/static/js/angular-ui-tree/angular-ui-tree.min.css">
-        
+
         <script src="/static/js/jquery-2.0.3.min.js"></script>
+
         <!-- Latest compiled and minified JavaScript -->
         <script src="static/js/bootstrap-3.3.5-dist/js/bootstrap.min.js"></script>
+
+        <link rel="stylesheet" href="/static/css/ng-tags-input.min.css">
+        <link rel="stylesheet" href="/static/css/angular-notify.min.css">
         
         <script src="/static/js/angular.min.js"></script>
         <script src="/static/js/angular-route.min.js"></script>
@@ -27,6 +31,10 @@
 
         <script src="/static/js/angular-ui-tree/angular-ui-tree.min.js"></script>
 
+        <script type="text/javascript" src="/static/js/ng-tags-input.min.js"></script>
+        <script type="text/javascript" src="/static/js/angular-notify.min.js"></script>
+
+  
         <script>window.ws_url = "ws://%(host)s/ws";</script>
         <script src="/static/js/fmp.js"></script>
 
@@ -86,11 +94,7 @@
                 padding:5px;
                 font-size:1.80em;
             }
-            code {
-                color:black;
-                background: #DDD;
-                font-size: 0.7em;
-            }
+            
             .pad-badge {
                 margin: 15px;
             }
@@ -121,10 +125,115 @@
                 text-decoration: none;
             }
 
+
             .tree-node-content {
                 padding:30px;
                 background: #DDD;
                 margin-bottom: 5px;
+            }
+
+            .bootstrap .tags {
+
+              background-color: #fff;
+
+              border: 1px solid #ccc;
+
+              border-radius: 4px;
+
+              box-shadow: inset 0 1px 1px rgba(0,0,0,0.075);
+
+              transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+
+            }
+
+
+            .bootstrap .tags.focused {
+
+              border-color: #66afe9;
+
+              box-shadow: inset 0 1px 1px rgba(0,0,0,0.075), 0 0 8px rgba(102,175,233,0.6);
+            }
+
+
+            .bootstrap .tags .tag-item {
+              background: #428bca;
+
+              border: 1px solid #357ebd;
+
+              border-radius: 4px;
+
+              color: #fff;
+
+            }
+
+            div.tag-template div a.ng-binding {
+                color:#fff;
+            }
+
+
+            .bootstrap .tags .tag-item.selected {
+
+              background: #d9534f;
+
+              border: 1px solid #d43f3a;
+
+              border-radius: 4px;
+
+              color: #fff;
+
+            }
+
+
+            .bootstrap .tags .tag-item button {
+
+              background: transparent;
+
+              color: #000;
+
+              opacity: .4;
+
+            }
+
+
+            .bootstrap .autocomplete {
+
+              border-radius: 4px;
+
+            }
+
+
+            .bootstrap .autocomplete .suggestion-item.selected {
+
+              color: #262626;
+
+              background-color: #e9e9e9;
+
+            }
+
+
+            .bootstrap .autocomplete .suggestion-item em {
+
+              font-weight: normal;
+
+              background-color: #dddd00;
+
+            }
+
+
+            .bootstrap .autocomplete .suggestion-item.selected em {
+              color: #262626;
+              background-color: #dddd00;
+
+            }
+
+            
+            code {
+                color:black;
+                background: #DDD;
+                font-size: 0.7em;
+                width: 150px !important;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
         </style>
@@ -149,6 +258,7 @@
               <ul class="nav navbar-nav">
                 <li data-match-route="/home*" ><a href="#/home">Home</a></li>
                 <li data-match-route="/search*"><a href="#/search">Search</a></li>
+                <li data-match-route="/genres"><a href="#/genres">Genres</a></li>
                 <li data-match-route="/listeners"><a href="#/listeners">Listeners</a></li>
               </ul>
               

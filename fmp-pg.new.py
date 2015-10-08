@@ -426,6 +426,7 @@ class FmpPlaylist(Playlist):
         print "FILENAME:", filename
         if filename:
             self.files[self.index].playing = True
+            self.reload_current()
             self.player.uri = self.files[self.index].filename
             self.update_treeview()
         else:
@@ -552,7 +553,7 @@ class FmpPlaylist(Playlist):
         super(FmpPlaylist, self).deinc_index(*args, **kwargs)
 
     def on_eos(self, bus, msg):
-        self.player.push_status("End of stream")
+        self.player.push_status("End of stream*****************")
         print "FmpPlaylist.on_eos"
         # Trigger mark_as_played
         time_status = self.player.get_time_status()
@@ -563,7 +564,7 @@ class FmpPlaylist(Playlist):
             self.files[self.index].mark_as_played(**time_status)
         except AttributeError:
             sys.exit()
-        self.files[self.index].playing = False
+        
         self.inc_index()
 
     def json(self):

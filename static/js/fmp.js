@@ -20,7 +20,9 @@ var fmpApp = angular.module('fmpApp', [
     'mgcrea.ngStrap',
     'ngCookies',
     'ngSanitize',
-    'ui.tree'
+    'ui.tree',
+    'ngTagsInput',
+    'cgNotify'
   ])
   .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter', function($websocket, $cookies, $http, $sce, $filter) {
     // Open a WebSocket connection
@@ -136,7 +138,7 @@ var fmpApp = angular.module('fmpApp', [
 
       var obj = JSON.parse(message.data);
       
-      console.log("message.data:", obj);
+      // console.log("message.data:", obj);
       if (typeof obj['time-status'] != 'undefined') {
           collection.time_status = obj['time-status']['str'];
           if (obj['time-status']['state'] == 'PAUSED') {
@@ -238,13 +240,19 @@ var fmpApp = angular.module('fmpApp', [
       }
       // collection.push(JSON.parse(message.data));
       // console.log("collection:",collection)
+
+      collection.loadGenres = function(query) {
+        return $http.get('/genres?query=' + query);
+      };
     });
 
     
 
     return methods;
   }])
-  .controller('PlayerController', function ($scope, PlayerData) {
+  .controller('PlayerController', function ($scope, PlayerData, $http, 
+                                            notify) {
+
     $scope.PlayerData = PlayerData;
     $scope.next = function(e) {
         $.get("/next/");
@@ -255,6 +263,54 @@ var fmpApp = angular.module('fmpApp', [
     $scope.pause = function(e) {
         $.get("/pause/");
     };
+
+    $scope.addEntry = function(e){
+      console.log("e:",e)
+    }
+    $scope.onAddGenre = function(fid, genre){
+      console.log("onAddGenre fid:", fid, 'genre:', genre);
+      $http({
+        method: 'GET',
+        url: '/add_genre',
+        params: {"fid": fid, "genre": genre.genre}
+      }).then(function successCallback(response) {
+
+      }, function errorCallback(response) {
+      });
+    }
+    $scope.onRemoveGenre = function(fid, genre){
+      console.log("onRemoveGenre fid:", fid, 'genre:', genre);
+      $http({
+        method: 'GET',
+        url: '/remove_genre',
+        params: {"fid": fid, "genre": genre.genre}
+      }).then(function successCallback(response) {
+      }, function errorCallback(response) {
+      });
+    }
+
+    $scope.sync = function(fid, uid) {
+      $http({
+        method: 'GET',
+        url: '/sync',
+        params: {"fid": fid, "uid": uid}
+      }).then(function successCallback(response) {
+        if (response.data.RESULT == "OK") {
+           notify({
+            "message": response.data.Message,
+            "classes": "alert-success",
+            "duration": 5000
+          })
+        } else {
+          notify({
+            "message": response.data.Error,
+            "classes": "alert-danger",
+            "duration": 5000
+          })
+        }
+      }, function errorCallback(response) {
+      });
+    }
   })
   .controller('ArtistCtrl', function($scope, $http, $routeParams) {
       $scope.params = $routeParams;
@@ -354,6 +410,10 @@ var fmpApp = angular.module('fmpApp', [
       $scope.loadPageLocked = false;
       $scope.calledWhileLocked = false;
 
+      $scope.$on('$routeUpdate', function(){
+          $scope.params = $routeParams;
+      });
+
       console.log("$scope.params:", $scope.params);
       $scope.loadPage = function() {
         console.log("LOAD PAGE");
@@ -423,6 +483,7 @@ var fmpApp = angular.module('fmpApp', [
       
 
       $scope.$watchCollection('params', function(newValue, oldValue) {
+          console.log('params changed')
           $scope.loadPage();
       });
       
@@ -524,8 +585,73 @@ var fmpApp = angular.module('fmpApp', [
 
     });
   })
-  .controller('RatingCtrl', function ($scope) {
+  .controller('GenreController', function($scope, $http){
+    $scope.genres = [];
+    $scope.toggleGenre = function(genre){
+      genre.enabled = !genre.enabled;
+      genre.query = $scope.query;
+      $http({
+        method: 'GET',
+        url: '/genre_enabled/',
+        params: genre
+      }).then(function successCallback(response) {
+          
+      }, function errorCallback(response) {
+      });
+    }
+    $scope.$watch('query', function(){
+      var params = {
+          'fetch_all':1,
+          'query': $scope.query
+      }
+      $http({
+        method: 'GET',
+        url: '/genres/',
+        params: params
+      }).then(function successCallback(response) {
+          $scope.genres = response.data;
+      }, function errorCallback(response) {
+      });
+    })
+
+    $http({
+      method: 'GET',
+      url: '/genres/?fetch_all=1'
+    }).then(function successCallback(response) {
+        $scope.genres = response.data;
+    }, function errorCallback(response) {
+    });
+  })
+  .controller('RatingCtrl', function ($scope, $http) {
     $scope.isReadonly = false;
+
+    $scope.setTrueScore = function(data) {
+      if (data.true_score <= -1) {
+        data.score = parseInt(data.score) + 1;
+      }
+      if (data.true_score >= 125) {
+        data.score = parseInt(data.score) - 1;
+      }
+      data.true_score = ((data.rating * 2 * 10) + 
+                          data.score * 10) / 2.0;
+      $http({
+        "url":"/set_score",
+        "params": data
+      }).then(function successCallback(response) {
+        console.log("response:", response)
+      }, function errorCallback(response) {
+      });
+    }
+
+    $scope.upScore = function(data) {
+      data.score = parseInt(data.score) + 1;
+      $scope.setTrueScore(data);
+    };
+
+    $scope.downScore = function(data) {
+      data.score = parseInt(data.score) - 1;
+      $scope.setTrueScore(data);
+    };
 
     $scope.setRating = function() {
         console.log("data.rating:", $scope.data.rating);
@@ -571,6 +697,10 @@ var fmpApp = angular.module('fmpApp', [
         templateUrl: '/static/templates/search.html',
         controller: 'SearchController',
         reloadOnSearch: false
+      })
+      .when("/genres", {
+        templateUrl:"/static/templates/genres.html",
+        controller:"GenreController"
       })
       .otherwise({
         redirectTo: '/home'

@@ -35,9 +35,11 @@ class Listeners_Watcher(GObject.GObject, Log):
     }
     def __init__(self, *args, **kwargs):
         super(Listeners_Watcher, self).__init__(*args, **kwargs)
-        self.listeners = []
-        self.non_listeners = []
-        self.users = []
+        self.container = {
+            'users': [],
+            'listeners': [],
+            'non_listeners': [],
+        }
         self.load_users()
 
     def get_users(self):
@@ -47,19 +49,43 @@ class Listeners_Watcher(GObject.GObject, Log):
 
         return get_results_assoc_dict(sql)
 
+    def user_in(self, user, key):
+        for u in self.container[key]:
+            if u['uid'] == user['uid']:
+                return True
+        return False
+
+    def get_idx(self, user, key):
+        for idx, u in enumerate(self.container[key]):
+            if u['uid'] == user['uid']:
+                return idx
+        return None
+
+    def add_to_remove_from(self, user, add_to, remove_from):
+        idx = self.get_idx(user, add_to)
+        if idx is None:
+            self.container[add_to].append(user)
+        else:
+            self.container[add_to][idx].update(user)
+
+        idx = self.get_idx(user, remove_from)
+        if idx is not None:
+            del self.container[remove_from][idx]
+
     def load_users(self):
-        pre_users = deepcopy(self.users)
-        self.listeners = []
-        self.non_listeners = []
-        self.users = self.get_users()
-        if self.users == pre_users:
+        pre_users = deepcopy(self.container['users'])
+        self.container['users'] = self.get_users()
+        if self.container['users'] == pre_users:
             return
 
-        for u in self.users:
-            if u.get('listening'):
-                self.listeners.append(u)
+        for user in self.container['users']:
+            if user.get('listening'):
+                self.add_to_remove_from(
+                    user=user, add_to='listeners', remove_from="non_listeners")
             else:
-                self.non_listeners.append(u)
+                self.add_to_remove_from(
+                    user=user, add_to='non_listeners', remove_from="listeners")
+
         self.emit('listeners-changed', self.json())
 
     def set_listening(self, uid, state):
@@ -91,6 +117,25 @@ class Listeners_Watcher(GObject.GObject, Log):
         query(sql, spec)
         self.load_users()
 
+    def check_users(self):
+        if not self.container['listeners'] or not self.container['users']:
+            self.load_users()
+
+    @property
+    def listeners(self):
+        self.check_users()
+        return self.container['listeners']
+
+    @property
+    def users(self):
+        self.check_users()
+        return self.container['users']
+
+    @property
+    def non_listeners(self):
+        self.check_users()
+        return self.container['non_listeners']
+
     def json(self):
         return {
             'listeners': self.listeners,
@@ -117,12 +162,17 @@ def get_fobj(*args, **kwargs):
     return None
 
 def get_users():
+    if not listener_watcher.users:
+        listener_watcher.load_users()
+
     return listener_watcher.users
 
 def get_recently_played(limit=10, convert_to_fobj=False, listeners=None):
     user_history_sanity_check()
-    listeners = _listeners(listeners)
+    listeners = _listeners()
     uids = get_uids(listeners)
+    if not uids:
+        return []
 
     limit = int(limit)
     user_limit = limit * 3
@@ -175,6 +225,8 @@ def get_listeners():
     return listener_watcher.listeners
 
 def _listeners(listeners=None):
+    if not listener_watcher.listeners:
+        listener_watcher.load_users()
     if listeners is None:
         listeners = get_listeners()
     return listeners
@@ -228,7 +280,7 @@ def date_played_info_for_uid(**sql_args):
     return get_assoc_dict(sql, sql_args)
 
 def get_uids(listeners=None):
-    listeners = _listeners(listeners)
+    listeners = _listeners()
     uids = []
     for listener in listeners:
         uids.append(str(int(listener['uid'])))
