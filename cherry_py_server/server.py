@@ -525,13 +525,13 @@ class FmpServer(object):
 
         if uid:
             query_args['uid'] = uid
-            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname, usi.true_score")
+            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname, usi.true_score, usi.score")
             query_spec["FROM"].append("user_song_info usi, users u")
             query_spec["WHERE"].append("usi.fid = f.fid AND "
                                        "usi.uid = %(uid)s AND "
                                        "u.uid = usi.uid")
             query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid, '
-                                          'u.uname, usi.true_score')
+                                          'u.uname, usi.true_score, usi.score')
             query_spec['COUNT_FROM'].append("user_song_info usi, users u")
 
         if owner:
