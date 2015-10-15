@@ -64,17 +64,21 @@ if "--folders" in args:
     folder_list = []
     sql = """SELECT DISTINCT dirname 
              FROM file_locations
+             WHERE dirname NOT ILIKE '%cache%'
              ORDER BY dirname"""
     folders = get_results_assoc(sql)
     for f in folders:
+        if not os.path.exists(f['dirname']) or 'cache' in f['dirname']:
+            continue
         folder_list.append(f['dirname'])
+        print "dirname:", f['dirname']
 
     sql = """SELECT DISTINCT dirname 
-             FROM folders
+             FROM file_locations
              ORDER BY dirname"""
-    folders = get_results_assoc(sql)
-    for f in folders:
-        folder_list.append(f['dirname'])
+    #folders = get_results_assoc(sql)
+    #for f in folders:
+    #    folder_list.append(f['dirname'])
 
     len_folders = float(len(folders))
     folder_list = list(set(folder_list))

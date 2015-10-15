@@ -98,6 +98,7 @@ class Netcast_FObj(FObj_Class, Log):
     def __init__(self, *args, **kwargs):
         self.kwargs = kwargs
         self.dbInfo = {}
+        self.playing = False
         self.real_filename = kwargs.get('filename', "")
         self.listeners = Netcast_Listeners(parent=self, **kwargs)
         self.insert_new = kwargs.get("insert", False)

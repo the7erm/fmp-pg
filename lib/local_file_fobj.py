@@ -856,7 +856,18 @@ class Local_File(fobj.FObj):
         if not self.db_info:
             return True
         self.getmtime()
-        if self.mtime != self.db_info['mtime']:
+        print "self.mtime: %s self.db_info['mtime']:%s" % (
+            self.mtime, self.db_info.get('mtime'))
+        mtime = time.mktime(self.mtime.timetuple())
+        db_mtime = self.db_info.get('mtime', 0)
+        if db_mtime:
+            db_mtime = time.mktime(db_mtime.timetuple())
+        else:
+            db_mtime = 0
+        mtime = int(mtime)
+        db_mtime = int(db_mtime)
+        if mtime != db_mtime:
+            print "mtime_changed:True", mtime, db_mtime
             return True
 
         print "self.mtime:",self.mtime,"==",self.db_info['mtime']

@@ -1,11 +1,34 @@
+<script type="text/ng-template" id="word-template">
+
+  <div class="tag-template">
+    <div>
+      {{data.word}}
+      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
+    </div>
+  </div>
+
+</script>
 <h3>Search</h3>
 <a href="/#artists?l={{params.q[0]}}" class="btn">Browse by artists</a><br>
-Search: <input type="text" placeholder="keywords" ng-model="params.q" style="width:60%">
+Search: 
+<tags-input ng-model="tags" 
+            display-property="word" 
+            placeholder="Keywords" 
+            class="bootstrap"
+            template="word-template"
+            add-on-space="true"
+            min-length="1"
+            replace-spaces-with-dashes="false"
+            on-tag-added="onAddWord($tag)"
+            on-tag-removed="onRemoveWord($tag)">
+    <auto-complete source="loadTags($query)" min-length="0"></auto-complete>
+</tags-input>
+
 <button class='btn' ng-class="{'btn-default': !params.oc, 'btn-info': params.oc}" ng-click="params.oc=!params.oc" >Only Cued</button><br>
 <div ng-if="loadPageLocked">Loading page: {{bigCurrentPage}}<br><br><br><br></div>
 <pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()" 
 ng-show="!loadPageLocked" items-per-page="10"></pagination>
-<div class="container-fliud">
+<div class="container-fluid">
 	<div class="row" ng-repeat="(key, data) in response.results">
 		<div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
 			<button class="btn" ng-class="{'btn-default':!data.cued, 'btn-info':data.cued}" ng-click="cue(data)">cued</button>
@@ -21,7 +44,7 @@ ng-show="!loadPageLocked" items-per-page="10"></pagination>
 		</div>
 		<div ng_if="data.usi_fid" ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-6 col-md-4 col-lg-4">
 			{{data.uname}}
-	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
 	         <span style="cursor:pointer;">
 		         <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
 		         <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>

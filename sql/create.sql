@@ -406,7 +406,9 @@ CREATE TABLE file_locations (
     end_fingerprint character varying(255),
     last_scan date,
     device_id integer NOT NULL,
-    "exists" boolean DEFAULT false
+    "exists" boolean DEFAULT false,
+    folder_id integer NOT NULL,
+    mtime_int bigint DEFAULT 0
 );
 
 
@@ -468,6 +470,25 @@ ALTER SEQUENCE file_locations_flid_seq OWNED BY file_locations.flid;
 
 
 --
+-- Name: file_locations_folder_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE file_locations_folder_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: file_locations_folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE file_locations_folder_id_seq OWNED BY file_locations.folder_id;
+
+
+--
 -- Name: files; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -481,7 +502,10 @@ CREATE TABLE files (
     front_fingerprint character varying(255),
     middle_fingerprint character varying(255),
     end_fingerprint character varying(255),
-    edited boolean DEFAULT false
+    edited boolean DEFAULT false,
+    artists_agg text,
+    genres_agg text,
+    basename_agg text
 );
 
 
@@ -1065,8 +1089,28 @@ CREATE TABLE preload (
 CREATE TABLE preload_cache (
     fid integer NOT NULL,
     uid integer NOT NULL,
-    reason text
+    reason text,
+    pcid integer NOT NULL
 );
+
+
+--
+-- Name: preload_cache_pcid_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE preload_cache_pcid_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: preload_cache_pcid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE preload_cache_pcid_seq OWNED BY preload_cache.pcid;
 
 
 --
@@ -1395,7 +1439,7 @@ ALTER SEQUENCE user_history_uid_seq OWNED BY user_history.uid;
 --
 
 CREATE TABLE user_song_info (
-    usid integer NOT NULL,
+    usid bigint NOT NULL,
     uid integer NOT NULL,
     fid integer NOT NULL,
     rating integer DEFAULT 6,
@@ -1476,7 +1520,8 @@ CREATE TABLE users (
     selected boolean DEFAULT false,
     admin boolean DEFAULT false,
     preload_true_scores text,
-    cue_netcasts boolean DEFAULT false NOT NULL
+    cue_netcasts boolean DEFAULT false NOT NULL,
+    sync_dir text
 );
 
 
@@ -1619,6 +1664,13 @@ ALTER TABLE ONLY file_locations ALTER COLUMN device_id SET DEFAULT nextval('file
 
 
 --
+-- Name: folder_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY file_locations ALTER COLUMN folder_id SET DEFAULT nextval('file_locations_folder_id_seq'::regclass);
+
+
+--
 -- Name: fid; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1756,6 +1808,13 @@ ALTER TABLE ONLY preload ALTER COLUMN fid SET DEFAULT nextval('preload_fid_seq':
 --
 
 ALTER TABLE ONLY preload ALTER COLUMN plid SET DEFAULT nextval('preload_plid_seq'::regclass);
+
+
+--
+-- Name: pcid; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY preload_cache ALTER COLUMN pcid SET DEFAULT nextval('preload_cache_pcid_seq'::regclass);
 
 
 --
@@ -2198,6 +2257,34 @@ CREATE INDEX fph_size_idx ON fingerprint_history USING btree (size);
 
 
 --
+-- Name: idx_aag_artists; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_aag_artists ON files USING btree (artists_agg);
+
+
+--
+-- Name: idx_aag_basename; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_aag_basename ON files USING btree (basename_agg);
+
+
+--
+-- Name: idx_agg_genres; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_agg_genres ON files USING btree (genres_agg);
+
+
+--
+-- Name: idx_aid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_aid ON file_artists USING btree (aid);
+
+
+--
 -- Name: idx_device_id; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -2212,6 +2299,13 @@ CREATE INDEX idx_dirname ON folders USING btree (dirname);
 
 
 --
+-- Name: idx_fid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_fid ON file_artists USING btree (fid);
+
+
+--
 -- Name: idx_filesystem; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
@@ -2219,10 +2313,31 @@ CREATE INDEX idx_filesystem ON devices USING btree (filesystem);
 
 
 --
+-- Name: idx_folder_id; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_folder_id ON file_locations USING btree (folder_id);
+
+
+--
+-- Name: idx_uid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_uid ON user_song_info USING btree (uid);
+
+
+--
 -- Name: idx_ultp; Type: INDEX; Schema: public; Owner: -; Tablespace: 
 --
 
 CREATE INDEX idx_ultp ON user_song_info USING btree (ultp NULLS FIRST);
+
+
+--
+-- Name: idx_usi_fid; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX idx_usi_fid ON user_song_info USING btree (fid);
 
 
 --

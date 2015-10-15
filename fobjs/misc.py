@@ -26,6 +26,18 @@ GObject.threads_init()
 
 logger = logging.getLogger(__name__)
 
+def to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (str, unicode)):
+        value = value.lower()
+        if value in ('t','true','1','on'):
+            return True
+        if not value or value in('f', '0', 'false', 'off', 'null', 
+                                 'undefined'):
+            return False
+    return bool(value)
+
 class Listeners_Watcher(GObject.GObject, Log):
     __name__ = 'Listeners_Watcher'
     logger = logger
@@ -39,13 +51,17 @@ class Listeners_Watcher(GObject.GObject, Log):
             'users': [],
             'listeners': [],
             'non_listeners': [],
+            'user_dict': {}
         }
         self.load_users()
+        if not self.listeners:
+            self.set_listening(1, True)
 
     def get_users(self):
-        sql = """SELECT uid, uname, listening, admin, cue_netcasts, sync_dir
+        sql = """SELECT uid, uname, listening, admin, cue_netcasts, sync_dir,
+                        listening_on_satellite
                  FROM users
-                 ORDER BY admin DESC, listening DESC, uname"""
+                 ORDER BY listening DESC, admin DESC, uname"""
 
         return get_results_assoc_dict(sql)
 
@@ -66,6 +82,9 @@ class Listeners_Watcher(GObject.GObject, Log):
         if idx is None:
             self.container[add_to].append(user)
         else:
+            # We update the elements because we want to keep all
+            # reference to the object intact.  So doing an user[idx] = user 
+            # value will break that reference. where .update() won't.
             self.container[add_to][idx].update(user)
 
         idx = self.get_idx(user, remove_from)
@@ -79,6 +98,14 @@ class Listeners_Watcher(GObject.GObject, Log):
             return
 
         for user in self.container['users']:
+            uid = user.get('uid')
+            if uid not in self.container['user_dict']:
+                self.container['user_dict'][uid] = user
+                self.container['user_dict'][str(uid)] = user
+            else:
+                self.container['user_dict'][uid].update(user)
+                self.container['user_dict'][str(uid)].update(user)
+
             if user.get('listening'):
                 self.add_to_remove_from(
                     user=user, add_to='listeners', remove_from="non_listeners")
@@ -87,6 +114,9 @@ class Listeners_Watcher(GObject.GObject, Log):
                     user=user, add_to='non_listeners', remove_from="listeners")
 
         self.emit('listeners-changed', self.json())
+
+    def set_listening_on_satellite(self, uid, state):
+        self.set_user_bool_column(uid, 'listening_on_satellite', state)
 
     def set_listening(self, uid, state):
         self.set_user_bool_column(uid, 'listening', state)
@@ -101,7 +131,8 @@ class Listeners_Watcher(GObject.GObject, Log):
         Gdk.threads_leave()
         uid = int(uid)
         value = to_bool(value)
-        whitelist = ('listening', 'cue_netcasts', 'admin')
+        whitelist = ('listening', 'cue_netcasts', 'admin',
+                     'listening_on_satellite')
         if col not in whitelist:
             return
 
@@ -118,18 +149,26 @@ class Listeners_Watcher(GObject.GObject, Log):
         self.load_users()
 
     def check_users(self):
-        if not self.container['listeners'] or not self.container['users']:
+        if not self.container['listeners'] or not self.container['users']\
+           or not self.container['user_dict']:
             self.load_users()
+
 
     @property
     def listeners(self):
         self.check_users()
+
         return self.container['listeners']
 
     @property
     def users(self):
         self.check_users()
         return self.container['users']
+
+    @property
+    def user_dict(self):
+        self.check_users()
+        return self.container['user_dict']
 
     @property
     def non_listeners(self):
@@ -400,6 +439,7 @@ JSON_WHITE_LIST = [
     'gid',
     'listeners',
     'listening',
+    'listening_on_satellite',
     'ltp',
     'netcast_name',
     'netcastInfo',
@@ -513,17 +553,6 @@ def get_words_from_string(string):
 
     return final_words
 
-def to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (str, unicode)):
-        value = value.lower()
-        if value in ('t','true','1','on'):
-            return True
-        if not value or value in('f', '0', 'false', 'off', 'null', 
-                                 'undefined'):
-            return False
-    return bool(value)
 
 
 def leave_threads():

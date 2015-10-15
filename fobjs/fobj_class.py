@@ -45,7 +45,7 @@ class FObj_Class(Log):
     @property
     def mtime(self):
         if self.exists:
-            return os.path.getmtime(self.filename)
+            return int(os.path.getmtime(self.filename))
         return -1
 
     def reload(self):

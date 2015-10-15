@@ -25,9 +25,17 @@ class UserFileInfo(UserFile, Log):
             kwargs['eid'] = None
         if 'fid'  not in kwargs:
             kwargs['fid'] = None
+        if 'uname' not in kwargs:
+            kwargs['uname'] = ''
         super(UserFileInfo, self).__init__(*args, **kwargs)
-        self.log_debug(".__init__() user:%(uname)s fid:%(fid)s eid:%(eid)s" % 
-                       kwargs)
+        try:
+            self.log_debug(
+                ".__init__() user:%(uname)s fid:%(fid)s eid:%(eid)s" % 
+                kwargs)
+        except KeyError:
+            self.log_debug(
+                ".__init__() user:%(uid)s fid:%(fid)s eid:%(eid)s" % 
+                kwargs)
 
     @property
     def rating(self):
@@ -146,6 +154,11 @@ class UserFileInfo(UserFile, Log):
         # UserFileInfo.mark_as_played
         self.log_debug('.mark_as_played()')
         self.load_user_file_db_info()
+        user = listener_watcher.user_dict[self.uid]
+        if user.get('listening_on_satellite') \
+           and not self.kwargs.get("mark_as_played_from_server"):
+            self.log_debug(".mark_as_played not marking as played because user is listening_on_satellite")
+            return
         self.userFileDbInfo['percent_played'] = sql_args.get('percent_played', 0)
         self.userFileDbInfo['ultp'] = self.get_now(**sql_args)
         res = self.save()
@@ -155,6 +168,9 @@ class UserFileInfo(UserFile, Log):
     def mark_as_completed(self, **sql_args):
         # UserFileInfo.mark_as_completed
         self.load_user_file_db_info()
+        if self.userFileDbInfo.get('listening_on_satellite') and \
+           not self.kwargs.get("from_server"):
+            return
         self.check_file_info()
         self.userFileDbInfo['percent_played'] = 100
         self.userFileDbInfo['ultp'] = self.get_now(**sql_args)
@@ -169,7 +185,8 @@ class UserFileInfo(UserFile, Log):
             'uid': self.uid,
             'fid': self.fid
         }
-        sql = """SELECT usi.*, u.uname, u.sync_dir
+        sql = """SELECT usi.*, u.uname, u.sync_dir, u.listening, 
+                        u.listening_on_satellite
                  FROM user_song_info usi, users u
                  WHERE usi.uid = %(uid)s AND
                        u.uid = usi.uid AND

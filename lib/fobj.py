@@ -235,6 +235,7 @@ class FObj:
             # print "self.filename:",self.filename
             try:
                 t = os.path.getmtime(self.filename)
+                t = int(t)
             except OSError:
                 self.exists = False
                 return -1

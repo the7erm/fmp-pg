@@ -34,6 +34,8 @@
         <script type="text/javascript" src="/static/js/ng-tags-input.min.js"></script>
         <script type="text/javascript" src="/static/js/angular-notify.min.js"></script>
 
+        <script type="text/javascript" src="/static/js/angular.audio.js"></script>
+
   
         <script>window.ws_url = "ws://%(host)s/ws";</script>
         <script src="/static/js/fmp.js"></script>
@@ -236,6 +238,15 @@
                 text-overflow: ellipsis;
             }
 
+            .playing-index {
+                background: #DDD;
+                font-weight: bold;
+            }
+
+            .playlist-item {
+                padding:20px;
+            }
+
         </style>
     </head>
     <body>
@@ -273,10 +284,16 @@
         <nav class="navbar navbar-fixed-bottom navbar-default " role="navigation" bs-navbar ng-controller="PlayerController">
             <form style="width:100%%;">
             <div class="btn-group btn-group-justified" role="group" aria-label="..." style="width:100%%;" >
-                <button class="btn  navbar-btn" id="prev" ng-click="prev();" style="width:33%%;">Prev</button>
-                <button style="width:33%%;" class="btn play-pause navbar-btn" ng-click="pause();">{{ PlayerData.collection.play_pause }}</button>
-                <button style="width:33%%;"class="btn navbar-btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}" 
-                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span></button>
+                <button class="btn navbar-btn" id="prev" ng-click="prev();" style="width:33%%;"><span class="glyphicon glyphicon-fast-backward"></span></button> 
+                <button style="width:33%%;" class="btn navbar-btn" ng-click="pause();"><span ng-class="{
+                    'glyphicon glyphicon-pause':(PlayerData.collection.play_pause=='Pause'),
+                    'glyphicon glyphicon-play':(PlayerData.collection.play_pause=='Play')
+                }"></span></button>
+                <button ng-if="PlayerData.collection.mode=='remote'" style="width:33%%;" class="btn navbar-btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}" 
+                    ng-click="PlayerData.voteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span>
+                    <span class="glyphicon glyphicon-fast-forward"></span>
+                </button><button ng-if="PlayerData.collection.mode=='satellite'" class="btn navbar-btn" style="width:33%%;"
+                ng-click="SatellitePlayer.next()"><span class="glyphicon glyphicon-fast-forward"></span></button>
             </div>
             </form>
         </nav>

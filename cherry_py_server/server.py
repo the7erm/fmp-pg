@@ -37,6 +37,7 @@ import os
 import sys
 import math
 import shutil
+tmpdir = os.path.expanduser("~/.fmp/tmp")
 
 try:
     from db.db import *
@@ -45,7 +46,12 @@ except:
     from db.db import *
 
 from fobjs.misc import _listeners, get_words_from_string, to_bool,\
-                       listener_watcher, leave_threads
+                       listener_watcher, leave_threads, jsonize
+
+from fobjs.user_file_info_class import UserFileInfo
+from fobjs.local_fobj_class import Local_FObj
+
+convert_files = []
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -84,6 +90,22 @@ cherrypy.config.update({
         'tools.websocket.handler_cls': ChatWebSocketHandler
     }
 })
+
+def convert_to_int(value, default=None):
+
+    try:
+        value = int(value)
+    except:
+        value = default
+    return value
+
+def convert_to_float(value, default=None):
+
+    try:
+        value = float(value)
+    except:
+        value = default
+    return value
 
 class FmpServer(object):
     def __init__(self, *args, **kwargs):
@@ -158,7 +180,12 @@ class FmpServer(object):
 
     @cherrypy.expose
     def set_listening(self, *args, **kwargs):
+        self.history()
         return self.set_user_bool_column('listening')
+
+    @cherrypy.expose
+    def set_listening_on_satellite(self, *args, **kwargs):
+        return self.set_user_bool_column('listening_on_satellite')
 
     @cherrypy.expose
     def set_cue_netcasts(self, *args, **kwargs):
@@ -173,7 +200,8 @@ class FmpServer(object):
         uid = int(uid)
         value = cherrypy.request.params.get(col)
         value = to_bool(value)
-        whitelist = ('listening', 'cue_netcasts', 'admin')
+        whitelist = ('listening', 'cue_netcasts', 'admin', 
+                     'listening_on_satellite')
         if col not in whitelist:
             return self.listeners()
         listener_watcher.set_user_bool_column(uid, col, value)
@@ -210,6 +238,8 @@ class FmpServer(object):
                 skip_countdown[watch_id] = time() + 5
             elif len_listeners > 10:
                 skip_countdown[watch_id] = time() + 10
+            if len_listeners == 1 or len_listeners == voted_to_skip_count:
+                skip_countdown[watch_id] = time()
                 
         elif skip_countdown.get(watch_id) and (voted_to_skip_count == 0 or
                                           voted_to_skip_count < (len_listeners * 0.5)):
@@ -244,6 +274,148 @@ class FmpServer(object):
         json_response['gen_time'] = "%s" % gen_time
         
         return json_dumps(json_response)
+
+    @cherrypy.expose
+    def preload(self, *args, **kwargs):
+        uid = cherrypy.request.params.get('uid')
+        uid = int(uid)
+        limit = cherrypy.request.params.get("limit")
+        try:
+            limit = int(limit)
+        except:
+            limit = None
+
+        if limit is None:
+            limit = 1
+
+        spec = {"uid" : uid}
+
+        OFFSET_LIMIT = ""
+
+        if limit is not None:
+            OFFSET_LIMIT = "OFFSET 0 LIMIT %d" % limit
+
+        queries = [
+            """SELECT p.*, u.uname
+               FROM preload p, users u
+               WHERE reason ILIKE '%%FROM Search%%' AND
+                     p.uid = %(uid)s AND u.uid = p.uid
+               ORDER BY plid
+               {LIMIT}""",
+            """SELECT p.*, u.uname
+               FROM preload_cache p, users u
+               WHERE reason ILIKE '%%FROM Search%%' AND
+                     p.uid = %(uid)s  AND u.uid = p.uid
+               ORDER BY pcid
+               {LIMIT}""",
+            """SELECT p.*, u.uname
+               FROM preload p, users u
+               WHERE reason NOT ILIKE '%%FROM Search%%' AND
+                     p.uid = %(uid)s AND u.uid = p.uid
+               ORDER BY plid
+               {LIMIT}""",
+            """SELECT p.*, u.uname
+               FROM preload_cache p, users u
+               WHERE reason NOT ILIKE '%%FROM Search%%' AND
+                     p.uid = %(uid)s  AND u.uid = p.uid
+               ORDER BY pcid
+               {LIMIT}""",
+        ]
+
+        results = []
+        for sql in queries:
+            sql = sql.format(LIMIT=OFFSET_LIMIT)
+            print mogrify(sql, spec)
+            res = get_results_assoc_dict(sql, spec)
+            for r in res:
+                r['limit_uids'] = [uid]
+                lf = Local_FObj(**r)
+                if not lf.basename.lower().endswith(".mp3"):
+                    filename = converter.get_converted_filename(
+                            lf.fid, lf.filename)
+                    if not os.path.exists(filename):
+                        converter.add_file(lf.fid, lf.filename)
+                        continue
+                results.append(lf.json())
+                if limit is not None and len(results) > limit:
+                    break
+
+        return json_dumps(results)
+
+    @cherrypy.expose
+    def history(self, uid=None):
+        uid = convert_to_int(uid)
+        spec = {
+            "uid": uid
+        }
+        limit = 1
+        sql = """SELECT uh.*
+                 FROM user_history uh
+                 WHERE uh.uid = %(uid)s AND uh.time_played IS NOT NULL
+                 ORDER BY time_played DESC
+                 OFFSET 0 LIMIT 10"""
+        kwargs = {
+            'uid': uid
+        }
+        
+        results = []
+        print mogrify(sql, spec)
+        res = get_results_assoc_dict(sql, spec)
+        for r in res:
+            r['limit_uids'] = [uid]
+            lf = Local_FObj(**r)
+            results.append(lf.json())
+            if not lf.filename.lower().endswith(".mp3"):
+                converter.add_file(lf.fid, lf.filename)
+        results.reverse()
+        return json_dumps(results)
+
+
+    @cherrypy.expose
+    def mark_as_played(self, uid=None, fid=None, eid=None, percent=None,
+                       now=None):
+        cherrypy.log("*"*100)
+        cherrypy.log("mark_as_played from server")
+        fid = convert_to_int(fid, 0)
+        eid = convert_to_int(eid, 0)
+        uid = convert_to_int(uid, 0)
+        percent = convert_to_float(percent, 0.0)
+
+        if fid:
+            spec = {
+                'uid': uid,
+                'fid': fid
+            }
+            sql = """DELETE FROM preload
+                     WHERE fid = %(fid)s AND uid = %(uid)s"""
+            query(sql, spec)
+
+            sql = """DELETE FROM preload_cache
+                     WHERE fid = %(fid)s AND uid = %(uid)s"""
+            query(sql, spec)
+
+            sql = """SELECT * 
+                     FROM users u, user_song_info usi
+                     WHERE u.uid = %(uid)s AND usi.fid = %(fid)s AND
+                           u.uid = usi.uid
+                     LIMIT 1"""
+            print mogrify(sql, spec)
+            userDbInfo = get_assoc_dict(sql, spec)
+            userDbInfo['mark_as_played_from_server'] = True
+            kwargs = {
+                'uid': uid,
+                'fid': fid,
+                'userDbInfo': userDbInfo,
+                'mark_as_played_from_server': True
+            }
+            usi = UserFileInfo(**kwargs)
+            usi.mark_as_played(percent_played=percent)
+            print "LOADED USI"
+            return json_dumps({"usi": usi.json()})
+
+            
+        return json_dumps({"RESULT": "OK"})
+
 
     @cherrypy.expose
     def genres(self, query=None, fetch_all=False):
@@ -377,11 +549,32 @@ class FmpServer(object):
                      WHERE fid = %(fid)s"""
             files = get_results_assoc_dict(sql, {"fid": fid})
             for f in files:
-                filename = os.path.join(f['dirname'], f['basename'])
-                if os.path.exists(filename):
-                    return cherrypy.lib.static.serve_file(
-                        filename, "application/x-download",
-                        "attachment", f['basename'])
+                original_filename = os.path.join(f['dirname'], f['basename'])
+                print "FILENAME:", original_filename
+                if os.path.exists(original_filename):
+                    print "EXISTS:", original_filename
+                    basename = f['basename']
+                    if not basename.lower().endswith(".mp3"):
+                        converted_filename = converter.get_converted_filename(
+                            fid, original_filename)
+                        if not os.path.exists(converted_filename):
+                            print "MISSING:", converted_filename
+                            converter.add_file(fid, original_filename)
+                            continue
+                        basename += ".converted.mp3"
+                    else:
+                        converted_filename = original_filename
+                    # path, content_type=None, disposition=None, name=None, debug=False
+                    args = {
+                        "path": converted_filename, 
+                        "content_type": "audio/mpeg",
+                        "disposition":"attachment", 
+                        "name": basename
+                    }
+                    print "ARGS:", args
+
+                    return cherrypy.lib.static.serve_file(**args)
+            print "OUT OF LOOP?"
 
         if eid is not None:
             sql = """SELECT episode_url, local_file
@@ -463,6 +656,96 @@ class FmpServer(object):
                                       .replace(" With ", " with ")
                                       for v in artists])
 
+    @cherrypy.expose
+    def tags(self, *args, **kwargs):
+        word = cherrypy.request.params.get('word')
+        word = str(word)
+        word = word.lower()
+        queries = [
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word)s
+               ORDER BY word
+               LIMIT 10""",
+            # GET words that start with the string, and are 1 character
+            # Longer than our search that are all letters.
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word_)s AND word !~* '\W' AND
+                     len < (length(%(word_)s) + 1) {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word_)s AND word !~* '\W' AND
+                     len >= (length(%(word_)s) + 1) AND
+                     len < (length(%(word_)s) + 3) {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+            # Anything that starts with our word
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word_)s AND word !~* '\W' {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+            # Anything that contains our word without punctuation.
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(_word_)s 
+               ORDER BY word
+               LIMIT 10""",
+            # Anything that contains our word with punctuation.
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word_)s AND word ~* '\W' {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(_word_)s  AND word ~* '\W' {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+            # Same as above just other characters like .,-
+            """SELECT word
+               FROM words
+               WHERE word LIKE %(word_)s AND word ~* '\W' AND
+                     len < (length(%(word_)s) + 1) {AND_NOT_IN}
+               ORDER BY word
+               LIMIT 10""",
+        ]
+        results = []
+        spec = {
+            "word": word,
+            "word_": word+"%",
+            "_word_": "%"+word+"%"
+        }
+        for sql in queries:
+            if len(results) > 10:
+                break;
+            words = []
+            for w in results:
+                if not w:
+                    continue
+                words.append(mogrify("%s", (w,)))
+
+            AND_NOT_IN = ""
+
+            if words:
+                AND_NOT_IN = " AND word NOT IN (%s)" % ",".join(words)
+                
+            sql = sql.format(AND_NOT_IN=AND_NOT_IN)
+            res = get_results_assoc_dict(sql, spec)
+            for r in res:
+                if r['word'] not in results:
+                    results.append(r['word'])
+                    if len(results) > 10:
+                        break
+
+        words = []
+        for r in results:
+            words.append({'word':word})
+
+        return json_dumps(results)
 
 
     @cherrypy.expose
@@ -562,8 +845,8 @@ class FmpServer(object):
             query_spec['ORDER_BY'].append("rank DESC")
 
         if only_cued:
-            query_spec['SELECT'].append("CASE WHEN p.reason = 'FROM Search' "                         "THEN 0 ELSE 1 END AS p_reason, "
-                                         "p.reason, plid")
+            query_spec['SELECT'].append("CASE WHEN p.reason = 'FROM Search' "                        "THEN 0 ELSE 1 END AS p_reason, "
+                                        "p.reason, plid")
             query_spec['ORDER_BY'].append("""p_reason, plid""")
             query_spec['GROUP_BY'].append("p.reason, plid")
 
@@ -702,18 +985,21 @@ class FmpServer(object):
                 return json_dumps({"RESULT": "OK",
                                    "Message": "You already have this file."})
 
+            copied = False
             try:
                 os.link(src, dst)
+                copied = True
             except:
                 pass
 
-            if not os.path.exists(dst):
+            if not copied:
                 try:
                     shutil.copy2(src, dst)
+                    copied = True
                 except:
                     pass
 
-            if not os.path.exists(dst):
+            if not copied:
                 return json_dumps({
                     "RESULT": "Error",
                     "Error": "Unable to copy file to %r" % dst
@@ -867,8 +1153,11 @@ class FmpServer(object):
         return json_dumps({"RESULT": "STARTED"})
 
 def cherry_py_worker():
-    static_path = os.path.realpath(sys.path[0])
-    static_img_path = os.path.join(static_path, "images")
+    static_path = sys.path[0]
+    static_img_path = os.path.join(static_path, "static", "images")
+    print "IMAGE PATH:", static_img_path
+    favicon = os.path.join(static_img_path, "favicon.ico")
+    print "IMAGE:", favicon
     cherrypy.quickstart(FmpServer(), '/', config={
         '/ws': {
             'tools.websocket.on': True,
@@ -876,8 +1165,7 @@ def cherry_py_worker():
         },
         '/favicon.ico': {
             'tools.staticfile.on': True,
-            'tools.staticfile.filename': os.path.join(static_img_path,
-                                                      "favicon.ico")
+            'tools.staticfile.filename': favicon
         },
         '/static': {
             'tools.staticdir.root': static_path,

@@ -44,9 +44,28 @@ class Listeners(Log):
         self.kwargs = kwargs
         super(Listeners, self).__init__(*args, **kwargs)
         self.listeners = listener_watcher.listeners
+        if kwargs.get('limit_uids'):
+            self.limit_listeners()
+
         self.parent = kwargs.get('parent')
         self.load_user_file_info(**self.kwargs)
-        listener_watcher.connect("listeners-changed", self.on_listener_change)
+        if not kwargs.get('limit_uids'):
+            listener_watcher.connect("listeners-changed", 
+                                     self.on_listener_change)
+
+    def limit_listeners(self):
+        sql = """SELECT uid, uname, listening, admin, cue_netcasts, sync_dir,
+                        listening_on_satellite
+                 FROM users
+                 WHERE uid IN ({uids})
+                 ORDER BY listening DESC, admin DESC, uname"""
+        listeners = self.kwargs.get('limit_uids', [])
+        uids = [str(int(uid)) for uid in listeners]
+        sql = sql.format(uids=",".join(uids))
+        self.listeners = get_results_assoc(sql)
+        for l in self.listeners:
+            l['listening'] = True
+
 
     def on_listener_change(self, *args, **kwargs):
         leave_threads()
@@ -57,7 +76,8 @@ class Listeners(Log):
             self.log_debug(".reload() - not reloading, not playing")
             return
         self.log_debug(".reload()")
-        self.listeners = listener_watcher.listeners
+        if not self.kwargs.get("limit_uids"):
+            self.listeners = listener_watcher.listeners
         self.load_user_file_info(**self.kwargs)
 
     def load_user_file_info(self, **kwargs):
@@ -70,7 +90,11 @@ class Listeners(Log):
         if kwargs.get('eid'):
             ufi_class = UserNetcastInfo
 
-        users = listener_watcher.users
+        if not self.kwargs.get("limit_uids"):
+            users = listener_watcher.users
+        else:
+            users = self.listeners
+
         for l in users:
             uid = l['uid']
             kwargs.update(l)
@@ -107,6 +131,11 @@ class Listeners(Log):
             self.load_user_file_info(**sql_args)
 
         for user_file_info in self.user_file_info:
+            uid = user_file_info.userDbInfo.get('uid')
+            if listener_watcher.user_dict[uid]['listening_on_satellite'] and \
+               not self.kwargs.get("mark_as_played_from_server"):
+                self.log_debug(".mark_as_played() SKIPPING user %s listening_on_satellite" % user_file_info.uname)
+                continue
             self.log_debug(".mark_as_played() user_file_info.mark_as_played()")
             user_file_info.mark_as_played(**sql_args)
         return
@@ -126,6 +155,10 @@ class Listeners(Log):
 
         sql_args['down_voted'] = down_voted
         for user_file_info in self.user_file_info:
+            uid = user_file_info.uid
+            user = listener_watcher.user_dict[uid]
+            if user['listening_on_satellite']:
+                continue
             if user_file_info.uid not in down_voted:
                 user_file_info.inc_score(**sql_args)
             else:
@@ -133,6 +166,10 @@ class Listeners(Log):
 
     def deinc_score(self, **sql_args):
         for user_file_info in self.user_file_info:
+            uid = user_file_info.uid
+            user = listener_watcher.user_dict[uid]
+            if user['listening_on_satellite']:
+                continue
             user_file_info.deinc_score(**sql_args)
 
     def majority_deinc_score(self, **sql_args):
@@ -147,6 +184,10 @@ class Listeners(Log):
         sql_args['down_voted'] = down_voted
         self.log_debug("sql_args:%s", sql_args)
         for user_file_info in self.user_file_info:
+            uid = user_file_info.uid
+            user = listener_watcher.user_dict[uid]
+            if user['listening_on_satellite']:
+                continue
             if user_file_info.uid in down_voted:
                 self.log_debug("majority_deinc_score uid:%s uname:%s" % (user_file_info.uid, user_file_info.uname))
                 user_file_info.deinc_score(**sql_args)

@@ -40,8 +40,6 @@ class UserFile(Log):
         self.uid = kwargs.get('uid')
         self.uname = kwargs.get('uname')
         self.log_debug("/.__init__()")
-        # listener_watcher.connect("listeners-changed", 
-        #                       self.on_listeners_changed)
 
     def on_listeners_changed(self, *args, **kwargs):
         leave_threads()
@@ -65,7 +63,7 @@ class UserFile(Log):
         if not value:
             return
         if self.uid != value or self.userDbInfo == {}:
-            self.load_from_uid(self, value)
+            self.load_from_uid(value)
 
     def load_from_uid(self, value):
         # UserFile.load_from_uid
@@ -167,7 +165,7 @@ class UserFile(Log):
 
         fid_query, eid_query = self.get_history_query(**sql_args)
         
-        sql = """SELECT uh.*, uname, sync_dir
+        sql = """SELECT uh.*, uname, sync_dir, listening_on_satellite
                  FROM
                  user_history uh, users u
                  WHERE uh.uid = %(uid)s AND
@@ -302,8 +300,8 @@ class UserHistoryItem(UserFile):
     __name__ = 'UserHistoryItem'
     logger = logger
     def __init__(self, *args, **kwargs):
-        super(UserHistoryItem, self).__init__(*args, **kwargs)
         self.historyDbInfo = kwargs.get('historyDbInfo', {})
+        super(UserHistoryItem, self).__init__(*args, **kwargs)
         self.uhid = kwargs.get('uhid')
         self.uid = kwargs.get('uid')
 
@@ -325,7 +323,7 @@ class UserHistoryItem(UserFile):
         self.load_from_uhid(value)
 
     def load_from_uhid(self, uhid):
-        sql = """SELECT uh.*, uname
+        sql = """SELECT uh.*, uname, listening_on_satellite
                  FROM user_history uh,
                       users u
                  WHERE uhid = %(uhid)s AND
@@ -388,6 +386,7 @@ class UserHistoryItem(UserFile):
 
     def load_from_uid_fid_eid_date_played(self):
         self.log_debug(".load_from_uid_fid_eid_date_played()")
+
         self.log_debug(".historyDbInfo:%s", self.historyDbInfo)
         self.historyDbInfo_sanity_check()
         if 'uid' not in self.historyDbInfo:
@@ -399,7 +398,7 @@ class UserHistoryItem(UserFile):
         # This one makes sure it hasn't been played today.
         fid_query, eid_query = self.get_history_query(**sql_args)
 
-        sql = """SELECT uh.*, uname, u.sync_dir
+        sql = """SELECT uh.*, uname, u.sync_dir, u.listening_on_satellite
                  FROM user_history uh,
                       users u
                  WHERE uh.uid = %(uid)s AND
@@ -569,6 +568,12 @@ class UserHistoryItem(UserFile):
             self.log_crit("UNABLE TO UPDATE HISTORY:%s" % self.historyDbInfo)
 
     def mark_as_played(self, **sql_args):
+        user = listener_watcher.user_dict[self.uid]
+        if user['listening_on_satellite'] and \
+           not self.kwargs.get('mark_as_played_from_server'):
+            self.log_debug(".mark_as_played() NOT MARKING AS PLAYED user "
+                           "listening on satellite.")
+            return
         percent_played = sql_args.get('percent_played', 0)
         self.log_debug(".mark_as_played:%s", percent_played)
         self.historyDbInfo['percent_played'] = percent_played
@@ -581,6 +586,12 @@ class UserHistoryItem(UserFile):
         self.save()
 
     def mark_as_completed(self, **sql_args):
+        user = listener_watcher.user_dict[self.uid]
+        if user['listening_on_satellite'] and \
+           not self.kwargs.get('mark_as_played_from_server'):
+            self.log_debug(".mark_as_completed() NOT MARKING AS PLAYED user "
+                           "listening on satellite.")
+            return
         self.historyDbInfo['percent_played'] = 100
         ultp = self.get_now(**sql_args)
         self.historyDbInfo['time_played'] = ultp

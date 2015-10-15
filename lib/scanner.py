@@ -25,6 +25,7 @@ from file_location import FileLocation, audio_ext, video_ext, is_supported_file
 from __init__ import get_assoc, query
 from datetime import date
 from parse_df import associate_devices
+from time import sleep
 
 print "scanner.py called"
 
@@ -39,17 +40,69 @@ video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
              '.mp4', '.mov', '.m4v']
 valid_exts = audio_ext + audio_with_tags + video_ext
 
+folder_sql = """SELECT * 
+                FROM folders
+                WHERE dirname = %(dirname)s
+                LIMIT 1"""
+
+folder_update_sql = """UPDATE folders
+                       SET mtime = %(mtime)s,
+                           scan_mtime = %(scan_mtime)s
+                       WHERE dirname = %(dirname)s
+                       RETURNING * """
+
+def ok_to_scan_folder(dirname):
+    force = "--force" in sys.argv
+    dirname = os.path.realpath(dirname)
+    mtime = int(os.path.getmtime(dirname))
+    folder_info = get_assoc(folder_sql, {'dirname': dirname})
+    try:
+        folder_info = dict(folder_info)
+    except:
+        folder_info = {}
+
+    folder_db_mtime = folder_info.get('mtime', 0)
+    if not folder_db_mtime:
+        folder_db_mtime = 0
+    diff1 = abs(folder_db_mtime - mtime)
+    folder_db_scan_mtime = folder_info.get('scan_mtime', 0)
+    if not folder_db_scan_mtime:
+        folder_db_scan_mtime = 0
+    diff2 = abs(folder_db_scan_mtime - mtime)
+
+    # We use diff1 & diff2 to account for leap seconds.
+
+    if not force and diff1 < 10 and diff2 < 10:
+        if diff1 > 0 or diff2 > 0:
+            print "SKIPPING","*"*100
+        print "SKIPPING NOTHING'S CHANGED in %s \n SKIPPING diff1:%s diff2:%s" % (
+            dirname, diff1, diff2)
+
+            
+        return False
+    print "NOT SKIPPING %s folder_info:%s mtime:%s" % (dirname, folder_info, mtime)
+    return True
+
 def scan_file(root=None, name=None, filename=None, hash=True, dirname=None):
     if filename is None:
         filename = join(root, name)
         
     if not is_supported_file(filename):
-        print "skipping:", filename
+        print "SKIPPING:", filename
         return
 
     if root is None:
         root, name = os.path.split(filename)
     filename = os.path.realpath(filename)
+    
+    dirname, basename = os.path.split(filename)
+    if not ok_to_scan_folder(dirname):
+        print "SKIPPING folder has not changed -- scan_file"
+        return
+
+    if 'cache' in filename:
+        print "skipping:", filename, "(cache)"
+        return
 
     for folder in SKIP_DIRS:
         if folder in filename:
@@ -66,6 +119,10 @@ def scan_file(root=None, name=None, filename=None, hash=True, dirname=None):
         return
 
     print 'scanning:', filename
+    if not os.path.exists(filename):
+        print "missing:", filename
+        return
+    
     try:
         # FileLocation(filename=filename, insert=True)
         f = Local_File(filename=filename, hash=hash, insert=True, silent=True)
@@ -101,15 +158,8 @@ def scan_dir(directory, hash=True):
 
     _files = {}
     dir_files = {}
-    folder_sql = """SELECT * 
-                    FROM folders
-                    WHERE dirname = %(dirname)s
-                    LIMIT 1"""
-    folder_update_sql = """UPDATE folders
-                           SET mtime = %(mtime)s,
-                               scan_mtime = %(scan_mtime)s
-                           WHERE dirname = %(dirname)s
-                           RETURNING * """
+    
+    
     force = "--force" in sys.argv
     for root, dirs, files in os.walk(directory):
         if root in already_scanned:
@@ -125,19 +175,8 @@ def scan_dir(directory, hash=True):
             continue
         print "scanning:", root
         dirname = os.path.realpath(root)
-        mtime = int(os.path.getmtime(dirname))
-        folder_info = get_assoc(folder_sql, {'dirname': dirname})
-        try:
-            folder_info = dict(folder_info)
-        except:
-            folder_info = {}
-        
-        if folder_info and folder_info.get('mtime') == mtime and \
-           mtime == folder_info.get('scan_mtime') and not force:
-            folder_info = dict(folder_info)
-            print "SKIPPING NOTHING'S CHANGED in %s" % dirname
+        if not ok_to_scan_folder(dirname):
             continue
-        print "NOT SKIPPING %s folder_info:%s mtime:%s" % (dirname, folder_info, mtime)
 
         dir_files[dirname] = []
         for f in files:

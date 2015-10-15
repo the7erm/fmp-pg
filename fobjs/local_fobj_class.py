@@ -30,7 +30,7 @@ class Local_FObj(FObj_Class):
         self.kwargs = kwargs
         self.artistDbInfo = []
         self.vote_data = {}
-        self.genresDbInfo = {}
+        self.genresDbInfo = []
         self.clean()
         self.real_filename = kwargs.get('filename', "")
         self.insert_new = kwargs.get("insert", False)
@@ -45,6 +45,9 @@ class Local_FObj(FObj_Class):
     def clean(self):
         self.locations = []
         self.dbInfo = {}
+        self.artistDbInfo = []
+        self.vote_data = {}
+        self.genresDbInfo = []
 
     @property
     def filename(self):

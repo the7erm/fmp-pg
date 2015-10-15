@@ -20,7 +20,9 @@
 
 import os
 import sys
-
+import re
+from subprocess import check_call, Popen
+tmpdir = os.path.expanduser("~/.fmp/tmp")
 os.chdir(sys.path[0])
 
 from setproctitle import setproctitle
@@ -310,6 +312,63 @@ class UserFileInfoTreeview():
             server.broadcast({"player-playing": playlist.files[playlist.index].json()})
 
 
+class Converter(Log):
+    __name__ = "Converter"
+    def __init__(self, *args, **kwargs):
+        super(Converter, self).__init__(*args, **kwargs)
+        self.running = False
+        self.convert_files = []
+        server.converter = self
+
+    def add_file(self, fid, filename):
+        self.log_debug(".add_file(fid=%r, filename=%r)" % (fid, filename))
+        self.convert_files.append((fid, filename))
+        if not self.running:
+            self.running = True
+            GObject.idle_add(self.convert)
+
+    def get_converted_filename(self, fid, filename):
+        self.log_debug("FILENAME:%r" % filename)
+        basename = os.path.basename(filename)
+        basename = re.sub('\W', '-', basename)
+        filename = os.path.join(tmpdir, "%s.%s.mp3" % (fid, basename))
+        self.log_debug("/FILENAME:%r" % filename)
+        return filename
+
+    def convert(self, *args, **kwargs):
+        self.running = True
+        Gdk.threads_leave()
+        while self.convert_files:
+            fid, src = self.convert_files.pop(0)
+            basename = os.path.basename(src)
+            tmp_dst = os.path.join(tmpdir, "%s.tmp.mp3" % fid)
+            dst = self.get_converted_filename(fid, src)
+            if os.path.exists(dst):
+                print "EXISTS:",dst
+                continue
+            if os.path.exists(tmp_dst):
+                mtime = os.path.getmtime(tmp_dst)
+                now = time()
+                if mtime >= now - 60:
+                    print "MTIME > now"
+                    continue
+            self.log_debug("converting:%r => %r" % (src, dst))
+            cmd = ["avconv", "-y", "-i", src, tmp_dst]
+            print "*"*1000
+            self.log_debug("cmd:%s" % cmd)
+            try:
+                p = Popen(cmd)
+                p.wait()
+                os.rename(tmp_dst, dst)
+            except:
+                print "ERROR"
+
+        self.running = False
+
+
+
+
+
 class FmpPlayer(Player):
     __name__ = 'FmpPlayer'
     def __init__(self, *args, **kwargs):
@@ -391,7 +450,11 @@ class FmpPlaylist(Playlist):
 
     def broadcast_change(self,  *args, **kwargs):
         server.broadcast({"state-changed": self.player.state_string})
-        server.broadcast({"player-playing": self.files[self.index].json()})
+        try:
+            server.broadcast({"player-playing": self.files[self.index].json()})
+        except IndexError, e:
+            print "IndexError:", e
+            return
         self.user_file_info_treeview.update(self, broadcast_change=False)
         if hasattr(self, 'user_file_info_tray'):
             self.user_file_info_tray.on_artist_title_changed(broadcast_change=False)
@@ -404,6 +467,7 @@ class FmpPlaylist(Playlist):
 
     def set_player_uri(self):
         try:
+            print "*"*20
             print "self.index:",self.index
             print "self.files[self.index]", self.files[self.index]
         except IndexError as e:
@@ -435,6 +499,7 @@ class FmpPlaylist(Playlist):
                 print "HAS FID:", fid
                 self.fid_sanity_check(fid)
             print "NO FILENAME"
+            self.inc_index()
 
     def fid_sanity_check(self, fid):
         sql = """SELECT * FROM file_locations WHERE fid = %(fid)s"""
@@ -604,6 +669,9 @@ def refresh_netcasts():
     #t = Thread(target=myfunc2)
     t.start()
     return True
+
+
+converter = Converter()
     
 preload = Preload()
 server.preload = preload

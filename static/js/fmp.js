@@ -1,17 +1,4 @@
 
-window.next_click = function(e) {
-    e.preventDefault();
-    $.get("/next/");
-};
-window.pause_click = function(e) {
-    alert("CALLED");
-    e.preventDefault();
-    $.get("/pause/");
-};
-window.prev_click = function(e) {
-    e.preventDefault();
-    $.get("/prev/");
-};
 
 var fmpApp = angular.module('fmpApp', [
     'ngWebSocket', // you may also use 'angular-websocket' if you prefer
@@ -22,246 +9,655 @@ var fmpApp = angular.module('fmpApp', [
     'ngSanitize',
     'ui.tree',
     'ngTagsInput',
-    'cgNotify'
+    'cgNotify',
+    'ngAudio'
   ])
-  .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter', function($websocket, $cookies, $http, $sce, $filter) {
-    // Open a WebSocket connection
-    var collection = {
-          'ws_url': window.ws_url,
-          "iam": $cookies.get('iam') || null,
-          "jobs": {}
-        },
-        dataStream = $websocket(collection.ws_url);
+  .factory('UserUtils', ['$http', function($http){
+      var methods = {};
 
-    var methods = {
-      collection: collection,
-      get: function() {
-        dataStream.send(JSON.stringify({"connected": "ok"}));
-      }
-    };
-
-    methods.votedToSkip = function(uid) {
-      if (!collection) {
-        collection = methods.collection;
-      }
-      var watch_id = collection.fid || collection.eid;
-
-      if (!uid || !watch_id) {
-          return false;
-      }
-      if (!collection.vote_data) {
-        collection.vote_data = {};
-      }
-      if (!collection.vote_data[watch_id]) {
-          collection.vote_data[watch_id] = {};
-      }
-      if (!collection.vote_data[watch_id][uid]) {
-          collection.vote_data[watch_id][uid] = false;
-      }
-      return collection.vote_data[watch_id][uid];
-    }
-
-    methods.voteToSkip = function(uid) {
-      var vote = !methods.votedToSkip(uid);
-      console.log("***********************voteToSkip:", uid, vote);
-      var _id = collection.fid || collection.eid;
-      if (!collection.vote_data[_id]) {
-        collection.vote_data[_id] = {};
-      }
-      if (!collection.vote_data[_id][uid]) {
-        collection.vote_data[_id][uid] = false;
-      }
-      collection.vote_data[_id][uid] = vote;
-      $.ajax({
-          'url': "/vote_to_skip/",
-          'data': {
-            'watch_id': _id,
-            'uid': uid,
-            'vote': vote
-          },
-          'method': 'GET',
-          'cache': false,
-          'type': 'json'
-      }).done(function(data){
-          // console.log("VOTE DATA:",data);
-      });
-    };
-
-    methods.setIam = function(uid) {
-      collection.iam = uid;
-      var expires = new Date();
-      expires.setFullYear(parseInt(expires.getFullYear()) + 1);
-      $cookies.put('iam', uid, {
-          'expires': expires
-      });
-      $http({
-        method: 'GET',
-        url: '/set_listening/?uid='+uid+'&listening=true'
-      }).then(function successCallback(response) {
-      }, function errorCallback(response) {
-      });
-    };
-
-    if (collection.iam) {
-        methods.setIam(collection.iam);
-    }
-
-    dataStream.onOpen(function(){
-      collection.CONNECTION = "OPEN";
-      setTimeout(methods.get, 100);
-    });
-
-    dataStream.onClose(function(){
-      collection.CONNECTION = "LOST";
-      collection.RECONNECTING = "true";
-      // dataStream.reconnect();
-    });
-
-    dataStream.initialTimeout = 500;
-    dataStream.maxTimeout = 5000;
-    dataStream.reconnectIfNotNormalClose = true;
-
-    
-
-    var htmlEntities = function(str) {
-        return str.replace("<","&lt;").replace(">", "&gt;");
-    };
-
-    var fixedEncodeURIComponent = function (str) {
-      return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-        return '%' + c.charCodeAt(0).toString(16);
-      });
-    }
-
-    var searchLink = $filter('searchLink');
-    dataStream.onMessage(function(message) {
-
-      var obj = JSON.parse(message.data);
-      
-      // console.log("message.data:", obj);
-      if (typeof obj['time-status'] != 'undefined') {
-          collection.time_status = obj['time-status']['str'];
-          if (obj['time-status']['state'] == 'PAUSED') {
-            collection.play_pause = 'Play';
-          } else {
-            collection.play_pause = 'Pause';
-          }
-          //return;
-      }
-
-      if (typeof obj['jobs'] != 'undefined') {
-        console.log("MESSAGE RECIEVED:", obj['jobs']);
-        if (obj['jobs']) {
-          for (var k in obj['jobs']) {
-            collection.jobs[k] = obj['jobs'][k];
-          }
-        } else {
-          collection.jobs =  {};
+      methods.setTrueScore = function(data) {
+        if (data.true_score <= -1) {
+          data.score = parseInt(data.score) + 1;
         }
-        ///return;
-      }
-
-      if (typeof obj['vote_data'] != 'undefined') {
-          collection.vote_data = obj['vote_data'];
-      }
-
-      if (typeof obj['CONNECTED'] != 'undefined') {
-          //return;
-      }
-
-      if (typeof obj['state-changed'] != 'undefined') {
-          if (obj['state-changed'] == 'PLAYING') {
-              collection.play_pause = 'Pause';
-          }
-          if (obj['state-changed'] == 'PAUSED') {
-              collection.play_pause = 'Play';
-          }
-      }
-
-      if (typeof obj['seconds_left_to_skip'] != 'undefined') {
-          collection.seconds_left_to_skip = obj['seconds_left_to_skip'];
-      }
-
-      if (typeof obj['player-playing']  != 'undefined') {
-          var artist_title = "",
-              artist = "",
-              title = obj['player-playing']['title'] || obj['player-playing']['basename'] || "";
-
-          collection.owners = obj['player-playing']['owners'];
-          collection.genres = obj['player-playing']['genres'];
-          
-          if (typeof obj['player-playing']['episode_title'] != 'undefined') {
-              artist = obj['player-playing']['netcast_name'] || "";
-              title = obj['player-playing']['episode_title'] || "";
-          }
-          if (typeof obj['player-playing']['artists'] != 'undefined' && 
-              obj['player-playing']['artists'] && 
-              typeof obj['player-playing']['artists'][0] != 'undefined' &&
-              typeof obj['player-playing']['artists'][0]['artist'] != 'undefined') {
-              artist = obj['player-playing']['artists'][0]['artist'];
-          }
-
-          if (artist) {
-              artist_title = searchLink(artist);
-          }
-          if (artist) {
-              artist_title += " - " + searchLink(title);
-          } else {
-              artist_title = searchLink(title);
-          }
-          collection.fid = obj['player-playing']['fid'];
-          collection.eid = obj['player-playing']['eid'];
-          collection.artist_title = artist_title;
-          if (typeof obj['player-playing']['preloadInfo'] != 'undefined') {
-            collection.reason = obj['player-playing']['preloadInfo']['reason'];
-          } else {
-            collection.reason = "";
-          }
-          if (typeof obj['player-playing']['user_file_info']['listeners'] != 'undefined') {
-              var ratings = [];
-              for (var i=0;i<obj['player-playing']['user_file_info']['listeners'].length; i++) {
-                var listener = obj['player-playing']['user_file_info']['listeners'][i];
-                ratings.push({
-                  'fid': listener.fid,
-                  'uid': listener.uid,
-                  'rating': listener.rating,
-                  'score': listener.score,
-                  'uname': listener.uname,
-                  'true_score': listener.true_score,
-                  'sync_dir': listener.sync_dir
-                });
-              }
-              collection.ratings = ratings;
-          } else {
-            collection.ratings = [];
-          }
-
-
-      }
-      // collection.push(JSON.parse(message.data));
-      // console.log("collection:",collection)
-
-      collection.loadGenres = function(query) {
-        return $http.get('/genres?query=' + query);
+        if (data.true_score >= 125) {
+          data.score = parseInt(data.score) - 1;
+        }
+        data.true_score = ((data.rating * 2 * 10) + 
+                            data.score * 10) / 2.0;
+        $http({
+          "url":"/set_score",
+          "params": data
+        }).then(function successCallback(response) {
+          console.log("response:", response)
+        }, function errorCallback(response) {
+        });
       };
-    });
+      
+      return methods;
+  }])
+  .factory('SatellitePlayer', ['$http', '$cookies', '$filter', 'ngAudio',
+    '$interval','UserUtils', 'notify', '$timeout', function($http, $cookies, $filter, ngAudio, $interval, UserUtils, notify, $timeout){
+        var iam = $cookies.get('iam');
+        if (!iam) {
+          iam = -1;
+        }
 
-    
+        var collection = {
+                playlist: [],
+                preload: [],
+                idx:0,
+                iam:iam,
+                sound:null,
+                time_status: "",
+                restored: false,
+                initPreloadLocked: false,
+                resumePosition: 0,
+                remaining: -1000
+            },
+            methods = {
+                collection: collection,
+            };
 
-    return methods;
+        methods.resume = function() {
+            console.log("methods.resume()")
+            if (!collection.sound || !collection.sound.canPlay || !collection.sound.duration) {
+              console.log("collection.sound.duration:", collection.sound.duration);
+              console.log("trying again position:", collection.resumePosition)
+              $timeout(methods.resume, 500);
+              return;
+            }
+            console.log("position:", collection.resumePosition * collection.sound.duration);
+            // collection.sound.play();
+            collection.sound.progress = collection.resumePosition;
+            console.log("collection.sound.progress:", collection.sound.progress);
+        }
+
+        methods.initPlaylist = function() {
+           console.log("initPlaylist")
+           $http({
+              "url": "/history",
+              "params": {"uid": collection.iam }
+            }).then(function successCallback(response) {
+              console.log("success", response.data);
+              collection.playlist = response.data;
+              collection.idx = collection.playlist.length - 1;
+              console.log("collection.idx:", collection.idx);
+              var user_file_info = collection.playlist[collection.idx]['user_file_info'];
+              console.log("user_file_info:", user_file_info)
+              collection.resumePosition = user_file_info['listeners'][0]['percent_played'] * 0.01;
+
+              console.log("collection.resumePosition:", collection.resumePosition)
+              $timeout(methods.resume, 1);
+              methods.setIndex();
+              collection.sound.play();
+            }, function errorCallback(response) {
+              
+            });
+        }
+
+        methods.initPreload = function() {
+            if (collection.initPreloadLocked) {
+                return;
+            }
+            collection.initPreloadLocked = true;
+            $http({
+              "url": "/preload",
+              "params": {"uid": collection.iam }
+            }).then(function successCallback(response) {
+              collection.preload = response.data;
+              collection.initPreloadLocked = false;
+            }, function errorCallback(response) {
+              collection.initPreloadLocked = false;
+            });
+
+            $http({
+              "url": "/preload",
+              "params": {"uid": collection.iam, "limit":10 }
+            }).then(function successCallback(response) {
+              // Tell the server to convert the next files to .mp3 if needed.
+            }, function errorCallback(response) {
+              
+            });
+        }
+
+        // collection.sound.play();
+
+        methods.incIdx = function() {
+          var idx = collection.idx + 1;
+          methods.setIndex(idx);
+          collection.sound.play();
+        };
+        methods.deIncIdx = function() {
+          var idx = collection.idx - 1;
+          methods.setIndex(idx);
+          collection.sound.play();
+        };
+        methods.next = function() {
+            methods.deIncScore();
+            methods.incIdx();
+        };
+        methods.prev = function() {
+            methods.deIncIdx();
+        };
+        methods.incScore = function() {
+            angular.forEach(collection.playlist[collection.idx]['user_file_info']['listeners'], function(user) {
+                if (user.uid == collection.iam) {
+                  user.score = parseInt(user.score) + 1;
+                  UserUtils.setTrueScore(user);
+                }
+            });
+        };
+        methods.deIncScore = function() {
+          angular.forEach(collection.playlist[collection.idx]['user_file_info']['listeners'], function(user) {
+                if (user.uid == collection.iam) {
+                  user.score = parseInt(user.score) - 1;
+                  UserUtils.setTrueScore(user);
+                }
+            });
+        };
+
+        methods.formatTime = function(seconds) {
+          var seconds = Math.floor(seconds),
+              minutes = Math.floor(seconds / 60);
+          seconds = seconds - (minutes * 60);
+          if (seconds < 10 && seconds > -10) {
+            seconds = "0"+seconds;
+          }
+          return minutes+":"+seconds;
+        }
+
+        methods.markAsPlayed = function(force) {
+          if (collection.mode == 'remote') {
+            // console.log("markAsPlayed - remote");
+            return;
+          }
+          console.log("markAsPlayed - 1");
+          if (typeof collection.sound == 'undefined') {
+            return;
+          }
+          console.log("markAsPlayed - 2");
+          if (collection.sound.paused && !force) {
+            return;
+          }
+          console.log("markAsPlayed - 3");
+          if (force) {
+            console.log("forcing", force);
+          }
+          console.log("markAsPlayed - 4");
+          var params = {
+              "fid": collection.playlist[collection.idx].fid,
+              "eid": collection.playlist[collection.idx].eid,
+              "uid": collection.iam,
+              "percent": (collection.sound.progress || 0) * 100
+          };
+          $http({
+              "url":"/mark_as_played",
+              "params": params
+          }).then(function successCallback(response) {
+            methods.fixPlaylist();
+            if (collection.preload.length == 0) {
+              console.log("markAsPlayed - 5");
+              methods.initPreload();
+            }
+            console.log("markAsPlayed - 6");
+          }, function errorCallback(response) {
+          });
+          return true;
+        };
+
+        methods.updateTime = function() {
+          
+          if (collection.mode == 'remote') {
+            console.log("updateTime - remote");
+            return;
+          }
+          if (typeof collection.sound == 'undefined') {
+            return;
+          }
+          if (typeof collection.sound.audio == 'undefined') {
+            return;
+          }
+          
+          console.log("updateTime - satellite");
+          if (collection.sound.paused) {
+            if (collection.sound.progress >= 1.0) {
+              console.log("marking at 100%");
+              methods.markAsPlayed(true);
+              methods.incScore();
+              methods.incIdx();
+            }
+            return;
+          }
+          collection.time_status = "-"+methods.formatTime(collection.sound.remaining) + " " + methods.formatTime(collection.sound.currentTime)+"/"+methods.formatTime(collection.sound.duration) +" "+(collection.sound.progress * 100).toFixed(2);
+
+        };
+
+        methods.fixPlaylist = function() {
+          var playlistItem = collection.playlist[collection.idx];
+          if (!playlistItem) {
+            return;
+          }
+          for(var i=0;i<collection.preload.length;i++) {
+              var preloadItem = collection.preload[i];
+              if (playlistItem.fid == preloadItem.fid) {
+                collection.preload.splice(i, 1);
+                console.log("removed",i);
+              }
+          }
+        };
+
+        methods.setIndex = function(idx) {
+          console.log("setIndex:", idx);
+          
+          if (typeof idx != 'undefined') {
+            idx = parseInt(idx);
+            if (idx >= collection.playlist.length ) {
+              console.log("REMOVING ITEM FROM PRELOAD");
+              var item = collection.preload.shift();
+              if (item) {
+                collection.playlist.push(item);
+                methods.fixPlaylist();
+                methods.initPreload();
+              }
+              if (idx >= collection.playlist.length) {
+                idx = 0;
+              }
+            }
+            if (idx < 0) {
+              idx = collection.playlist.length - 1;
+            }
+          }
+
+          if (collection.playlist[idx] == 'undefined') {
+              console.log("undefined index1");
+          }
+
+          if (typeof idx != 'undefined' && typeof collection.playlist[idx] != 'undefined') {
+            collection.idx = idx;
+          }
+
+          if (typeof collection.playlist[collection.idx] == 'undefined') {
+            console.log("undefined index");
+            return;
+          }
+
+          if (collection.sound) {
+            console.log("stopping")
+            collection.sound.stop();
+          }
+
+          console.log("loading audio");
+
+          collection.sound = ngAudio.load('/download/?fid='+collection.playlist[collection.idx].fid);
+          collection.sound.performance = 100;
+          var obj = collection.playlist[collection.idx];
+          console.log("setIndex obj:", obj);
+          if (typeof methods.PlayerDataMethods == 'undefined') {
+            return;
+          }
+          methods.PlayerDataMethods.setPlayingData(obj);
+
+        };
+
+        methods.playIndex = function(idx) {
+          if (collection.sound && !collection.sound.paused) {
+            collection.sound.stop();
+          }
+          methods.setIndex(idx);
+          collection.sound.play();
+        }
+
+        methods.init = function() {
+          methods.initPlaylist();
+          methods.initPreload();
+        }
+
+        $interval(methods.updateTime, 1000);
+        $interval(methods.markAsPlayed, 5000, 0, true, false);
+
+        return methods;
+  }])
+  .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter',
+    'SatellitePlayer', function($websocket, $cookies, $http, $sce, $filter, SatellitePlayer) {
+        // Open a WebSocket connection
+        var collection = {
+              'ws_url': window.ws_url,
+              "iam": $cookies.get('iam') || null,
+              "jobs": {},
+              "mode": "remote"
+            },
+            dataStream = $websocket(collection.ws_url);
+
+        var mode = $cookies.get('mode');
+
+
+        if (mode) {
+            collection.mode = mode;
+            SatellitePlayer.collection.mode = mode;
+
+        }
+
+        var methods = {
+          collection: collection,
+          get: function() {
+            dataStream.send(JSON.stringify({"connected": "ok"}));
+          }
+        };
+
+        
+
+        methods.votedToSkip = function(uid) {
+          if (!collection) {
+            collection = methods.collection;
+          }
+          var watch_id = collection.fid || collection.eid;
+
+          if (!uid || !watch_id) {
+              return false;
+          }
+          if (!collection.vote_data) {
+            collection.vote_data = {};
+          }
+          if (!collection.vote_data[watch_id]) {
+              collection.vote_data[watch_id] = {};
+          }
+          if (!collection.vote_data[watch_id][uid]) {
+              collection.vote_data[watch_id][uid] = false;
+          }
+          return collection.vote_data[watch_id][uid];
+        }
+
+        methods.voteToSkip = function(uid) {
+          var vote = !methods.votedToSkip(uid);
+          console.log("***********************voteToSkip:", uid, vote);
+          var _id = collection.fid || collection.eid;
+          if (!collection.vote_data[_id]) {
+            collection.vote_data[_id] = {};
+          }
+          if (!collection.vote_data[_id][uid]) {
+            collection.vote_data[_id][uid] = false;
+          }
+          collection.vote_data[_id][uid] = vote;
+          $.ajax({
+              'url': "/vote_to_skip/",
+              'data': {
+                'watch_id': _id,
+                'uid': uid,
+                'vote': vote
+              },
+              'method': 'GET',
+              'cache': false,
+              'type': 'json'
+          }).done(function(data){
+              // console.log("VOTE DATA:",data);
+          });
+        };
+
+        methods.setIam = function(uid) {
+          collection.iam = uid;
+          SatellitePlayer.collection.iam = uid;
+          var expires = new Date();
+          expires.setFullYear(parseInt(expires.getFullYear()) + 1);
+          $cookies.put('iam', uid, {
+              'expires': expires
+          });
+          methods.setListening(uid, true);
+          if (collection.mode == 'satellite') {
+            methods.setListeningOnSatellite(uid, true);
+          } else {
+            methods.setListeningOnSatellite(uid, false);
+          }
+        };
+
+        methods.setListening = function(uid, listening) {
+          $http({
+              method: 'GET',
+              url: '/set_listening/',
+              params: {
+                'uid': uid,
+                'listening': listening,
+              }
+            }).then(function successCallback(response) {
+            }, function errorCallback(response) {
+            });
+        }
+
+        methods.setListeningOnSatellite = function(uid, listening_on_satellite) {
+          $http({
+              method: 'GET',
+              url: '/set_listening_on_satellite/',
+              params: {
+                'uid': uid,
+                'listening_on_satellite': listening_on_satellite,
+              }
+            }).then(function successCallback(response) {
+            }, function errorCallback(response) {
+            });
+        }
+
+        methods.setMode = function(mode) {
+          console.log("setMode:", mode);
+          var expires = new Date();
+          expires.setFullYear(parseInt(expires.getFullYear()) + 1);
+          $cookies.put('mode', mode, {
+              'expires': expires
+          });
+          if (mode == 'satellite') {
+            collection.play_pause = "Pause";
+            SatellitePlayer.init();
+            methods.setListening(collection.iam, true);
+            methods.setListeningOnSatellite(collection.iam, true);
+          } else {
+            collection.play_pause = "Play";
+            methods.setListening(collection.iam, true);
+            methods.setListeningOnSatellite(collection.iam, false);
+            methods.get();
+          }
+          SatellitePlayer.collection.mode = mode;
+          if (SatellitePlayer.collection.sound && !SatellitePlayer.collection.sound.paused) {
+              SatellitePlayer.collection.sound.pause();
+          }
+        };
+
+        methods.setPlayingData = function(obj) {
+            console.log("setPlayingData:", obj);
+            var artist_title = "",
+                artist = "",
+                title = obj['title'] || obj['basename'] || "";
+
+            collection.owners = obj['owners'];
+            collection.genres = obj['genres'];
+            
+            if (typeof obj['episode_title'] != 'undefined') {
+                artist = obj['netcast_name'] || "";
+                title = obj['episode_title'] || "";
+            }
+            if (typeof obj['artists'] != 'undefined' && 
+                obj['artists'] && 
+                typeof obj['artists'][0] != 'undefined' &&
+                typeof obj['artists'][0]['artist'] != 'undefined') {
+                artist = obj['artists'][0]['artist'];
+            }
+
+            if (artist) {
+                artist_title = searchLink(artist);
+            }
+            if (artist) {
+                artist_title += " - " + searchLink(title);
+            } else {
+                artist_title = searchLink(title);
+            }
+            collection.fid = obj['fid'];
+            collection.eid = obj['eid'];
+            collection.artist_title = artist_title;
+            if (typeof obj['preloadInfo'] != 'undefined') {
+              collection.reason = obj['preloadInfo']['reason'];
+            } else if (typeof obj['reason'] != 'undefined') {
+              collection.reason = obj.reason;
+            } else {
+              collection.reason = "";
+            }
+            if (typeof obj['user_file_info']['listeners'] != 'undefined') {
+                console.log("user_file_info detected");
+                var ratings = [];
+                for (var i=0;i<obj['user_file_info']['listeners'].length; i++) {
+                  var listener = obj['user_file_info']['listeners'][i];
+                  if (listener['listening_on_satellite'] && collection.mode == 'remote') {
+                    continue;
+                  }
+                  ratings.push({
+                    'fid': listener.fid,
+                    'uid': listener.uid,
+                    'rating': listener.rating,
+                    'score': listener.score,
+                    'uname': listener.uname,
+                    'true_score': listener.true_score,
+                    'sync_dir': listener.sync_dir
+                  });
+                }
+                collection.ratings = ratings;
+                console.log("collection.ratings:", collection.ratings);
+            } else {
+              collection.ratings = [];
+            }
+
+        }
+
+        dataStream.onOpen(function(){
+          collection.CONNECTION = "OPEN";
+          setTimeout(methods.get, 100);
+        });
+
+        dataStream.onClose(function(){
+          collection.CONNECTION = "LOST";
+          collection.RECONNECTING = "true";
+          // dataStream.reconnect();
+        });
+
+        dataStream.initialTimeout = 500;
+        dataStream.maxTimeout = 5000;
+        dataStream.reconnectIfNotNormalClose = true;
+
+        var htmlEntities = function(str) {
+            return str.replace("<","&lt;").replace(">", "&gt;");
+        };
+
+        var fixedEncodeURIComponent = function (str) {
+          return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
+            return '%' + c.charCodeAt(0).toString(16);
+          });
+        }
+
+        var searchLink = $filter('searchLink');
+        dataStream.onMessage(function(message) {
+          if (collection.mode != "remote") {
+            // console.log("mode:", collection.mode);
+            return;
+          }
+          var obj = JSON.parse(message.data);
+          
+          // console.log("message.data:", obj);
+          if (typeof obj['time-status'] != 'undefined') {
+              collection.time_status = obj['time-status']['str'];
+              if (obj['time-status']['state'] == 'PAUSED') {
+                collection.play_pause = 'Play';
+              } else {
+                collection.play_pause = 'Pause';
+              }
+              //return;
+          }
+
+          if (typeof obj['jobs'] != 'undefined') {
+            console.log("MESSAGE RECIEVED:", obj['jobs']);
+            if (obj['jobs']) {
+              for (var k in obj['jobs']) {
+                collection.jobs[k] = obj['jobs'][k];
+              }
+            } else {
+              collection.jobs =  {};
+            }
+            ///return;
+          }
+
+          if (typeof obj['vote_data'] != 'undefined') {
+              collection.vote_data = obj['vote_data'];
+          }
+
+          if (typeof obj['CONNECTED'] != 'undefined') {
+              //return;
+          }
+
+          if (typeof obj['state-changed'] != 'undefined') {
+              if (obj['state-changed'] == 'PLAYING') {
+                  collection.play_pause = 'Pause';
+              }
+              if (obj['state-changed'] == 'PAUSED') {
+                  collection.play_pause = 'Play';
+              }
+          }
+
+          if (typeof obj['seconds_left_to_skip'] != 'undefined') {
+              collection.seconds_left_to_skip = obj['seconds_left_to_skip'];
+          }
+
+          if (typeof obj['player-playing']  != 'undefined') {
+              methods.setPlayingData(obj['player-playing']);
+          }
+          // collection.push(JSON.parse(message.data));
+          // console.log("collection:",collection)
+
+          collection.loadGenres = function(query) {
+            return $http.get('/genres?query=' + query);
+          };
+        });
+
+        methods.init = function() {
+          methods.setMode(collection.mode);
+
+          if (collection.iam) {
+              methods.setIam(collection.iam);
+          }
+        }
+
+        SatellitePlayer.PlayerDataMethods = methods;
+
+        methods.init();
+
+        return methods;
   }])
   .controller('PlayerController', function ($scope, PlayerData, $http, 
-                                            notify) {
+                                            notify, SatellitePlayer) {
 
     $scope.PlayerData = PlayerData;
+    $scope.SatellitePlayer = SatellitePlayer;
     $scope.next = function(e) {
-        $.get("/next/");
+        if (PlayerData.collection.mode == 'remote') {
+          $.get("/next/");
+        } else {
+          SatellitePlayer.next();
+        }
     };
     $scope.prev = function(e) {
-        $.get("/prev/");
+        if (PlayerData.collection.mode == 'remote') {
+          $.get("/prev/");
+        } else {
+          SatellitePlayer.prev();
+        }
     };
     $scope.pause = function(e) {
-        $.get("/pause/");
+        console.log("PAUSED");
+        if (PlayerData.collection.mode == 'remote') {
+          $.get("/pause/");
+        } else {
+          var sound = SatellitePlayer.collection.sound;
+          if (sound.paused) {
+            sound.play();
+            PlayerData.collection.play_pause = "Pause";
+          } else {
+            sound.pause();
+            PlayerData.collection.play_pause = "Play";
+          }
+        }
     };
 
     $scope.addEntry = function(e){
@@ -409,6 +805,40 @@ var fmpApp = angular.module('fmpApp', [
       $scope.bigTotalItems = 0;
       $scope.loadPageLocked = false;
       $scope.calledWhileLocked = false;
+      $scope.loadTags = function(query) {
+          return $http.get('/tags?word='+encodeURIComponent(query));
+      };
+      $scope.onAddWord = function(word) {
+        if (!word || !word.word || word.word == " ") {
+          return;
+        }
+        console.log("q:", $scope.params.q);
+        var words = $scope.params.q.split(" "),
+            newWords = [];
+        words.push(word.word);
+        for (var i=0;i<words.length;i++) {
+          if (!words[i] || words[i] == " ") {
+            continue;
+          }
+          console.log("pushing:",words[i])
+          newWords.push(words[i]);
+        }
+        $scope.params.q = words.join(" ");
+      }
+      $scope.onRemoveWord = function(word) {
+        if (!word || !word.word) {
+          return;
+        }
+        var words = $scope.params.q.split(" "),
+            newWords = [];
+        for (var i=0;i<words.length;i++) {
+          if (!words[i] || words[i] == word.word) {
+            continue;
+          }
+          newWords.push(words[i]);
+        }
+        $scope.params.q = newWords.join(" ");
+      }
 
       $scope.$on('$routeUpdate', function(){
           $scope.params = $routeParams;
@@ -421,6 +851,17 @@ var fmpApp = angular.module('fmpApp', [
         $scope.params.s = ($scope.bigCurrentPage - 1) * 10;
         if (!$scope.params.q) {
           $scope.params.q = "";
+        }
+        $scope.tags = [];
+        if ($scope.params.q) {
+          var words = $scope.params.q.split(" "),
+              tags = [];
+          for (var i=0;i<words.length;i++) {
+            if (words[i] && words[i] != " ") {
+              tags.push(words[i]);
+            }
+          }
+          $scope.tags = tags;
         }
         if ($scope.params.oc) {
           $scope.params.oc = true;
@@ -498,7 +939,7 @@ var fmpApp = angular.module('fmpApp', [
         if (!data.cued) {
           data.cued = data.fid;
           if (PlayerData.collection.iam) {
-            data.uid = PlayerData.collection.iam
+            data.uid = PlayerData.collection.iam;
           } else {
             data.uid = null;
           }
@@ -622,26 +1063,10 @@ var fmpApp = angular.module('fmpApp', [
     }, function errorCallback(response) {
     });
   })
-  .controller('RatingCtrl', function ($scope, $http) {
+  .controller('RatingCtrl', function ($scope, $http, UserUtils) {
     $scope.isReadonly = false;
 
-    $scope.setTrueScore = function(data) {
-      if (data.true_score <= -1) {
-        data.score = parseInt(data.score) + 1;
-      }
-      if (data.true_score >= 125) {
-        data.score = parseInt(data.score) - 1;
-      }
-      data.true_score = ((data.rating * 2 * 10) + 
-                          data.score * 10) / 2.0;
-      $http({
-        "url":"/set_score",
-        "params": data
-      }).then(function successCallback(response) {
-        console.log("response:", response)
-      }, function errorCallback(response) {
-      });
-    }
+    $scope.setTrueScore = UserUtils.setTrueScore;
 
     $scope.upScore = function(data) {
       data.score = parseInt(data.score) + 1;

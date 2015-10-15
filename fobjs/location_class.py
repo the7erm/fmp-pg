@@ -171,7 +171,8 @@ class Locations(object):
         basename = os.path.basename(filename)
         (mode, ino, dev, nlink, uid, gid, size, atime, mtime, 
              ctime) = os.stat(filename)
-        mtime = datetime.utcfromtimestamp(mtime)
+        mtime_int = int(mtime)
+        mtime = datetime.utcfromtimestamp(mtime_int)
         mtime = mtime.replace(tzinfo=pytz.utc)
         print "+"*100
         print "last modified: %s" % mtime
