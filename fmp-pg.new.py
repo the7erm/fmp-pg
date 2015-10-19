@@ -325,7 +325,8 @@ class Converter(Log):
         self.convert_files.append((fid, filename))
         if not self.running:
             self.running = True
-            GObject.idle_add(self.convert)
+            self.thread = Thread(target=self.convert)
+            self.thread.start()
 
     def get_converted_filename(self, fid, filename):
         self.log_debug("FILENAME:%r" % filename)
@@ -337,7 +338,6 @@ class Converter(Log):
 
     def convert(self, *args, **kwargs):
         self.running = True
-        Gdk.threads_leave()
         while self.convert_files:
             fid, src = self.convert_files.pop(0)
             basename = os.path.basename(src)
@@ -364,9 +364,6 @@ class Converter(Log):
                 print "ERROR"
 
         self.running = False
-
-
-
 
 
 class FmpPlayer(Player):
@@ -666,7 +663,7 @@ def refresh_netcasts_once():
 def refresh_netcasts():
     logger.debug("STARTING REFRESH NETCASTS")
     t = Thread(target=refresh_and_download_all_netcasts)
-    #t = Thread(target=myfunc2)
+    #t = Thread(target)
     t.start()
     return True
 
@@ -681,6 +678,8 @@ GObject.timeout_add_seconds(60, picker.populate_preload_for_all_users)
 # refresh_netcasts_timeout = GObject.timeout_add_seconds(120, refresh_netcasts)
 GObject.idle_add(preload.refresh_once)
 GObject.idle_add(refresh_netcasts_once)
+listener_watcher.connect('listeners-changed', 
+                         picker.populate_preload_for_all_users_once)
 
 def insert_missing_files_for_all_users():
     print "HERE"*10

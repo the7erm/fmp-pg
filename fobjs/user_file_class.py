@@ -66,6 +66,7 @@ class UserFile(Log):
             self.load_from_uid(value)
 
     def load_from_uid(self, value):
+        value = int(value)
         # UserFile.load_from_uid
         sql_args = {
             'uid': value
@@ -397,6 +398,8 @@ class UserHistoryItem(UserFile):
         sql_args = deepcopy(self.historyDbInfo)
         # This one makes sure it hasn't been played today.
         fid_query, eid_query = self.get_history_query(**sql_args)
+        if 'date_played' not in sql_args:
+            sql_args['date_played'] = sql_args['time_played'].date()
 
         sql = """SELECT uh.*, uname, u.sync_dir, u.listening_on_satellite
                  FROM user_history uh,

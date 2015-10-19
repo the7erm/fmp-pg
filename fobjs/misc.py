@@ -116,16 +116,20 @@ class Listeners_Watcher(GObject.GObject, Log):
         self.emit('listeners-changed', self.json())
 
     def set_listening_on_satellite(self, uid, state):
-        self.set_user_bool_column(uid, 'listening_on_satellite', state)
+        GObject.idle_add(self.set_user_bool_column, uid, 
+                         'listening_on_satellite', state)
 
     def set_listening(self, uid, state):
-        self.set_user_bool_column(uid, 'listening', state)
+        GObject.idle_add(self.set_user_bool_column, uid, 
+                         'listening', state)
 
     def set_admin(self, uid, state):
-        self.set_user_bool_column(uid, 'admin', state)
+        GObject.idle_add(self.set_user_bool_column, uid, 
+                         'admin', state)
 
     def set_cue_netcasts(self, uid, state):
-        self.set_user_bool_column(uid, 'cue_netcasts', state)
+        GObject.idle_add(self.set_user_bool_column, uid, 
+                         'cue_netcasts', state)
 
     def set_user_bool_column(self, uid, col, value):
         Gdk.threads_leave()

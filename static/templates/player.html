@@ -35,9 +35,9 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
         <div class="col-md-3 col-lg-3">
             <span ng-if="PlayerData.collection.fid">
             <h4>Genre(s)</h4>
-            <tags-input ng-model="PlayerData.collection.genres" 
-                        display-property="genre" 
-                        placeholder="Add a genre" 
+            <tags-input ng-model="PlayerData.collection.genres"
+                        display-property="genre"
+                        placeholder="Add a genre"
                         class="bootstrap"
                         template="genre-template"
                         min-length="1"
@@ -57,22 +57,22 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
         </div>
         <div class="col-xs-4 col-sm-3 col-md-2 col-lg-3">
             <button ng-if="PlayerData.collection.mode=='remote'" class="btn" ng-class="{'btn-info':(PlayerData.votedToSkip(data.uid)),
-                     'btn-default':(!PlayerData.votedToSkip(data.uid))}" 
-                ng-click="PlayerData.voteToSkip(data.uid)">{{data.uname}} vote to skip 
-                <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span> 
+                     'btn-default':(!PlayerData.votedToSkip(data.uid))}"
+                ng-click="PlayerData.voteToSkip(data.uid)">{{data.uname}} vote to skip
+                <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(data.uid)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span>
                 <span class="glyphicon glyphicon-fast-forward">
             </button>
             <span ng-if="PlayerData.collection.mode=='satellite'"> {{data.uname}}</span>
-            <button ng-if="PlayerData.collection.mode=='satellite'" class="btn btn-default" 
+            <button ng-if="PlayerData.collection.mode=='satellite'" class="btn btn-default"
                 ng-click="SatellitePlayer.next()"><span class="glyphicon glyphicon-fast-forward"></button>
             <button class="btn btn-default btn-xs" ng-if="data.sync_dir"
                     ng-click="sync(PlayerData.collection.fid, data.uid)">Sync</button>
         </div>
         <div ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3" ng-if="data.fid">
             <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
-            
+
         </div>
-        
+
         <div class="col-xs-4 col-sm-2 col-md-2 col-lg-2" ng-controller="RatingCtrl" style="cursor:pointer;" ng-if="PlayerData.collection.fid">
             <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
             <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
@@ -80,16 +80,17 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
         </div>
         <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr/></div>
     </div>
-  
+
 </div>
 <br clear="all">
 <br clear="all">
 
 <div ng-if="PlayerData.collection.mode=='satellite'">
+    {{SatellitePlayer.collection.uids}}
     <div ng-repeat="(key, data) in SatellitePlayer.collection.playlist">
         <li>playlist:{{data.basename}}</li>
     </div>
-    <div ng-repeat="(key, data) in SatellitePlayer.collection.preload">
+    <div ng-repeat="(uid, data) in SatellitePlayer.collection.preload">
         <li>preload:{{data.basename}}</li>
     </div>
 </div>

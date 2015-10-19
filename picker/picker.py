@@ -105,19 +105,24 @@ def get_files_from_preload(listeners=None):
             )"""
     query(sql)
 
-    qued_sql = """SELECT *
-                  FROM preload
-                  WHERE uid = %(uid)s AND reason LIKE '%%FROM Search%%'
-                  ORDER BY plid
-                  LIMIT 1"""
+    queries = [
+        """SELECT *
+           FROM preload
+           WHERE uid = %(uid)s AND reason LIKE '%%FROM Search%%'
+           ORDER BY plid
+           LIMIT 1""",
+        """SELECT *
+           FROM preload
+           WHERE reason LIKE '%%FROM Search%%'
+           ORDER BY plid
+           LIMIT 1""",
+        """SELECT *
+           FROM preload
+           WHERE uid = %(uid)s
+           ORDER BY plid
+           LIMIT 1"""
+    ]
 
-    select_sql = """SELECT *
-                    FROM preload
-                    WHERE uid = %(uid)s
-                    ORDER BY plid
-                    LIMIT 1"""
-
-    queries = [qued_sql, select_sql]
     delete_sql = """DELETE FROM preload 
                     WHERE plid = %(plid)s"""
     items = []
@@ -181,6 +186,7 @@ def populate_preload_for_all_users():
     global populate_preload_all_locked
     if populate_preload_all_locked:
         return True
+    Gdk.threads_leave()
     populate_preload_all_locked = True
     try:
         populate_preload()
@@ -191,9 +197,12 @@ def populate_preload_for_all_users():
     populate_preload_all_locked = False
     return True
 
+def populate_preload_for_all_users_once(*args, **kwargs):
+    populate_preload_for_all_users()
+    return False
+
 
 def populate_preload(uid=None, listeners=None):
-    wait()
     print "populate_preload:", uid
     totals = totals_in_preload()
     listeners = _listeners(listeners)
@@ -204,7 +213,8 @@ def populate_preload(uid=None, listeners=None):
             populate_preload(l['uid'], listeners)
         users = get_users()
         for u in users:
-            populate_preload(u['uid'], [u])
+            if u['listening']:
+                populate_preload(u['uid'], [u])
             if u['listening']:
                 move_to_preload(u['uid'])
             else:
@@ -218,9 +228,7 @@ def populate_preload(uid=None, listeners=None):
             return True
 
     populate_pick_from(listeners)
-    wait()
     true_scores = make_true_scores_list()
-    wait()
     uname = ""
     for u in listeners:
         if u['uid'] == uid:
@@ -228,14 +236,10 @@ def populate_preload(uid=None, listeners=None):
 
     out_of = []
     for true_score in true_scores:
-        wait()
         dbInfos = get_random_unplayed(uid=uid, uname=uname)
         for dbInfo in dbInfos:
-            wait()
             insert_into_preload(dbInfo, listeners)
-            wait()
             remove_from_pick_from(**dbInfo)
-            wait()
 
         if true_score in out_of:
             continue
@@ -245,11 +249,8 @@ def populate_preload(uid=None, listeners=None):
             out_of.append(true_score)
 
         for dbInfo in dbInfos:
-            wait()
             insert_into_preload(dbInfo, listeners)
-            wait()
             remove_from_pick_from(**dbInfo)
-            wait()
 
         
 

@@ -64,8 +64,8 @@ class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
         print "received_message:", m
         broadcast({
-            "CONNECTED": "OK", 
-            "time": "%s" % utcnow().isoformat() 
+            "CONNECTED": "OK",
+            "time": "%s" % utcnow().isoformat()
         })
         broadcast({
             "player-playing": playlist.files[playlist.index].json()
@@ -75,8 +75,8 @@ class ChatWebSocketHandler(WebSocket):
 
     def opened(self):
         return json.dumps({
-            "CONNECTED": "OK", 
-            "time": "%s" % utcnow().isoformat() 
+            "CONNECTED": "OK",
+            "time": "%s" % utcnow().isoformat()
         })
 
     def closed(self, code, reason="A client left the room without a proper explanation."):
@@ -140,7 +140,7 @@ class FmpServer(object):
         query(sql, spec)
         sql = """UPDATE user_song_info usi
                  SET true_score = (
-                        (rating * 2 * 10) + 
+                        (rating * 2 * 10) +
                         (score * 10)
                      ) / 2.0
                  WHERE fid = %(fid)s AND uid = %(uid)s"""
@@ -200,7 +200,7 @@ class FmpServer(object):
         uid = int(uid)
         value = cherrypy.request.params.get(col)
         value = to_bool(value)
-        whitelist = ('listening', 'cue_netcasts', 'admin', 
+        whitelist = ('listening', 'cue_netcasts', 'admin',
                      'listening_on_satellite')
         if col not in whitelist:
             return self.listeners()
@@ -208,7 +208,7 @@ class FmpServer(object):
         return self.listeners()
 
     @cherrypy.expose
-    def vote_to_skip(self, watch_id=None, uid=None, vote=None,  
+    def vote_to_skip(self, watch_id=None, uid=None, vote=None,
                      *args,**kwargs):
 
         vote = to_bool(vote)
@@ -226,7 +226,7 @@ class FmpServer(object):
 
         listeners = listener_watcher.listeners
         len_listeners = len(listeners)
-        
+
         print "len_listeners:", len_listeners
         print "skip_countdown.get(watch_id):", skip_countdown.get(watch_id)
         voted_to_skip_count = remove_old_votes(watch_id)
@@ -240,11 +240,11 @@ class FmpServer(object):
                 skip_countdown[watch_id] = time() + 10
             if len_listeners == 1 or len_listeners == voted_to_skip_count:
                 skip_countdown[watch_id] = time()
-                
+
         elif skip_countdown.get(watch_id) and (voted_to_skip_count == 0 or
                                           voted_to_skip_count < (len_listeners * 0.5)):
             del skip_countdown[watch_id]
-        json_broadcast({'vote_data': vote_data, 
+        json_broadcast({'vote_data': vote_data,
                         'voted_to_skip_count': voted_to_skip_count})
 
         playlist.files[playlist.index].vote_data = vote_data[watch_id]
@@ -272,13 +272,24 @@ class FmpServer(object):
         gen_time = time() - start
         cherrypy.log("gen_time: %s", str(gen_time))
         json_response['gen_time'] = "%s" % gen_time
-        
+
         return json_dumps(json_response)
+
+    def get_uids(self):
+        uid_param = cherrypy.request.params.get('uid')
+        uids = []
+        for uid in uid_param.split(","):
+            try:
+                uid = int(uid)
+                uid = str(uid)
+            except:
+                continue
+            uids.append(uid)
+        return uids
 
     @cherrypy.expose
     def preload(self, *args, **kwargs):
-        uid = cherrypy.request.params.get('uid')
-        uid = int(uid)
+        uids = self.get_uids()
         limit = cherrypy.request.params.get("limit")
         try:
             limit = int(limit)
@@ -288,47 +299,49 @@ class FmpServer(object):
         if limit is None:
             limit = 1
 
-        spec = {"uid" : uid}
-
         OFFSET_LIMIT = ""
 
         if limit is not None:
             OFFSET_LIMIT = "OFFSET 0 LIMIT %d" % limit
 
+        UID_IN_AND = ""
+        if uids:
+            UID_IN_AND = "p.uid IN ({UIDS}) AND ".format(UIDS=",".join(uids))
+
         queries = [
             """SELECT p.*, u.uname
                FROM preload p, users u
                WHERE reason ILIKE '%%FROM Search%%' AND
-                     p.uid = %(uid)s AND u.uid = p.uid
+                     {UID_IN_AND} u.uid = p.uid
                ORDER BY plid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload_cache p, users u
                WHERE reason ILIKE '%%FROM Search%%' AND
-                     p.uid = %(uid)s  AND u.uid = p.uid
+                     {UID_IN_AND} u.uid = p.uid
                ORDER BY pcid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload p, users u
                WHERE reason NOT ILIKE '%%FROM Search%%' AND
-                     p.uid = %(uid)s AND u.uid = p.uid
+                     {UID_IN_AND} u.uid = p.uid
                ORDER BY plid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload_cache p, users u
                WHERE reason NOT ILIKE '%%FROM Search%%' AND
-                     p.uid = %(uid)s  AND u.uid = p.uid
+                     {UID_IN_AND} u.uid = p.uid
                ORDER BY pcid
                {LIMIT}""",
         ]
 
         results = []
         for sql in queries:
-            sql = sql.format(LIMIT=OFFSET_LIMIT)
-            print mogrify(sql, spec)
-            res = get_results_assoc_dict(sql, spec)
+            sql = sql.format(LIMIT=OFFSET_LIMIT, UID_IN_AND=UID_IN_AND)
+            print mogrify(sql)
+            res = get_results_assoc_dict(sql)
             for r in res:
-                r['limit_uids'] = [uid]
+                r['limit_uids'] = uids
                 lf = Local_FObj(**r)
                 if not lf.basename.lower().endswith(".mp3"):
                     filename = converter.get_converted_filename(
@@ -340,29 +353,47 @@ class FmpServer(object):
                 if limit is not None and len(results) > limit:
                     break
 
-        return json_dumps(results)
+        return json_dumps({
+            "uids": uids,
+            "results": results
+        })
 
     @cherrypy.expose
-    def history(self, uid=None):
-        uid = convert_to_int(uid)
+    def history(self, *args, **kwargs):
+        uids = self.get_uids()
+        fid_param = cherrypy.request.params.get('fid')
+
+
+
+        UID_IN = "uh.uid IN ({UIDS}) AND".format(UIDS=",".join(uids))
+
+        AND_FID = 'uh.fid IS NOT NULL'
+        fid = convert_to_int(fid_param, None)
+
+        if fid:
+            AND_FID = "uh.fid = %(fid)s"
+
         spec = {
-            "uid": uid
+            'fid': fid
         }
+
         limit = 1
         sql = """SELECT uh.*
                  FROM user_history uh
-                 WHERE uh.uid = %(uid)s AND uh.time_played IS NOT NULL
+                 WHERE {UID_IN} uh.time_played IS NOT NULL AND
+                       {AND_FID}
                  ORDER BY time_played DESC
-                 OFFSET 0 LIMIT 10"""
-        kwargs = {
-            'uid': uid
-        }
-        
+                 LIMIT 10""".format(
+                    UID_IN=UID_IN,
+                    AND_FID=AND_FID
+                )
+
         results = []
         print mogrify(sql, spec)
         res = get_results_assoc_dict(sql, spec)
         for r in res:
-            r['limit_uids'] = [uid]
+            print "R:",r
+            r['limit_uids'] = uids
             lf = Local_FObj(**r)
             results.append(lf.json())
             if not lf.filename.lower().endswith(".mp3"):
@@ -374,46 +405,52 @@ class FmpServer(object):
     @cherrypy.expose
     def mark_as_played(self, uid=None, fid=None, eid=None, percent=None,
                        now=None):
+
+        uids = self.get_uids()
+
         cherrypy.log("*"*100)
         cherrypy.log("mark_as_played from server")
         fid = convert_to_int(fid, 0)
         eid = convert_to_int(eid, 0)
-        uid = convert_to_int(uid, 0)
+        # uid = convert_to_int(uid, 0)
+
         percent = convert_to_float(percent, 0.0)
 
         if fid:
             spec = {
-                'uid': uid,
                 'fid': fid
             }
             sql = """DELETE FROM preload
-                     WHERE fid = %(fid)s AND uid = %(uid)s"""
+                     WHERE fid = %(fid)s AND uid IN ({UIDS})""".format(
+                        UIDS=",".join(uids))
             query(sql, spec)
 
             sql = """DELETE FROM preload_cache
-                     WHERE fid = %(fid)s AND uid = %(uid)s"""
+                     WHERE fid = %(fid)s AND uid IN ({UIDS})""".format(
+                        UIDS=",".join(uids))
             query(sql, spec)
 
-            sql = """SELECT * 
+            sql = """SELECT *
                      FROM users u, user_song_info usi
-                     WHERE u.uid = %(uid)s AND usi.fid = %(fid)s AND
+                     WHERE usi.uid IN ({UIDS}) AND usi.fid = %(fid)s AND
                            u.uid = usi.uid
-                     LIMIT 1"""
+                     LIMIT 1""".format(UIDS=",".join(uids))
             print mogrify(sql, spec)
             userDbInfo = get_assoc_dict(sql, spec)
             userDbInfo['mark_as_played_from_server'] = True
             kwargs = {
-                'uid': uid,
                 'fid': fid,
                 'userDbInfo': userDbInfo,
                 'mark_as_played_from_server': True
             }
-            usi = UserFileInfo(**kwargs)
-            usi.mark_as_played(percent_played=percent)
+            for uid in uids:
+                kwargs['uid'] = int(uid)
+                usi = UserFileInfo(**kwargs)
+                usi.mark_as_played(percent_played=percent)
             print "LOADED USI"
             return json_dumps({"usi": usi.json()})
 
-            
+
         return json_dumps({"RESULT": "OK"})
 
 
@@ -461,7 +498,7 @@ class FmpServer(object):
         print mogrify(sql, kwargs)
         sql = """UPDATE user_song_info usi
                  SET true_score = (
-                        (rating * 2 * 10) + 
+                        (rating * 2 * 10) +
                         (score * 10)
                      ) / 2.0
                  WHERE fid = %(fid)s AND uid = %(uid)s"""
@@ -490,7 +527,7 @@ class FmpServer(object):
                      RETURNING *"""
             genreDbInfo = get_assoc_dict(sql, spec)
 
-        
+
         genreDbInfo['fid'] = fid
         sql = """SELECT * FROM file_genres
                  WHERE fid = %(fid)s AND gid = %(gid)s
@@ -564,11 +601,12 @@ class FmpServer(object):
                         basename += ".converted.mp3"
                     else:
                         converted_filename = original_filename
+                        print "USING original_filename:", original_filename
                     # path, content_type=None, disposition=None, name=None, debug=False
                     args = {
-                        "path": converted_filename, 
+                        "path": converted_filename,
                         "content_type": "audio/mpeg",
-                        "disposition":"attachment", 
+                        "disposition":"inline",
                         "name": basename
                     }
                     print "ARGS:", args
@@ -616,8 +654,8 @@ class FmpServer(object):
     @cherrypy.expose
     def artist_letters(self, *args, **kwargs):
         cherrypy.log(("+"*20)+" artists letters "+("+"*20))
-        sql = """SELECT DISTINCT lower(substr(artist, 1, 1)) AS letter 
-                 FROM artists a, files f, file_artists fa 
+        sql = """SELECT DISTINCT lower(substr(artist, 1, 1)) AS letter
+                 FROM artists a, files f, file_artists fa
                  WHERE fa.aid = a.aid AND f.fid = fa.fid ORDER BY letter"""
 
         letters = get_results_assoc_dict(sql)
@@ -691,7 +729,7 @@ class FmpServer(object):
             # Anything that contains our word without punctuation.
             """SELECT word
                FROM words
-               WHERE word LIKE %(_word_)s 
+               WHERE word LIKE %(_word_)s
                ORDER BY word
                LIMIT 10""",
             # Anything that contains our word with punctuation.
@@ -732,7 +770,7 @@ class FmpServer(object):
 
             if words:
                 AND_NOT_IN = " AND word NOT IN (%s)" % ",".join(words)
-                
+
             sql = sql.format(AND_NOT_IN=AND_NOT_IN)
             res = get_results_assoc_dict(sql, spec)
             for r in res:
@@ -775,14 +813,14 @@ class FmpServer(object):
             }
             return json_dumps(response)
         """
-        
+
 
         query_offset = "LIMIT %d OFFSET %d" % (limit, start)
         query_args = {}
         query_spec = {
           "SELECT": ["""DISTINCT f.fid, f.artists_agg AS artists,
-                        string_agg(DISTINCT fl.basename, ',') AS basenames, 
-                        title, sha512, p.fid AS cued, f.fid AS id, 
+                        string_agg(DISTINCT fl.basename, ',') AS basenames,
+                        title, sha512, p.fid AS cued, f.fid AS id,
                         'f' AS id_type"""],
           "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid,
                       file_locations fl"""],
@@ -804,7 +842,7 @@ class FmpServer(object):
         query_base_count = """SELECT count(DISTINCT f.fid) AS total
                               FROM {COUNT_FROM}
                               WHERE {WHERE}"""
-        
+
 
         if uid:
             query_args['uid'] = uid
@@ -821,7 +859,7 @@ class FmpServer(object):
             query_args['owner'] = owner
             query_spec["FROM"].append("folders fld, folder_owners fo")
             query_spec['COUNT_FROM'].append("folders fld, folder_owners fo")
-            query_spec["WHERE"].append("""fo.uid = %(owner)s AND 
+            query_spec["WHERE"].append("""fo.uid = %(owner)s AND
                                           fld.folder_id = fo.folder_id AND
                                           fl.folder_id = fld.folder_id AND
                                           fl.fid = f.fid""")
@@ -908,7 +946,7 @@ class FmpServer(object):
         except Exception, err:
           print "ERR", err
           query("COMMIT;")
-            
+
         response = {
             "RESULT": "OK",
             "results": results,
@@ -919,14 +957,18 @@ class FmpServer(object):
         return json_dumps(response)
 
     @cherrypy.expose
+    def users(self):
+        return json_dumps(jsonize(listener_watcher.users))
+
+    @cherrypy.expose
     def sync(self, fid, uid):
         spec = {
             'fid': int(fid),
             'uid': int(uid)
         }
 
-        sql = """SELECT * 
-                 FROM users 
+        sql = """SELECT *
+                 FROM users
                  WHERE uid = %(uid)s
                  LIMIT 1"""
         user = get_assoc_dict(sql, spec)
@@ -943,10 +985,10 @@ class FmpServer(object):
             if not os.path.exists(user['sync_dir']):
                 return json_dumps({"RESULT": "Error",
                                    "Error": "The sync_dir %r doesn't exist "
-                                            "and couldn't be created." 
+                                            "and couldn't be created."
                                             % user['sync_dir']})
 
-        sql = """SELECT * 
+        sql = """SELECT *
                  FROM folders
                  WHERE dirname = %(sync_dir)s
                  LIMIT 1"""
@@ -965,7 +1007,7 @@ class FmpServer(object):
 
         sql = """SELECT *
                  FROM folder_owners
-                 WHERE uid = %(uid)s AND 
+                 WHERE uid = %(uid)s AND
                        folder_id = %(folder_id)s"""
 
         for l in locations:
@@ -1008,11 +1050,11 @@ class FmpServer(object):
             insert_sql = """INSERT INTO file_locations
                      (
                         atime,
-                        basename, 
-                        dirname, 
+                        basename,
+                        dirname,
                         end_fingerprint,
                         exists,
-                        fid, 
+                        fid,
                         fingerprint,
                         fixed,
                         folder_id,
@@ -1024,18 +1066,18 @@ class FmpServer(object):
                      )
                      VALUES(
                         %(atime)s,
-                        %(basename)s, 
+                        %(basename)s,
                         %(dirname)s,
                         %(end_fingerprint)s,
                         %(exists)s,
-                        %(fid)s, 
+                        %(fid)s,
                         %(fingerprint)s,
                         %(fixed)s,
-                        %(folder_id)s, 
+                        %(folder_id)s,
                         %(front_fingerprint)s,
                         %(last_scan)s,
                         %(middle_fingerprint)s,
-                        %(mtime)s, 
+                        %(mtime)s,
                         %(size)s
                     )
                     RETURNING *"""
@@ -1049,8 +1091,8 @@ class FmpServer(object):
                 'folder_id': user_folder['folder_id']
             })
 
-            sql = """SELECT * FROM file_locations 
-                     WHERE dirname = %(sync_dir)s AND 
+            sql = """SELECT * FROM file_locations
+                     WHERE dirname = %(sync_dir)s AND
                            basename = %(basename)s
                      LIMIT 1"""
             record = get_assoc_dict(sql, spec)
@@ -1071,15 +1113,15 @@ class FmpServer(object):
                 })
 
         return json_dumps({"RESULT": "FAIL",
-                           "Message": 
+                           "Message":
                            "The source file doesn't exist anywhere."})
 
 
     def getFolderOwners(self, folder_id):
-        sql = """SELECT u.uid, u.uname, fo.folder_id AS fo_folder_id, 
-                        fo.uid AS owner 
-                 FROM users u 
-                      LEFT JOIN folder_owners fo ON 
+        sql = """SELECT u.uid, u.uname, fo.folder_id AS fo_folder_id,
+                        fo.uid AS owner
+                 FROM users u
+                      LEFT JOIN folder_owners fo ON
                                 fo.folder_id = %(folder_id)s AND fo.uid = u.uid
                  ORDER BY admin DESC, listening DESC, uname;"""
         return get_results_assoc_dict(sql, {'folder_id': folder_id})
@@ -1098,7 +1140,7 @@ class FmpServer(object):
 
         sql = """SELECT *
                  FROM folders
-                 WHERE parent_folder_id = %(folder_id)s AND 
+                 WHERE parent_folder_id = %(folder_id)s AND
                        folder_id != %(folder_id)s
                  ORDER BY dirname"""
         children = get_results_assoc_dict(sql, spec)
@@ -1118,7 +1160,7 @@ class FmpServer(object):
         for child in children:
             child['collapsed'] = True
             child['owners'] = self.getFolderOwners(child['folder_id'])
-            
+
         return json_dumps([folder])
 
     @cherrypy.expose
@@ -1126,13 +1168,13 @@ class FmpServer(object):
         params = cherrypy.request.params
         owner = params.get('owner')
         owner = to_bool(owner)
-        
+
         params['owner'] = owner
         print "SET OWNER:", params
         if not params.get('owner'):
             sql = """DELETE FROM folder_owners
                      WHERE uid = %(uid)s AND folder_id = %(folder_id)s"""
-            
+
         else:
             sql = """INSERT INTO folder_owners (uid, folder_id)
                      VALUES(%(uid)s, %(folder_id)s)"""
@@ -1215,7 +1257,7 @@ def current_watch_id():
     except:
         print "FAILED FID"
         fid = -1
-        
+
     try:
         eid = playlist.files[playlist.index].eid
         if eid:

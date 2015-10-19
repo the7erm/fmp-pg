@@ -10,10 +10,10 @@
 </script>
 <h3>Search</h3>
 <a href="/#artists?l={{params.q[0]}}" class="btn">Browse by artists</a><br>
-Search: 
-<tags-input ng-model="tags" 
-            display-property="word" 
-            placeholder="Keywords" 
+Search:
+<tags-input ng-model="tags"
+            display-property="word"
+            placeholder="Keywords"
             class="bootstrap"
             template="word-template"
             add-on-space="true"
@@ -24,14 +24,27 @@ Search:
     <auto-complete source="loadTags($query)" min-length="0"></auto-complete>
 </tags-input>
 
+
+
 <button class='btn' ng-class="{'btn-default': !params.oc, 'btn-info': params.oc}" ng-click="params.oc=!params.oc" >Only Cued</button><br>
 <div ng-if="loadPageLocked">Loading page: {{bigCurrentPage}}<br><br><br><br></div>
-<pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()" 
+
+Searching collection:
+<a class="badge"
+       ng-class="{'btn btn-info':!params.owner}"
+       ng-click="setOwner()">All</a>
+<span ng-repeat="(key, user) in users">
+    <a class="badge"
+       ng-class="{'btn btn-info':user.uid==params.owner}"
+       ng-click="setOwner(user.uid)">{{user.uname}}</a>
+</span>
+<br>
+<pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()"
 ng-show="!loadPageLocked" items-per-page="10"></pagination>
 <div class="container-fluid">
 	<div class="row" ng-repeat="(key, data) in response.results">
 		<div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
-			<button class="btn" ng-class="{'btn-default':!data.cued, 'btn-info':data.cued}" ng-click="cue(data)">cued</button>
+			<button class="btn" ng-class="{'btn-default':!data.cued, 'btn-info':data.cued}" ng-click="cue(data)">cue<span ng-if="data.cued" >d</span></button>
 		</div>
 		<div class="col-xs-9 col-sm-4 col-md-3 col-lg-3">
 			<span ng-if="data.artists">
@@ -51,7 +64,7 @@ ng-show="!loadPageLocked" items-per-page="10"></pagination>
 	         </span>
 	         {{data.true_score}}
 	    </div>
-		
+
 		<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
 	</div>
 </div>

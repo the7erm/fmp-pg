@@ -15,24 +15,63 @@ var fmpApp = angular.module('fmpApp', [
   .factory('UserUtils', ['$http', function($http){
       var methods = {};
 
-      methods.setTrueScore = function(data) {
+      methods.calculateTrueScore = function(data) {
         if (data.true_score <= -1) {
           data.score = parseInt(data.score) + 1;
         }
         if (data.true_score >= 125) {
           data.score = parseInt(data.score) - 1;
         }
-        data.true_score = ((data.rating * 2 * 10) + 
+        data.true_score = ((data.rating * 2 * 10) +
                             data.score * 10) / 2.0;
+      }
+
+      methods.setTrueScore = function(data) {
+        methods.calculateTrueScore(data);
         $http({
           "url":"/set_score",
           "params": data
         }).then(function successCallback(response) {
-          console.log("response:", response)
         }, function errorCallback(response) {
         });
       };
-      
+
+      methods.formatTime = function(seconds) {
+        var seconds = Math.floor(seconds),
+            minutes = Math.floor(seconds / 60);
+        seconds = seconds - (minutes * 60);
+        if (seconds < 10 && seconds > -10) {
+          seconds = "0"+seconds;
+        }
+        return minutes+":"+seconds;
+      }
+
+      methods.setListening = function(uid, listening) {
+        $http({
+          method: 'GET',
+          url: '/set_listening/',
+          params: {
+            'uid': uid,
+            'listening': listening,
+          }
+        }).then(function successCallback(response) {
+        }, function errorCallback(response) {
+        });
+      }
+
+      methods.setListeningOnSatellite = function(uid, listening_on_satellite) {
+        $http({
+          method: 'GET',
+          url: '/set_listening_on_satellite/',
+          params: {
+            'uid': uid,
+            'listening_on_satellite': listening_on_satellite,
+          }
+        }).then(function successCallback(response) {
+        }, function errorCallback(response) {
+        });
+      }
+
       return methods;
   }])
   .factory('SatellitePlayer', ['$http', '$cookies', '$filter', 'ngAudio',
@@ -45,6 +84,7 @@ var fmpApp = angular.module('fmpApp', [
         var collection = {
                 playlist: [],
                 preload: [],
+                preloadDict: {},
                 idx:0,
                 iam:iam,
                 sound:null,
@@ -52,11 +92,52 @@ var fmpApp = angular.module('fmpApp', [
                 restored: false,
                 initPreloadLocked: false,
                 resumePosition: 0,
-                remaining: -1000
+                remaining: -1000,
+                uids: []
             },
             methods = {
                 collection: collection,
             };
+
+        methods.addUid = function(uid) {
+          console.log("addUid:", uid);
+          uid = parseInt(uid);
+          var idx = collection.uids.indexOf(uid);
+          if (idx == -1) {
+            collection.uids.push(uid);
+            if (collection.restored) {
+              collection.preload = [];
+              methods.reloadCurrentIdx();
+            }
+            localStorage.uids = collection.uids.join(",");
+            UserUtils.setListening(uid, true);
+            UserUtils.setListeningOnSatellite(uid, true);
+          }
+        }
+
+        methods.removeUid = function(uid) {
+          console.log("removeUid:", uid);
+          uid = parseInt(uid);
+          var idx = collection.uids.indexOf(uid);
+          if (idx != -1 && uid != collection.iam) {
+            collection.uids = collection.uids.splice(idx-1, 1);
+            if (collection.restored) {
+              collection.preload = [];
+              methods.reloadCurrentIdx();
+            }
+            localStorage.uids = collection.uids.join(",");
+            UserUtils.setListeningOnSatellite(uid, false);
+          }
+        }
+        methods.addUid(collection.iam);
+
+        var uids = localStorage.uids || "";
+        if (uids) {
+          uids = uids.split(",");
+          for (var i=0;i<uids.length; i++) {
+            methods.addUid(uids[i]);
+          }
+        }
 
         methods.resume = function() {
             console.log("methods.resume()")
@@ -70,13 +151,14 @@ var fmpApp = angular.module('fmpApp', [
             // collection.sound.play();
             collection.sound.progress = collection.resumePosition;
             console.log("collection.sound.progress:", collection.sound.progress);
+            collection.restored = true;
         }
 
         methods.initPlaylist = function() {
            console.log("initPlaylist")
            $http({
               "url": "/history",
-              "params": {"uid": collection.iam }
+              "params": {"uid": collection.uids.join(",") }
             }).then(function successCallback(response) {
               console.log("success", response.data);
               collection.playlist = response.data;
@@ -91,7 +173,7 @@ var fmpApp = angular.module('fmpApp', [
               methods.setIndex();
               collection.sound.play();
             }, function errorCallback(response) {
-              
+
             });
         }
 
@@ -100,23 +182,28 @@ var fmpApp = angular.module('fmpApp', [
                 return;
             }
             collection.initPreloadLocked = true;
+            for (var i=0;i<collection.uids.length;i++) {
+              var uid = collection.uids[i];
+              $http({
+                "url": "/preload",
+                "params": {"uid": uid }
+              }).then(function successCallback(response) {
+                var uid = response.data.uids[0];
+                for (var i=0;i<response.data.results.length;i++) {
+                  collection.preload.push(response.data.results[i]);
+                }
+                collection.initPreloadLocked = false;
+              }, function errorCallback(response) {
+                collection.initPreloadLocked = false;
+              });
+            }
             $http({
               "url": "/preload",
-              "params": {"uid": collection.iam }
-            }).then(function successCallback(response) {
-              collection.preload = response.data;
-              collection.initPreloadLocked = false;
-            }, function errorCallback(response) {
-              collection.initPreloadLocked = false;
-            });
-
-            $http({
-              "url": "/preload",
-              "params": {"uid": collection.iam, "limit":10 }
+              "params": {"uid": collection.uids.join(","), "limit":10 }
             }).then(function successCallback(response) {
               // Tell the server to convert the next files to .mp3 if needed.
             }, function errorCallback(response) {
-              
+
             });
         }
 
@@ -156,15 +243,7 @@ var fmpApp = angular.module('fmpApp', [
             });
         };
 
-        methods.formatTime = function(seconds) {
-          var seconds = Math.floor(seconds),
-              minutes = Math.floor(seconds / 60);
-          seconds = seconds - (minutes * 60);
-          if (seconds < 10 && seconds > -10) {
-            seconds = "0"+seconds;
-          }
-          return minutes+":"+seconds;
-        }
+
 
         methods.markAsPlayed = function(force) {
           if (collection.mode == 'remote') {
@@ -172,7 +251,7 @@ var fmpApp = angular.module('fmpApp', [
             return;
           }
           console.log("markAsPlayed - 1");
-          if (typeof collection.sound == 'undefined') {
+          if (typeof collection.sound == 'undefined' || !collection.sound) {
             return;
           }
           console.log("markAsPlayed - 2");
@@ -187,7 +266,7 @@ var fmpApp = angular.module('fmpApp', [
           var params = {
               "fid": collection.playlist[collection.idx].fid,
               "eid": collection.playlist[collection.idx].eid,
-              "uid": collection.iam,
+              "uid": collection.uids.join(","),
               "percent": (collection.sound.progress || 0) * 100
           };
           $http({
@@ -206,7 +285,7 @@ var fmpApp = angular.module('fmpApp', [
         };
 
         methods.updateTime = function() {
-          
+
           if (collection.mode == 'remote') {
             console.log("updateTime - remote");
             return;
@@ -217,7 +296,7 @@ var fmpApp = angular.module('fmpApp', [
           if (typeof collection.sound.audio == 'undefined') {
             return;
           }
-          
+
           console.log("updateTime - satellite");
           if (collection.sound.paused) {
             if (collection.sound.progress >= 1.0) {
@@ -228,7 +307,7 @@ var fmpApp = angular.module('fmpApp', [
             }
             return;
           }
-          collection.time_status = "-"+methods.formatTime(collection.sound.remaining) + " " + methods.formatTime(collection.sound.currentTime)+"/"+methods.formatTime(collection.sound.duration) +" "+(collection.sound.progress * 100).toFixed(2);
+          collection.time_status = "-"+UserUtils.formatTime(collection.sound.remaining) + " " + UserUtils.formatTime(collection.sound.currentTime)+"/"+UserUtils.formatTime(collection.sound.duration) +" "+(collection.sound.progress * 100).toFixed(2);
 
         };
 
@@ -248,7 +327,7 @@ var fmpApp = angular.module('fmpApp', [
 
         methods.setIndex = function(idx) {
           console.log("setIndex:", idx);
-          
+
           if (typeof idx != 'undefined') {
             idx = parseInt(idx);
             if (idx >= collection.playlist.length ) {
@@ -286,7 +365,7 @@ var fmpApp = angular.module('fmpApp', [
             collection.sound.stop();
           }
 
-          console.log("loading audio");
+          console.log("loading audio:", '/download/?fid='+collection.playlist[collection.idx].fid);
 
           collection.sound = ngAudio.load('/download/?fid='+collection.playlist[collection.idx].fid);
           collection.sound.performance = 100;
@@ -312,13 +391,32 @@ var fmpApp = angular.module('fmpApp', [
           methods.initPreload();
         }
 
+        methods.reloadCurrentIdx = function() {
+          var idx = collection.idx;
+          console.log("reloadCurrentIdx:", collection.idx)
+          $http({
+              "url": "/history",
+              "params": {
+                  "uid": collection.uids.join(","),
+                  "fid": collection.playlist[idx].fid
+              }
+          }).then(function successCallback(response) {
+            if (response.data) {
+              var obj = response.data[0];
+              methods.PlayerDataMethods.setPlayingData(obj);
+            }
+          }, function errorCallback(response) {
+
+          });
+        }
+
         $interval(methods.updateTime, 1000);
         $interval(methods.markAsPlayed, 5000, 0, true, false);
 
         return methods;
   }])
   .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter',
-    'SatellitePlayer', function($websocket, $cookies, $http, $sce, $filter, SatellitePlayer) {
+    'SatellitePlayer', 'UserUtils', function($websocket, $cookies, $http, $sce, $filter, SatellitePlayer, UserUtils) {
         // Open a WebSocket connection
         var collection = {
               'ws_url': window.ws_url,
@@ -343,8 +441,6 @@ var fmpApp = angular.module('fmpApp', [
             dataStream.send(JSON.stringify({"connected": "ok"}));
           }
         };
-
-        
 
         methods.votedToSkip = function(uid) {
           if (!collection) {
@@ -401,39 +497,15 @@ var fmpApp = angular.module('fmpApp', [
           $cookies.put('iam', uid, {
               'expires': expires
           });
-          methods.setListening(uid, true);
+          UserUtils.setListening(uid, true);
           if (collection.mode == 'satellite') {
-            methods.setListeningOnSatellite(uid, true);
+            UserUtils.setListeningOnSatellite(uid, true);
           } else {
-            methods.setListeningOnSatellite(uid, false);
+            UserUtils.setListeningOnSatellite(uid, false);
           }
         };
 
-        methods.setListening = function(uid, listening) {
-          $http({
-              method: 'GET',
-              url: '/set_listening/',
-              params: {
-                'uid': uid,
-                'listening': listening,
-              }
-            }).then(function successCallback(response) {
-            }, function errorCallback(response) {
-            });
-        }
 
-        methods.setListeningOnSatellite = function(uid, listening_on_satellite) {
-          $http({
-              method: 'GET',
-              url: '/set_listening_on_satellite/',
-              params: {
-                'uid': uid,
-                'listening_on_satellite': listening_on_satellite,
-              }
-            }).then(function successCallback(response) {
-            }, function errorCallback(response) {
-            });
-        }
 
         methods.setMode = function(mode) {
           console.log("setMode:", mode);
@@ -445,12 +517,12 @@ var fmpApp = angular.module('fmpApp', [
           if (mode == 'satellite') {
             collection.play_pause = "Pause";
             SatellitePlayer.init();
-            methods.setListening(collection.iam, true);
-            methods.setListeningOnSatellite(collection.iam, true);
+            UserUtils.setListening(collection.iam, true);
+            UserUtils.setListeningOnSatellite(collection.iam, true);
           } else {
             collection.play_pause = "Play";
-            methods.setListening(collection.iam, true);
-            methods.setListeningOnSatellite(collection.iam, false);
+            UserUtils.setListening(collection.iam, true);
+            UserUtils.setListeningOnSatellite(collection.iam, false);
             methods.get();
           }
           SatellitePlayer.collection.mode = mode;
@@ -467,13 +539,13 @@ var fmpApp = angular.module('fmpApp', [
 
             collection.owners = obj['owners'];
             collection.genres = obj['genres'];
-            
+
             if (typeof obj['episode_title'] != 'undefined') {
                 artist = obj['netcast_name'] || "";
                 title = obj['episode_title'] || "";
             }
-            if (typeof obj['artists'] != 'undefined' && 
-                obj['artists'] && 
+            if (typeof obj['artists'] != 'undefined' &&
+                obj['artists'] &&
                 typeof obj['artists'][0] != 'undefined' &&
                 typeof obj['artists'][0]['artist'] != 'undefined') {
                 artist = obj['artists'][0]['artist'];
@@ -555,7 +627,7 @@ var fmpApp = angular.module('fmpApp', [
             return;
           }
           var obj = JSON.parse(message.data);
-          
+
           // console.log("message.data:", obj);
           if (typeof obj['time-status'] != 'undefined') {
               collection.time_status = obj['time-status']['str'];
@@ -625,7 +697,7 @@ var fmpApp = angular.module('fmpApp', [
 
         return methods;
   }])
-  .controller('PlayerController', function ($scope, PlayerData, $http, 
+  .controller('PlayerController', function ($scope, PlayerData, $http,
                                             notify, SatellitePlayer) {
 
     $scope.PlayerData = PlayerData;
@@ -730,7 +802,8 @@ var fmpApp = angular.module('fmpApp', [
         });
       }
   })
-  .controller('ListenerCtrl', function($scope, $http){
+  .controller('ListenerCtrl', function($scope, $http, SatellitePlayer){
+    $scope.SatellitePlayer = SatellitePlayer;
     $scope.getUserForUid = function (uid)  {
       for(var i=0;i<$scope.listeners.length; i++) {
           var user = $scope.listeners[i];
@@ -745,7 +818,8 @@ var fmpApp = angular.module('fmpApp', [
             url_map = {
               'admin': '/set_admin/',
               'cue_netcasts': '/set_cue_netcasts/',
-              'listening': '/set_listening/'
+              'listening': '/set_listening/',
+              'listening_on_satellite': '/set_listening_on_satellite/'
             };
         if (!user || typeof url_map[col] == 'undefined') {
           // TODO display an alert or something.
@@ -758,7 +832,7 @@ var fmpApp = angular.module('fmpApp', [
         }).then(function successCallback(response) {
           $scope.listeners = response.data;
         }, function errorCallback(response) {
-          
+
         });
     }
     $scope.set_listening = function(uid, checkbox) {
@@ -784,15 +858,32 @@ var fmpApp = angular.module('fmpApp', [
       $scope.set_user_col(user.uid, 'listening');
     };
 
+    $scope.set_listening_with_me = function(uid) {
+      var user = $scope.getUserForUid(uid);
+      console.log("set_listening_with_me:", uid);
+      console.log("user.on_this_browser_session:", user.on_this_browser_session);
+      if (user.on_this_browser_session){
+        SatellitePlayer.addUid(uid);
+      } else {
+        SatellitePlayer.removeUid(uid);
+      }
+    }
+
     $scope.listeners = [];
     $http({
       method: 'GET',
       url: '/listeners'
     }).then(function successCallback(response) {
+
+      for (var i=0;i<response.data.length;i++) {
+        var user = response.data[i];
+        if (SatellitePlayer.collection.uids.indexOf(user.uid) != -1 || SatellitePlayer.collection.iam == user.uid) {
+          response.data[i].on_this_browser_session = true;
+        }
+      }
       $scope.listeners = response.data;
-      console.log(response);
     }, function errorCallback(response) {
-      
+
     });
   })
   .controller('SearchController', function($scope, $location, $route, $routeParams, $http, $cookies, PlayerData) {
@@ -805,6 +896,19 @@ var fmpApp = angular.module('fmpApp', [
       $scope.bigTotalItems = 0;
       $scope.loadPageLocked = false;
       $scope.calledWhileLocked = false;
+      $scope.users = [];
+
+      $http({
+        method: 'GET',
+        url: '/users'
+      }).then(function successCallback(response) {
+          $scope.users = response.data;
+      }, function errorCallback(response) {
+      });
+
+      $scope.setOwner = function(uid) {
+        $scope.params.owner = uid;
+      }
       $scope.loadTags = function(query) {
           return $http.get('/tags?word='+encodeURIComponent(query));
       };
@@ -847,7 +951,7 @@ var fmpApp = angular.module('fmpApp', [
       console.log("$scope.params:", $scope.params);
       $scope.loadPage = function() {
         console.log("LOAD PAGE");
-       
+
         $scope.params.s = ($scope.bigCurrentPage - 1) * 10;
         if (!$scope.params.q) {
           $scope.params.q = "";
@@ -921,20 +1025,20 @@ var fmpApp = angular.module('fmpApp', [
       } else {
         $scope.bigCurrentPage = 1;
       }
-      
+
 
       $scope.$watchCollection('params', function(newValue, oldValue) {
           console.log('params changed')
           $scope.loadPage();
       });
-      
+
 
       $scope.pageChanged = function() {
         console.log("bigCurrentPage:",$scope.bigCurrentPage);
         $scope.loadPage();
       };
 
-      
+
       $scope.cue = function(data) {
         if (!data.cued) {
           data.cued = data.fid;
@@ -947,7 +1051,7 @@ var fmpApp = angular.module('fmpApp', [
           data.cued = null;
           data.cued_for = null;
         }
-        
+
         $http({
             method: 'GET',
             url: '/cue',
@@ -962,7 +1066,7 @@ var fmpApp = angular.module('fmpApp', [
   .controller('FolderCtrl', function($scope){
 
   })
-  .controller('FoldersTreeCtrl', function($scope, $routeParams, $http, 
+  .controller('FoldersTreeCtrl', function($scope, $routeParams, $http,
               PlayerData){
 
     $scope.jobs = PlayerData.collection.jobs;
@@ -1005,7 +1109,7 @@ var fmpApp = angular.module('fmpApp', [
         url: '/set_owner',
         params: {
           'folder_id': scope.dir.folder_id,
-          'uid': scope.user.uid, 
+          'uid': scope.user.uid,
           'owner': scope.user.owner
         }
       });
@@ -1013,7 +1117,7 @@ var fmpApp = angular.module('fmpApp', [
     $scope.toggle = function (scope) {
       console.log("SCOPE:", scope);
       scope.toggle();
-      
+
     };
     $http({
       method: 'GET',
@@ -1036,7 +1140,7 @@ var fmpApp = angular.module('fmpApp', [
         url: '/genre_enabled/',
         params: genre
       }).then(function successCallback(response) {
-          
+
       }, function errorCallback(response) {
       });
     }
@@ -1067,6 +1171,7 @@ var fmpApp = angular.module('fmpApp', [
     $scope.isReadonly = false;
 
     $scope.setTrueScore = UserUtils.setTrueScore;
+    $scope.calculateTrueScore = UserUtils.calculateTrueScore;
 
     $scope.upScore = function(data) {
       data.score = parseInt(data.score) + 1;
@@ -1086,6 +1191,7 @@ var fmpApp = angular.module('fmpApp', [
           data: $scope.data,
           cache: false
         });
+        $scope.calculateTrueScore($scope.data);
     };
 
     $scope.ratingStates = [
@@ -1173,15 +1279,15 @@ var fmpApp = angular.module('fmpApp', [
       return $sce.trustAsHtml(res.join(", "));
     }
     return searchLink;
-  }]).filter('html', ['$sce', function ($sce) { 
+  }]).filter('html', ['$sce', function ($sce) {
     return function (text) {
         return $sce.trustAsHtml(text);
     }
   }]);
 
-    
 
-    
+
+
 
 angular.module("template/rating/rating.html",[]).run(["$templateCache",function(a){
     a.put("template/rating/rating.html",'<span ng-mouseleave="reset()" ng-keydown="onKeydown($event)" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="{{range.length}}" aria-valuenow="{{value}}">\n    <span ng-repeat-start="r in range track by $index" class="sr-only">({{ $index < value ? \'*\' : \' \' }})</span>\n    <i ng-repeat-end ng-mouseenter="enter($index)" ng-click="rate($index)" class="glyphicon" ng-class="$index <= value && (r.stateOn || \'glyphicon-star\') || (r.stateOff || \'glyphicon-star-empty\')" ng-attr-title="{{r.title}}" ></i>\n</span>\n')

@@ -7,7 +7,9 @@
 				<th>uname</th>
 				<th>admin</th>
 				<th>listening</th>
+				<th>listening_on_satellite</th>
 				<th>cue netcasts</th>
+				<th ng-if="SatellitePlayer.collection.mode=='satellite'">Listening with me on satellite</th>
 			</tr>
 		</thead>
 		<tr ng-repeat="(key, data) in listeners">
@@ -15,7 +17,12 @@
 			<td><button class="btn" ng-class="{'btn-info':data.listening}" ng-click="data.uiddata.listening=!!data.listening;set_listening(data.uid);">{{data.uname}}</button></td>
 			<td><input type="checkbox" ng-model="data.admin" ng-change="set_user_col(data.uid, 'admin');"></td>
 			<td><input type="checkbox" ng-model="data.listening" ng-change="set_listening(data.uid, true);"></td>
+			<td><input type="checkbox" ng-model="data.listening_on_satellite" ng-change="set_user_col(data.uid, 'listening_on_satellite');"></td>
 			<td><input type="checkbox" ng-model="data.cue_netcasts" ng-change="set_user_col(data.uid, 'cue_netcasts');"></td>
+			<td ng-if="SatellitePlayer.collection.mode=='satellite'">
+				<input type="checkbox" ng-model="data.on_this_browser_session"
+					   ng-change="set_listening_with_me(data.uid);">
+			</td>
 		</tr>
 	</table>
 </div>
