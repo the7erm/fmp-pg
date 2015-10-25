@@ -24,3 +24,11 @@ for f in session.query(File)\
     print("f:", f)
     # print("ufi:", ufi)
 """
+result = session.query(File).from_statement("""SELECT f.*
+                      FROM files f
+                      LEFT JOIN user_file_info usi ON user_id = :user_id AND
+                                                      usi.file_id = f.id
+                      WHERE usi.file_id IS NULL""")\
+                      .params(user_id='1')
+for r in result.all():
+    print("r:",r)
