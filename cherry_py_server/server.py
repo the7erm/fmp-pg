@@ -287,6 +287,41 @@ class FmpServer(object):
             uids.append(uid)
         return uids
 
+    def preload_query(self, sql, OFFSET_LIMIT, UID_IN_AND, ignore_fids,
+                      results, limit, uids):
+        AND_FID_NOT_IN = ""
+        if ignore_fids:
+            AND_FID_NOT_IN = " AND fid NOT IN (%s)" % ",".join(
+                str(x) for x in ignore_fids)
+
+        sql = sql.format(LIMIT=OFFSET_LIMIT, UID_IN_AND=UID_IN_AND,
+                         AND_FID_NOT_IN=AND_FID_NOT_IN)
+        print "SQL:", mogrify(sql)
+        res = get_results_assoc_dict(sql)
+        print "MADE IT PAST SQL"
+        for r in res:
+            ignore_fids.append(r['fid'])
+            print "RES:", r
+            r['limit_uids'] = uids
+            lf = Local_FObj(**r)
+            print "MADE IT PAST LF"
+            if not lf.basename.lower().endswith(".mp3"):
+                filename = converter.get_converted_filename(
+                        lf.fid, lf.filename)
+                if not os.path.exists(filename):
+                    print "MISSING:",filename
+                    converter.add_file(lf.fid, lf.filename)
+                    sql = """DELETE FROM preload WHERE fid = %(fid)s"""
+                    query(sql, r)
+                    sql = """DELETE FROM preload_cache WHERE fid = %(fid)s"""
+                    query(sql, r)
+                    continue
+            print "APPENDING:", lf.json()
+            results.append(lf.json())
+
+            if limit is not None and len(results) > limit:
+                break
+
     @cherrypy.expose
     def preload(self, *args, **kwargs):
         uids = self.get_uids()
@@ -313,45 +348,37 @@ class FmpServer(object):
                FROM preload p, users u
                WHERE reason ILIKE '%%FROM Search%%' AND
                      {UID_IN_AND} u.uid = p.uid
+                     {AND_FID_NOT_IN}
                ORDER BY plid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload_cache p, users u
                WHERE reason ILIKE '%%FROM Search%%' AND
                      {UID_IN_AND} u.uid = p.uid
+                     {AND_FID_NOT_IN}
                ORDER BY pcid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload p, users u
                WHERE reason NOT ILIKE '%%FROM Search%%' AND
                      {UID_IN_AND} u.uid = p.uid
+                     {AND_FID_NOT_IN}
                ORDER BY plid
                {LIMIT}""",
             """SELECT p.*, u.uname
                FROM preload_cache p, users u
                WHERE reason NOT ILIKE '%%FROM Search%%' AND
                      {UID_IN_AND} u.uid = p.uid
+                     {AND_FID_NOT_IN}
                ORDER BY pcid
                {LIMIT}""",
         ]
 
         results = []
+        ignore_fids = []
         for sql in queries:
-            sql = sql.format(LIMIT=OFFSET_LIMIT, UID_IN_AND=UID_IN_AND)
-            print mogrify(sql)
-            res = get_results_assoc_dict(sql)
-            for r in res:
-                r['limit_uids'] = uids
-                lf = Local_FObj(**r)
-                if not lf.basename.lower().endswith(".mp3"):
-                    filename = converter.get_converted_filename(
-                            lf.fid, lf.filename)
-                    if not os.path.exists(filename):
-                        converter.add_file(lf.fid, lf.filename)
-                        continue
-                results.append(lf.json())
-                if limit is not None and len(results) > limit:
-                    break
+            self.preload_query(sql, OFFSET_LIMIT, UID_IN_AND,
+                               ignore_fids, results, limit, uids)
 
         return json_dumps({
             "uids": uids,
@@ -362,8 +389,6 @@ class FmpServer(object):
     def history(self, *args, **kwargs):
         uids = self.get_uids()
         fid_param = cherrypy.request.params.get('fid')
-
-
 
         UID_IN = "uh.uid IN ({UIDS}) AND".format(UIDS=",".join(uids))
 
@@ -804,6 +829,12 @@ class FmpServer(object):
         only_cued = to_bool(only_cued)
 
         q = params.get("q", '').strip()
+        if q is not None:
+            q = q.strip()
+            q += " "
+            words = get_words_from_string(q)
+            q += " ".join(words)
+            q = q.strip()
         """
         if not q and not only_cued:
             response = {
@@ -819,17 +850,16 @@ class FmpServer(object):
         query_args = {}
         query_spec = {
           "SELECT": ["""DISTINCT f.fid, f.artists_agg AS artists,
-                        string_agg(DISTINCT fl.basename, ',') AS basenames,
+                        f.basename_agg AS basenames,
                         title, sha512, p.fid AS cued, f.fid AS id,
                         'f' AS id_type"""],
-          "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid,
-                      file_locations fl"""],
-          "COUNT_FROM": ["files f, file_locations fl"],
+          "FROM": ["""files f LEFT JOIN preload p ON p.fid = f.fid"""],
+          "COUNT_FROM": ["files f"],
           "ORDER_BY": [],
-          "WHERE": ["fl.fid = f.fid"],
+          "WHERE": [],
           "WHERERATINGSCORE": [],
           "GROUP_BY": ["f.fid, f.title, f.sha512, p.fid, id, id_type",
-                       "f.artists_agg"]
+                       "f.artists_agg, f.basename_agg"]
         }
 
         query_base = """SELECT {SELECT}
@@ -844,33 +874,35 @@ class FmpServer(object):
                               WHERE {WHERE}"""
 
 
+
         if uid:
             query_args['uid'] = uid
-            query_spec["SELECT"].append("usi.uid, usi.rating, usi.fid AS usi_fid, u.uname, usi.true_score, usi.score")
+            query_spec["SELECT"].append("usi.uid, usi.rating, "
+                                        "usi.fid AS usi_fid, "
+                                        "u.uname, usi.true_score, "
+                                        "usi.score, usi.ultp")
             query_spec["FROM"].append("user_song_info usi, users u")
             query_spec["WHERE"].append("usi.fid = f.fid AND "
                                        "usi.uid = %(uid)s AND "
                                        "u.uid = usi.uid")
             query_spec["GROUP_BY"].append('usi.uid, usi.rating, usi_fid, '
-                                          'u.uname, usi.true_score, usi.score')
+                                          'u.uname, usi.true_score, '
+                                          'usi.score, usi.ultp')
             query_spec['COUNT_FROM'].append("user_song_info usi, users u")
+            if not q and not only_cued:
+                query_spec['ORDER_BY'].append("ultp DESC NULLS LAST")
 
         if owner:
             query_args['owner'] = owner
-            query_spec["FROM"].append("folders fld, folder_owners fo")
-            query_spec['COUNT_FROM'].append("folders fld, folder_owners fo")
+            owner_from = ("folders fld, folder_owners fo, "
+                          "file_locations fl")
+            query_spec["FROM"].append(owner_from)
+            query_spec['COUNT_FROM'].append(owner_from)
             query_spec["WHERE"].append("""fo.uid = %(owner)s AND
                                           fld.folder_id = fo.folder_id AND
                                           fl.folder_id = fld.folder_id AND
                                           fl.fid = f.fid""")
 
-
-        if q is not None:
-            q = q.strip()
-            q += " "
-            words = get_words_from_string(q)
-            q += " ".join(words)
-            q = q.strip()
         if q:
             query_spec["SELECT"].append("ts_rank(tsv, query) AS rank")
             count_from = """keywords kw,
@@ -949,7 +981,7 @@ class FmpServer(object):
 
         response = {
             "RESULT": "OK",
-            "results": results,
+            "results": jsonize(results),
             "total": total
         }
         cherrypy.log(">>>>>>>>>>>>> query running time:%s" % (
@@ -1254,6 +1286,7 @@ def current_watch_id():
         fid = playlist.files[playlist.index].fid
         if fid:
             watch_id = fid
+        return fid
     except:
         print "FAILED FID"
         fid = -1
@@ -1262,10 +1295,11 @@ def current_watch_id():
         eid = playlist.files[playlist.index].eid
         if eid:
             watch_id = eid
+            return eid
     except:
         eid = -1
 
-    cherrypy.log("watch_id:%s" % watch_id)
+    # cherrypy.log("watch_id:%s" % watch_id)
     return watch_id
 
 def broadcast_countdown():
@@ -1276,8 +1310,9 @@ def broadcast_countdown():
     #print({'fid': fid, 'eid': eid, 'watch_id': watch_id}, 'after')
 
     seconds_left_to_skip = None
-    print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
+    # print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
     if skip_countdown.get(watch_id) is not None:
+        print "skip_countdown:",skip_countdown, skip_countdown.get(watch_id)
         if playlist.player.state_string != "PLAYING":
             skip_countdown[watch_id] = time() + 5
         seconds_left_to_skip = math.ceil(skip_countdown[watch_id] - time())

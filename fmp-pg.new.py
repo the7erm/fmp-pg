@@ -73,20 +73,21 @@ class UserFileInfoTreeview():
         self.init_treeview_cols()
         self.init_cells()
         self.pack_treeview_cols()
-        listener_watcher.connect("listeners-changed", 
+        listener_watcher.connect("listeners-changed",
             self.on_listeners_changed)
 
     def on_listeners_changed(self, *args, **kwargs):
+        print "on_listeners_changed()"
         Gdk.threads_leave()
         self.update_treeview(self.playlist, False)
 
     def on_fullscreen(self, *args, **kwargs):
         print "on_fullscreen:", args, kwargs
-        """self.player.connect("fullscreen", 
+        """self.player.connect("fullscreen",
                             self.user_file_info_treeview.on_fullscreen)
-        self.player.connect("hide-controls", 
+        self.player.connect("hide-controls",
                             self.user_file_info_treeview.on_hide_controls)
-        self.player.connect("show-controls", 
+        self.player.connect("show-controls",
                             self.user_file_info_treeview.on_show_controls)"""
         self.show_hide_controls()
 
@@ -100,7 +101,7 @@ class UserFileInfoTreeview():
             for key in self.store_col_indexes.keys():
                 obj[key] = getattr(file_info, key, -100000)
             playlist_rows.append(obj)
-        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and 
+        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and
            not self.playlist.player.showing_controls):
             self.treeview.hide()
         else:
@@ -213,17 +214,17 @@ class UserFileInfoTreeview():
         # <CellRendererCombo object at 0x7f75e2926320 (GtkCellRendererCombo at 0x1180660)>, '0', '4'
         rating = int(text)
         logger.debug("+"*100)
-        logger.debug("on_rating_combo_change: cell:%s path:%s rating:%s" % 
+        logger.debug("on_rating_combo_change: cell:%s path:%s rating:%s" %
                      (cell, path, rating))
 
         rating_idx = self.col_idx('rating')
         self.ufi_store[path][rating_idx] = rating
 
         true_score_idx = self.col_idx('true_score')
-        
+
         uid_idx = self.col_idx('uid')
         uid = self.ufi_store[path][uid_idx]
-        
+
         index = self.playlist.index
         for file_info in self.playlist.files[index].listeners.user_file_info:
             if file_info.uid == uid:
@@ -246,6 +247,7 @@ class UserFileInfoTreeview():
                 self.treeview.append_column(col)
 
     def update(self, playlist, broadcast_change=True):
+        print ".update()"
         store_rows = []
         for store_row in self.ufi_store:
             obj = {}
@@ -267,7 +269,7 @@ class UserFileInfoTreeview():
             playlist_rows.append(obj)
 
         Gdk.threads_enter()
-        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and 
+        if len(playlist_rows) == 0 or (self.fullscreen and self.is_video and
            not self.playlist.player.showing_controls):
             self.treeview.hide()
         else:
@@ -286,11 +288,11 @@ class UserFileInfoTreeview():
                 logger.debug("appending:%s" % (file_info.kwargs))
                 row = []
                 col_numbers = []
-                
+
                 treeiter = self.ufi_store.append(None, None)
                 for col_number, item in enumerate(self.ufi_store_structure):
                     for k, v in item.items():
-                        
+
                         if hasattr(file_info, k):
                             value = getattr(file_info,k )
                             logger.debug("GETATTR k:%s value:%s" % (k, value))
@@ -383,7 +385,7 @@ class FmpPlayer(Player):
     def init_listeners_window(self):
         self.listeners_scrolled_window = Gtk.ScrolledWindow()
         self.listeners_scrolled_window.add(ListenersTable.treeview)
-        self.stack.add_titled(self.listeners_scrolled_window, 
+        self.stack.add_titled(self.listeners_scrolled_window,
                               "Listeners",
                               "Listeners")
         return
@@ -412,27 +414,29 @@ class FmpPlaylist(Playlist):
             self, listener_watcher)
         super(FmpPlaylist, self).__init__(*args, **kwargs)
         self.user_file_info_tray = RatingTrayIcon(self, listener_watcher)
-        self.player.connect("fullscreen", 
+        self.player.connect("fullscreen",
                             self.user_file_info_treeview.show_hide_controls)
-        self.player.connect("hide-controls", 
+        self.player.connect("hide-controls",
                             self.user_file_info_treeview.show_hide_controls)
-        self.player.connect("show-controls", 
+        self.player.connect("show-controls",
                             self.user_file_info_treeview.show_hide_controls)
         self.player.video_area_vbox.pack_start(
             self.user_file_info_treeview.treeview, False, False, 0)
         self.user_file_info_treeview.treeview.show()
         self.update_treeview()
 
-        GObject.timeout_add_seconds(5, self.update_treeview)
+        # GObject.timeout_add_seconds(5, self.update_treeview)
         self.player.window.connect('key-press-event', self.on_key_press)
-        listener_watcher.connect('listeners-changed', 
+        listener_watcher.connect('listeners-changed',
             self.on_listeners_changed)
 
     def on_listeners_changed(self, *args, **kwargs):
+        self.log_debug(".on_listeners_changed()")
         self.reload_current()
 
     def reload_current(self):
         Gdk.threads_leave()
+        self.log_debug(".reload_current()")
         self.files[self.index].reload()
         self.broadcast_change()
 
@@ -446,6 +450,7 @@ class FmpPlaylist(Playlist):
 
 
     def broadcast_change(self,  *args, **kwargs):
+        self.log_debug(".broadcast_change()")
         server.broadcast({"state-changed": self.player.state_string})
         try:
             server.broadcast({"player-playing": self.files[self.index].json()})
@@ -457,6 +462,7 @@ class FmpPlaylist(Playlist):
             self.user_file_info_tray.on_artist_title_changed(broadcast_change=False)
 
     def update_treeview(self):
+        self.log_debug(".update_treeview()")
         Gdk.threads_leave()
         print "="*100
         self.user_file_info_treeview.update(self)
@@ -478,7 +484,7 @@ class FmpPlaylist(Playlist):
             return
         else:
             filename = self.files[self.index].filename
-        # Clear the voting data just before a song starts playing in the 
+        # Clear the voting data just before a song starts playing in the
         # event it's left over from last time.
         self.files[self.index].vote_data = {}
         server.vote_data = {}
@@ -533,7 +539,7 @@ class FmpPlaylist(Playlist):
         # self.log_debug("drifted:%s seconds" % drifted)
         self.last_position = position
         if self.last_marked_as_played > now - 5:
-            # self.log_debug("!.mark_as_played()")
+            self.log_debug("!.mark_as_played()")
             return
         self.log_debug(".mark_as_played()")
         self.last_marked_as_played = now
@@ -541,19 +547,22 @@ class FmpPlaylist(Playlist):
             self.files[self.index].mark_as_played(**time_status)
         except AttributeError:
             sys.exit()
-        
+
     def force_broadcast_time(self):
         self.log_debug(".force_broadcast_time()")
         if not hasattr(self, 'last_time_status'):
             self.last_time_status = {}
         self.broadcast_time(self.player, self.last_time_status, True)
-        
+
     def broadcast_time(self, player, time_status, force=False):
         Gdk.threads_leave()
+
         if not hasattr(self, 'last_time_status'):
             self.last_time_status = {}
-        if time_status == self.last_time_status and not force:
+        if time_status.get('percent_played') == \
+           self.last_time_status.get('percent_played') and not force:
             return
+        self.log_debug(".broadcast_time() time_status:%s" % time_status)
         self.last_time_status = deepcopy(time_status)
         try:
             time_status['now'] = "%s" % time_status['now']
@@ -626,14 +635,14 @@ class FmpPlaylist(Playlist):
             self.files[self.index].mark_as_played(**time_status)
         except AttributeError:
             sys.exit()
-        
+
         self.inc_index()
 
     def json(self):
         files = []
         for file_obj in self.files:
             files.append(file_obj.json())
-        
+
         # TODO add config variable
         unlistened_episodes = get_unlistend_episode(limit=10)
         netcasts = []
@@ -651,6 +660,7 @@ class FmpPlaylist(Playlist):
 
 def refresh_netcasts_once():
     refresh_netcasts()
+    return
     seconds_to_next_expire = get_seconds_to_next_expire_time()
     if not seconds_to_next_expire or seconds_to_next_expire < 60:
         # At the minimum we want to wait 60 seconds to the next time we call
@@ -669,16 +679,16 @@ def refresh_netcasts():
 
 
 converter = Converter()
-    
+
 preload = Preload()
 server.preload = preload
 picker.initial_picker()
-GObject.timeout_add_seconds(60, preload.refresh)
+# GObject.timeout_add_seconds(60, preload.refresh)
 GObject.timeout_add_seconds(60, picker.populate_preload_for_all_users)
 # refresh_netcasts_timeout = GObject.timeout_add_seconds(120, refresh_netcasts)
-GObject.idle_add(preload.refresh_once)
-GObject.idle_add(refresh_netcasts_once)
-listener_watcher.connect('listeners-changed', 
+# GObject.idle_add(preload.refresh_once)
+# GObject.idle_add(refresh_netcasts_once)
+listener_watcher.connect('listeners-changed',
                          picker.populate_preload_for_all_users_once)
 
 def insert_missing_files_for_all_users():
@@ -688,6 +698,7 @@ def insert_missing_files_for_all_users():
     for u in users:
         print "+++insert_missing_files_for_all_users:%s" % u
         picker.insert_missing_files_for_uid(u['uid'])
+    return False
 
 recently_played = get_recently_played(convert_to_fobj=True)
 

@@ -27,13 +27,14 @@ GObject.threads_init()
 logger = logging.getLogger(__name__)
 
 def to_bool(value):
+    print "TOBOOL"
     if isinstance(value, bool):
         return value
     if isinstance(value, (str, unicode)):
         value = value.lower()
         if value in ('t','true','1','on'):
             return True
-        if not value or value in('f', '0', 'false', 'off', 'null', 
+        if not value or value in('f', '0', 'false', 'off', 'null',
                                  'undefined'):
             return False
     return bool(value)
@@ -42,7 +43,7 @@ class Listeners_Watcher(GObject.GObject, Log):
     __name__ = 'Listeners_Watcher'
     logger = logger
     __gsignals__ = {
-        'listeners-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, 
+        'listeners-changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE,
                               (object,)),
     }
     def __init__(self, *args, **kwargs):
@@ -58,6 +59,7 @@ class Listeners_Watcher(GObject.GObject, Log):
             self.set_listening(1, True)
 
     def get_users(self):
+        self.log_debug(".get_users()")
         sql = """SELECT uid, uname, listening, admin, cue_netcasts, sync_dir,
                         listening_on_satellite
                  FROM users
@@ -66,24 +68,27 @@ class Listeners_Watcher(GObject.GObject, Log):
         return get_results_assoc_dict(sql)
 
     def user_in(self, user, key):
+        self.log_debug(".user_in()")
         for u in self.container[key]:
             if u['uid'] == user['uid']:
                 return True
         return False
 
     def get_idx(self, user, key):
+        self.log_debug(".get_idx()")
         for idx, u in enumerate(self.container[key]):
             if u['uid'] == user['uid']:
                 return idx
         return None
 
     def add_to_remove_from(self, user, add_to, remove_from):
+        self.log_debug(".add_to_remove_from()")
         idx = self.get_idx(user, add_to)
         if idx is None:
             self.container[add_to].append(user)
         else:
             # We update the elements because we want to keep all
-            # reference to the object intact.  So doing an user[idx] = user 
+            # reference to the object intact.  So doing an user[idx] = user
             # value will break that reference. where .update() won't.
             self.container[add_to][idx].update(user)
 
@@ -92,6 +97,7 @@ class Listeners_Watcher(GObject.GObject, Log):
             del self.container[remove_from][idx]
 
     def load_users(self):
+        self.log_debug(".load_users()")
         pre_users = deepcopy(self.container['users'])
         self.container['users'] = self.get_users()
         if self.container['users'] == pre_users:
@@ -116,22 +122,23 @@ class Listeners_Watcher(GObject.GObject, Log):
         self.emit('listeners-changed', self.json())
 
     def set_listening_on_satellite(self, uid, state):
-        GObject.idle_add(self.set_user_bool_column, uid, 
+        GObject.idle_add(self.set_user_bool_column, uid,
                          'listening_on_satellite', state)
 
     def set_listening(self, uid, state):
-        GObject.idle_add(self.set_user_bool_column, uid, 
+        GObject.idle_add(self.set_user_bool_column, uid,
                          'listening', state)
 
     def set_admin(self, uid, state):
-        GObject.idle_add(self.set_user_bool_column, uid, 
+        GObject.idle_add(self.set_user_bool_column, uid,
                          'admin', state)
 
     def set_cue_netcasts(self, uid, state):
-        GObject.idle_add(self.set_user_bool_column, uid, 
+        GObject.idle_add(self.set_user_bool_column, uid,
                          'cue_netcasts', state)
 
     def set_user_bool_column(self, uid, col, value):
+        self.log_debug("set_user_bool_column()")
         Gdk.threads_leave()
         uid = int(uid)
         value = to_bool(value)
@@ -145,14 +152,16 @@ class Listeners_Watcher(GObject.GObject, Log):
         }
         spec[col] = value
 
-        sql = """UPDATE users 
+        sql = """UPDATE users
                  SET {col} = %({col})s
                  WHERE uid = %(uid)s""".format(col=col)
 
         query(sql, spec)
         self.load_users()
+        return False
 
     def check_users(self):
+        self.log_debug(".check_users()")
         if not self.container['listeners'] or not self.container['users']\
            or not self.container['user_dict']:
             self.load_users()
@@ -160,26 +169,31 @@ class Listeners_Watcher(GObject.GObject, Log):
 
     @property
     def listeners(self):
+        self.log_debug(".listeners()")
         self.check_users()
 
         return self.container['listeners']
 
     @property
     def users(self):
+        self.log_debug(".users()")
         self.check_users()
         return self.container['users']
 
     @property
     def user_dict(self):
         self.check_users()
+        self.log_debug(".user_dict()")
         return self.container['user_dict']
 
     @property
     def non_listeners(self):
         self.check_users()
+        self.log_debug(".non_listeners()")
         return self.container['non_listeners']
 
     def json(self):
+        self.log_debug(".json()")
         return {
             'listeners': self.listeners,
         }
@@ -339,8 +353,8 @@ def get_unlistend_episode(listeners=None, limit=1):
         return None
 
     sql = """SELECT ne.*, n.*
-             FROM netcast_episodes ne 
-                  LEFT JOIN netcast_listend_episodes nle ON 
+             FROM netcast_episodes ne
+                  LEFT JOIN netcast_listend_episodes nle ON
                             nle.eid = ne.eid,
                   netcast_subscribers ns,
                   netcasts n
@@ -365,18 +379,18 @@ def get_unlistend_episode(listeners=None, limit=1):
     return results
 
 def get_expired_netcasts():
-    sql = """SELECT * 
+    sql = """SELECT *
              FROM netcasts
              WHERE expire_time <= NOW() OR expire_time IS NULL"""
     return get_results_assoc_dict(sql)
 
 def user_history_sanity_check():
-    sql = """UPDATE user_history 
-             SET time_played = current_timestamp 
+    sql = """UPDATE user_history
+             SET time_played = current_timestamp
              WHERE time_played > current_timestamp"""
     query(sql)
 
-    sql = """UPDATE user_history 
+    sql = """UPDATE user_history
              SET date_played = current_timestamp::date
              WHERE date_played > current_timestamp::date"""
     query(sql)
@@ -419,7 +433,7 @@ def format_sql(sql, sql_args={}, sets=[], wheres=[], values=[],
             cols=cols_join.join(sql_cols),
             values=values_join.join(sql_values),
         ),
-        reindent=True, 
+        reindent=True,
         keyword_case='upper'
     )
 
@@ -432,6 +446,8 @@ JSON_WHITE_LIST = [
     'artist',
     'artists',
     'basename',
+    'basenames',
+    'cued',
     'date_played',
     'eid',
     'enabled',
@@ -441,6 +457,8 @@ JSON_WHITE_LIST = [
     'genre',
     'genres',
     'gid',
+    'id',
+    'id_type',
     'listeners',
     'listening',
     'listening_on_satellite',
@@ -451,6 +469,7 @@ JSON_WHITE_LIST = [
     'non_listeners',
     'owner',
     'owners',
+    'p_reason',
     'percent_played',
     'plid',
     'preload',
@@ -459,6 +478,7 @@ JSON_WHITE_LIST = [
     'reason',
     'score',
     'seq',
+    'sha512',
     'sync_dir',
     'time_played',
     'title',
@@ -469,6 +489,7 @@ JSON_WHITE_LIST = [
     'uname',
     'user_file_info',
     'users',
+    'usi_fid',
 ]
 
 def jsonize(dbInfo):
@@ -488,12 +509,13 @@ def jsonize(dbInfo):
         #if isinstance(dbInfo[key], dict):
         #    dbInfo[key] = jsonize(dbInfo[key])
     for key in remove_keys:
+        print "removing:", key
         del dbInfo[key]
     return dbInfo
 
 def get_seconds_to_next_expire_time():
-    sql = """SELECT expire_time 
-             FROM netcasts 
+    sql = """SELECT expire_time
+             FROM netcasts
              ORDER BY expire_time ASC
              LIMIT 1"""
     res = get_assoc_dict(sql)
@@ -511,7 +533,7 @@ def delete_fid(fid):
     if file_locations:
         return
 
-    
+
     sql = """DELETE FROM user_song_info WHERE fid = %(fid)s"""
     query(sql, spec)
     sql = """DELETE FROM user_history WHERE fid = %(fid)s"""
@@ -526,7 +548,7 @@ def delete_fid(fid):
     sql = """DELETE FROM files WHERE fid = %(fid)s"""
     query(sql, spec)
 
-    
+
 def get_words_from_string(string):
     if string is None:
         return []
@@ -565,7 +587,7 @@ def leave_threads():
 
 if __name__ == "__main__":
 
-    sql = """SELECT DISTINCT fg.fid, 
+    sql = """SELECT DISTINCT fg.fid,
                              string_agg(DISTINCT g.genre, ', ' ORDER BY g.genre) AS genres_agg
              FROM file_genres fg
                   LEFT JOIN genres g ON g.gid = fg.gid
@@ -578,7 +600,7 @@ if __name__ == "__main__":
                  RETURNING *"""
         print get_assoc_dict(sql, agg)
 
-    sql = """SELECT DISTINCT f.fid, 
+    sql = """SELECT DISTINCT f.fid,
                              string_agg(DISTINCT fl.basename, ', ' ORDER BY fl.basename) AS basename_agg
              FROM files f
                   LEFT JOIN file_locations fl ON fl.fid = f.fid
@@ -591,8 +613,8 @@ if __name__ == "__main__":
                  RETURNING *"""
         print get_assoc_dict(sql, agg)
 
-    sql = """SELECT DISTINCT fa.fid, 
-                             string_agg(DISTINCT a.artist, ', ' 
+    sql = """SELECT DISTINCT fa.fid,
+                             string_agg(DISTINCT a.artist, ', '
                                         ORDER BY a.artist) AS artists_agg
              FROM file_artists fa
                   LEFT JOIN artists a ON a.aid = fa.aid
@@ -658,4 +680,3 @@ if __name__ == "__main__":
         query(sql, f)
 
         print "remove:", f
-
