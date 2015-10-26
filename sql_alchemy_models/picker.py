@@ -93,6 +93,6 @@ preload = get_preload()
 player = Player()
 
 file = preload.pop()
-player.uri = file.uri
-player.play()
+player.uri = file.filename
+player.state = 'PLAYING'
 Gtk.main()

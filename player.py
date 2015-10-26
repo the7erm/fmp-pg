@@ -94,6 +94,15 @@ PACK_PADDING = 0
 
 class Log(object):
     def log_debug(self, *args, **kwargs):
+        print("log_debug:", args, kwargs)
+        return
+
+    def log_info(self, *args, **kwargs):
+        print("log_info:", args, kwargs)
+        return
+
+    def log_error(self, *args, **kwargs):
+        print("log_error:", args, kwargs)
         return
 
 class PlayerError(Exception):
@@ -395,8 +404,8 @@ class Player(GObject.GObject, Log):
         self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
         Gdk.threads_leave()
         # print "time status obj:", obj
-        obj['now'] = time.time()
-        obj['now_iso'] = obj['now'].isoformat()
+        obj['now'] = time()
+        # obj['now_iso'] = obj['now'].isoformat()
         self.emit('time-status', obj)
         GObject.idle_add(self.show_video_window)
         # self.show_video_window()
@@ -793,7 +802,7 @@ class Player(GObject.GObject, Log):
         if os.path.exists(value):
             value = os.path.realpath(value)
             self.filename = value
-            uri = "file://" + urllib.quote(value)
+            uri = "file://" + urllib.parse.quote(value)
         else:
             self.filename = ""
 
@@ -806,10 +815,10 @@ class Player(GObject.GObject, Log):
             Gdk.threads_enter()
             self.playbin.set_property('uri', self.uri)
             Gdk.threads_leave()
-            self.push_status("uri:%s" % urllib.unquote(self.uri))
+            self.push_status("uri:%s" % urllib.parse.unquote(self.uri))
             self.artist = ""
             self.title = ""
-            self.artist_title = urllib.unquote(os.path.basename(self.uri))
+            self.artist_title = urllib.parse.unquote(os.path.basename(self.uri))
             self.emit('uri-changed', self.uri)
             self.emit('artist-title-changed', self.artist_title)
             self.on_check_resize()
@@ -854,7 +863,7 @@ class Player(GObject.GObject, Log):
         state = self.state
         Gdk.threads_enter()
         if state in(PAUSED, STOPPED, READY):
-            logger.debug("SET IMAGE: PLAY")
+            # logger.debug("SET IMAGE: PLAY")
             self.pause_btn.set_image(self.play_img)
         elif state == PLAYING:
             logger.debug("SET IMAGE: PAUSE")

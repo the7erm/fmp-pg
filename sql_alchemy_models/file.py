@@ -123,11 +123,6 @@ class File(Base):
         return None
 
     @property
-    def uri(self):
-        return urllib.quote(self.filename)
-
-
-    @property
     def exists(self):
         for l in self.locations:
             if l.exists:
