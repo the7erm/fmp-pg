@@ -1,29 +1,19 @@
 from db_session import session
 from file import User, UserFileInfo, File
 from sqlalchemy.sql import not_, and_, text
+from random import shuffle
+from collections import defaultdict
+from pprint import pprint
 
-user = session.query(User).filter(User.name == "erm").first()
 
-if not user:
-    user = User()
-    user.name = "erm"
-    session.add(user)
-    session.commit()
+def build_truescore_list():
+    scores = []
+    for i in range(0, 11):
+        for score in range(0, i+1):
+            scores.append(i*10)
 
-print (user)
-"""
-dbsession.query( TableOne, TableTwo ).join( TableTwo ).filter( TableOne.id == TableTwo.id ).filter( TableTwo.id == 1 )
-"""
-
-"""
-# This will get everything
-# I want to restrict to only rows for specific user_ids
-for f in session.query(File)\
-                     .filter(File.user_file_info == None)\
-                     .all():
-    print("f:", f)
-    # print("ufi:", ufi)
-"""
+    shuffle(scores)
+    return scores
 
 def get_random_unplayed_for_user_id(user_id):
     result = session.query(File).from_statement(
@@ -37,5 +27,51 @@ def get_random_unplayed_for_user_id(user_id):
         .params(user_id=user_id)
     return result.first()
 
-f = get_random_unplayed_for_user_id(1)
-print (f)
+
+def get_random_for_user_id_true_score(user_id, true_score):
+    result = session.query(File).from_statement(
+        text("""SELECT f.*
+                FROM files f, user_file_info ufi
+                WHERE ufi.file_id = f.id AND
+                      ufi.user_id = :user_id AND
+                      ufi.true_score >= :true_score
+                ORDER BY time_played, random()
+                LIMIT 1"""))\
+        .params(user_id=user_id,
+                true_score=true_score)
+    return result.first()
+
+def get_preload(uids=[]):
+    results = []
+    for user in session.query(User).all():
+        pick = get_random_unplayed_for_user_id(user.id)
+        if pick:
+            results.append(pick)
+
+        if not true_score_pool.get(user.id):
+            true_score_pool[user.id] = build_truescore_list()
+
+        true_score = true_score_pool[user.id].pop()
+        pick = get_random_for_user_id_true_score(user.id, true_score)
+        if not pick:
+            while true_score in true_score_pool[user.id]:
+                true_score_pool[user.id].remove(true_score)
+            continue
+        results.append(pick)
+
+    return results
+
+users = ['erm', 'steph', 'sam', 'halle']
+true_score_pool = defaultdict(list)
+
+for name in users:
+    user = session.query(User).filter(User.name == name).first()
+
+    if not user:
+        user = User()
+        user.name = name
+        session.add(user)
+        session.commit()
+
+pprint(get_preload())
+
