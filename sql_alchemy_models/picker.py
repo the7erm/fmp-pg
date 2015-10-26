@@ -43,7 +43,13 @@ def get_random_for_user_id_true_score(user_id, true_score):
 
 def get_preload(uids=[]):
     results = []
-    for user in session.query(User).all():
+    query = session.query(User)
+    if uids:
+        query.filter(User.id.in_(uids))
+    else:
+        query.filter(User.listening==True)
+
+    for user in query.all():
         pick = get_random_unplayed_for_user_id(user.id)
         if pick:
             results.append(pick)
