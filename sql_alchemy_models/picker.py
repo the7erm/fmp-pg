@@ -4,7 +4,9 @@ from sqlalchemy.sql import not_, and_, text
 from random import shuffle
 from collections import defaultdict
 from pprint import pprint
-
+import sys
+sys.path.append('../')
+from player import Player, Gtk
 
 def build_truescore_list():
     scores = []
@@ -23,7 +25,7 @@ def get_random_unplayed_for_user_id(user_id):
                                            usi.file_id = f.id
            WHERE usi.file_id IS NULL
            ORDER BY random()
-           LIMIT 1 """))\
+           LIMIT 1"""))\
         .params(user_id=user_id)
     return result.first()
 
@@ -43,13 +45,14 @@ def get_random_for_user_id_true_score(user_id, true_score):
 
 def get_preload(uids=[]):
     results = []
-    query = session.query(User)
+    user_query = session.query(User)
     if uids:
-        query.filter(User.id.in_(uids))
+        user_query = user_query.filter(User.id.in_(uids))
     else:
-        query.filter(User.listening==True)
+        user_query = user_query.filter(User.listening==True)
 
-    for user in query.all():
+    for user in user_query.all():
+        print("user:", user)
         pick = get_random_unplayed_for_user_id(user.id)
         if pick:
             results.append(pick)
@@ -79,5 +82,17 @@ for name in users:
         session.add(user)
         session.commit()
 
-pprint(get_preload())
+    if name == 'erm':
+        user.listening = True
+        session.add(user)
+        session.commit()
 
+preload = get_preload()
+
+
+player = Player()
+
+file = preload.pop()
+player.uri = file.uri
+player.play()
+Gtk.main()

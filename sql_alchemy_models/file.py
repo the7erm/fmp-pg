@@ -10,6 +10,7 @@ from math import floor
 import mutagen
 import re
 import sys
+import urllib
 from pprint import pprint, pformat
 
 import hashlib
@@ -120,6 +121,11 @@ class File(Base):
             if l.exists:
                 return l.filename
         return None
+
+    @property
+    def uri(self):
+        return urllib.quote(self.filename)
+
 
     @property
     def exists(self):
