@@ -1,6 +1,6 @@
 from db_session import session
 from file import User, UserFileInfo, File
-from sqlalchemy.sql import not_, and_
+from sqlalchemy.sql import not_, and_, text
 
 user = session.query(User).filter(User.name == "erm").first()
 
@@ -24,12 +24,18 @@ for f in session.query(File)\
     print("f:", f)
     # print("ufi:", ufi)
 """
-result = session.query(File).from_statement(
-    """SELECT f.*
-       FROM files f
-       LEFT JOIN user_file_info usi ON user_id = :user_id AND
-                                       usi.file_id = f.id
-       WHERE usi.file_id IS NULL""")\
-    .params(user_id='1')
-for r in result.all():
-    print("r:",r)
+
+def get_random_unplayed_for_user_id(user_id):
+    result = session.query(File).from_statement(
+        text("""SELECT f.*
+           FROM files f
+           LEFT JOIN user_file_info usi ON user_id = :user_id AND
+                                           usi.file_id = f.id
+           WHERE usi.file_id IS NULL
+           ORDER BY random()
+           LIMIT 1 """))\
+        .params(user_id=user_id)
+    return result.first()
+
+f = get_random_unplayed_for_user_id(1)
+print (f)

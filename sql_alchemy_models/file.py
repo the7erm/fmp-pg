@@ -114,9 +114,31 @@ class File(Base):
         "Location",
          order_by="Location.dirname,Location.basename", backref="file")
 
+    @property
+    def filename(self):
+        for l in self.locations:
+            if l.exists:
+                return l.filename
+        return None
+
+    @property
+    def exists(self):
+        for l in self.locations:
+            if l.exists:
+                return True
+        return False
+
+    def mark_as_played(self, percent=None):
+        self.time_played = time.time()
+
+
     def __repr__(self):
-           return "<File(fingerprint='%s')>" % (
-                    self.fingerprint)
+           return ("<File(id=%r,\n"
+                   "      fingerprint=%r\n"
+                   "      filename=%r)>" % (
+                    self.id,
+                    self.fingerprint,
+                    self.filename))
 
 class DiskEntitiy(object):
     id = Column(Integer, primary_key=True)
@@ -399,11 +421,13 @@ class Folder(DiskEntitiy, Base):
         if not self.changed:
             print("NOT CHANGED:", self.dirname)
             return
-
+        print ("scanning:", self.dirname)
         for dirname, dirs, files in os.walk(self.dirname):
-            pprint(files)
+            # pprint(files)
             for _dir in dirs:
                 d = os.path.realpath(os.path.join(dirname, _dir))
+                if not d or d == "/":
+                    continue
                 folder = session.query(Folder).filter_by(dirname=d).first()
                 if not folder:
                     folder = Folder(dirname=d)
@@ -486,11 +510,24 @@ if __name__ == "__main__":
     from db_session import engine, session, create_all
     create_all(Base)
 
-    MEDIA_DIR ='/home/erm/disk2/acer-home/mp3'
-    folder = session.query(Folder).filter_by(dirname=MEDIA_DIR).first()
-    if not folder:
-        folder = Folder(dirname=MEDIA_DIR)
+    dirs = [
+        '/home/erm/disk2/acer-home/Amazon MP3',
+        '/home/erm/disk2/acer-home/Amazon-MP3',
+        '/home/erm/disk2/acer-home/dwhelper',
+        '/home/erm/disk2/acer-home/halle',
+        '/home/erm/disk2/acer-home/media',
+        '/home/erm/disk2/acer-home/mp3',
+        '/home/erm/disk2/acer-home/ogg',
+        '/home/erm/disk2/acer-home/sam',
+        '/home/erm/disk2/acer-home/steph',
+        '/home/erm/disk2/acer-home/stereofame',
+        '/home/erm/disk2/syncthing',
+    ]
+    for d in dirs:
+        folder = session.query(Folder).filter_by(dirname=d).first()
+        if not folder:
+            folder = Folder(dirname=d)
 
-    session.add(folder)
-    session.commit()
-    folder.scan()
+        session.add(folder)
+        session.commit()
+        folder.scan()
