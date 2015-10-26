@@ -324,9 +324,11 @@ class Player(GObject.GObject, Log):
 
     def on_state_change(self, player, state):
         # Player.on_state_change()
+        print "on_state_change"
         self.show_video_window()
 
     def show_video_window(self):
+        print "show_video_window"
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
@@ -337,6 +339,7 @@ class Player(GObject.GObject, Log):
             self.is_video = False
 
         self.hide_controls()
+        return False
 
 
     def get_time_status(self):
@@ -374,6 +377,7 @@ class Player(GObject.GObject, Log):
         return string
 
     def time_status(self):
+        print "time_status()"
         # Player.time_status()
         Gdk.threads_leave()
         obj = self.get_time_status()
@@ -421,12 +425,14 @@ class Player(GObject.GObject, Log):
 
     def on_window_resize(self, *args):
         # Player.on_window_resize()
+        print "on_window_resize()"
         self.show_video_window()
         self.temp_height = 0
         self.temp_width = 0
         self.on_check_resize()
 
     def on_check_resize(self, *args):
+        print "on_check_resize()"
         # Player.on_check_resize()
         if not hasattr(self, 'pixbuf'):
             return
@@ -435,6 +441,7 @@ class Player(GObject.GObject, Log):
         self.resizeImage(boxAllocation.width, boxAllocation.height)
 
     def resizeImage(self, allocation_width, allocation_height, force=False):
+        print "resizeImage()"
         # Player.resizeImage()
         # allocation_height = allocation_height - 40
         if self.temp_height != allocation_height or self.temp_width != allocation_width or force:
@@ -530,6 +537,7 @@ class Player(GObject.GObject, Log):
             self.emit('show-controls', {})
 
     def hide_controls(self, *args, **kwargs):
+        self.log_debug(".hide_controls()")
         if self.is_video and self.fullscreen and self.show_controls_time < (time() - 5):
             self.showing_controls = False
             self.bottom_hbox.hide()
@@ -818,6 +826,7 @@ class Player(GObject.GObject, Log):
 
     @property
     def state(self):
+        print "state()"
         # Player.state()
         Gdk.threads_leave()
         self.pipeline_ready()
@@ -851,6 +860,7 @@ class Player(GObject.GObject, Log):
         self.log_info(' /SET STATE:%s', value)
 
     def on_state_changed(self, player, value):
+        print "on_state_changed()"
         # Player.on_state_changed()
         Gdk.threads_leave()
         state = self.state
@@ -986,6 +996,7 @@ class Player(GObject.GObject, Log):
 
     def set_image(self):
         # Player.set_image()
+        print "set_image()"
         self.pixbuf = GdkPixbuf.Pixbuf.new_from_file("/tmp/tmp.img")
         self.temp_width = 0
         self.temp_height = 0

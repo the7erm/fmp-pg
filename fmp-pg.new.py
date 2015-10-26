@@ -398,7 +398,7 @@ class FmpPlayer(Player):
             'uri': self.uri,
             'last_time_status': self.last_time_status
         }
-        print "PLAYER:", res
+        # print "PLAYER:", res
         return res
 
 class FmpPlaylist(Playlist):
