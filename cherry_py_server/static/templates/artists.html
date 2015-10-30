@@ -1,0 +1,9 @@
+<ol class="breadcrumb">
+  <li ng-repeat="letter in artist_letters" ng-class="{'active':params.l==letter}"><a href="#/artists/?l={{letter | fixedEncodeURIComponent}}" >{{letter}}</a></li>
+</ol>
+
+<div ng-repeat="artist in artists" ng-if="artists" ng-bind-html="artist | searchLink"></div>
+<br>
+<ol class="breadcrumb">
+  <li ng-repeat="letter in artist_letters" ng-class="{'active':params.l==letter}"><a href="#/artists/?l={{letter | fixedEncodeURIComponent}}" >{{letter}}</a></li>
+</ol>

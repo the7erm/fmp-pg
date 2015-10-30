@@ -1,0 +1,134 @@
+<h3>Player</h3>
+<span id="time-status">
+    <span ng-if="PlayerData.collection.mode=='remote'">{{PlayerData.collection.time_status}} </span>
+    <span ng-if="PlayerData.collection.mode=='satellite'">
+        {{ SatellitePlayer.collection.time_status }}
+    </span>
+</span>
+
+<div>
+
+    <span ng-repeat="(key, data) in PlayerData.collection.playingData.artists"
+          >
+          <span ng-bind-html="data.name | searchLink"></span>
+          <span ng-if="!$last">, </span>
+    </span>
+    <span ng-if="PlayerData.collection.playingData.artists[0]&&PlayerData.collection.playingData.titles[0]"> - </span>
+    <span ng-repeat="(key, data) in PlayerData.collection.playingData.titles">      <span ng-bind-html="data.name | searchLink"></span>
+          <span ng-if="!$last">, </span>
+    </span>
+    <span ng-if="!PlayerData.collection.playingData.artists[0]&&!PlayerData.collection.playingData.titles[0]">
+        <code ng-bind-html="PlayerData.collection.playingData.locations[0].basename | searchLink"></code>
+    </span>
+    <br/>
+    <span ng-repeat="(key, data) in PlayerData.collection.playingData.albums">
+        <span ng-bind-html="data.name | searchLink"></span>
+        <span ng-if="!$last">, </span>
+    </span>
+
+    <h4>Genre(s)</h4>
+    <tags-input ng-model="PlayerData.collection.playingData.genres"
+                display-property="name"
+                placeholder="Add a genre"
+                class="bootstrap"
+                template="genre-template"
+                min-length="1"
+                replace-spaces-with-dashes="false"
+                on-tag-added="onAddGenre(PlayerData.collection.playingData.id, $tag)"
+                on-tag-removed="onRemoveGenre(PlayerData.collection.playingData.id, $tag)">
+        <auto-complete></auto-complete>
+    </tags-input>
+
+    <h4 ng-click="PlayerData.collection.show_locations=!PlayerData.collection.show_locations"> <span ng-class="{
+        'glyphicon glyphicon-triangle-right':!PlayerData.collection.show_locations,
+        'glyphicon glyphicon-triangle-bottom':PlayerData.collection.show_locations,
+    }"></span> Locations</h4>
+    <dl ng-if="PlayerData.collection.show_locations" ng-repeat="(key, data) in PlayerData.collection.playingData.locations">
+        <dt>{{data.dirname}}</dt>
+        <dd ng-bind-html="data.basename | searchLink"></dd>
+    </dl>
+</div>
+<div class="reason" ng-if="PlayerData.collection.reason">{{ PlayerData.collection.reason }}</div>
+<script type="text/ng-template" id="genre-template">
+
+  <div class="tag-template">
+    <div>
+      <a href="/#/search/?q={{data.name}}">{{data.name}}</a>
+      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
+    </div>
+  </div>
+
+</script>
+
+<!--
+Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collection.mode" ng-change="PlayerData.setMode(PlayerData.collection.mode)">
+      <option value="remote">Remote</option>
+      <option value="satellite">Satellite</option>
+</select><br>
+-->
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4 col-lg-4" ng-if="PlayerData.collection.owners&&PlayerData.collection.owners.length>0">
+            Owners:
+            <span ng-repeat="(key, data) in PlayerData.collection.owners">
+                <a ng-if='data.owner' href="/#/search/?owner={{data.uid}}" class="badge" >{{data.uname}}</a>
+            </span>
+        </div>
+        <div class="col-md-3 col-lg-3">
+
+        </div>
+        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr/></div>
+    </div>
+
+    <div class="row" ng-repeat="(key, data) in PlayerData.collection.playingData.user_file_info">
+        <div class="col-xs-2 col-sm-1 col-md-1 col-lg-1" style="min-height:40px;">
+            <button class="btn" ng-click="PlayerData.setIam(data.user_id)" ng-class="{'btn-default':(PlayerData.collection.iam!=data.user_id), 'btn-info':(PlayerData.collection.iam==data.user_id)}"></button>
+        </div>
+        <div class="col-xs-4 col-sm-3 col-md-2 col-lg-3">
+            <button ng-if="PlayerData.collection.mode=='remote'" class="btn"
+                    ng-class="{'btn-info':data.voted_to_skip,
+                               'btn-default':!data.voted_to_skip}"
+                    ng-click="PlayerData.voteToSkip(data)">
+                {{data.user.name}} vote to skip
+                <span ng-if="data.voted_to_skip" class="badge">{{PlayerData.collection.skip_countdown}}</span>
+                <span class="glyphicon glyphicon-fast-forward">
+            </button>
+            <span ng-if="PlayerData.collection.mode=='satellite'"> {{data.user.name}}</span>
+            <button ng-if="PlayerData.collection.mode=='satellite'" class="btn btn-default"
+                ng-click="SatellitePlayer.next()"><span class="glyphicon glyphicon-fast-forward"></button>
+            <button class="btn btn-default btn-xs" ng-if="data.user.sync_dir"
+                    ng-click="sync(PlayerData.collection.fid, data.user.id)">Sync</button>
+        </div>
+        <div ng-controller="RatingCtrl" class="rating-div col-xs-12 col-sm-4 col-md-4 col-lg-3" >
+            <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
+
+        </div>
+
+        <div class="col-xs-4 col-sm-2 col-md-2 col-lg-2" ng-controller="RatingCtrl" style="cursor:pointer;">
+            <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
+            <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
+             {{data.true_score}}
+        </div>
+        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr/></div>
+    </div>
+
+</div>
+<br clear="all">
+<br clear="all">
+
+<div ng-if="PlayerData.collection.mode=='satellite'">
+    {{SatellitePlayer.collection.uids}}
+    <div ng-repeat="(key, data) in SatellitePlayer.collection.playlist">
+        <li>playlist:{{data.basename}}</li>
+    </div>
+    <div ng-repeat="(uid, data) in SatellitePlayer.collection.preload">
+        <li>preload:{{data.basename}}</li>
+    </div>
+</div>
+
+<ul ng-if="PlayerData.collection.iam==1">
+  <li ng-repeat="(key, data) in PlayerData.collection track by key">
+    {{key}}: <span ng-if="key!='player'">{{ data }}</span>
+  </li>
+</ul>

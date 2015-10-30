@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html ng-app="fmpApp">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" href="/favicon.ico">
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
+
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
+
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="/static/js/angular-ui-tree/angular-ui-tree.min.css">
+
+        <link rel="stylesheet" href="/static/css/ng-tags-input.min.css">
+        <link rel="stylesheet" href="/static/css/angular-notify.min.css">
+
+        <link rel="stylesheet" href="/static/css/fmp.css">
+        <script type='text/javascript'>
+            window.ws_url = "ws://%(host)s/ws";
+            window.playingData = %(playlist_data)s;
+        </script>
+    </head>
+    <body>
+        <nav class="navbar navbar-fixed-top navbar-default" role="navigation" bs-navbar>
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#/home">FMP</a>
+
+            </div>
+
+            <span class="visible-sm-inline badge pull-right pad-badge">sm</span>
+            <span class="visible-md-inline badge pull-right pad-badge">md</span>
+            <span class="visible-lg-inline badge pull-right pad-badge">lg</span>
+            <div id="navbar" class="collapse navbar-collapse">
+              <ul class="nav navbar-nav">
+                <li data-match-route="/home*" ><a href="#/home">Home</a></li>
+                <li data-match-route="/search*"><a href="#/search">Search</a></li>
+                <li data-match-route="/genres"><a href="#/genres">Genres</a></li>
+                <li data-match-route="/listeners"><a href="#/listeners">Listeners</a></li>
+              </ul>
+
+            </div><!-- /.nav-collapse -->
+
+        </nav><!-- /.navbar -->
+        <br clear="all" />
+        <br clear="all" />
+        <div ng-view class="container-fluid"></div>
+        <nav class="navbar navbar-fixed-bottom navbar-default " role="navigation" bs-navbar ng-controller="PlayerController">
+            <form style="width:100%%;">
+            <div class="btn-group btn-group-justified" role="group" aria-label="..." style="width:100%%;" >
+                <button class="btn navbar-btn" id="prev" ng-click="prev();" style="width:33%%;"><span class="glyphicon glyphicon-fast-backward"></span></button>
+                <button style="width:33%%;" class="btn navbar-btn" ng-click="pause();"><span ng-class="{
+                    'glyphicon glyphicon-pause':(PlayerData.collection.play_pause=='Pause'),
+                    'glyphicon glyphicon-play':(PlayerData.collection.play_pause=='Play')
+                }"></span></button>
+                <button ng-if="PlayerData.collection.mode=='remote'" style="width:33%%;" class="btn navbar-btn" ng-class="{'hidden':(!PlayerData.collection.iam),'btn-info':(PlayerData.votedToSkip(PlayerData.collection.iam))}"
+                    ng-click="PlayerData.userIdVoteToSkip(PlayerData.collection.iam)">Vote<span ng-if="(PlayerData.votedToSkip(PlayerData.collection.iam))">d</span> to skip <span ng-if="PlayerData.collection.seconds_left_to_skip&&PlayerData.votedToSkip(PlayerData.collection.iam)" class="badge">{{PlayerData.collection.seconds_left_to_skip}}</span>
+                    <span class="glyphicon glyphicon-fast-forward"></span>
+                </button><button ng-if="PlayerData.collection.mode=='satellite'" class="btn navbar-btn" style="width:33%%;"
+                ng-click="SatellitePlayer.next()"><span class="glyphicon glyphicon-fast-forward"></span></button>
+            </div>
+            </form>
+        </nav>
+        <script src="/static/js/jquery-2.0.3.min.js"></script>
+
+        <!-- Latest compiled and minified JavaScript -->
+        <script type="text/javascript"
+                src="static/js/bootstrap-3.3.5-dist/js/bootstrap.min.js"></script>
+
+        <script type="text/javascript"
+                src="/static/js/angular.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-route.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-websocket.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-sanitize.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-cookies.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/ui-bootstrap-tpls-0.13.4.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-strap/angular-strap.min.js"></script>
+        <script type="text/javascript"
+                src="/static/js/angular-strap/angular-strap.tpl.min.js"></script>
+
+        <script type="text/javascript"
+                src="/static/js/angular-ui-tree/angular-ui-tree.min.js"></script>
+
+        <script type="text/javascript" src="/static/js/ng-tags-input.min.js"></script>
+        <script type="text/javascript" src="/static/js/angular-notify.min.js"></script>
+
+        <script type="text/javascript" src="/static/js/angular.audio.js"></script>
+
+        <script type="text/javascript" src="/static/js/fmp.js"></script>
+    </body>
+</html>

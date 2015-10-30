@@ -36,7 +36,9 @@ from pprint import pprint
 from datetime import datetime
 from copy import deepcopy
 from time import sleep, time
+from constants import SUPPORTED_EXTENSIONS
 # from utils import utcnow
+from .media_tags import MediaTags
 
 PLAYING = Gst.State.PLAYING
 PAUSED = Gst.State.PAUSED
@@ -49,26 +51,6 @@ time_format = Gst.Format(Gst.Format.TIME)
 # logger = logging.getLogger(__name__)
 
 logger = None
-SUPPORTED_EXTENSIONS = (
-    '',
-    '.avi',
-    '.divx',
-    '.flac',
-    '.flv',
-    '.m4a',
-    '.m4v',
-    '.mov',
-    '.mp3',
-    '.mp4',
-    '.mpeg',
-    '.mpg',
-    '.ogg',
-    '.vorb',
-    '.vorbis',
-    '.wav',
-    '.wma',
-    '.wmv',
-)
 
 debug_threads = False
 
@@ -366,6 +348,11 @@ class Player(GObject.GObject, Log):
             'remaining_str': "-%s" % self.format_ns(remaining),
             'state': self.state_string
         }
+        obj['str'] = "%s %s/%s" % (
+            obj['remaining_str'],
+            obj['position_str'],
+            obj['duration_str']
+        );
         # print "self.state_string:",self.state_string
         return obj
 
@@ -395,11 +382,7 @@ class Player(GObject.GObject, Log):
         #    return True
 
         self.last_time_status = deepcopy(obj)
-        obj['str'] = "%s %s/%s" % (
-            obj['remaining_str'],
-            obj['position_str'],
-            obj['duration_str']
-        );
+
         Gdk.threads_enter()
         self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
         Gdk.threads_leave()
@@ -475,6 +458,7 @@ class Player(GObject.GObject, Log):
 
 
     def push_status(self, msg):
+        return
         # Player.push_status()
         self.log_debug(".push_status:%s", msg)
         # self.alt_drawingarea_vbox_label.set_text(msg)
@@ -595,7 +579,7 @@ class Player(GObject.GObject, Log):
         if self.seek_lock:
             return
         self.seek_lock = True
-        if isinstance(position, (str, unicode)):
+        if isinstance(position, str):
             position = self.parse_position_string(position)
 
         if position < 0:
@@ -605,13 +589,7 @@ class Player(GObject.GObject, Log):
             self.log_error("DURATION IS 0")
             self.seek_lock = False
             return
-        """
 
-
-        self_duration = self.duration
-        if position > self_duration:
-            position = self_duration
-        """
         Gdk.threads_enter()
         self.playbin.seek_simple(
             Gst.Format.TIME,
@@ -770,9 +748,10 @@ class Player(GObject.GObject, Log):
     def get_img_path(self):
         img_path = ""
         possible_paths = [
-            os.path.join(sys.path[0],"static", "images"),
+            os.path.join(sys.path[0], "images"),
+            os.path.join(sys.path[0], "static", "images"),
             os.path.join(sys.path[0], "..", "static", "images"),
-            os.path.join(sys.path[0], "..", "images")
+            os.path.join(sys.path[0], "..", "images"),
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -866,10 +845,8 @@ class Player(GObject.GObject, Log):
             # logger.debug("SET IMAGE: PLAY")
             self.pause_btn.set_image(self.play_img)
         elif state == PLAYING:
-            logger.debug("SET IMAGE: PAUSE")
             self.pause_btn.set_image(self.pause_img)
-        else:
-            logger.debug("INVALID STATE: %s" % state)
+
         Gdk.threads_leave()
         self.push_status("state-changed:%s" % self.state_to_string(value))
 
@@ -1014,7 +991,7 @@ class Player(GObject.GObject, Log):
 class Playlist(Log):
     __name__ == 'Playlist'
     logger = logger
-    def __init__(self, files=[], player=None, index=0):
+    def __init__(self, files=[], player=None, index=0, *args, **kwargs):
         self.index = index
         self.files = files
         if player is None:
@@ -1283,139 +1260,6 @@ def get_files_in_dir(folder):
                 continue
             result.append(os.path.realpath(os.path.join(root, name)))
     return result
-
-audio_ext = ['.mp3','.wav','.ogg','.wma','.flac', '.m4a']
-audio_with_tags = ['.mp3','.ogg','.wma','.flac', '.m4a']
-video_ext = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
-             '.mp4', '.mov', '.m4v']
-
-def is_video(ext=None):
-    return ext.lower() in video_ext
-
-
-def is_audio(ext=None):
-    return ext.lower() in audio_ext
-
-
-def has_tags(ext=None):
-    return ext.lower() in audio_with_tags
-
-
-class MediaTags(object):
-    def __init__(self, filename=None):
-        self.filename = filename
-        self.direction = os.path.dirname(filename)
-        self.basename = os.path.basename(filename)
-        self.tags_easy = None
-        self.tags_hard = None
-        self.base, self.ext = os.path.splitext(self.basename)
-        self.has_tags = has_tags(self.ext)
-        self.is_audio = is_audio(self.ext)
-        self.is_video = is_video(self.ext)
-        self.tags_combined = {}
-        self.exists = os.path.exists(self.filename)
-        self.get_tags()
-
-    def get_easy_tags(self):
-        if not self.exists or not self.has_tags or self.tags_easy is not None:
-            return
-        try:
-            self.tags_easy = mutagen.File(self.filename, easy=True)
-            # print "GET_TAGS EASY"
-            if self.tags_easy:
-                self.combine_tags(self.tags_easy)
-
-        except mutagen.mp3.HeaderNotFoundError as e:
-            # print "mutagen.mp3.HeaderNotFoundError:",e
-            self.tags_easy = None
-        except KeyError as e:
-            print("KeyError:", e)
-            # if self.tags_easy:
-            # self.tags_easy = None
-
-    def combine_tags(self, tags):
-        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist',
-                       'tpe1', 'tpe2', 'tpe3')
-        title_keys = ('title', 'tit2')
-        album_keys = ('album', 'wm/albumtitle', 'albumtitle', 'talb')
-        year_keys = ('year', 'wm/year', 'date', 'tdrc', 'tdat', 'tory', 'tdor',
-                     'tyer')
-        genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
-                      'tcon')
-        track_keys = ('wm/tracknumber', 'track', 'trck')
-        image_keys = ('apic:', 'apic')
-        for k in tags:
-            # print "k:",k
-            # print "k:",k,":",tags[k]
-            self.add_to_combined(k, tags[k])
-            k_lower = k.lower()
-            if k_lower in artist_keys:
-                self.add_to_combined('artist', tags[k])
-            if k_lower in title_keys:
-                self.add_to_combined('title', tags[k])
-            if k_lower in album_keys:
-                self.add_to_combined('album', tags[k])
-            if k_lower in year_keys:
-                self.add_to_combined('year', tags[k])
-            if k_lower in genre_keys:
-                self.add_to_combined('genre', tags[k])
-            if k_lower in track_keys:
-                self.add_to_combined('track', tags[k])
-            if k_lower in image_keys:
-                # print "FOUND IMAGE"
-                self.add_to_combined('image', tags[k], convert_to_string=False)
-            if k_lower.startswith('apic:'):
-                self.add_to_combined('image', tags[k], convert_to_string=False)
-
-    def add_to_combined(self, tag, value, convert_to_string=True):
-        if tag not in self.tags_combined:
-            self.tags_combined[tag] = []
-        if value not in self.tags_combined[tag]:
-            if isinstance(value, list):
-                for v in value:
-                    if isinstance(v, list):
-                        for _v in value:
-                            if _v not in self.tags_combined[tag]:
-                                # print "_v:", _v
-                                if convert_to_string:
-                                    vs = "%s" % _v
-                                    vs = vs.replace("\x00", "")
-                                else:
-                                    vs = _v
-                                self.tags_combined[tag].append(vs)
-                    elif v not in self.tags_combined[tag]:
-                        try:
-                            if convert_to_string:
-                                vs = "%s" % v
-                                vs = vs.replace("\x00", "")
-                            else:
-                                vs = v
-                            self.tags_combined[tag].append(vs)
-                        except TypeError:
-                            continue
-                return
-            if convert_to_string:
-                self.tags_combined[tag].append("%s" % value)
-            else:
-                self.tags_combined[tag].append(value)
-
-    def get_hard_tags(self):
-        if not self.exists or not self.has_tags or self.tags_hard is not None:
-            return
-        try:
-            self.tags_hard = mutagen.File(self.filename)
-            # print "GET_TAGS HARD"
-            if self.tags_hard:
-                self.combine_tags(self.tags_hard)
-        except mutagen.mp3.HeaderNotFoundError as e:
-            # print "mutagen.mp3.HeaderNotFoundError:",e
-            self.tags_hard = None
-
-    def get_tags(self, easy=True, hard=True):
-        if easy:
-            self.get_easy_tags()
-        if hard:
-            self.get_hard_tags()
 
 if __name__ == "__main__":
     files = []

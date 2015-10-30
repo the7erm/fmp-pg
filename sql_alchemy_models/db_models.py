@@ -1,29 +1,60 @@
 
+import sys
+sys.path.append("../")
+from fmp_utils.db_session import engine, session, create_all, Session
+from fmp_utils.jobs import jobs
 from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
-                       Float
+                       Float, Date
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship, backref
+from sqlalchemy.sql import not_, and_, text
 import os
+from random import shuffle
+from datetime import date
 
-from fmp_base import Base
+try:
+    from .fmp_base import Base, to_json
+except SystemError:
+    from fmp_base import Base, to_json
+
 from math import floor
-import mutagen
 import re
 import sys
 import urllib
 from pprint import pprint, pformat
+from time import time
+
+
+from fmp_utils.constants import VALID_EXT
+from fmp_utils.media_tags import MediaTags
 
 import hashlib
 BLOCKSIZE = 65536
 
-AUDIO_EXT_WITH_TAGS = ['.mp3','.ogg','.wma','.flac', '.m4a']
-AUDIO_EXT_WITHOUT_TAGS = ['.wav']
-AUDIO_EXT = AUDIO_EXT_WITHOUT_TAGS + AUDIO_EXT_WITH_TAGS
+def get_users(user_ids=[]):
+    user_query = session.query(User)
+    if user_ids:
+        user_query = user_query.filter(User.id.in_(user_ids))
+    else:
+        user_query = user_query.filter(User.listening==True)
 
-VIDEO_EXT = ['.wmv','.mpeg','.mpg','.avi','.theora','.div','.divx','.flv',
-             '.mp4', '.mov', '.m4v']
+    users_query = user_query.order_by(User.name.asc())
+    users = user_query.all()
 
-VALID_EXT = AUDIO_EXT + VIDEO_EXT
+    if not users:
+        users = session.query(User)\
+                       .order_by(User.name.asc())\
+                       .all()
+    return users
+
+def do_commit(*objs):
+    for obj in objs:
+        _session = Session.object_session(obj)
+        if _session:
+            _session.commit()
+        else:
+            session.add(obj)
+            session.commit()
 
 artist_association_table = Table('artist_association', Base.metadata,
     Column('file_id', Integer, ForeignKey('files.id')),
@@ -65,11 +96,17 @@ class Artist(Base):
                           secondary=album_artist_association_table,
                           backref="artists")
 
+    def json(self):
+        return to_json(self, Artist)
+
 class Title(Base):
     __tablename__ = 'titles'
 
     id = Column(Integer, primary_key=True)
     name = Column(String)
+
+    def json(self):
+        return to_json(self, Title)
 
 class Keyword(Base):
     __tablename__ = 'keywords'
@@ -81,35 +118,49 @@ class Genre(Base):
     __tablename__ = 'genres'
     id = Column(Integer, primary_key=True)
     name = Column(String)
-    seqential = Column(Boolean, default=True)
+    seqential = Column(Boolean, default=False)
     enabled = Column(Boolean, default=True)
+
+    def json(self):
+        return to_json(self, Genre)
 
 class Album(Base):
     __tablename__ = 'albums'
     id = Column(Integer, primary_key=True)
     name = Column(String)
-    seqential = Column(Boolean, default=True)
+    seqential = Column(Boolean, default=False)
+
+    def json(self):
+        return to_json(self, Album)
 
 class File(Base):
     __tablename__ = 'files'
 
     id = Column(Integer, primary_key=True)
     time_played = Column(BigInteger)
+    percent_played = Column(Float)
     fingerprint = Column(String)
+    keywords_txt = Column(String)
+    reason = Column(String)
 
     artists = relationship("Artist", secondary=artist_association_table,
-                           backref="files")
+                           backref="files",
+                           order_by="Artist.name")
     titles = relationship("Title", secondary=title_assocation_table,
-                          backref="files")
+                          backref="files",
+                          order_by="Title.name")
     genres = relationship("Genre", secondary=genre_association_table,
-                           backref="files")
+                           backref="files",
+                           order_by="Genre.name")
     albums = relationship("Album", secondary=album_association_table,
-                           backref="files")
+                           backref="files",
+                           order_by="Album.name")
 
     keywords = relationship("Keyword", secondary=keywords_assocation_table,
                             backref="files")
 
-    user_file_info = relationship("UserFileInfo", backref="file")
+    user_file_info = relationship("UserFileInfo", backref="file",
+                                  order_by="UserFileInfo.user_id")
 
     locations = relationship(
         "Location",
@@ -129,9 +180,83 @@ class File(Base):
                 return True
         return False
 
-    def mark_as_played(self, percent=None):
-        self.time_played = time.time()
+    @property
+    def cued(self):
+        cued = session.query(Preload)\
+                      .filter(Preload.file_id==self.id)\
+                      .first()
+        if cued:
+            cued = cued.json()
+        else:
+            cued = False
 
+        return cued
+
+
+    def mark_as_played(self, **kwargs):
+        print("File.mark_as_played()")
+        percent_played = kwargs.get('percent_played', 0)
+        if self.percent_played and int(self.percent_played) == int(percent_played):
+            return
+        self.time_played = int(kwargs.get('now', time()))
+        self.percent_played = percent_played
+        do_commit(self)
+        self.iterate_user_ids(self.mark_user_as_played, **kwargs)
+
+    def iterate_user_ids(self, cmd, **kwargs):
+        if 'user_ids' in kwargs:
+            for user_id in kwargs.get('user_ids'):
+                cmd(user_id, **kwargs)
+            return
+
+        for user in session.query(User).filter(User.listening==True).all():
+            kwargs['user'] = user
+            cmd(user.id, **kwargs)
+
+        # The goal here is to make it so files are not marked as played
+        # when no one is listening, or inc de_inc score.
+
+    def mark_user_as_played(self, user_id, *args, **kwargs):
+        self.iterate_ufi('mark_as_played', user_id, *args, **kwargs)
+
+    def create_ufi(self, user_id, **kwargs):
+        if 'user' not in kwargs or not kwargs.get('user'):
+            kwargs['user'] = session.query(User).filter(id=user_id).first()
+
+        user = kwargs.get('user')
+        if not user:
+            return None
+
+        ufi = UserFileInfo()
+        ufi.file_id = self.id
+        ufi.user_id = user.id
+        ufi.reason = self.reason
+        return ufi
+
+    def inc_score(self, *args, **kwargs):
+        self.iterate_user_ids(self.inc_user_score, **kwargs)
+
+    def inc_user_score(self, user_id, *args, **kwargs):
+        self.iterate_ufi('inc_score', user_id, *args, **kwargs)
+
+    def deinc_score(self, *args, **kwargs):
+        self.iterate_user_ids(self.deinc_user_score, **kwargs)
+
+    def deinc_user_score(self, user_id, *args, **kwargs):
+        self.iterate_ufi('deinc_score', user_id, *args, **kwargs)
+
+    def iterate_ufi(self, cmd, user_id, *args, **kwargs):
+        for ufi in self.user_file_info:
+            if ufi.user.id == user_id:
+                ufi.reason = self.reason
+                exec_cmd = getattr(ufi, cmd)
+                exec_cmd(*args, **kwargs)
+                return
+
+        ufi = self.create_ufi(user_id, **kwargs)
+        if ufi:
+            exec_cmd = getattr(ufi, cmd)
+            exec_cmd(*args, **kwargs)
 
     def __repr__(self):
            return ("<File(id=%r,\n"
@@ -140,6 +265,47 @@ class File(Base):
                     self.id,
                     self.fingerprint,
                     self.filename))
+
+    def clear_voted_to_skip(self, user_ids=[]):
+
+        users = get_users(user_ids)
+
+        for user in users:
+            for ufi in self.user_file_info:
+                if ufi.user_id == user.id and ufi.voted_to_skip:
+                    ufi.voted_to_skip = False
+                    do_commit(ufi)
+
+    def get_users(self, user_ids=[]):
+        return get_users(user_ids)
+
+    def json(self, user_ids=[]):
+        json = to_json(self, File)
+        json['cued'] = self.cued
+
+        users = get_users(user_ids)
+
+        keys = ['artists', 'titles', 'genres', 'locations']
+        for k in keys:
+            json[k] = []
+            for obj in getattr(self, k):
+                json[k].append(obj.json())
+
+        json['user_file_info'] = []
+        for user in users:
+            found = False
+            for ufi in self.user_file_info:
+                if ufi.user_id == user.id:
+                    json['user_file_info'].append(ufi.json())
+                    found = True
+                    break
+            if found:
+                continue
+            ufi = self.create_ufi(user.id, user=user)
+            do_commit(ufi)
+            json['user_file_info'].append(ufi.json())
+
+        return json
 
 class DiskEntitiy(object):
     id = Column(Integer, primary_key=True)
@@ -192,9 +358,6 @@ class Location(DiskEntitiy, Base):
         return self.mtime != self.actual_mtime or self.size != self.actual_size
 
     def scan(self):
-        self.tags_easy = None
-        self.tags_hard = None
-        self.tags_combined = {}
         if not self.exists:
             print ("missing:", self.filename)
             return
@@ -203,32 +366,7 @@ class Location(DiskEntitiy, Base):
             print ("not changed:", self.filename)
             return
 
-        self.tags_combined = {
-            'artist': [],
-            'title': [],
-            'genre': [],
-            'album': [],
-            'year': [],
-            'track': [],
-            'keywords': []
-        }
-        try:
-            tags_easy = mutagen.File(self.filename, easy=True)
-            self.combine_tags(tags_easy)
-        except mutagen.mp3.HeaderNotFoundError:
-            pass
-        except mutagen.mp4.MP4StreamInfoError:
-            pass
-
-        try:
-            tags_hard = mutagen.File(self.filename)
-            self.combine_tags(tags_hard)
-        except mutagen.mp3.HeaderNotFoundError:
-            pass
-        except mutagen.mp4.MP4StreamInfoError:
-            pass
-
-
+        self.media_tags = MediaTags(filename=self.filename)
         self.update_fingerprint()
 
         if not self.file:
@@ -238,9 +376,7 @@ class Location(DiskEntitiy, Base):
                 self.file = File()
 
         self.file.fingerprint = self.fingerprint
-        session.add(self.file)
-        session.add(self)
-        session.commit()
+        do_commit(self.file, self)
         self.set_file_assocations()
         self.update_stats()
 
@@ -249,40 +385,24 @@ class Location(DiskEntitiy, Base):
         self.mtime = self.actual_mtime
         self.size = self.actual_size
         self.file_exists = self.exists
-        session.add(self)
-        session.commit()
+        do_commit(self)
 
     def set_file_assocations(self):
         # self.add_keyword(self.basename)
-        base, ext = os.path.splitext(self.basename)
-        artist_from_filename = ""
-        try:
-            artist_from_filename, title_from_filename = base.split("-", 1)
-        except:
-            title_from_filename = base
-        artist_from_filename = artist_from_filename.strip()
-        title_from_filename = title_from_filename.strip()
-
-        if artist_from_filename:
-            self.add_to_combined('artist', artist_from_filename)
-
-        if title_from_filename:
-            self.add_to_combined('title', title_from_filename)
 
         self.add_obj(Artist, 'artist')
         self.add_obj(Title, 'title')
 
         self.add_obj(Genre, 'genre')
         self.add_obj(Album, 'album')
-        self.add_obj(Keyword, 'keywords')
+        # self.add_obj(Keyword, 'keywords')
+        self.file.keywords_txt = " ".join(self.media_tags.tags_combined['keywords'])
 
-        session.add(self.file)
-        session.commit()
-
-
+        do_commit(self.file)
 
     def add_obj(self, cls, tag):
-        for text in self.tags_combined.get(tag, []):
+        for text in self.media_tags.tags_combined.get(tag, []):
+            text = str(text)
             text = text.strip()
             if not text:
                 continue
@@ -290,98 +410,12 @@ class Location(DiskEntitiy, Base):
             if not obj:
                 obj = cls()
             obj.name = text
-            session.add(obj)
-            session.commit()
-            self.add_keyword(text)
+            do_commit(obj)
             obj.files.append(self.file)
-            session.add(obj)
-            session.commit()
+            do_commit(obj)
             print ("*"*100)
             print ("TAG %s:" % tag, text)
             print ("-"*100)
-
-
-
-    def combine_tags(self, tags):
-        if not tags:
-            return
-        artist_keys = ('artist', 'author', 'wm/albumartist', 'albumartist',
-                       'tpe1', 'tpe2', 'tpe3')
-        title_keys = ('title', 'tit2')
-        album_keys = ('album', 'wm/albumtitle', 'albumtitle', 'talb')
-        year_keys = ('year', 'wm/year', 'date', 'tdrc', 'tdat', 'tory', 'tdor',
-                     'tyer')
-        genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
-                      'tcon')
-        track_keys = ('wm/tracknumber', 'track', 'trck')
-        for k in tags:
-            # print ("k:",k,":",end="")
-            try:
-                # print(tags[k])
-                self.add_to_combined(k, tags[k])
-            except KeyError as e:
-                print ("KeyError:", e)
-                continue
-            k_lower = k.lower()
-            if k_lower in artist_keys:
-                self.add_to_combined('artist', tags[k])
-            if k_lower in title_keys:
-                self.add_to_combined('title', tags[k])
-            if k_lower in album_keys:
-                self.add_to_combined('album', tags[k])
-            if k_lower in year_keys:
-                self.add_to_combined('year', tags[k])
-            if k_lower in genre_keys:
-                self.add_to_combined('genre', tags[k])
-            if k_lower in track_keys:
-                self.add_to_combined('track', tags[k])
-
-    def add_keyword(self, value):
-        value = "%s" % value
-        value = value.lower()
-        value = value.strip()
-        if not value:
-            return
-        words = value.split(" ")
-        for word in words:
-            if not word:
-                continue
-            if word not in self.tags_combined['keywords']:
-                self.tags_combined['keywords'].append(word)
-
-            _word = re.sub("[^A-z0-9]+", "", word)
-            if _word and _word != word and \
-               _word not in self.tags_combined['keywords']:
-                self.tags_combined['keywords'].append(_word)
-
-            _word = re.split("[^A-z0-9]+", word)
-            for w in _word:
-                if w and w not in self.tags_combined['keywords']:
-                    self.tags_combined['keywords'].append(w)
-
-
-    def add_to_combined(self, tag, value):
-        if tag not in self.tags_combined:
-            self.tags_combined[tag] = []
-        if value not in self.tags_combined[tag]:
-            if isinstance(value, list):
-                for v in value:
-                    if isinstance(v, list):
-                        for _v in value:
-                            if _v not in self.tags_combined[tag]:
-                                vs = "%s" % _v
-                                vs = vs.replace("\x00", "")
-                                self.tags_combined[tag].append(vs)
-
-                    elif v not in self.tags_combined[tag]:
-                        try:
-                            vs = "%s" % v
-                            vs = vs.replace("\x00", "")
-                            self.tags_combined[tag].append(vs)
-                        except TypeError:
-                            continue
-                return
-            self.tags_combined[tag].append("%s" % value)
 
     def update_fingerprint(self):
         hasher = hashlib.sha512()
@@ -404,8 +438,10 @@ class Location(DiskEntitiy, Base):
 
 
         self.fingerprint = hasher.hexdigest()
-        session.add(self)
-        session.commit()
+        do_commit(self)
+
+    def json(self):
+        return to_json(self, Location)
 
 
 class Folder(DiskEntitiy, Base):
@@ -422,6 +458,7 @@ class Folder(DiskEntitiy, Base):
         if not self.changed:
             print("NOT CHANGED:", self.dirname)
             return
+
         print ("scanning:", self.dirname)
         for dirname, dirs, files in os.walk(self.dirname):
             # pprint(files)
@@ -453,9 +490,8 @@ class Folder(DiskEntitiy, Base):
                     loc.basename = _basename
                 loc.scan()
             break
-        session.add(self)
         self.mtime = self.actual_mtime
-        session.commit()
+        do_commit(self)
 
 
 class User(Base):
@@ -469,6 +505,11 @@ class User(Base):
     user_file_info = relationship("UserFileInfo", backref="user")
     history = relationship("UserFileHistory", backref="user")
 
+    def json(self):
+        d = to_json(self, User)
+        del d['pword']
+        return d
+
     def __repr__(self):
        return "<User(name=%r)>" % (
                     self.name)
@@ -478,19 +519,95 @@ class UserFileInfo(Base):
 
     id = Column(Integer, primary_key=True)
 
-    rating = Column(Integer)
-    skip_score = Column(Integer)
-    true_score = Column(Float)
+    rating = Column(Integer, default=6)
+    skip_score = Column(Integer, default=5)
+    true_score = Column(Float, default=((6 * 2 * 10) + (5 * 10)) / 2)
     time_played = Column(BigInteger)
+    date_played = Column(Date)
     percent_played = Column(Float)
+    reason = Column(String)
+    voted_to_skip = Column(Boolean)
 
     file_id = Column(Integer, ForeignKey('files.id'))
     user_id = Column(Integer, ForeignKey('users.id'))
     history = relationship("UserFileHistory", backref="user_file_info")
 
+    def mark_as_played(self, **kwargs):
+        print ("UserFileInfo.mark_as_played()")
+        self.time_played = int(kwargs.get('now', time()))
+        self.percent_played = kwargs.get('percent_played', 0)
+        self.date_played = date.fromtimestamp(self.time_played)
+        do_commit(self)
+
+        for h in self.history:
+            print("H:",h)
+            if h.date_played == self.date_played and h.user_id == self.user_id:
+                self.update_ufh(h)
+                h.mark_as_played(**kwargs)
+                return
+
+        ufh = UserFileHistory()
+        self.update_ufh(ufh)
+        ufh.mark_as_played(**kwargs)
+        self.history.append(ufh)
+
+    def update_ufh(self, ufh):
+        ufh.user_file_id = self.id
+        ufh.user_id = self.user_id
+        ufh.file_id = self.file_id
+        ufh.rating = self.rating
+        ufh.reason = self.reason
+        ufh.voted_to_skip = self.voted_to_skip
+        ufh.skip_score = self.skip_score
+        ufh.true_score = self.true_score
+
+    def inc_score(self, *args, **kwargs):
+        if self.skip_score is None:
+            self.skip_score = 5
+
+        if self.voted_to_skip:
+            # The user voted to skip, but the other users didn't so they
+            # were forced to listen to the whole song.
+            # We'll take it down by 2 notches for them.
+            self.skip_score += -2
+        else:
+            self.skip_score += 1
+        self.calculate_true_score()
+
+    def deinc_score(self, *args, **kwargs):
+        if self.skip_score is None:
+            self.skip_score = 5
+        self.skip_score += -1
+        self.calculate_true_score()
+
+    def calculate_true_score(self):
+        print("UserFileInfo.calculate_true_score()")
+        if self.rating is None:
+            self.rating = 6
+        if self.skip_score is None:
+            self.skip_score = 5
+
+        true_score = (((self.rating * 2 * 10) + (self.skip_score * 10)) / 2)
+
+        if true_score < -20:
+            true_score = -20
+
+        if true_score > 125:
+            true_score = 125
+
+        self.true_score = true_score
+
+        do_commit(self)
+
     def __repr__(self):
         return "<UserFileInfo(file_id=%r, user_id=%r)>" % (
                           self.file_id, self.user_id)
+
+    def json(self):
+        ufi = to_json(self, UserFileInfo)
+        if ufi:
+            ufi['user'] = self.user.json()
+        return ufi
 
 class UserFileHistory(Base):
     __tablename__ = "user_file_history"
@@ -500,35 +617,60 @@ class UserFileHistory(Base):
     skip_score = Column(Integer)
     true_score = Column(Float)
     time_played = Column(BigInteger)
+    date_played = Column(Date)
     percent_played = Column(Float)
     reason = Column(String)
+    voted_to_skip = Column(Boolean)
     user_id = Column(Integer, ForeignKey('users.id'))
     file_id = Column(Integer, ForeignKey('files.id'))
     user_file_id = Column(Integer, ForeignKey('user_file_info.id'))
 
+    def mark_as_played(self, **kwargs):
+        print ("UserFileHistory.mark_as_played()")
+        self.time_played = int(kwargs.get('now', time()))
+        self.percent_played = kwargs.get('percent_played', 0)
+        self.date_played = date.fromtimestamp(self.time_played)
+        do_commit(self)
+
+class PickFrom(Base):
+    __tablename__ = "pick_from"
+
+    id = Column(Integer, primary_key=True)
+    file_id = Column(Integer, index=True)
+
+class Preload(Base):
+    __tablename__ = "preload"
+    id = Column(Integer, primary_key=True)
+    file_id = Column(Integer, ForeignKey('files.id'))
+    user_id = Column(Integer, ForeignKey('users.id'))
+    reason = Column(String)
+    from_search = Column(Boolean, default=False)
+
+    def json(self):
+        return to_json(self, Preload)
 
 if __name__ == "__main__":
-    from db_session import engine, session, create_all
+
     create_all(Base)
 
     dirs = [
         '/home/erm/disk2/acer-home/Amazon MP3',
         '/home/erm/disk2/acer-home/Amazon-MP3',
-        '/home/erm/disk2/acer-home/dwhelper',
-        '/home/erm/disk2/acer-home/halle',
         '/home/erm/disk2/acer-home/media',
+        '/home/erm/disk2/acer-home/dwhelper',
+        '/home/erm/disk2/syncthing',
         '/home/erm/disk2/acer-home/mp3',
         '/home/erm/disk2/acer-home/ogg',
-        '/home/erm/disk2/acer-home/sam',
         '/home/erm/disk2/acer-home/steph',
         '/home/erm/disk2/acer-home/stereofame',
-        '/home/erm/disk2/syncthing',
+        '/home/erm/disk2/acer-home/sam',
+        '/home/erm/disk2/acer-home/halle',
     ]
+    shuffle(dirs)
     for d in dirs:
         folder = session.query(Folder).filter_by(dirname=d).first()
         if not folder:
             folder = Folder(dirname=d)
 
-        session.add(folder)
-        session.commit()
+        do_commit(folder)
         folder.scan()

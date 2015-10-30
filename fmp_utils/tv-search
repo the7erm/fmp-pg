@@ -1,0 +1,5 @@
+
+SELECT keywords_txt, ts_rank_cd(to_tsvector('english', keywords_txt), query) AS rank
+FROM files, plainto_tsquery('english', '') query
+WHERE query @@ to_tsvector('english', keywords_txt)
+ORDER BY rank DESC;

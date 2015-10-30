@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 import json
+from datetime import datetime, date
 
 Base = declarative_base()
 
@@ -15,6 +16,9 @@ def to_json(inst, cls):
     d = dict()
     for c in cls.__table__.columns:
         v = getattr(inst, c.name)
+        if isinstance(v, (datetime, date)):
+            v = "%s" % v
+
         if c.type in convert.keys() and v is not None:
             try:
                 d[c.name] = convert[c.type](v)
@@ -24,4 +28,4 @@ def to_json(inst, cls):
             d[c.name] = str()
         else:
             d[c.name] = v
-    return json.dumps(d)
+    return d
