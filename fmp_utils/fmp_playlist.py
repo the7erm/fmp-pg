@@ -12,13 +12,17 @@ class FmpPlaylist(Playlist):
         self.skip_countdown = 5
         self.server = kwargs.get('server')
         self.server.playlist = self
-        self.files = picker.get_recently_played()
-        if not self.files:
-            self.files = picker.get_preload()
-        self.preload = picker.get_preload()
-        self.set_player_uri()
-        self.player.state = 'PLAYING'
-        self.player.position = "%s%%" % self.files[self.index].percent_played
+        self.files = []
+        self.preload = []
+        if not kwargs.get('first_run'):
+            self.files = picker.get_recently_played()
+            if not self.files:
+                self.files = picker.get_preload()
+            self.preload = picker.get_preload()
+
+            self.set_player_uri()
+            self.player.state = 'PLAYING'
+            self.player.position = "%s%%" % self.files[self.index].percent_played
         self.tray_icon = TrayIcon(playlist=self)
 
 

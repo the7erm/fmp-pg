@@ -3,8 +3,11 @@ import sys
 sys.path.append('../')
 
 from fmp_utils.db_session import session
-from sql_alchemy_models.db_models import File, User, UserFileInfo, PickFrom,\
-                                         Preload
+from models.file import File
+from models.user import User
+from models.user_file_info import UserFileInfo
+from models.pick_from import PickFrom
+from models.preload import Preload
 from sqlalchemy.sql import not_, and_, text
 from random import shuffle
 from collections import defaultdict

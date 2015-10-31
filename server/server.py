@@ -12,10 +12,15 @@ from ws4py.messaging import TextMessage, BinaryMessage
 sys.path.append("../")
 from fmp_utils.db_session import session, Session, commit
 from fmp_utils.misc import to_bool
-from sql_alchemy_models.db_models import User, File, UserFileInfo, Preload,\
-                                         get_users, Genre
+from fmp_utils.first_run import first_run
+from models.base import to_json
+from models.user import User
+from models.file import File
+from models.user_file_info import UserFileInfo
+from models.preload import Preload
+from models.genre import Genre
+from models.user import get_users
 from sqlalchemy.sql import not_, text, and_
-from sql_alchemy_models.fmp_base import to_json
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -56,10 +61,10 @@ class FmpServer(object):
         template_data = {
             'host': cherrypy.request.headers['Host'],
             'scheme': 'ws',
-            'playlist_data': json.dumps(playlist.json())
+            'playlist_data': []
         }
         static_path = sys.path[0]
-        index_path = os.path.join(static_path, "cherry_py_server", "templates",
+        index_path = os.path.join(static_path, "server", "templates",
                                   "index.html")
         data = "Error"
         with open(index_path, 'r') as fp:
@@ -397,7 +402,7 @@ class FmpServer(object):
 
 
 def cherry_py_worker():
-    root_path = os.path.join(sys.path[0], "cherry_py_server")
+    root_path = os.path.join(sys.path[0], "server")
     print("root_path:", root_path)
     static_img_path = os.path.join(root_path, "static", "images")
     print ("IMAGE PATH:", static_img_path)

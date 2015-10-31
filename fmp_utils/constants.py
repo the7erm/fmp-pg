@@ -34,3 +34,12 @@ VALID_EXT = AUDIO_EXT + VIDEO_EXT
 # This is for the player
 SUPPORTED_EXTENSIONS = [''] + VALID_EXT
 
+import os
+import sys
+
+CONFIG_DIR = os.path.expanduser(os.path.join("~/",".fmp"))
+
+if "--test-first-run" in sys.argv:
+    CONFIG_DIR = os.path.expanduser(os.path.join("~/",".fmp-test"))
+
+CACHE_DIR = os.path.join(CONFIG_DIR, "cache")

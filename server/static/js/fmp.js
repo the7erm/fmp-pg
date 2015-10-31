@@ -10,7 +10,10 @@ var fmpApp = angular.module('fmpApp', [
     'ui.tree',
     'ngTagsInput',
     'cgNotify',
-    'ngAudio'
+    'ngAudio',
+    'mgcrea.ngStrap.helpers.dimensions',
+    'mgcrea.ngStrap.helpers.debounce',
+    'ngSanitize',
   ])
   .factory('UserUtils', ['$http', function($http){
       var methods = {};
@@ -1070,6 +1073,9 @@ var fmpApp = angular.module('fmpApp', [
 
     });
   })
+  .controller('WelcomeController', function($scope, $http){
+    $scope.page = 1;
+  })
   .controller('GenreController', function($scope, $http){
     $scope.genres = [];
     $scope.toggleGenre = function(genre){
@@ -1143,8 +1149,18 @@ var fmpApp = angular.module('fmpApp', [
       {stateOn: 'yellow-star', stateOff: 'grey-star'},
       {stateOn: 'question-mark-on', stateOff: 'question-mark-off'}
     ];
-}).config(['$routeProvider', '$locationProvider',
-  function($routeProvider) {
+}).config(['$routeProvider', '$locationProvider', '$scrollspyProvider',
+           '$affixProvider',
+
+  function($routeProvider, $locationProvider, $scrollspyProvider, $affixProvider) {
+    angular.extend($scrollspyProvider.defaults, {
+      animation: 'am-fade-and-slide-top',
+      placement: 'top'
+    });
+
+    angular.extend($affixProvider.defaults, {
+      offsetTop: 100
+    });
     $routeProvider
       .when('/artists', {
         templateUrl: '/static/templates/artists.html',
@@ -1172,6 +1188,14 @@ var fmpApp = angular.module('fmpApp', [
       .when("/genres", {
         templateUrl:"/static/templates/genres.html",
         controller:"GenreController"
+      })
+      .when("/welcome/", {
+        templateUrl:"/static/templates/welcome.html",
+        controller:"WelcomeController"
+      })
+      .when("/welcome/:page", {
+        templateUrl:"/static/templates/welcome.html",
+        controller:"WelcomeController"
       })
       .otherwise({
         redirectTo: '/home'

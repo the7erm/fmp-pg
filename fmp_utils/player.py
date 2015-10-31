@@ -36,7 +36,7 @@ from pprint import pprint
 from datetime import datetime
 from copy import deepcopy
 from time import sleep, time
-from constants import SUPPORTED_EXTENSIONS
+from .constants import SUPPORTED_EXTENSIONS
 # from utils import utcnow
 from .media_tags import MediaTags
 
