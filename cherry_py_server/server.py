@@ -13,7 +13,7 @@ sys.path.append("../")
 from fmp_utils.db_session import session, Session, commit
 from fmp_utils.misc import to_bool
 from sql_alchemy_models.db_models import User, File, UserFileInfo, Preload,\
-                                         get_users
+                                         get_users, Genre
 from sqlalchemy.sql import not_, text, and_
 from sql_alchemy_models.fmp_base import to_json
 
@@ -225,6 +225,22 @@ class FmpServer(object):
         if voted_to_skip:
             playlist.skip_countdown = 5
         playlist.broadcast_playing()
+
+    @cherrypy.expose
+    def genres(self, *args, **kwargs):
+        genres = session.query(Genre).order_by(Genre.name).all()
+        return json_dumps([g.json() for g in genres])
+
+    @cherrypy.expose
+    def genre_enabled(self, *args, **kwargs):
+        session = Session()
+        genre = session.query(Genre)\
+                       .filter(Genre.id==kwargs.get('id'))\
+                       .first()
+
+        genre.enabled = to_bool(kwargs.get('enabled'))
+        session.commit()
+
 
     @cherrypy.expose
     def listeners(self, *args, **kwargs):

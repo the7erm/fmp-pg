@@ -1074,7 +1074,6 @@ var fmpApp = angular.module('fmpApp', [
     $scope.genres = [];
     $scope.toggleGenre = function(genre){
       genre.enabled = !genre.enabled;
-      genre.query = $scope.query;
       $http({
         method: 'GET',
         url: '/genre_enabled/',
