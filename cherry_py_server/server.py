@@ -225,6 +225,7 @@ class FmpServer(object):
         if voted_to_skip:
             playlist.skip_countdown = 5
         playlist.broadcast_playing()
+        print("VOTED TO SKIP")
 
     @cherrypy.expose
     def genres(self, *args, **kwargs):
