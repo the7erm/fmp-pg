@@ -6,6 +6,7 @@
 </div>
 <hr> -->
 <!-- bsActivePane is optional -->
+
 <div bs-active-pane="tabs.activeTab" bs-tabs>
   <div title="Welcome" name="Welcome" bs-pane>
     <div marked src="'/docs/1-welcome.md'"></div>
@@ -31,13 +32,13 @@
     <div ng-include src="'/static/templates/postgres-config.html'"></div>
   </div>
   <div title="Users" name="Users" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
-    <div ng-controller="ListenerCtrl" ng-include src="'/static/templates/listeners.html'"></div>
+    <div ng-controller="ListenerCtrl" ng-include src="'/static/templates/listeners.html'" ></div>
   </div>
-  <div title="Folders" name="FoldersList" bs-pane>
+  <div title="Folders" name="FoldersList" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
     <div ng-controller="FoldersCtrl" ng-include src="'/static/templates/folders.html'">FoldersCtrl</div>
   </div>
-</div>
 
+</div>
 
 <br clear="all">
 <br clear="all">

@@ -35,3 +35,13 @@ title_assocation_table = Table('title_assocation', Base.metadata,
     Column('file_id', Integer, ForeignKey('files.id')),
     Column('title_id', Integer, ForeignKey('titles.id'))
 )
+
+folder_assocation_table = Table('folder_assocation', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('folder_id', Integer, ForeignKey('folders.id'))
+)
+
+netcast_assocation_table = Table('netcast_association', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('rss_id', Integer, ForeignKey('rss.id'))
+)

@@ -8,12 +8,9 @@ from sqlalchemy import Column, Integer, String, BigInteger,\
                        Float, Boolean
 from sqlalchemy.orm import relationship
 
-try:
-    from .base import Base, to_json
-except SystemError:
-    from base import Base, to_json
-
+from .base import Base, to_json
 from .user_file_info import UserFileInfo
+from .associations import folder_assocation_table, netcast_assocation_table
 
 class User(Base):
     __tablename__ = 'users'
@@ -25,6 +22,13 @@ class User(Base):
     listening = Column(Boolean)
     user_file_info = relationship("UserFileInfo", backref="user")
     history = relationship("UserFileHistory", backref="user")
+    folders = relationship("Folder",
+                           secondary=folder_assocation_table,
+                           backref="owners")
+
+    subscriptions = relationship("Rss",
+                                 secondary=netcast_assocation_table,
+                                 backref="subscribers")
 
     def json(self):
         d = to_json(self, User)

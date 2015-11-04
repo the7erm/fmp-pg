@@ -289,11 +289,19 @@ def check_config():
 def is_first_run():
     response = check_config()
     config = response['config']
+    postgres = response['postgres']
     pprint(config)
-    if not config['dir']['exists'] or not config['file']['exists']:
-        print ("IS FIRST RUN")
-        print("^"*100)
+    try:
+        if not config['dir']['exists'] or not config['file']['exists'] or\
+           not postgres['installed'] or not postgres['running'] or \
+           not postgres['running'] or not postgres['db_exists'] or\
+           not postgres['can_connect']['connected']:
+            print ("IS FIRST RUN")
+            print("^"*100)
+            return True
+    except KeyError:
         return True
+
     return False
 
 first_run = is_first_run()

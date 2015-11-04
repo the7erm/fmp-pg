@@ -15,7 +15,6 @@ from .location import Location
 from .utils import do_commit
 from .base import Base, to_json
 
-
 class Folder(DiskEntitiy, Base):
     __tablename__ = "folders"
     __mapper_args__ = {'concrete':True}

@@ -5,6 +5,7 @@ if "../" not in sys.path:
     sys.path.append("../")
 import feedparser
 import re
+from fmp_utils.constants import CACHE_DIR
 from fmp_utils.db_session import  create_all, Session
 from fmp_utils.jobs import jobs
 from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
@@ -14,14 +15,7 @@ from sqlalchemy.sql import not_, and_, text
 from pprint import pprint
 from time import mktime
 from .user import User
-
-try:
-    from .base import Base, to_json
-except SystemError:
-    from base import Base, to_json
-
-
-CACHE_DIR = '/home/erm/.fmp/cache'
+from .base import Base, to_json
 
 class Rss(Base):
     __tablename__ = "rss"

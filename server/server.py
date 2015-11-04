@@ -35,8 +35,11 @@ cherrypy.tools.websocket = WebSocketTool()
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
-
-        playlist.broadcast_playing()
+        try:
+            playlist.broadcast_playing()
+        except NameError:
+            print("Playlist not initialized")
+            pass
         #  print ("json.loads()", json.loads(str_mdata))
 
         # cherrypy.engine.publish('websocket-broadcast', m)
@@ -627,7 +630,7 @@ class FmpServer(object):
                                           recurse-1),
                 'collapsed': True,
                 'has_media': has_media,
-                'folder': {}
+                'folder': folder_data.json()
             })
         return folders
 

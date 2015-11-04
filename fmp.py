@@ -25,6 +25,6 @@ else:
     from fmp_utils.db_session import create_all
     create_all(Base)
 
-playlist = FmpPlaylist(server=server, first_run=first_run.first_run)
+playlist = FmpPlaylist(server=server, first_run=first_run)
 
 Gtk.main()

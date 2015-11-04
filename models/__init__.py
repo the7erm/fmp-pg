@@ -16,24 +16,3 @@ from .user_file_info import *
 from .user_file_history import *
 from .utils import *
 
-"""
-album.py
-artist.py
-associations.py
-base.py
-db_models.py
-disk_entity.py
-file.py
-folder.py
-genre.py
-__init__.py
-location.py
-netcast.py
-pick_from.py
-preload.py
-title.py
-user_file_history.py
-user_file_info.py
-user.py
-utils.py
-"""
