@@ -4,7 +4,6 @@ from time import time
 
 if "../" not in sys.path:
     sys.path.append("../")
-from fmp_utils.db_session import engine, session, create_all, Session
 from sqlalchemy import ForeignKey, Column, Integer, String, BigInteger,\
                        Float, Date, Boolean
 from sqlalchemy.orm import relationship

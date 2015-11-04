@@ -1,0 +1,157 @@
+<br>
+<dl class="diagnostics" ng-if="progress.postgres.installed">
+    <dt><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.config.file.exists,
+                 'glyphicon glyphicon-remove-circle red':!progress.config.file.exists}"> </span> Config file exists
+    </dt>
+    <dd>Location:<code>{{progress.config.file.filename}}</code></dd>
+    <dd ng-if="progress.config.file.exists"><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.config.file.R_OK,
+                 'glyphicon glyphicon-remove-circle red':!progress.config.file.R_OK}"> </span> Config file readable</dd>
+    <dd ng-if="progress.config.file.exists"><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.config.file.W_OK,
+                 'glyphicon glyphicon-remove-circle red':!progress.config.file.W_OK}"> </span> Config file writeable</dd>
+    <dd ng-if="progress.config.file.exists"><span ng-class="{
+        'glyphicon glyphicon-ok-sign green':!progress.config.file.X_OK,
+        'glyphicon glyphicon-remove-circle red':progress.config.file.X_OK}"> </span> Config file <span ng-if="!progress.config.file.X_OK">NOT</span> executable</dd>
+    <dd ng-if="progress.config.file.exists">
+        <dl class="sub-diagnostic">
+            <dt ng-if="!progress.config.file.X_OK"><span class='glyphicon glyphicon-ok-sign green'></span>
+                Good practice</dt>
+            <dd ng-if="!progress.config.file.X_OK">Good job, it's important not to have files executable bit on when it's not needed.</dd>
+            <dt ng-if="progress.config.file.X_OK"><span class='glyphicon glyphicon-remove-circle red'></span>
+                Bad practice</dt>
+            <dd ng-if="progress.config.file.X_OK">While having <code>{{ progress.config.file.filename }}</code> executable won't stop FMP from working properly,  It's highly discouraged having it's executable bit on.  To fix the problem run <code>chmod -x {{ progress.config.file.filename }}</code></dd>
+        </dl>
+    </dd>
+
+  <dt><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.postgres.can_connect.connected,
+                 'glyphicon glyphicon-remove-circle red':!progress.postgres.can_connect.connected}"> </span> Create config file & Connect to db
+  </dt>
+  <dd ng-show="progress.postgres.can_connect">
+    <form name="pgForm">
+        <div class="form-group">
+
+            <label for="uname"><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.postgres.role_exists,
+                 'glyphicon glyphicon-remove-circle red':!progress.postgres.role_exists}"></span> User Name:</label>
+            <div ng-repeat="(key, data) in progress.postgres.db_user_list">
+                <div ng-if="data.role_name==progress.postgres.config.username">
+                    <span class="glyphicon glyphicon-ok-sign green"></span>
+                    Role Exists
+                </div>
+            </div>
+            <input type="text" class="form-control" name="dbUname" id="dbUname"
+                   ng-model="progress.postgres.config.username"
+                   placeholder="database user" required
+                   ng-pattern="/^[A-z0-9\-\_]+$/"
+                   ng-trim="false">
+
+            <div ng-if="pgForm.dbUname.$touched">
+                <div class='label label-danger' ng-if="pgForm.dbUname.$error.required">Username required to connect to database</div>
+
+                <div ng-if="pgForm.dbUname.$error.pattern">
+                    <div class='label label-danger'>Invalid pattern detected:</div>
+                    Please limit yourself to <code>A-z</code> <code>0-9</code>, dashes <code>-</code> and underscores <code>_</code>. <code>.ini</code> files and some scripts won't parse them correctly.
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="pwd">Password:</label>
+            <input type="password" name="dbPword" class="form-control" id="pwd"
+                   placeholder="database password"
+                   ng-model="progress.postgres.config.password"
+                   ng-pattern="/^[A-z0-9\-\_]+$/">
+            For security reasons don't make the password the same as your system password.  Anyone who can access fmp can potentially access it.
+            <div ng-if="pgForm.dbPword.$touched">
+                <div ng-if="pgForm.dbPword.$error.pattern">
+                    <div class='label label-danger'>Invalid pattern detected:</div>
+                    Please limit yourself to <code>A-z</code> <code>0-9</code>, dashes <code>-</code> and underscores <code>_</code>. <code>.ini</code> files and some scripts won't parse them correctly.
+                </div>
+            </div>
+        </div>
+        <div ng-if="progress.postgres.config.username&&!progress.postgres.role_exists">
+        <p>
+            You will need to create a user in the postgres database.  To do that you'll need to login as the system's postgres user.
+        </p>
+        <p>
+<pre>
+sudo su - postgres
+createuser {{progress.postgres.config.username}} -d <span ng-if="progress.postgres.config.password">-P
+# Enter your password (it won't echo)
+Password:
+</span>
+# Just to be safe you should also create a database for that user.
+createdb {{progress.postgres.config.username}}
+exit # pro-tip: ctrl+d on an empty prompt will log you out.
+</pre>
+Alternate
+<pre>
+sudo su - postgresql
+psql
+CREATE ROLE {{progress.postgres.config.username}} WITH LOGIN <span ng-if="progress.postgres.config.password">ENCRYPTED PASSWORD '&lt;hidden for security reasons&gt;'</span>;
+</pre>
+                <a class="btn btn-default" ng-click="createRole()">Run this for me</a>
+            </p>
+        </div>
+        <div class="form-group">
+            <label for="name"><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.postgres.db_exists,
+                 'glyphicon glyphicon-remove-circle red':!progress.postgres.db_exists}"> </span> Database Name:</label><br>
+            <div ng-repeat="(key, data) in progress.postgres.db_list">
+                <div ng-if="data.name==progress.postgres.config.database">
+                    <span class="glyphicon glyphicon-ok-sign green"></span>
+                    Database Exists
+                </div>
+            </div>
+            <br>
+            <input type="text" class="form-control" id="name" ng-model="progress.postgres.config.database" data-min-length="0" placeholder="database name"  bs-typeahead
+            bs-options="database as db.name for db in progress.postgres.db_list">
+        </div>
+        <div ng-if="progress.postgres.config.database&&progress.postgres.config.username&&!progress.postgres.db_exists">
+            <p>
+                Next you need to create the fmp database.
+            </p>
+<pre>
+sudo su - postgres
+createdb -O {{progress.postgres.config.username}} {{progress.postgres.config.database}}
+exit
+</pre>
+            <a class="btn btn-default" ng-click="createDb()">Run this for me</a>
+        </div>
+        <div class="form-group">
+            <label for="host">Host:</label>
+            <input type="text" class="form-control" id="host" ng-model="progress.postgres.config.host" placeholder="database host default is localhost">
+        </div>
+        <div class="form-group">
+            <label for="port">Port:</label>
+            <input type="text" class="form-control" id="port" ng-model="progress.postgres.config.port" placeholder="database port default is 5432">
+        </div>
+
+
+        <div class="form-group">
+            <a class="btn btn-default" ng-click="save()">Save</a>
+        </div>
+    </form>
+  </dd>
+  <dd ng-if="!progress.postgres.db_exists">
+    To make your life easier here's a list of all the databases via the <code>psql --list</code> command.
+    <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Encoding</th>
+            <th>collate</th>
+            <th>access_privileges</th>
+            <th>ctype</th>
+            <th>owner</th>
+          </tr>
+        </thead>
+        <tr ng-repeat="(key, data) in progress.postgres.db_list" ng-click="progress.postgres.config.database=data.name">
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.name}}</td>
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.encoding}}</td>
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.collate}}</td>
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.access_privileges}}</td>
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.ctype}}</td>
+            <td class="{{ dbRowClass(data, progress.postgres.can_connect) }}">{{data.owner}}</td>
+        </tr>
+    </table>
+   </dd>
+
+</dl>
+<span class="btn btn-success" ng-if="progress.postgres.db_exists" ng-click="tabs.activeTab='Users'">Next</span>

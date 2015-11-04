@@ -3,7 +3,7 @@ import sys
 if "../" not in sys.path:
     sys.path.append("../")
 
-from fmp_utils.db_session import engine, session, create_all, Session
+from fmp_utils.db_session import session_scope
 from sqlalchemy import Column, Integer, String, BigInteger,\
                        Float, Boolean
 from sqlalchemy.orm import relationship
@@ -36,17 +36,19 @@ class User(Base):
                     self.name)
 
 def get_users(user_ids=[]):
-    user_query = session.query(User)
-    if user_ids:
-        user_query = user_query.filter(User.id.in_(user_ids))
-    else:
-        user_query = user_query.filter(User.listening==True)
+    users = []
+    with session_scope() as session:
+        user_query = session.query(User)
+        if user_ids:
+            user_query = user_query.filter(User.id.in_(user_ids))
+        else:
+            user_query = user_query.filter(User.listening==True)
 
-    users_query = user_query.order_by(User.name.asc())
-    users = user_query.all()
+        users_query = user_query.order_by(User.name.asc())
+        users = user_query.all()
 
-    if not users:
-        users = session.query(User)\
-                       .order_by(User.name.asc())\
-                       .all()
+        if not users:
+            users = session.query(User)\
+                           .order_by(User.name.asc())\
+                           .all()
     return users

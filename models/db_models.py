@@ -30,39 +30,6 @@ from folder import Folder
 from model_utils import do_commit
 from math import floor
 
-"""
-subscribers_table = Table('subscribers_assocation', Base.metadata,
-    Column('netcast_id', Integer, ForeignKey('netcasts.id')),
-    Column('users_id', Integer, ForeignKey('users.id'))
-)
-
-class Netcast(Base):
-    __tablename__ = "netcasts"
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    url = Column(String)
-    expired = Column(Integer)
-    subscribers = relationship("User", secondary=subscribers_assocation,
-                               backref="subscriptions",
-                               order_by="User.name")
-
-    episodes = relationship("Episodes", backref="netcast")
-
-
-class Episodes(Base):
-    __tablename__ = "episodes"
-    id = Column(Integer, primary_key=True)
-    netcast_id = Column(Integer, ForeignKey('netcasts.id'))
-    name = Column(String)
-    url = Column(String)
-    cache_filename = Column(String)
-    pub_date = Column()
-    netcast_id = Column(Integer, ForeignKey('netcasts.id'))
-    played_for = relationship("User", secondary=subscribers_assocation,
-                              backref="episodes",
-                              order_by="Episodes.pub_date DESC")
-"""
-
 if __name__ == "__main__":
 
     create_all(Base)

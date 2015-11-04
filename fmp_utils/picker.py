@@ -2,7 +2,7 @@
 import sys
 sys.path.append('../')
 
-from fmp_utils.db_session import session
+from fmp_utils.db_session import Session, session_scope
 from models.file import File
 from models.user import User
 from models.user_file_info import UserFileInfo
@@ -28,50 +28,54 @@ def build_truescore_list():
 
 
 def get_preload(uids=[]):
+
     results = []
-    user_query = session.query(User)
-    if uids:
-        user_query = user_query.filter(User.id.in_(uids))
-    else:
-        user_query = user_query.filter(User.listening==True)
+    with session_scope() as session:
+        user_query = session.query(User)
+        if uids:
+            user_query = user_query.filter(User.id.in_(uids))
+        else:
+            user_query = user_query.filter(User.listening==True)
 
-    users = user_query.all()
+        users = user_query.all()
 
-    if not users:
-        users = session.query(User).all()
+        if not users:
+            users = session.query(User).all()
 
-    for user in users:
-        total = session.query(Preload)\
-                       .filter(Preload.user_id==user.id)\
-                       .count()
+        for user in users:
+            total = session.query(Preload)\
+                           .filter(Preload.user_id==user.id)\
+                           .count()
 
-        if total == 0:
-            populate_preload([user])
+            if total == 0:
+                populate_preload([user])
 
-        pick, preload = session.query(File, Preload)\
-                       .join(Preload, Preload.file_id == File.id)\
-                       .filter(Preload.user_id==user.id)\
-                       .order_by(Preload.from_search.desc(), Preload.id)\
-                       .first()
+            pick, preload = session.query(File, Preload)\
+                           .join(Preload, Preload.file_id == File.id)\
+                           .filter(Preload.user_id==user.id)\
+                           .order_by(Preload.from_search.desc(), Preload.id)\
+                           .first()
 
-        if pick:
-            pick.reason = preload.reason
-            session.add(pick)
-            session.commit()
+            if pick:
+                pick.reason = preload.reason
+                session.add(pick)
+                session.commit()
 
-            results.append(pick)
-            session.delete(preload)
-            session.commit()
+                results.append(pick)
+                session.delete(preload)
+                session.commit()
 
     return results
 
 def get_recently_played(limit=1):
-    return session.query(File)\
-                  .filter(File.time_played!=None)\
-                  .order_by(File.time_played.desc())\
-                  .limit(limit)\
-                  .all()
-
+    file = None
+    with session_scope() as session:
+        file = session.query(File)\
+                      .filter(File.time_played!=None)\
+                      .order_by(File.time_played.desc())\
+                      .limit(limit)\
+                      .all()
+    return file
 
 def populate_pick_from(user_id=None, truncate=False):
 

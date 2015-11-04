@@ -37,9 +37,16 @@ SUPPORTED_EXTENSIONS = [''] + VALID_EXT
 import os
 import sys
 
-CONFIG_DIR = os.path.expanduser(os.path.join("~/",".fmp"))
+USER_HOME = os.path.realpath(os.path.expanduser("~/"))
+CONFIG_DIR = os.path.join(USER_HOME, '.fmp')
 
 if "--test-first-run" in sys.argv:
-    CONFIG_DIR = os.path.expanduser(os.path.join("~/",".fmp-test"))
+    CONFIG_DIR = os.path.join(USER_HOME, '.fmp-test')
+
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config")
 
 CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
+
+os.makedirs(CONFIG_DIR, 0o775, True)
+os.makedirs(CACHE_DIR, 0o775, True)
+

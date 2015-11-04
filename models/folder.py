@@ -6,19 +6,14 @@ if "../" not in sys.path:
 
 from fmp_utils.constants import VALID_EXT
 from fmp_utils.media_tags import MediaTags
-from fmp_utils.db_session import engine, session, create_all, Session
 
 from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
                        Float, Date
 
-from disk_entity import DiskEntitiy
-from location import Location
-from model_utils import do_commit
-
-try:
-    from .base import Base, to_json
-except SystemError:
-    from base import Base, to_json
+from .disk_entity import DiskEntitiy
+from .location import Location
+from .utils import do_commit
+from .base import Base, to_json
 
 
 class Folder(DiskEntitiy, Base):

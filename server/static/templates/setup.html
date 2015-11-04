@@ -1,0 +1,45 @@
+<!-- <div class="btn btn-default" ng-click="toggleThirdTab()">
+  {{ tabs[2].disabled ? 'Enable' : 'Disable' }} third tab
+</div>
+<div class="btn btn-default" ng-click="tabs.activeTab='Profile'">
+  Select "Profile" tab
+</div>
+<hr> -->
+<!-- bsActivePane is optional -->
+<div bs-active-pane="tabs.activeTab" bs-tabs>
+  <div title="Welcome" name="Welcome" bs-pane>
+    <div marked src="'/docs/1-welcome.md'"></div>
+    <span class="btn btn-success" ng-if="progress.connected" ng-click="tabs.activeTab='Server'">Next</span>
+  </div>
+  <div title="Server" name="Server" bs-pane>
+    <br>
+    <dl class='diagnostics'>
+      <dt>
+        <span ng-class="{
+          'glyphicon glyphicon-ok-sign green':progress.connected,
+          'glyphicon glyphicon-remove-circle red':!progress.connected
+        }"> </span> Connect to FMP server</dt>
+      <dd ng-if="progress.connected">Good news ajax works.</dd>
+      <dd ng-if="!progress.connected">Can't connect to FMP server.</dd>
+    </dl>
+    <span class="btn btn-success" ng-if="progress.connected" ng-click="tabs.activeTab='Postgress'">Next</span>
+  </div>
+  <div title="PostgreSQL" name="Postgress" disabled="{{!progress.connected}}" bs-pane>
+    <div ng-include src="'/static/templates/postgres.html'"></div>
+  </div>
+  <div title="Config" name="Postgress Config" disabled="{{!progress.postgres.installed||!progress.postgres.running}}" bs-pane>
+    <div ng-include src="'/static/templates/postgres-config.html'"></div>
+  </div>
+  <div title="Users" name="Users" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
+    <div ng-controller="ListenerCtrl" ng-include src="'/static/templates/listeners.html'"></div>
+  </div>
+  <div title="Folders" name="FoldersList" bs-pane>
+    <div ng-controller="FoldersCtrl" ng-include src="'/static/templates/folders.html'">FoldersCtrl</div>
+  </div>
+</div>
+
+
+<br clear="all">
+<br clear="all">
+<br clear="all">
+<br clear="all">

@@ -3,28 +3,16 @@
 
 <script type="text/ng-template" id="nodes_renderer.html">
   <div class="tree-node tree-node-content" >
-    <a class="btn btn-success btn-xs"  data-nodrag ng-click="mtoggle(this)" ng-><span
+
+    <a class="btn btn-success btn-xs"  data-nodrag ng-click="mtoggle(this)"><span
         class="glyphicon"
         ng-class="{
           'glyphicon-chevron-right': collapsed,
           'glyphicon-chevron-down': !collapsed
         }"></span></a>
-    {{dir.dirname}}<br>
-    <span style="padding-left:30px;"></span>
-    <div class="btn-group btn-group-justified" role="group" aria-label="..." >
-	  <div class="btn-group btn-small" role="group" ng-repeat="user in dir.owners">
-	    <button class="btn" ng-class="{'btn-default':!user.owner, 'btn-info':user.owner}" ng-click="toggleOwner(this, user.uid)">{{user.uname}}</button>
+      {{dir.dirname}} <div class="pull-right badge" ng-if="dir.has_media" >has media</div>
 	  </div>
 	</div>
-	<div ng-if="jobs.folder_owner_progress[dir.folder_id]"
-		 class="progress">
-			<div class="progress-bar" ng-class="jobs.folder_owner_progress[dir.folder_id].class" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: {{jobs.folder_owner_progress[dir.folder_id].percent}}">
-				{{jobs.folder_owner_progress[dir.folder_id].text}}
-			</div>
-	</div>
-	<button class="btn btn-success pull-right" ng-click="applyToSubfolders(this)" ng-if="!jobs.folder_owner_progress[dir.folder_id]">Apply to subfolders</button>
-	<br>
-  </div>
   <ol ui-tree-nodes="" ng-model="dir.children" ng-class="{hidden: collapsed}">
     <li ng-repeat="dir in dir.children" ui-tree-node ng-include="'nodes_renderer.html'" data-nodrag data-collapsed="{{dir.collapsed}}">
     </li>
@@ -34,8 +22,8 @@
 <div class="row">
   <div class="col-sm-6">
     <div ui-tree id="tree-root" >
-      <ol ui-tree-nodes ng-model="folders" data-collapsed>
-        <li ng-repeat="dir in folders" ui-tree-node ng-include="'nodes_renderer.html'" data-collapsed></li>
+      <ol ui-tree-nodes ng-model="folders" data-collapsed="true">
+        <li ng-repeat="dir in folders" ui-tree-node ng-include="'nodes_renderer.html'" data-collapsed="true"></li>
       </ol>
     </div>
   </div>

@@ -5,7 +5,6 @@ if "../" not in sys.path:
     sys.path.append("../")
 
 from sqlalchemy import Table, Column, ForeignKey, Integer
-from fmp_utils.db_session import engine, session, create_all, Session
 
 try:
     from .base import Base

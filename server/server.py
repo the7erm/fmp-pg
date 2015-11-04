@@ -5,22 +5,29 @@ import json
 from time import time
 from datetime import date, datetime
 import cherrypy
+import configparser
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from ws4py.messaging import TextMessage, BinaryMessage
 
 sys.path.append("../")
-from fmp_utils.db_session import session, Session, commit
+from fmp_utils.db_session import session_scope, Session
 from fmp_utils.misc import to_bool
-from fmp_utils.first_run import first_run
+from fmp_utils.first_run import first_run, check_config
+from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
 from models.base import to_json
 from models.user import User
 from models.file import File
+from models.folder import Folder
 from models.user_file_info import UserFileInfo
 from models.preload import Preload
 from models.genre import Genre
 from models.user import get_users
 from sqlalchemy.sql import not_, text, and_
+import subprocess
+from pprint import pprint
+import shlex
+import re
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
@@ -73,33 +80,32 @@ class FmpServer(object):
 
     @cherrypy.expose
     def set_listening(self, user_id, listening, *args, **kwargs):
+        with session_scope() as session:
+            user = session.query(User)\
+                          .filter(User.id==user_id)\
+                          .first()
 
-        user = session.query(User)\
-                      .filter(User.id==user_id)\
-                      .first()
-
-        if user:
-            user.listening = to_bool(listening)
-            session.commit(user)
-
+            if user:
+                user.listening = to_bool(listening)
+                session.commit()
 
         playlist.broadcast_playing()
         return self.listeners()
 
     @cherrypy.expose
     def set_admin(self, user_id, admin, *args, **kwargs):
-        session = Session()
-        user = session.query(User)\
-                      .filter(User.id==user_id)\
-                      .first()
+        with session_scope() as session:
+            user = session.query(User)\
+                          .filter(User.id==user_id)\
+                          .first()
 
-        admin = to_bool(admin)
+            admin = to_bool(admin)
 
-        if user:
-            user.admin = admin
-        session.add(user)
-        session.commit()
-        session.close()
+            if user:
+                user.admin = admin
+            session.add(user)
+            session.commit()
+            session.close()
 
         return self.listeners()
 
@@ -250,14 +256,15 @@ class FmpServer(object):
 
     @cherrypy.expose
     def listeners(self, *args, **kwargs):
-        users = session.query(User)\
-                       .order_by(User.listening.desc().nullslast(),
-                                 User.admin.desc().nullslast(),
-                                 User.name.nullslast())\
-                       .all()
-        results = []
-        for u in users:
-            results.append(u.json())
+        with session_scope() as session:
+            users = session.query(User)\
+                           .order_by(User.listening.desc().nullslast(),
+                                     User.admin.desc().nullslast(),
+                                     User.name.nullslast())\
+                           .all()
+            results = []
+            for u in users:
+                results.append(u.json())
         return json_dumps(results)
 
     @cherrypy.expose
@@ -400,8 +407,234 @@ class FmpServer(object):
         session.close()
         return
 
+    @cherrypy.expose
+    def check_install(self):
+        return json_dumps(check_config())
+
+    @cherrypy.expose
+    def save_config(self, **kwargs):
+        cfg = check_config()
+        obj = self.load_json()
+        print("OBJ:", obj, kwargs)
+        cfg['postgres']['config'] = obj
+        database = obj.get('database')
+        exists = False
+
+        self.write_config(obj)
+        cfg = check_config()
+        if cfg['postgres']['db_exists'] and \
+           cfg['postgres']['can_connect']['connected']:
+            from fmp_utils.db_session import fmp_session
+            from models.base import Base
+            fmp_session.connect()
+            fmp_session.create_all(Base)
+
+        return json_dumps(cfg)
+
+
+
+    def validate_db_config(self, obj, required=['database', 'username']):
+        errors = []
+        keys = ['database', 'username', 'host', 'password']
+        for k in keys:
+            value = obj.get(k, '')
+            if value and not re.match("^[A-z0-9\-\_]+$", value):
+                errors.append("%s has an invalid character" % k)
+            if not value and k in required:
+                errors.append("%s requires a value" % k)
+        return errors
+
+    @cherrypy.expose
+    def create_db(self):
+        obj = self.load_json()
+
+        database = obj.get("database", 'fmp')
+        username = obj.get('username', '')
+        host = obj.get('host', 'localhost')
+        password = obj.get('password', '')
+        errors = self.validate_db_config(obj)
+        if errors:
+            return json_dumps({
+                "RESULT": "FAIL",
+                "Error": ",".join(errors)
+            })
+
+        spec = {
+            'username': username,
+            'database': database
+        }
+
+        fp = open("/tmp/create_db.sh",'w')
+        fp.write("""!#/bin/sh
+        createdb -O %(username)s %(username)s
+        createdb -O %(username)s %(database)s
+        """ % spec)
+        fp.close()
+        os.chmod("/tmp/create_db.sh", 0o777)
+        try:
+            op = [
+                'gksu', '-m', 'Create postgres db %s' % database,
+                '-u', 'postgres', "/tmp/create_db.sh"]
+            print("op:", op)
+            self.write_config(obj)
+            output = subprocess.check_output(op)
+            os.unlink("/tmp/create_db.sh")
+            output = output.decode("utf8")
+            print("output:",  output)
+            self.write_config(obj)
+            return json_dumps({"RESULT": "OK",
+                               "output": output})
+        except:
+            err = "%s" % sys.exc_info()[0]
+            if 'already exists' in err:
+                self.write_config(obj)
+            print ("sys.exc_info()[0]:", sys.exc_info()[0], sys.exc_info()[1])
+
+            return json_dumps({"RESULT": "FAIL"})
+
+    def write_config(self, data):
+        print("write_config:", data)
+        config = configparser.RawConfigParser()
+
+        config.add_section('postgres')
+        for k, v in data.items():
+            print(k,":",v)
+            config.set('postgres', k, v)
+
+        with open(CONFIG_FILE, 'w') as configfile:
+            config.write(configfile)
+        print("/write_config")
+
+    def load_json(self):
+        rawbody = cherrypy.request.body.read()
+        obj = json.loads(rawbody.decode("utf8"))
+        return obj
+
+    @cherrypy.expose
+    def add_user(self):
+        obj = self.load_json()
+        name = obj.get('name', '').strip()
+        if not name:
+            return self.listeners()
+        session = Session()
+        user = session.query(User)\
+                      .filter(User.name == obj['name'])\
+                      .first()
+        if user:
+            return self.listeners()
+        user = User()
+        user.name = obj.get('name')
+        session.add(user)
+        session.commit()
+        session.close()
+        return self.listeners()
+
+    @cherrypy.expose
+    def create_role(self):
+        obj = self.load_json()
+        print("obj:", obj);
+        """
+        gksudo -m "Create postgres user 'test'" -u postgresql "psql -c '"""
+
+        database = obj.get("database", '')
+        username = obj.get('username', '')
+        host = obj.get('host', '')
+        password = obj.get('password', '')
+        errors = self.validate_db_config(obj, ['username'])
+        if errors:
+            return json_dumps({
+                "RESULT": "FAIL",
+                "Error": ",".join(errors)
+            })
+
+        try:
+            if password:
+                fp = open("/tmp/create_role.sh",'w')
+                fp.write("""!#/bin/sh
+                psql -c "CREATE ROLE %s WITH LOGIN ENCRYPTED PASSWORD \'%s\'"
+                """ % (username, password))
+                fp.close()
+            else:
+                fp = open("/tmp/create_role.sh",'w')
+                fp.write("""!#/bin/sh
+                psql -c "CREATE ROLE %s WITH LOGIN"
+                """ % (username,))
+                fp.close()
+            os.chmod("/tmp/create_role.sh", 0o777)
+            op = [
+                'gksu', '-m', 'Create postgres user %s' % username,
+                '-u', 'postgres', "/tmp/create_role.sh"]
+            print("op:", op)
+            self.write_config(obj)
+            output = subprocess.check_output(op)
+            if os.path.exists("/tmp/create_role.sh"):
+                os.unlink("/tmp/create_role.sh")
+            output = output.decode("utf8")
+            print("output:",  output)
+            return json_dumps({"RESULT": "OK",
+                               "output": output})
+        except:
+            err = "%s" % sys.exc_info()[0]
+            if 'already exists' in err:
+                self.write_config(obj)
+            print ("sys.exc_info()[0]:", sys.exc_info()[0], sys.exc_info()[1])
+            if os.path.exists("/tmp/create_role.sh"):
+                os.unlink("/tmp/create_role.sh")
+            return json_dumps({"RESULT": "FAIL"})
+
+    @cherrypy.expose
+    def browse(self, folder):
+        with session_scope() as session:
+            results = json_dumps(self.get_dirs(folder, 1, session=session))
+        return results
+
+    def get_dirs(self, folder, recurse=0, session=None):
+        if recurse <= 0:
+            return []
+
+        dirs = []
+        files = []
+        has_media = False
+
+        for root, _dirs, files in os.walk(folder):
+            for d in _dirs:
+                if d.startswith("."):
+                    continue
+                dirs.append(d)
+            for f in files:
+                base, ext = os.path.splitext(f)
+                ext = ext.lower()
+                if ext in VALID_EXT:
+                    has_media = True
+            break
+        dirs.sort()
+        files.sort()
+        folders = []
+
+
+        for d in dirs:
+            if d.startswith("."):
+                continue
+            realpath = os.path.join(folder, d)
+            folder_data = session.query(Folder)\
+                                 .filter(Folder.dirname==realpath)\
+                                 .first()
+
+            folders.append({
+                'realpath': realpath,
+                'dirname': d,
+                'children': self.get_dirs(os.path.join(root,d),
+                                          recurse-1),
+                'collapsed': True,
+                'has_media': has_media,
+                'folder': {}
+            })
+        return folders
+
 
 def cherry_py_worker():
+    doc_path = os.path.join(sys.path[0])
+    print("doc_path:", doc_path)
     root_path = os.path.join(sys.path[0], "server")
     print("root_path:", root_path)
     static_img_path = os.path.join(root_path, "static", "images")
@@ -419,6 +652,11 @@ def cherry_py_worker():
             'tools.staticdir.root': root_path,
             'tools.staticdir.on': True,
             'tools.staticdir.dir': "static"
+        },
+        '/docs': {
+            'tools.staticdir.root': doc_path,
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': "docs"
         }
     })
 

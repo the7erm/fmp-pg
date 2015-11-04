@@ -9,7 +9,6 @@ from datetime import date
 if "../" not in sys.path:
     sys.path.append("../")
 
-from fmp_utils.db_session import engine, session, create_all, Session
 from .utils import do_commit
 
 try:

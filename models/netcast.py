@@ -5,7 +5,7 @@ if "../" not in sys.path:
     sys.path.append("../")
 import feedparser
 import re
-from fmp_utils.db_session import engine, session, create_all, Session
+from fmp_utils.db_session import  create_all, Session
 from fmp_utils.jobs import jobs
 from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
                        Float, Date, ForeignKey, UniqueConstraint
@@ -13,7 +13,7 @@ from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import not_, and_, text
 from pprint import pprint
 from time import mktime
-from user import User
+from .user import User
 
 try:
     from .base import Base, to_json

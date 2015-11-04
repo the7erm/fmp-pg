@@ -1,4 +1,22 @@
 <h3>Listeners</h3>
+<br>
+<form name="userForm">
+    <div class="form-group">
+        <label for="addUname">User Name:</label>
+        <input type="text" class="form-control" name="addUname" id="addUname"
+               ng-model="newUser.name"
+               placeholder="Username" required>
+    </div>
+    <!--
+    <div class="form-group">
+        <label for="addPword">Password:</label>
+        <input type="text" class="form-control" name="addPword" id="addPword"
+               ng-model="user.add.pword"
+               placeholder="Password" required>
+    </div> -->
+    <a ng-click="addUser(newUser)" class="btn btn-default">Add</a>
+</form>
+<hr>
 <div class="table-responsive">
 	<table class="table table-hover table-striped">
 		<thead>

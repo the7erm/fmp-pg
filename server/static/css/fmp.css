@@ -157,3 +157,31 @@ code {
 .playlist-item {
     padding:20px;
 }
+
+.green {
+  color:green;
+}
+
+.red {
+  color: red;
+}
+
+dl.diagnostics dd {
+  padding-left: 27px;
+  font-size:0.75em;
+}
+
+dl.sub-diagnostic dt{
+  padding-left: 20px;
+  font-weight: bold;
+}
+
+dl.sub-diagnostic dd {
+  padding-left: 40px;
+  font-weight: normal;
+  font-size:1em;
+}
+
+.connected_db {
+  font-weight: bold;
+}

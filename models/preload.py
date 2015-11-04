@@ -4,7 +4,7 @@ import sys
 if "../" not in sys.path:
     sys.path.append("../")
 from sqlalchemy import Table, Column, ForeignKey, String, Integer, Boolean
-from fmp_utils.db_session import engine, session, create_all, Session
+
 try:
     from .base import Base, to_json
 except SystemError:

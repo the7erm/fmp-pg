@@ -1,19 +1,21 @@
 
 
 var fmpApp = angular.module('fmpApp', [
+    'cgNotify',
+    'hc.marked',
+    'ngAudio',
+    'ngCookies',
+    'ngRoute',
+    'ngSanitize',
+    'ngTagsInput',
     'ngWebSocket', // you may also use 'angular-websocket' if you prefer
     'ui.bootstrap',
-    'ngRoute',
-    'mgcrea.ngStrap',
-    'ngCookies',
-    'ngSanitize',
     'ui.tree',
-    'ngTagsInput',
-    'cgNotify',
-    'ngAudio',
-    'mgcrea.ngStrap.helpers.dimensions',
+    'mgcrea.ngStrap',
     'mgcrea.ngStrap.helpers.debounce',
-    'ngSanitize',
+    'mgcrea.ngStrap.helpers.dimensions',
+    'mgcrea.ngStrap.tab',
+    'mgcrea.ngStrap.typeahead'
   ])
   .factory('UserUtils', ['$http', function($http){
       var methods = {};
@@ -456,6 +458,9 @@ var fmpApp = angular.module('fmpApp', [
           if (!collection.playingData) {
             return false;
           }
+          if (!collection.playingData.user_file_info) {
+            return false;
+          }
           for(var i=0;i<collection.playingData.user_file_info.length;i++) {
             if (collection.playingData.user_file_info[i].user_id == user_id) {
               return collection.playingData.user_file_info[i].voted_to_skip;
@@ -465,6 +470,9 @@ var fmpApp = angular.module('fmpApp', [
         }
 
         methods.userIdVoteToSkip = function(user_id) {
+          if (!collection.playingData || !collection.playingData.user_file_info) {
+            return;
+          }
           for(var i=0;i<collection.playingData.user_file_info.length;i++) {
             if (collection.playingData.user_file_info[i].user_id == user_id) {
               methods.voteToSkip(collection.playingData.user_file_info[i]);
@@ -746,6 +754,7 @@ var fmpApp = angular.module('fmpApp', [
       }
   })
   .controller('ListenerCtrl', function($scope, $http, SatellitePlayer){
+    console.log("ListenerCtrl CALLED")
     $scope.SatellitePlayer = SatellitePlayer;
     $scope.getUserForUid = function (id)  {
       for(var i=0;i<$scope.listeners.length; i++) {
@@ -755,6 +764,24 @@ var fmpApp = angular.module('fmpApp', [
           }
       }
       return null;
+    }
+    $scope.addUser = function(newUser) {
+      console.log("newUser:", newUser);
+      for(var i=0;i<$scope.listeners.length; i++) {
+          var user = $scope.listeners[i];
+          if (user.name == newUser.name) {
+            return;
+          }
+      }
+      $http({
+        method: 'POST',
+        url: '/add_user',
+        data:newUser
+      }).then(function successCallback(response) {
+        $scope.listeners = response.data;
+      }, function errorCallback(response) {
+
+      });
     }
     $scope.set_user_col = function(id, col) {
         var user = $scope.getUserForUid(id),
@@ -1006,7 +1033,36 @@ var fmpApp = angular.module('fmpApp', [
       }
 
   })
-  .controller('FolderCtrl', function($scope){
+  .controller('FoldersCtrl', function($scope, $http){
+      $scope.folder = "/";
+      $scope.folders = [];
+
+      $scope.toggle = function (scope) {
+        console.log("SCOPE:", scope);
+        scope.toggle();
+
+      };
+      $scope.mtoggle = function(scope) {
+        scope.toggle();
+        $http({
+          method: 'GET',
+          url: '/browse',
+          params: {"folder": scope['dir']['realpath'] }
+        }).then(function successCallback(response) {
+            scope['dir']['children'] = response.data;
+        }, function errorCallback(response) {
+
+        });
+      }
+      $http({
+        method: 'GET',
+        url: '/browse',
+        params: {"folder": "/"}
+      }).then(function successCallback(response) {
+          $scope.folders = response.data;
+      }, function errorCallback(response) {
+
+      });
 
   })
   .controller('FoldersTreeCtrl', function($scope, $routeParams, $http,
@@ -1014,7 +1070,6 @@ var fmpApp = angular.module('fmpApp', [
 
     $scope.jobs = PlayerData.collection.jobs;
     $scope.mtoggle = function(scope) {
-      console.log("CALLED:", scope);
       scope.toggle();
       $http({
         method: 'GET',
@@ -1073,8 +1128,87 @@ var fmpApp = angular.module('fmpApp', [
 
     });
   })
-  .controller('WelcomeController', function($scope, $http){
+  .controller('ConfigController', function($scope, $http){
     $scope.page = 1;
+    $scope.progress = {
+        'connected': false,
+        'postgres_installed': false,
+        'config_exists': false,
+        'config_readable': false,
+        'db_connected': false,
+        'db_created': false,
+        'add_folders': false,
+        'listen': false,
+        'postgres': {
+          'config': {
+            'user': '',
+            'password': '',
+            'database': 'fmp',
+            'host': 'localhost',
+            'port': '5432'
+          }
+        }
+    };
+
+    $scope.tabs = [
+    ];
+    $scope.tabs.activeTab = "Welcome";
+    $scope.check_install = function() {
+      $http({
+          method: 'GET',
+          url: '/check_install/'
+      }).then(function successCallback(response) {
+          $scope.progress = response.data;
+      }, function errorCallback(response) {
+      });
+    }
+    $scope.check_install();
+
+    $scope.createRole = function() {
+      $http({
+        method: 'POST',
+        url: '/create_role/',
+        data: $scope.progress.postgres.config
+      }).then(function successCallback(response) {
+        $scope.check_install();
+      }, function errorCallback(response) {
+        $scope.check_install();
+      });
+    }
+
+    $scope.createDb = function() {
+      $http({
+        method: 'POST',
+        url: '/create_db/',
+        data: $scope.progress.postgres.config
+      }).then(function successCallback(response) {
+        $scope.check_install();
+      }, function errorCallback(response) {
+        $scope.check_install();
+      });
+    }
+
+    $scope.save = function() {
+      console.log("progress.postgres.config:", $scope.progress.postgres.config);
+      $http({
+        method: 'POST',
+        url: '/save_config/',
+        data: $scope.progress.postgres.config
+      }).then(function successCallback(response) {
+          $scope.check_install();
+      }, function errorCallback(response) {
+      });
+    }
+    $scope.dbRowClass = function(data, can_connect) {
+      if (!can_connect || data.name != can_connect.name || !can_connect.name) {
+        return '';
+      }
+      if (!can_connect.connected) {
+        return 'danger connected_db';
+      }
+      return 'success connected_db';
+    }
+
   })
   .controller('GenreController', function($scope, $http){
     $scope.genres = [];
@@ -1111,6 +1245,9 @@ var fmpApp = angular.module('fmpApp', [
         $scope.genres = response.data;
     }, function errorCallback(response) {
     });
+  })
+  .controller('FolderController', function(){
+
   })
   .controller('RatingCtrl', function ($scope, $http, UserUtils) {
     $scope.isReadonly = false;
@@ -1150,9 +1287,17 @@ var fmpApp = angular.module('fmpApp', [
       {stateOn: 'question-mark-on', stateOff: 'question-mark-off'}
     ];
 }).config(['$routeProvider', '$locationProvider', '$scrollspyProvider',
-           '$affixProvider',
+           '$affixProvider', '$typeaheadProvider',
 
-  function($routeProvider, $locationProvider, $scrollspyProvider, $affixProvider) {
+  function($routeProvider, $locationProvider, $scrollspyProvider, $affixProvider,
+           $typeaheadProvider) {
+
+    angular.extend($typeaheadProvider.defaults, {
+      animation: 'am-flip-x',
+      minLength: 1,
+      limit: 8
+    });
+
     angular.extend($scrollspyProvider.defaults, {
       animation: 'am-fade-and-slide-top',
       placement: 'top'
@@ -1172,6 +1317,10 @@ var fmpApp = angular.module('fmpApp', [
         controller: 'FoldersTreeCtrl',
         reloadOnSearch: false
       })
+      .when("/genres", {
+        templateUrl:"/static/templates/genres.html",
+        controller:"GenreController"
+      })
       .when('/home', {
         templateUrl: '/static/templates/player.html',
         controller: 'PlayerController'
@@ -1185,17 +1334,13 @@ var fmpApp = angular.module('fmpApp', [
         controller: 'SearchController',
         reloadOnSearch: false
       })
-      .when("/genres", {
-        templateUrl:"/static/templates/genres.html",
-        controller:"GenreController"
+      .when('/setup', {
+        templateUrl: '/static/templates/setup.html',
+        controller: 'ConfigController'
       })
       .when("/welcome/", {
-        templateUrl:"/static/templates/welcome.html",
-        controller:"WelcomeController"
-      })
-      .when("/welcome/:page", {
-        templateUrl:"/static/templates/welcome.html",
-        controller:"WelcomeController"
+        templateUrl: '/static/templates/setup.html',
+        controller:"ConfigController"
       })
       .otherwise({
         redirectTo: '/home'

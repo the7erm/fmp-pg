@@ -22,7 +22,10 @@ class FmpPlaylist(Playlist):
 
             self.set_player_uri()
             self.player.state = 'PLAYING'
-            self.player.position = "%s%%" % self.files[self.index].percent_played
+            try:
+                self.player.position = "%s%%" % self.files[self.index].percent_played
+            except IndexError:
+                pass
         self.tray_icon = TrayIcon(playlist=self)
 
 
@@ -31,7 +34,11 @@ class FmpPlaylist(Playlist):
 
     def on_time_status(self, player, pos_data):
         # print("on_time_status:", pos_data)
-        playing_item = self.files[self.index]
+        try:
+            playing_item = self.files[self.index]
+        except IndexError:
+            jobs.run_next_job()
+            return
         playing_item.mark_as_played(**pos_data)
 
         skip_user_file_infos = self.do_countdown(playing_item, pos_data)
@@ -82,7 +89,10 @@ class FmpPlaylist(Playlist):
 
     def set_player_uri(self):
         pprint(self.files)
-        self.files[self.index].clear_voted_to_skip()
+        try:
+            self.files[self.index].clear_voted_to_skip()
+        except IndexError:
+            return
         filename = self.files[self.index].filename
         print ("set_player_uri:", filename)
         # setproctitle("fmp.py %r" % filename)
@@ -94,18 +104,31 @@ class FmpPlaylist(Playlist):
 
     def json(self):
         self.player.last_time_status['skip_countdown'] = self.skip_countdown
-        return {
-            'player-playing': self.files[self.index].json(),
-            'time-status': self.player.last_time_status
-        }
+        try:
+            return {
+                'player-playing': self.files[self.index].json(),
+                'time-status': self.player.last_time_status
+            }
+        except IndexError:
+            print("IndexError")
+            return {
+                'player-playing': {},
+                'time-status': self.player.last_time_status
+            }
 
     def on_eos(self, *args, **kwargs):
-        self.files[self.index].inc_score()
+        try:
+            self.files[self.index].inc_score()
+        except IndexError:
+            return
         super(FmpPlaylist, self).on_eos(*args, **kwargs)
         self.preload = picker.get_preload()
 
     def next(self, *args, **kwargs):
-        self.files[self.index].deinc_score()
+        try:
+            self.files[self.index].deinc_score()
+        except IndexError:
+            return
         super(FmpPlaylist, self).next(*args, **kwargs)
 
     def pause(self, *args, **kwargs):

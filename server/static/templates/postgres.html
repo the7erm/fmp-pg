@@ -1,0 +1,34 @@
+<br>
+<dl class="diagnostics" ng-if="progress.connected">
+  <dt>
+    <span ng-class="{
+    'glyphicon glyphicon-ok-sign green':progress.postgres.installed,
+    'glyphicon glyphicon-remove-circle red':!progress.postgres.installed}"> </span> Install<span ng-if="progress.postgres.installed">ed</span> PostgreSQL
+  </dt>
+  <dd ng-if="progress.postgres.installed">psql location:<code>{{progress.postgres.installed}}</code></dd>
+  <dd ng-if="!progress.postgres.installed">
+    It appears that postgres isn't installed.
+    <p ng-if="progress.postgres.install.cmd">
+        To install postgres run:
+        <pre>{{progress.postgres.install.cmd}}</pre>
+        <span ng-if="!progress.postgres.install.tested"><b>This command has not been tested, if you run it and it does, or doesn't work please create an <a href="https://github.com/the7erm/fmp-pg/issues">issue</a> either way.</b></span>
+    </p>
+    <p ng-if="!progress.postgres.install.cmd">
+        Sorry the command <code>which</code> can't find <code>apt-get</code>, <code>emerge</code>, <code>yum</code> or <code>pacman</code>. It looks like you're going to have to install <a href="http://www.postgresql.org/"><code>postgres</code></a> manually.  </p>
+    <p ng-if="!progress.postgres.install.cmd">
+        If you have one of these programs installed please add the file directory/folder to the end of <code>export PATH=""</code> (folders are separated with a <code>:</code>) variable usually in <code>/etc/bashrc</code> or <code>~/.bashrc</code> and and run <code>. /etc/bashrc</code> or <code>. ~/.bashrc</code> (Yes with the `.`) to load the changes.  You'll need to restart <code>fmp.py</code> with the proper path.  You may need to log out and log back in for the changes to take effect.
+    </p>
+    <p ng-if="!progress.postgres.install.cmd">
+        If you started <code>fmp.py</code> from a terminal, then all you'll need to do is press <code>ctrl+c</code> type in <code>. ~/.bashrc</code> or <code>. /etc/bashrc</code> in that terminal for the changes to take effect.
+    </p>
+  </dd>
+  <dt><span ng-class="{'glyphicon glyphicon-ok-sign green':progress.postgres.running,
+                 'glyphicon glyphicon-remove-circle red':!progress.postgres.running}"> </span> PostgreSQL server is running</dt>
+  <dd ng-if="progress.postgres.running">
+  Output of <code>pgrep postgres -a</code>:
+  <pre>{{progress.postgres.running}}</pre></dd>
+  <dd ng-if="!progress.postgres.running">
+    You don't appear to have postgres running you can start it with <code>sudo service postgresql start</code></dd>
+</dl>
+
+<span class="btn btn-success" ng-if="progress.postgres.installed" ng-click="tabs.activeTab='Postgress Config'">Next</span>
