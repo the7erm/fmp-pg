@@ -1,5 +1,3 @@
-
-
 var fmpApp = angular.module('fmpApp', [
     'cgNotify',
     'hc.marked',
@@ -81,6 +79,59 @@ var fmpApp = angular.module('fmpApp', [
         });
       }
 
+      return methods;
+  }])
+  .factory('ConfigUtils', ['$http', function($http){
+      var collection = {
+            'progress': {
+              'connected': false,
+              'postgres_installed': false,
+              'config_exists': false,
+              'config_readable': false,
+              'db_connected': false,
+              'db_created': false,
+              'add_folders': false,
+              'listen': false,
+              'postgres': {
+                'config': {
+                  'user': '',
+                  'password': '',
+                  'database': 'fmp',
+                  'host': 'localhost',
+                  'port': '5432'
+                }
+              }
+            }
+          },
+          methods = {
+            'collection': collection
+          };
+
+      methods.check_install = function(scope) {
+        $http({
+            method: 'GET',
+            url: '/check_install/'
+        }).then(function successCallback(response) {
+            collection.progress = response.data;
+            if (scope) {
+              scope.progress = response.data;
+            }
+        }, function errorCallback(response) {
+        });
+      };
+
+      methods.addFolderToLibrary = function(dir) {
+        console.log("addFolderToLibrary:", dir);
+        $http({
+          'method': 'POST',
+          'url': '/add_folder/',
+          'data': dir
+        }).then(function successCallback(response){
+
+        }, function errorCallback(response){
+
+        });
+      };
       return methods;
   }])
   .factory('SatellitePlayer', ['$http', '$cookies', '$filter', 'ngAudio',
@@ -753,7 +804,7 @@ var fmpApp = angular.module('fmpApp', [
         });
       }
   })
-  .controller('ListenerCtrl', function($scope, $http, SatellitePlayer){
+  .controller('ListenerCtrl', function($scope, $http, SatellitePlayer, ConfigUtils){
     console.log("ListenerCtrl CALLED")
     $scope.SatellitePlayer = SatellitePlayer;
     $scope.getUserForUid = function (id)  {
@@ -779,6 +830,7 @@ var fmpApp = angular.module('fmpApp', [
         data:newUser
       }).then(function successCallback(response) {
         $scope.listeners = response.data;
+        ConfigUtils.check_install();
       }, function errorCallback(response) {
 
       });
@@ -1033,7 +1085,7 @@ var fmpApp = angular.module('fmpApp', [
       }
 
   })
-  .controller('FoldersCtrl', function($scope, $http){
+  .controller('FoldersCtrl', function($scope, $http, ConfigUtils){
       $scope.folder = "/";
       $scope.folders = [];
 
@@ -1063,7 +1115,7 @@ var fmpApp = angular.module('fmpApp', [
       }, function errorCallback(response) {
 
       });
-
+      $scope.addFolderToLibrary = ConfigUtils.addFolderToLibrary;
   })
   .controller('FoldersTreeCtrl', function($scope, $routeParams, $http,
               PlayerData){
@@ -1128,41 +1180,28 @@ var fmpApp = angular.module('fmpApp', [
 
     });
   })
-  .controller('ConfigController', function($scope, $http){
+  .controller('ConfigController', function($scope, $http, ConfigUtils){
     $scope.page = 1;
-    $scope.progress = {
-        'connected': false,
-        'postgres_installed': false,
-        'config_exists': false,
-        'config_readable': false,
-        'db_connected': false,
-        'db_created': false,
-        'add_folders': false,
-        'listen': false,
-        'postgres': {
-          'config': {
-            'user': '',
-            'password': '',
-            'database': 'fmp',
-            'host': 'localhost',
-            'port': '5432'
-          }
-        }
-    };
+    $scope.progress = ConfigUtils.collection.progress;
 
-    $scope.tabs = [
-    ];
+    $scope.tabs = [];
     $scope.tabs.activeTab = "Welcome";
-    $scope.check_install = function() {
-      $http({
-          method: 'GET',
-          url: '/check_install/'
-      }).then(function successCallback(response) {
-          $scope.progress = response.data;
-      }, function errorCallback(response) {
-      });
+    if (localStorage.configActiveTab) {
+      $scope.tabs.activeTab = localStorage.configActiveTab;
     }
-    $scope.check_install();
+    $scope.check_install = function(){
+      ConfigUtils.check_install($scope);
+      // $scope.progress = ConfigUtils.collection.progress;
+    }
+    $scope.check_install($scope);
+
+    $scope.$watch('tabs.activeTab', function(newValue, oldValue){
+        console.log("tabs.activeTab changed newValue:", newValue, "oldValue:",
+                    oldValue);
+        $scope.progress = ConfigUtils.collection.progress;
+        $scope.check_install();
+        localStorage.configActiveTab = newValue;
+    })
 
     $scope.createRole = function() {
       $http({
@@ -1245,9 +1284,6 @@ var fmpApp = angular.module('fmpApp', [
         $scope.genres = response.data;
     }, function errorCallback(response) {
     });
-  })
-  .controller('FolderController', function(){
-
   })
   .controller('RatingCtrl', function ($scope, $http, UserUtils) {
     $scope.isReadonly = false;

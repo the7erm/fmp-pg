@@ -211,6 +211,7 @@ def insert_random_unplayed_for_user_from_pick_from(user):
 
         remove_file_from_pick_from(result, session)
         if result:
+            session.add(user)
             insert_into_preload(
                     user.id, result.id, "random unplayed for %s" % user.name)
     return result
@@ -246,6 +247,7 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
 def remove_file_from_pick_from(result, session):
     if not result:
         return
+    session.add(result)
     session.execute(text("""DELETE FROM pick_from
                             WHERE file_id = :file_id"""),
                     {'file_id': result.id })
@@ -264,13 +266,14 @@ def remove_file_from_pick_from(result, session):
     session.commit()
 
 def insert_into_preload(user_id, file_id, reason="", from_search=False):
-    preload = Preload()
-    preload.user_id = user_id
-    preload.file_id = file_id
-    preload.reason = reason
-    preload.from_search = from_search
-    session.add(preload)
-    session.commit()
+    with session_scope() as session:
+        preload = Preload()
+        preload.user_id = user_id
+        preload.file_id = file_id
+        preload.reason = reason
+        preload.from_search = from_search
+        session.add(preload)
+        session.commit()
 
 
 def populate_preload(users=[]):
@@ -304,6 +307,7 @@ def populate_preload_for_user(user, threashold=1):
         session.add(user)
         true_score_pool[user.id] = build_truescore_list()
         cnt = 0
+        session.add(user)
         for true_score in true_score_pool[user.id]:
             if cnt <= threashold:
                 # always run the first query.
@@ -317,6 +321,7 @@ def populate_preload_for_user(user, threashold=1):
                 jobs.append_picker(
                     user.id, insert_random_unplayed_for_user_from_pick_from, user)
 
+                session.add(user)
                 jobs.append_picker(
                     user.id, insert_random_for_user_true_score_from_pick_from, user,
                     true_score)

@@ -33,7 +33,7 @@ class FmpSession():
             self.connection_string = connection_string.format(
                 user=user, pword=pword, host=host, port=port,
                 database=database)
-            print("self.connection_string:", self.connection_string)
+            # print("self.connection_string:", self.connection_string)
             self.db = 'postgres'
         except:
             self.connection_string = "sqlite://"

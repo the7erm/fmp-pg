@@ -4,6 +4,7 @@ from fmp_utils import picker
 from fmp_utils.jobs import jobs
 
 from pprint import pprint, pformat
+from fmp_utils.db_session import Session, session_scope
 
 class FmpPlaylist(Playlist):
 
@@ -23,7 +24,10 @@ class FmpPlaylist(Playlist):
             self.set_player_uri()
             self.player.state = 'PLAYING'
             try:
-                self.player.position = "%s%%" % self.files[self.index].percent_played
+                with session_scope() as session:
+                    session.add(self.files[self.index])
+                    self.player.position = "%s%%" % \
+                        self.files[self.index].percent_played
             except IndexError:
                 pass
         self.tray_icon = TrayIcon(playlist=self)
@@ -33,6 +37,7 @@ class FmpPlaylist(Playlist):
         self.player.connect('time-status', self.on_time_status)
 
     def on_time_status(self, player, pos_data):
+        Gdk.threads_leave()
         # print("on_time_status:", pos_data)
         try:
             playing_item = self.files[self.index]
@@ -49,30 +54,36 @@ class FmpPlaylist(Playlist):
         jobs.run_next_job()
 
     def do_countdown(self, playing_item, pos_data):
-        users = playing_item.get_users()
-        skip_cnt = 0
-        skip_user_file_infos = []
-        for user in users:
-            for ufi in playing_item.user_file_info:
-                if ufi.user_id == user.id and ufi.voted_to_skip:
-                    skip_cnt += 1
-                    skip_user_file_infos.append(ufi)
-        len_users = len(users)
-        half = len_users * 0.5
+        with session_scope() as session:
+            session.add(playing_item)
+            users = playing_item.get_users()
+            skip_cnt = 0
+            skip_user_file_infos = []
+            for user in users:
+                session.add(user)
+                session.add(playing_item)
+                for ufi in playing_item.user_file_info:
+                    if ufi.user_id == user.id and ufi.voted_to_skip:
+                        skip_cnt += 1
+                        skip_user_file_infos.append(ufi)
+            len_users = len(users)
+            half = len_users * 0.5
 
-        if skip_cnt == len_users:
-            self.skip_countdown = 0
-        elif skip_cnt < half:
-            self.skip_countdown = 5
-        elif skip_cnt >= half:
-            self.skip_countdown += -1
+            if skip_cnt == len_users:
+                self.skip_countdown = 0
+            elif skip_cnt < half:
+                self.skip_countdown = 5
+            elif skip_cnt >= half:
+                self.skip_countdown += -1
 
-        pos_data['skip_countdown'] = self.skip_countdown
-        return skip_user_file_infos
+            pos_data['skip_countdown'] = self.skip_countdown
+            return skip_user_file_infos
 
     def skip_majority(self, skip_user_file_infos):
-        for ufi in skip_user_file_infos:
-            ufi.deinc_score()
+        with session_scope() as session:
+            for ufi in skip_user_file_infos:
+                session.add(ufi)
+                ufi.deinc_score()
 
         self.inc_index()
 

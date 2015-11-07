@@ -26,5 +26,7 @@ else:
     create_all(Base)
 
 playlist = FmpPlaylist(server=server, first_run=first_run)
+from models.folder import folder_scanner
+folder_scanner.scan()
 
 Gtk.main()

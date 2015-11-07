@@ -37,9 +37,10 @@
   <div title="Folders" name="FoldersList" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
     <div ng-controller="FoldersCtrl" ng-include src="'/static/templates/folders.html'">FoldersCtrl</div>
   </div>
-
 </div>
-
+<pre>
+{{progress | json}}
+</pre>
 <br clear="all">
 <br clear="all">
 <br clear="all">

@@ -20,6 +20,7 @@ class User(Base):
     pword = Column(String)
     admin = Column(Boolean)
     listening = Column(Boolean)
+    listen_to_netcasts = Column(Boolean)
     user_file_info = relationship("UserFileInfo", backref="user")
     history = relationship("UserFileHistory", backref="user")
     folders = relationship("Folder",
@@ -31,13 +32,18 @@ class User(Base):
                                  backref="subscribers")
 
     def json(self):
-        d = to_json(self, User)
-        del d['pword']
+        d = {}
+        with session_scope() as session:
+            session.add(self)
+            d = to_json(self, User)
+            del d['pword']
         return d
 
     def __repr__(self):
-       return "<User(name=%r)>" % (
-                    self.name)
+        with session_scope() as session:
+            session.add(self)
+            return "<User(name=%r)>" % (
+                        self.name)
 
 def get_users(user_ids=[]):
     users = []

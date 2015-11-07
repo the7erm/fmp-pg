@@ -5,6 +5,7 @@ from math import floor
 from .base import Base, to_json
 
 from sqlalchemy import Column, Integer, BigInteger, Boolean, String
+from fmp_utils.db_session import Session, session_scope
 
 class DiskEntitiy(object):
     id = Column(Integer, primary_key=True)
@@ -24,10 +25,15 @@ class DiskEntitiy(object):
 
     @property
     def changed(self):
-        return self.mtime != self.actual_mtime
+        with session_scope() as session:
+            session.add(self)
+            return self.mtime != self.actual_mtime
 
     @property
     def filename(self):
-        return self.dirname
+        with session_scope() as session:
+            session.add(self)
+            return self.dirname
+
 
 

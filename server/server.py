@@ -18,7 +18,7 @@ from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
 from models.base import to_json
 from models.user import User
 from models.file import File
-from models.folder import Folder
+from models.folder import Folder, scan_folder
 from models.user_file_info import UserFileInfo
 from models.preload import Preload
 from models.genre import Genre
@@ -135,44 +135,43 @@ class FmpServer(object):
 
     @cherrypy.expose
     def set_rating_or_score(self, file_id, user_id, attr, value):
-        created, session, user_file_info = self.get_user_file_info(file_id, user_id)
-        setattr(user_file_info, attr, value)
-        user_file_info.calculate_true_score()
-        response = json_dumps(user_file_info.json())
-        if created:
-            print("CREATED")
+
+        user_file_info = self.get_user_file_info(file_id, user_id)
+        with session_scope() as session:
+            session.add(user_file_info)
+            setattr(user_file_info, attr, value)
+            user_file_info.calculate_true_score()
             session.commit()
-            session.close()
-        else:
+            response = json_dumps(user_file_info.json())
             playlist.broadcast_playing()
         return response
 
     def get_user_file_info(self, file_id, user_id):
-        user_file_info = None
-        playing_file = playlist.files[playlist.index]
-        for ufi in playing_file.user_file_info:
-            if ufi.file_id != file_id:
-                break
-            if ufi.user_id == user_id:
-                user_file_info = ufi
-                break;
+        with session_scope() as session:
+            user_file_info = None
+            playing_file = playlist.files[playlist.index]
+            session.add(playing_file)
+            for ufi in playing_file.user_file_info:
+                session.add(ufi)
+                if ufi.file_id != file_id:
+                    break
+                if ufi.user_id == user_id:
+                    user_file_info = ufi
+                    break;
 
 
-        if user_file_info:
-            created = False
-            session = Session.object_session(user_file_info)
-        else:
-            print("CREATING SESSION")
-            session = Session()
-            created = True
-            user_file_info = session.query(UserFileInfo)\
-                                    .filter(and_(
-                                        UserFileInfo.file_id==file_id,
-                                        UserFileInfo.user_id==user_id
-                                    ))\
-                                    .first()
-            session = Session.object_session(user_file_info)
-        return created, session, user_file_info
+            if user_file_info:
+                created = False
+            else:
+                print("CREATING SESSION")
+                created = True
+                user_file_info = session.query(UserFileInfo)\
+                                        .filter(and_(
+                                            UserFileInfo.file_id==file_id,
+                                            UserFileInfo.user_id==user_id
+                                        ))\
+                                        .first()
+        return user_file_info
 
 
     @cherrypy.expose
@@ -209,37 +208,38 @@ class FmpServer(object):
     @cherrypy.expose
     def vote_to_skip(self, *args, **kwargs):
         playing_file = playlist.files[playlist.index]
-        session = Session.object_session(playing_file)
-        file_id = kwargs.get('file_id')
-        user_id = kwargs.get('user_id')
-        voted_to_skip = to_bool(kwargs.get('voted_to_skip'))
-        print("VOTED TO SKIP:", voted_to_skip)
-        if playing_file.id == file_id:
-            found = False
-            for ufi in playing_file.user_file_info:
-                if ufi.user_id == user_id:
-                    found = True
+        with session_scope() as session:
+            session.add(playing_file)
+            file_id = kwargs.get('file_id')
+            user_id = kwargs.get('user_id')
+            voted_to_skip = to_bool(kwargs.get('voted_to_skip'))
+            print("VOTED TO SKIP:", voted_to_skip)
+            if playing_file.id == file_id:
+                found = False
+                for ufi in playing_file.user_file_info:
+                    if ufi.user_id == user_id:
+                        found = True
+                        ufi.voted_to_skip = voted_to_skip
+                        break
+                if not found:
+                    ufi = playing_file.create_ufi(user_id)
                     ufi.voted_to_skip = voted_to_skip
-                    break
-            if not found:
-                ufi = playing_file.create_ufi(user_id)
+            else:
+                ufi = session.query(UserFileInfo)\
+                             .filter(and_(
+                                 UserFileInfo.file_id==file_id,
+                                 UserFileInfo.user_id==kwargs.get('user_id')
+                             ))\
+                             .first()
                 ufi.voted_to_skip = voted_to_skip
-        else:
-            ufi = session.query(UserFileInfo)\
-                         .filter(and_(
-                             UserFileInfo.file_id==file_id,
-                             UserFileInfo.user_id==kwargs.get('user_id')
-                         ))\
-                         .first()
-            ufi.voted_to_skip = voted_to_skip
 
-        session.add(ufi)
-        session.commit()
+            session.add(ufi)
+            session.commit()
 
-        if voted_to_skip:
-            playlist.skip_countdown = 5
-        playlist.broadcast_playing()
-        print("VOTED TO SKIP")
+            if voted_to_skip:
+                playlist.skip_countdown = 5
+            playlist.broadcast_playing()
+            print("VOTED TO SKIP")
 
     @cherrypy.expose
     def genres(self, *args, **kwargs):
@@ -272,108 +272,111 @@ class FmpServer(object):
 
     @cherrypy.expose
     def search(self, *args, **kwargs):
-        session = Session()
-        params = cherrypy.request.params
-        cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
-        cherrypy.log("search: kwargs:%s" % ( kwargs,))
-        start = int(params.get("s", 0))
-        limit = int(params.get("l", 10))
-        only_cued = params.get('oc', False)
-        owner = params.get("owner",'')
-        try:
-            uid = int(params.get('uid', 0))
-        except:
-            uid = 0
+        with session_scope() as session:
+            params = cherrypy.request.params
+            cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
+            cherrypy.log("search: kwargs:%s" % ( kwargs,))
+            start = int(params.get("s", 0))
+            limit = int(params.get("l", 10))
+            only_cued = params.get('oc', False)
+            owner = params.get("owner",'')
+            try:
+                uid = int(params.get('uid', 0))
+            except:
+                uid = 0
 
-        only_cued = to_bool(only_cued)
+            only_cued = to_bool(only_cued)
 
-        q = params.get("q", '').strip()
-        query_offset = "LIMIT %d OFFSET %d" % (limit, start)
-        query_args = {}
-        query_spec = {
-          "SELECT": ["""f.*"""],
-          "FROM": ["""files f"""],
-          "COUNT_FROM": ["files f"],
-          "ORDER_BY": [],
-          "WHERE": [],
-          "WHERERATINGSCORE": [],
-        }
+            q = params.get("q", '').strip()
+            query_offset = "LIMIT %d OFFSET %d" % (limit, start)
+            query_args = {}
+            query_spec = {
+              "SELECT": ["""f.*"""],
+              "FROM": ["""files f"""],
+              "COUNT_FROM": ["files f"],
+              "ORDER_BY": [],
+              "WHERE": [],
+              "WHERERATINGSCORE": [],
+            }
 
-        query_base = """SELECT {SELECT}
-                        FROM {FROM}
-                        WHERE {WHERE}
-                        ORDER BY {ORDER_BY}
-                        {query_offset}"""
+            query_base = """SELECT {SELECT}
+                            FROM {FROM}
+                            WHERE {WHERE}
+                            ORDER BY {ORDER_BY}
+                            {query_offset}"""
 
-        query_base_count = """SELECT count(*) AS total
-                              FROM {COUNT_FROM}
-                              WHERE {WHERE}"""
+            query_base_count = """SELECT count(*) AS total
+                                  FROM {COUNT_FROM}
+                                  WHERE {WHERE}"""
 
-        if only_cued:
-            users = get_users(user_ids=kwargs.get('user_ids', []))
-            user_ids = [str(u.id) for u in users]
-            USER_IDS = ",".join(user_ids)
-            query_spec["FROM"].append("preload p")
-            query_spec["COUNT_FROM"].append("preload p")
-            query_spec["WHERE"].append("f.id = p.file_id AND "
-                                       "p.user_id IN ({USER_IDS})".format(
-                                            USER_IDS=USER_IDS
-                                      ))
-            query_spec['ORDER_BY'].append("from_search DESC NULLS LAST, p.id")
+            if only_cued:
+                users = get_users(user_ids=kwargs.get('user_ids', []))
+                user_ids = []
+                for u in users:
+                    session.add(u)
+                    user_ids.append(str(u.id))
+                USER_IDS = ",".join(user_ids)
+                query_spec["FROM"].append("preload p")
+                query_spec["COUNT_FROM"].append("preload p")
+                query_spec["WHERE"].append("f.id = p.file_id AND "
+                                           "p.user_id IN ({USER_IDS})".format(
+                                                USER_IDS=USER_IDS
+                                          ))
+                query_spec['ORDER_BY'].append("from_search DESC NULLS LAST, p.id")
 
-        if q:
-            query_spec["SELECT"].append("ts_rank_cd(to_tsvector('english', keywords_txt), query) AS rank")
-            count_from = """plainto_tsquery('english', :q) query"""
-            query_spec["FROM"].append(count_from)
-            query_spec["COUNT_FROM"].append(count_from)
-            query_spec["WHERE"].append("query @@ to_tsvector('english', keywords_txt)")
-            query_args['q'] = q
-            query_spec['ORDER_BY'].append("rank DESC")
+            if q:
+                query_spec["SELECT"].append("ts_rank_cd(to_tsvector('english', keywords_txt), query) AS rank")
+                count_from = """plainto_tsquery('english', :q) query"""
+                query_spec["FROM"].append(count_from)
+                query_spec["COUNT_FROM"].append(count_from)
+                query_spec["WHERE"].append("query @@ to_tsvector('english', keywords_txt)")
+                query_args['q'] = q
+                query_spec['ORDER_BY'].append("rank DESC")
 
 
 
-        query_spec['ORDER_BY'].append("time_played DESC NULLS LAST")
+            query_spec['ORDER_BY'].append("time_played DESC NULLS LAST")
 
-        search_query = query_base.format(
-            SELECT=",".join(query_spec['SELECT']),
-            FROM=",".join(query_spec['FROM']),
-            WHERE=" AND ".join(query_spec['WHERE']),
-            ORDER_BY=",".join(query_spec['ORDER_BY']),
-            query_offset=query_offset
-        )
+            search_query = query_base.format(
+                SELECT=",".join(query_spec['SELECT']),
+                FROM=",".join(query_spec['FROM']),
+                WHERE=" AND ".join(query_spec['WHERE']),
+                ORDER_BY=",".join(query_spec['ORDER_BY']),
+                query_offset=query_offset
+            )
 
-        count_query = query_base_count.format(
-            SELECT=",".join(query_spec['SELECT']),
-            COUNT_FROM=",".join(query_spec['COUNT_FROM']),
-            WHERE=" AND ".join(query_spec['WHERE']),
-            ORDER_BY=",".join(query_spec['ORDER_BY'])
-        )
+            count_query = query_base_count.format(
+                SELECT=",".join(query_spec['SELECT']),
+                COUNT_FROM=",".join(query_spec['COUNT_FROM']),
+                WHERE=" AND ".join(query_spec['WHERE']),
+                ORDER_BY=",".join(query_spec['ORDER_BY'])
+            )
 
-        if not query_spec['WHERE']:
-            search_query = search_query.replace("WHERE", '')
-            count_query = count_query.replace("WHERE", '')
+            if not query_spec['WHERE']:
+                search_query = search_query.replace("WHERE", '')
+                count_query = count_query.replace("WHERE", '')
 
-        print("search_query:", search_query)
-        print("count_query:", count_query)
+            print("search_query:", search_query)
+            print("count_query:", count_query)
 
-        print ("FETCHING 'files'")
-        files = session.query(File).from_statement(
-            text(search_query))\
-            .params(**query_args)\
-            .all()
+            print ("FETCHING 'files'")
+            files = session.query(File).from_statement(
+                text(search_query))\
+                .params(**query_args)\
+                .all()
 
-        results = []
-        for res in files:
-            results.append(res.json())
+            results = []
+            for res in files:
+                results.append(res.json())
 
-        print ("counting total")
-        total = session.execute(text(count_query),query_args).first()
+            print ("counting total")
+            total = session.execute(text(count_query),query_args).first()
 
-        session.close()
-        return json_dumps({
-            "results": results,
-            "total": total[0]
-        })
+            session.close()
+            return json_dumps({
+                "results": results,
+                "total": total[0]
+            })
 
     @cherrypy.expose
     def users(self, *args, **kwargs):
@@ -591,6 +594,32 @@ class FmpServer(object):
             results = json_dumps(self.get_dirs(folder, 1, session=session))
         return results
 
+    @cherrypy.expose
+    def add_folder(self,*args,**kwargs):
+        obj = self.load_json()
+        print("add_folder()")
+        pprint(obj)
+        """
+        {'children': [],
+         'collapsed': True,
+         'dirname': 'Amazon MP3',
+         'folder_data': {},
+         'has_media': True,
+         'realpath': '/home/erm/disk2/acer-home/Amazon MP3'}"""
+        result = {
+            "RESULT": "FAIL",
+        }
+        realpath = obj.get('realpath', '')
+        if not realpath or not os.path.exists(realpath):
+            result['Error'] = 'Missing %s' % realpath
+            return json_dumps(result)
+
+        scan_folder(realpath, add_to_folder_scanner=True, recurse=2)
+        json_dumps({"RESULT": "OK",
+                    "msg": "already added"})
+
+        return json_dumps(result)
+
     def get_dirs(self, folder, recurse=0, session=None):
         if recurse <= 0:
             return []
@@ -619,9 +648,16 @@ class FmpServer(object):
             if d.startswith("."):
                 continue
             realpath = os.path.join(folder, d)
-            folder_data = session.query(Folder)\
-                                 .filter(Folder.dirname==realpath)\
-                                 .first()
+            folder_data_json = {}
+            try:
+                folder_data = session.query(Folder)\
+                                     .filter(Folder.dirname==realpath)\
+                                     .first()
+
+                if folder_data:
+                    folder_data_json = folder_data.json()
+            except NameError:
+                pass
 
             folders.append({
                 'realpath': realpath,
@@ -630,7 +666,7 @@ class FmpServer(object):
                                           recurse-1),
                 'collapsed': True,
                 'has_media': has_media,
-                'folder': folder_data.json()
+                'folder_data': folder_data_json
             })
         return folders
 

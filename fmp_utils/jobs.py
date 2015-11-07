@@ -2,12 +2,14 @@
 import sys
 from collections import defaultdict
 from time import time
+import traceback
 
 class Jobs():
     # This class is designed to be called every once in a while.
     # the idea is to execute a job once a second during the time_status
     # iteration.
     def __init__(self):
+        self.job_lock = False
         self.low = []
         self.med = []
         self.high = []
@@ -15,6 +17,9 @@ class Jobs():
         self.user_ids = []
 
     def run_next_job(self):
+        if self.job_lock:
+            return
+        self.job_lock = True
         end_time = time() + 0.5
 
         print("end_time:", end_time, 'time:', time())
@@ -24,20 +29,24 @@ class Jobs():
             job = self.high.pop(0)
             self.exe(job)
             if time() < end_time:
-                 return
+                self.job_lock = False
+                return
 
         while self.med:
             job = self.med.pop(0)
             self.exe(job)
             if time() < end_time:
-                 return
+                self.job_lock = False
+                return
 
         while self.low:
             job = self.low.pop(0)
             self.exe(job)
             if time() < end_time:
-                 return
+                self.job_lock = False
+                return
 
+        self.job_lock = False
         print ("jobs complete")
 
     def run_picker_jobs(self, end_time):
@@ -83,6 +92,7 @@ class Jobs():
             print("Error args:", args)
             print("Error kwargs:", kwargs)
             print("Error:", e)
+            traceback.print_exc()
 
     def append(self, cmd, *args, **kwargs):
         priority = kwargs.get('priority', 'low')
@@ -90,16 +100,28 @@ class Jobs():
             priority = 'low'
 
         jobs = getattr(self, priority)
-        jobs.append((cmd, args, kwargs))
+        cmd_tpl = (cmd, args, kwargs)
+        if kwargs.get("unique") and cmd_tpl in jobs:
+            return
+        jobs.append(cmd_tpl)
 
     def append_low(self, cmd, *args, **kwargs):
-        self.low.append((cmd, args, kwargs))
+        cmd_tpl = (cmd, args, kwargs)
+        if kwargs.get('unique') and cmd_tpl in self.low:
+            return
+        self.low.append(cmd_tpl)
 
     def append_med(self, cmd, *args, **kwargs):
-        self.med.append((cmd, args, kwargs))
+        cmd_tpl = (cmd, args, kwargs)
+        if kwargs.get('unique') and cmd_tpl in self.med:
+            return
+        self.med.append(cmd_tpl)
 
     def append_high(self, cmd, *args, **kwargs):
-        self.high.append((cmd, args, kwargs))
+        cmd_tpl = (cmd, args, kwargs)
+        if kwargs.get('unique') and cmd_tpl in self.high:
+            return
+        self.high.append(cmd_tpl)
 
     def append_picker(self, user_id, cmd, *args, **kwargs):
         self.picker[user_id].append((cmd, args, kwargs))

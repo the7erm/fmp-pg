@@ -11,6 +11,10 @@
           'glyphicon-chevron-down': !collapsed
         }"></span></a>
       {{dir.dirname}} <div class="pull-right badge" ng-if="dir.has_media" >has media</div>
+      <button class="btn pull-right" ng-class="{
+        'btn-default':!dir.folder_data.id,
+        'btn-success':dir.folder_data.id
+      }" ng-click="addFolderToLibrary(dir)">Add to library</button>
 	  </div>
 	</div>
   <ol ui-tree-nodes="" ng-model="dir.children" ng-class="{hidden: collapsed}">

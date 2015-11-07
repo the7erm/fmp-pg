@@ -7,6 +7,7 @@ if "../" not in sys.path:
 from sqlalchemy import ForeignKey, Column, Integer, String, BigInteger,\
                        Float, Date, Boolean
 from sqlalchemy.orm import relationship
+from fmp_utils.db_session import Session, session_scope
 
 try:
     from .base import Base, to_json
@@ -36,25 +37,32 @@ class UserFileInfo(Base):
     history = relationship("UserFileHistory", backref="user_file_info")
 
     def mark_as_played(self, **kwargs):
-        print ("UserFileInfo.mark_as_played()")
-        self.time_played = int(kwargs.get('now', time()))
-        self.percent_played = kwargs.get('percent_played', 0)
-        self.date_played = date.fromtimestamp(self.time_played)
-        do_commit(self)
+        with session_scope() as session:
+            session.add(self)
+            print ("UserFileInfo.mark_as_played()")
+            self.time_played = int(kwargs.get('now', time()))
+            self.percent_played = kwargs.get('percent_played', 0)
+            self.date_played = date.fromtimestamp(self.time_played)
+            do_commit(self)
+            session.add(self)
 
-        for h in self.history:
-            print("H:",h)
-            if h.date_played == self.date_played and h.user_id == self.user_id:
-                self.update_ufh(h)
-                h.mark_as_played(**kwargs)
-                return
+            for h in self.history:
+                print("H:",h)
+                if h.date_played == self.date_played and h.user_id == self.user_id:
+                    self.update_ufh(h, session)
+                    h.mark_as_played(**kwargs)
+                    return
 
-        ufh = UserFileHistory()
-        self.update_ufh(ufh)
-        ufh.mark_as_played(**kwargs)
-        self.history.append(ufh)
+            ufh = UserFileHistory()
+            session.add(ufh)
+            self.update_ufh(ufh, session)
+            session.add(self)
+            ufh.mark_as_played(**kwargs)
+            session.add(self)
+            session.add(ufh)
+            self.history.append(ufh)
 
-    def update_ufh(self, ufh):
+    def update_ufh(self, ufh, session):
         ufh.user_file_id = self.id
         ufh.user_id = self.user_id
         ufh.file_id = self.file_id
@@ -84,30 +92,35 @@ class UserFileInfo(Base):
         self.calculate_true_score()
 
     def calculate_true_score(self):
-        print("UserFileInfo.calculate_true_score()")
-        if self.rating is None:
-            self.rating = 6
-        if self.skip_score is None:
-            self.skip_score = 5
+        with session_scope() as session:
+            session.add(self)
+            print("UserFileInfo.calculate_true_score()")
+            if self.rating is None:
+                self.rating = 6
+            if self.skip_score is None:
+                self.skip_score = 5
 
-        true_score = (((self.rating * 2 * 10) + (self.skip_score * 10)) / 2)
+            true_score = (((self.rating * 2 * 10) + (self.skip_score * 10)) / 2)
 
-        if true_score < -20:
-            true_score = -20
+            if true_score < -20:
+                true_score = -20
 
-        if true_score > 125:
-            true_score = 125
+            if true_score > 125:
+                true_score = 125
 
-        self.true_score = true_score
+            self.true_score = true_score
 
-        do_commit(self)
+            do_commit(self)
 
     def __repr__(self):
         return "<UserFileInfo(file_id=%r, user_id=%r)>" % (
                           self.file_id, self.user_id)
 
     def json(self):
-        ufi = to_json(self, UserFileInfo)
-        if ufi:
-            ufi['user'] = self.user.json()
+        with session_scope() as session:
+            session.add(self)
+            ufi = to_json(self, UserFileInfo)
+            if ufi:
+                session.add(self)
+                ufi['user'] = self.user.json()
         return ufi
