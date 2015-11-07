@@ -67,10 +67,14 @@ with session_scope() as session:
                         .filter(Folder.dirname==dirname)\
                         .first()
         if folder:
+            folder.dirname = dirname
+            folder.mtime = folder.actual_mtime
+            session.commit()
             continue
 
         folder = Folder()
         folder.dirname = dirname
+        folder.mtime = folder.actual_mtime
         session.add(folder)
         session.commit()
 
@@ -90,6 +94,11 @@ with session_scope() as session:
                                   Location.basename==basename)\
                           .first()
         if location:
+            if location.changed:
+                session.add(location)
+                location.scan()
+                session.add(location)
+                session.commit()
             continue
         location = Location()
         location.dirname = dirname

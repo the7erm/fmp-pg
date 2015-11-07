@@ -243,8 +243,9 @@ class FmpServer(object):
 
     @cherrypy.expose
     def genres(self, *args, **kwargs):
-        genres = session.query(Genre).order_by(Genre.name).all()
-        return json_dumps([g.json() for g in genres])
+        with session_scope() as session:
+            genres = session.query(Genre).order_by(Genre.name).all()
+            return json_dumps([g.json() for g in genres])
 
     @cherrypy.expose
     def genre_enabled(self, *args, **kwargs):
