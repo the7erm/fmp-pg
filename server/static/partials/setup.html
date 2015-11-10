@@ -26,16 +26,16 @@
     <span class="btn btn-success" ng-if="progress.connected" ng-click="tabs.activeTab='Postgress'">Next</span>
   </div>
   <div title="PostgreSQL" name="Postgress" disabled="{{!progress.connected}}" bs-pane>
-    <div ng-include src="'/static/templates/postgres.html'"></div>
+    <div ng-include src="'/static/partials/postgres.html'"></div>
   </div>
   <div title="Config" name="Postgress Config" disabled="{{!progress.postgres.installed||!progress.postgres.running}}" bs-pane>
-    <div ng-include src="'/static/templates/postgres-config.html'"></div>
+    <div ng-include src="'/static/partials/postgres-config.html'"></div>
   </div>
   <div title="Users" name="Users" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
-    <div ng-controller="ListenerCtrl" ng-include src="'/static/templates/listeners.html'" ></div>
+    <div ng-controller="ListenerCtrl" ng-include src="'/static/partials/listeners.html'" ></div>
   </div>
   <div title="Folders" name="FoldersList" disabled="{{!progress.postgres.installed||!progress.postgres.running||!progress.postgres.db_exists}}" bs-pane>
-    <div ng-controller="FoldersCtrl" ng-include src="'/static/templates/folders.html'">FoldersCtrl</div>
+    <div ng-controller="FoldersCtrl" ng-include src="'/static/partials/folders.html'">FoldersCtrl</div>
   </div>
 </div>
 <pre>
