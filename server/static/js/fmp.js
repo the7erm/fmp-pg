@@ -1344,38 +1344,38 @@ var fmpApp = angular.module('fmpApp', [
     });
     $routeProvider
       .when('/artists', {
-        templateUrl: '/static/templates/artists.html',
+        templateUrl: '/static/partials/artists.html',
         controller: 'ArtistCtrl',
         reloadOnSearch: false
       })
       .when('/folders', {
-        templateUrl: '/static/templates/folders.html',
+        templateUrl: '/static/partials/folders.html',
         controller: 'FoldersTreeCtrl',
         reloadOnSearch: false
       })
       .when("/genres", {
-        templateUrl:"/static/templates/genres.html",
+        templateUrl:"/static/partials/genres.html",
         controller:"GenreController"
       })
       .when('/home', {
-        templateUrl: '/static/templates/player.html',
+        templateUrl: '/static/partials/player.html',
         controller: 'PlayerController'
       })
       .when('/listeners', {
-        templateUrl: '/static/templates/listeners.html',
+        templateUrl: '/static/partials/listeners.html',
         controller: 'ListenerCtrl'
       })
       .when('/search', {
-        templateUrl: '/static/templates/search.html',
+        templateUrl: '/static/partials/search.html',
         controller: 'SearchController',
         reloadOnSearch: false
       })
       .when('/setup', {
-        templateUrl: '/static/templates/setup.html',
+        templateUrl: '/static/partials/setup.html',
         controller: 'ConfigController'
       })
       .when("/welcome/", {
-        templateUrl: '/static/templates/setup.html',
+        templateUrl: '/static/partials/setup.html',
         controller:"ConfigController"
       })
       .otherwise({

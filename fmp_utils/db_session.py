@@ -29,6 +29,8 @@ class FmpSession():
             host = config.get('postgres', 'host')
             port = config.get('postgres', 'port')
             database = config.get("postgres", "database")
+            self.user = user
+            self.pword = pword
             connection_string = 'postgresql+psycopg2://{user}:{pword}@{host}:{port}/{database}'
             self.connection_string = connection_string.format(
                 user=user, pword=pword, host=host, port=port,
