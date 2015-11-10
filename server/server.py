@@ -334,6 +334,89 @@ class FmpServer(object):
         genre.enabled = to_bool(kwargs.get('enabled'))
         session.commit()
 
+    @cherrypy.expose
+    def add_genre(self, *args, **kwargs):
+        params = cherrypy.request.params
+        print("PARAMS:")
+        pprint(params)
+        file_id = params.get('file_id')
+        genre_name = params.get("genre", "").strip()
+        if not genre_name:
+            return json_dumps({
+                "RESULT": "FAIL",
+                "Error":"Empty genre name:%s" % genre_name
+            })
+        with session_scope() as session:
+            file = session.query(File)\
+                          .filter(File.id==file_id)\
+                          .first()
+            if not file:
+                return json_dumps({
+                    "RESULT": "FAIL",
+                    "Error":"No file found for file_id:%s" % file_id
+                })
+            genre = session.query(Genre)\
+                           .filter(Genre.name==genre_name)\
+                           .first()
+            if not genre:
+                genre = Genre()
+                genre.name = genre_name
+                genre.enabled = True
+                session.add(genre)
+                session.commit()
+            session.add(file)
+            found = False
+            for g in file.genres:
+                if g.id == genre.id:
+                    found = True
+                    break
+            if not found:
+                file.genres.append(genre)
+                session.commit()
+
+        return json_dumps({"RESULT": "OK"})
+
+    @cherrypy.expose
+    def remove_genre(self, *args, **kwargs):
+        params = cherrypy.request.params
+        print("PARAMS:")
+        pprint(params)
+        file_id = params.get('file_id')
+        genre_name = params.get("genre", "").strip()
+        if not genre_name:
+            return json_dumps({
+                "RESULT": "FAIL",
+                "Error":"Empty genre name:%s" % genre_name
+            })
+
+        with session_scope() as session:
+            file = session.query(File)\
+                          .filter(File.id==file_id)\
+                          .first()
+            if not file:
+                return json_dumps({
+                    "RESULT": "FAIL",
+                    "Error":"No file found for file_id:%s" % file_id
+                })
+            genre = session.query(Genre)\
+                           .filter(Genre.name==genre_name)\
+                           .first()
+            if not genre:
+                genre = Genre()
+                genre.name = genre_name
+                genre.enabled = True
+                session.add(genre)
+                session.commit()
+            session.add(file)
+            found = False
+            for g in file.genres:
+                if g.id == genre.id:
+                    file.genres.remove(g)
+                    break
+            session.commit()
+
+        return json_dumps({"RESULT": "OK"})
+
 
     @cherrypy.expose
     def listeners(self, *args, **kwargs):

@@ -734,23 +734,25 @@ var fmpApp = angular.module('fmpApp', [
     $scope.addEntry = function(e){
       console.log("e:",e)
     }
-    $scope.onAddGenre = function(fid, genre){
-      console.log("onAddGenre fid:", fid, 'genre:', genre);
+    $scope.onAddGenre = function(file_id, genre){
+      console.log("onAddGenre file_id:", file_id, 'genre:', genre.name);
       $http({
         method: 'GET',
         url: '/add_genre',
-        params: {"fid": fid, "genre": genre.genre}
+        params: {"file_id": file_id,
+                 "genre": genre.name }
       }).then(function successCallback(response) {
 
       }, function errorCallback(response) {
       });
     }
-    $scope.onRemoveGenre = function(fid, genre){
-      console.log("onRemoveGenre fid:", fid, 'genre:', genre);
+    $scope.onRemoveGenre = function(file_id, genre){
+      console.log("onRemoveGenre file_id:", file_id, 'genre:', genre);
       $http({
         method: 'GET',
         url: '/remove_genre',
-        params: {"fid": fid, "genre": genre.genre}
+        params: {"file_id": file_id,
+                 "genre": genre.name }
       }).then(function successCallback(response) {
       }, function errorCallback(response) {
       });
