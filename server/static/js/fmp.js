@@ -1,19 +1,16 @@
 var fmpApp = angular.module('fmpApp', [
+    'ngWebSocket', // you may also use 'angular-websocket' if you prefer
+    'ngTagsInput',
     'cgNotify',
-    'hc.marked',
     'ngAudio',
     'ngCookies',
     'ngRoute',
     'ngSanitize',
-    'ngTagsInput',
-    'ngWebSocket', // you may also use 'angular-websocket' if you prefer
     'ui.bootstrap',
     'ui.tree',
     'mgcrea.ngStrap',
-    'mgcrea.ngStrap.helpers.debounce',
-    'mgcrea.ngStrap.helpers.dimensions',
     'mgcrea.ngStrap.tab',
-    'mgcrea.ngStrap.typeahead'
+    'hc.marked'
   ])
   .factory('UserUtils', ['$http', function($http){
       var methods = {};
@@ -759,6 +756,14 @@ var fmpApp = angular.module('fmpApp', [
       });
     }
 
+    $scope.searchGenre = function(query) {
+      return $http({
+        method: 'GET',
+        url: '/genres',
+        params: {"name": query}
+      });
+    }
+
     $scope.sync = function(fid, uid) {
       $http({
         method: 'GET',
@@ -1373,10 +1378,6 @@ var fmpApp = angular.module('fmpApp', [
       .when('/setup', {
         templateUrl: '/static/partials/setup.html',
         controller: 'ConfigController'
-      })
-      .when("/welcome/", {
-        templateUrl: '/static/partials/setup.html',
-        controller:"ConfigController"
       })
       .otherwise({
         redirectTo: '/home'

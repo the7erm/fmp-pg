@@ -1,3 +1,11 @@
+<script type="text/ng-template" id="genre-template">
+  <div class="tag-template">
+    <div>
+      <a href="/#/search/?q={{data.name}}">{{data.name}}</a>
+      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
+    </div>
+  </div>
+</script>
 <h3>Player</h3>
 <span id="time-status">
     <span ng-if="PlayerData.collection.mode=='remote'">{{PlayerData.collection.time_status}} </span>
@@ -32,11 +40,13 @@
                 placeholder="Add a genre"
                 class="bootstrap"
                 template="genre-template"
-                min-length="1"
                 replace-spaces-with-dashes="false"
                 on-tag-added="onAddGenre(PlayerData.collection.playingData.id, $tag)"
                 on-tag-removed="onRemoveGenre(PlayerData.collection.playingData.id, $tag)">
-        <auto-complete></auto-complete>
+        <auto-complete source="searchGenre($query)"
+                       min-length="0"
+                       debounce-delay="0"
+                       max-results-to-show="10"></auto-complete>
     </tags-input>
 
     <h4 ng-click="PlayerData.collection.show_locations=!PlayerData.collection.show_locations"> <span ng-class="{
@@ -49,16 +59,7 @@
     </dl>
 </div>
 <div class="reason" ng-if="PlayerData.collection.reason">{{ PlayerData.collection.reason }}</div>
-<script type="text/ng-template" id="genre-template">
 
-  <div class="tag-template">
-    <div>
-      <a href="/#/search/?q={{data.name}}">{{data.name}}</a>
-      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
-    </div>
-  </div>
-
-</script>
 
 <!--
 Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collection.mode" ng-change="PlayerData.setMode(PlayerData.collection.mode)">

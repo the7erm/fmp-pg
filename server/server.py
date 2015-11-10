@@ -21,9 +21,11 @@ from models.file import File
 from models.folder import Folder, scan_folder
 from models.user_file_info import UserFileInfo
 from models.preload import Preload
+from models.artist import Artist
+from models.album import Album
 from models.genre import Genre
 from models.user import get_users
-from sqlalchemy.sql import not_, text, and_
+from sqlalchemy.sql import not_, text, and_, func
 import subprocess
 from pprint import pprint
 import shlex
@@ -244,8 +246,83 @@ class FmpServer(object):
     @cherrypy.expose
     def genres(self, *args, **kwargs):
         with session_scope() as session:
-            genres = session.query(Genre).order_by(Genre.name).all()
+            genres = session.query(Genre)
+            name = kwargs.get('name')
+            if name:
+                genres = genres.filter(Genre.name.ilike("%s%%" % name))
+            genres = genres.order_by(Genre.name).all()
             return json_dumps([g.json() for g in genres])
+
+    @cherrypy.expose
+    def tags(self, *args, **kwargs):
+        word = kwargs.get('word')
+        hard_limit = 8
+        word_len = len(word)
+        lower_search = 3
+        with session_scope() as session:
+            results = []
+            limit = hard_limit
+            artists = session.query(Artist)\
+                             .filter(and_(
+                                Artist.name.ilike("%s%%" % word),
+                                func.length(Artist.name) < (word_len + lower_search)
+                              ))\
+                             .order_by(Artist.name)\
+                             .limit(limit)
+            results = [a.name for a in artists]
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                genres = session.query(Genre)\
+                             .filter(and_(
+                                Genre.name.ilike("%s%%" % word),
+                                func.length(Genre.name) < (word_len + lower_search)
+                              ))\
+                             .order_by(Genre.name)\
+                             .limit(limit)
+                results += [g.name for g in genres]
+                results = list(set(results))
+
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                albums = session.query(Album)\
+                             .filter(and_(
+                                Album.name.ilike("%s%%" % word),
+                                func.length(Album.name) < (word_len + lower_search)
+                              ))\
+                             .order_by(Album.name)\
+                             .limit(limit)
+                results += [a.name for a in albums]
+                results = list(set(results))
+
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                artists = session.query(Artist)\
+                                 .filter(Artist.name.ilike("%s%%" % word))\
+                                 .order_by(Artist.name)\
+                                 .limit(limit)
+                results += [a.name for a in artists]
+                results = list(set(results))
+
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                genres = session.query(Genre)\
+                             .filter(Genre.name.ilike("%s%%" % word))\
+                             .order_by(Genre.name)\
+                             .limit(limit)
+                results += [g.name for g in genres]
+                results = list(set(results))
+
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                albums = session.query(Album)\
+                             .filter(Album.name.ilike("%s%%" % word))\
+                             .order_by(Album.name)\
+                             .limit(limit)
+                results += [a.name for a in albums]
+                results = list(set(results))
+
+            return json_dumps(results)
+
 
     @cherrypy.expose
     def genre_enabled(self, *args, **kwargs):
