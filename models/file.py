@@ -35,6 +35,7 @@ from .artist import Artist
 from .title import Title
 from .genre import Genre
 from .album import Album
+from fmp_utils.misc import session_add
 # from .location import Location
 
 import hashlib
@@ -73,7 +74,7 @@ class File(Base):
     @property
     def filename(self):
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             for l in self.locations:
                 if l.exists:
                     return l.filename
@@ -90,7 +91,7 @@ class File(Base):
     def cued(self):
         cued = False
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             cued = session.query(Preload)\
                           .filter(Preload.file_id==self.id)\
                           .first()
@@ -104,7 +105,7 @@ class File(Base):
 
     def mark_as_played(self, **kwargs):
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             print("File.mark_as_played()")
             percent_played = kwargs.get('percent_played', 0)
             if self.percent_played and int(self.percent_played) == int(percent_played):
@@ -112,7 +113,7 @@ class File(Base):
             self.time_played = int(kwargs.get('now', time()))
             self.percent_played = percent_played
             do_commit(self)
-            session.add(self)
+            session_add(session, self)
             self.iterate_user_ids(self.mark_user_as_played, **kwargs)
 
     def iterate_user_ids(self, cmd, **kwargs):
@@ -123,7 +124,7 @@ class File(Base):
                 return
 
             for user in session.query(User).filter(User.listening==True).all():
-                session.add(user)
+                session_add(session, user)
                 kwargs['user'] = user
                 cmd(user.id, **kwargs)
 
@@ -143,8 +144,8 @@ class File(Base):
             user = kwargs.get('user')
             if not user:
                 return None
-            session.add(self)
-            session.add(user)
+            session_add(session, self)
+            session_add(session, user)
             ufi = UserFileInfo()
             ufi.file_id = self.id
             ufi.user_id = user.id
@@ -165,10 +166,10 @@ class File(Base):
 
     def iterate_ufi(self, cmd, user_id, *args, **kwargs):
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             for ufi in self.user_file_info:
-                session.add(self)
-                session.add(ufi)
+                session_add(session, self)
+                session_add(session, ufi)
                 if ufi.user.id == user_id:
                     ufi.reason = self.reason
                     exec_cmd = getattr(ufi, cmd)
@@ -182,7 +183,7 @@ class File(Base):
 
     def __repr__(self):
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             return ("<File(id=%r,\n"
                     "      fingerprint=%r\n"
                     "      filename=%r)>" % (
@@ -194,11 +195,11 @@ class File(Base):
         users = get_users(user_ids)
 
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             for user in users:
-                session.add(user)
+                session_add(session, user)
                 for ufi in self.user_file_info:
-                    session.add(ufi)
+                    session_add(session, ufi)
                     if ufi.user_id == user.id and ufi.voted_to_skip:
                         ufi.voted_to_skip = False
                         do_commit(ufi)
@@ -206,38 +207,38 @@ class File(Base):
     def get_users(self, user_ids=[]):
         return get_users(user_ids)
 
-    def json(self, user_ids=[]):
+    def json(self, user_ids=[], history=False):
         json = {}
         with session_scope() as session:
-            session.add(self)
+            session_add(session, self)
             json = to_json(self, File)
-            session.add(self)
+            session_add(session, self)
             json['cued'] = self.cued
-            session.add(self)
+            session_add(session, self)
 
             users = get_users(user_ids)
 
             keys = ['artists', 'titles', 'genres', 'locations']
             for k in keys:
-                session.add(self)
+                session_add(session, self)
                 json[k] = []
                 for obj in getattr(self, k):
                     json[k].append(obj.json())
 
             json['user_file_info'] = []
             for user in users:
-                session.add(self)
-                session.add(user)
+                session_add(session, self)
+                session_add(session, user)
                 found = False
                 for ufi in self.user_file_info:
                     if ufi.user_id == user.id:
-                        json['user_file_info'].append(ufi.json())
+                        json['user_file_info'].append(ufi.json(history=history))
                         found = True
                         break
                 if found:
                     continue
                 ufi = self.create_ufi(user.id, user=user)
                 do_commit(ufi)
-                json['user_file_info'].append(ufi.json())
+                json['user_file_info'].append(ufi.json(history=history))
 
         return json

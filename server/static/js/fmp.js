@@ -474,19 +474,21 @@ var fmpApp = angular.module('fmpApp', [
         return methods;
   }])
   .factory('PlayerData', ['$websocket', '$cookies', '$http', '$sce', '$filter',
-    'SatellitePlayer', 'UserUtils', function($websocket, $cookies, $http, $sce, $filter, SatellitePlayer, UserUtils) {
+    'SatellitePlayer', 'UserUtils', function($websocket, $cookies, $http, $sce,
+                                             $filter, SatellitePlayer,
+                                             UserUtils) {
         // Open a WebSocket connection
         var collection = {
               'ws_url': window.ws_url,
               "iam": $cookies.get('iam') || null,
               "jobs": {},
               "mode": "remote",
-              "show_locations": false
+              "show_locations": false,
+              "show_history": false
             },
             dataStream = $websocket(collection.ws_url);
 
         var mode = $cookies.get('mode');
-
 
         if (mode) {
             collection.mode = mode;
@@ -586,9 +588,58 @@ var fmpApp = angular.module('fmpApp', [
             collection.playingData = obj;
         }
 
+        methods.onAddGenre = function(file_id, genre){
+            console.log("onAddGenre file_id:", file_id, 'genre:', genre.name);
+            $http({
+              method: 'GET',
+              url: '/add_genre',
+              params: {"file_id": file_id,
+                       "genre": genre.name }
+            }).then(function successCallback(response) {
+
+            }, function errorCallback(response) {
+            });
+        };
+
+        methods.onRemoveGenre =  function(file_id, genre){
+            console.log("onRemoveGenre file_id:", file_id, 'genre:', genre);
+            $http({
+                method: 'GET',
+                url: '/remove_genre',
+                params: {"file_id": file_id,
+                         "genre": genre.name }
+            }).then(function successCallback(response) {
+            }, function errorCallback(response) {
+            });
+        };
+
+        methods.searchGenre = function(query) {
+            console.log("searchGenre:", query);
+            return $http({
+                method: 'GET',
+                url: '/genres',
+                params: {"name": query}
+            });
+        }
+
+        methods.loadHistory = function(obj) {
+            $http({
+                method: 'GET',
+                url: '/history',
+                params: {"file_id": obj.id}
+            }).then(function successCallback(response) {
+                for(var i=0;i<response.data.length; i++) {
+                  response.data[i]['date_time_played'] = new Date(
+                    parseInt(response.data[i]['time_played']) * 1000);
+                }
+                obj.history = response.data;
+            }, function errorCallback(response) {
+            });
+        }
+
         dataStream.onOpen(function(){
-          collection.CONNECTION = "OPEN";
-          setTimeout(methods.get, 100);
+            collection.CONNECTION = "OPEN";
+            setTimeout(methods.get, 100);
         });
 
         dataStream.onClose(function(){
@@ -700,6 +751,12 @@ var fmpApp = angular.module('fmpApp', [
                                             notify, SatellitePlayer) {
 
     $scope.PlayerData = PlayerData;
+    $scope.$watch("PlayerData.collection.playingData", function(newValue, oldValue){
+        console.log("CHANGED ID:", newValue, oldValue);
+        if (PlayerData.show_history && !PlayerData.collection.playingData.history) {
+          PlayerData.loadHistory(PlayerData.collection.playingData);
+        }
+    });
     $scope.SatellitePlayer = SatellitePlayer;
     $scope.next = function(e) {
         if (PlayerData.collection.mode == 'remote') {
@@ -734,37 +791,9 @@ var fmpApp = angular.module('fmpApp', [
     $scope.addEntry = function(e){
       console.log("e:",e)
     }
-    $scope.onAddGenre = function(file_id, genre){
-      console.log("onAddGenre file_id:", file_id, 'genre:', genre.name);
-      $http({
-        method: 'GET',
-        url: '/add_genre',
-        params: {"file_id": file_id,
-                 "genre": genre.name }
-      }).then(function successCallback(response) {
-
-      }, function errorCallback(response) {
-      });
-    }
-    $scope.onRemoveGenre = function(file_id, genre){
-      console.log("onRemoveGenre file_id:", file_id, 'genre:', genre);
-      $http({
-        method: 'GET',
-        url: '/remove_genre',
-        params: {"file_id": file_id,
-                 "genre": genre.name }
-      }).then(function successCallback(response) {
-      }, function errorCallback(response) {
-      });
-    }
-
-    $scope.searchGenre = function(query) {
-      return $http({
-        method: 'GET',
-        url: '/genres',
-        params: {"name": query}
-      });
-    }
+    $scope.onAddGenre = PlayerData.onAddGenre;
+    $scope.onRemoveGenre = PlayerData.onRemoveGenre;
+    $scope.searchGenre = PlayerData.searchGenre;
 
     $scope.sync = function(fid, uid) {
       $http({
@@ -915,7 +944,9 @@ var fmpApp = angular.module('fmpApp', [
 
     });
   })
-  .controller('SearchController', function($scope, $location, $route, $routeParams, $http, $cookies, PlayerData) {
+  .controller('SearchController', function($scope, $location, $route,
+                                           $routeParams, $http, $cookies,
+                                           PlayerData) {
       console.log("Loaded SearchController");
       $scope.params = $routeParams;
       $scope.loadedParams = "";
@@ -926,6 +957,9 @@ var fmpApp = angular.module('fmpApp', [
       $scope.loadPageLocked = false;
       $scope.calledWhileLocked = false;
       $scope.users = [];
+      $scope.onAddGenre = PlayerData.onAddGenre;
+      $scope.onRemoveGenre = PlayerData.onRemoveGenre;
+      $scope.searchGenre = PlayerData.searchGenre;
 
       $http({
         method: 'GET',

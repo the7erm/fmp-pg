@@ -116,11 +116,17 @@ class UserFileInfo(Base):
         return "<UserFileInfo(file_id=%r, user_id=%r)>" % (
                           self.file_id, self.user_id)
 
-    def json(self):
+    def json(self, history=False):
         with session_scope() as session:
             session.add(self)
             ufi = to_json(self, UserFileInfo)
+            ufi['history'] = []
             if ufi:
                 session.add(self)
                 ufi['user'] = self.user.json()
+            if history:
+                session.add(self)
+                for h in self.history:
+                    session.add(h)
+                    ufi['history'].append(h.json())
         return ufi

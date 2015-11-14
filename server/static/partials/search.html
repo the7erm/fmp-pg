@@ -8,6 +8,15 @@
   </div>
 
 </script>
+<script type="text/ng-template" id="search-genre-template">
+  <div class="tag-template">
+    <div>
+      <a href="/#/search/?q={{data.name}}">{{data.name}}</a>
+      <a class="remove-button" ng-click="$removeTag()">&#10006;</a>
+    </div>
+  </div>
+</script>
+
 <h3>Search</h3>
 <a href="/#artists?l={{params.q[0]}}" class="btn">Browse by artists</a><br>
 Search:
@@ -43,18 +52,17 @@ Searching collection:
 <pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()"
 ng-show="!loadPageLocked" items-per-page="10"></pagination>
 <div class="container-fluid">
-	<div class="row" ng-repeat="(key, rdata) in response.results">
-		<div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
-			<button class="btn" ng-class="{'btn-default':!rdata.cued, 'btn-info':rdata.cued}" ng-click="cue(rdata)">cue<span ng-if="rdata.cued" >d</span></button>
-		</div>
-		<div class="col-xs-9 col-sm-4 col-md-3 col-lg-3">
-            <span ng-repeat="(key, data) in rdata.artists"
-                  >
+    <div class="row" ng-repeat="(key, rdata) in response.results">
+        <div class="col-xs-3 col-sm-1 col-md-1 col-lg-1">
+            <button class="btn" ng-class="{'btn-default':!rdata.cued, 'btn-info':rdata.cued}" ng-click="cue(rdata)">cue<span ng-if="rdata.cued" >d</span></button>
+        </div>
+        <div class="col-xs-9 col-sm-4 col-md-3 col-lg-3">
+            <span ng-repeat="(key, data) in rdata.artists">
                   <span ng-bind-html="data.name | searchLink"></span>
                   <span ng-if="!$last">, </span>
             </span>
             <span ng-if="rdata.artists[0]&&rdata.titles[0]"> - </span>
-			<span ng-repeat="(key, data) in rdata.titles"
+            <span ng-repeat="(key, data) in rdata.titles"
                   >
                   <span ng-bind-html="data.name | searchLink"></span>
                   <span ng-if="!$last">, </span>
@@ -65,6 +73,20 @@ ng-show="!loadPageLocked" items-per-page="10"></pagination>
             </span>
             <br>
             <small>{{rdata.cued.reason}}</small>
+            <tags-input ng-model="rdata.genres"
+                        display-property="name"
+                        placeholder="Add a genre"
+                        class="bootstrap"
+                        template="search-genre-template"
+                        replace-spaces-with-dashes="false"
+                        on-tag-added="onAddGenre(rdata.id, $tag)"
+                        on-tag-removed="onRemoveGenre(rdata.id, $tag)">
+                <auto-complete source="searchGenre($query)"
+                               min-length="0"
+                               debounce-delay="0"
+                               max-results-to-show="10"></auto-complete>
+            </tags-input>
+
             <h4 ng-click="show_locations=!show_locations"> <span ng-class="{
                 'glyphicon glyphicon-triangle-right':!show_locations,
                 'glyphicon glyphicon-triangle-bottom':show_locations,
@@ -73,21 +95,24 @@ ng-show="!loadPageLocked" items-per-page="10"></pagination>
                 <dt>{{data.dirname}}</dt>
                 <dd ng-bind-html="data.basename | searchLink"></dd>
             </dl>
-		</div>
-        <div class="col-xs-12 col-sm-6 col-md-4 col-lg-4">
-    		<div ng-repeat="(key, data) in rdata.user_file_info" ng-controller="RatingCtrl" class="rating-div ">
-    			{{data.user.name}}
-    	        <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
-    	         <span style="cursor:pointer;">
-    		         <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
-    		         <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
-    	         </span>
-    	         {{data.true_score}}<br>
-                 <small>{{rdata.cued.reason || data.reason }}</small>
-    	    </div>
+
         </div>
-		<div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr></div>
-	</div>
+        <div class="col-xs-12 col-sm-6 col-md-4 col-lg-4">
+            <div ng-repeat="(key, data) in rdata.user_file_info" ng-controller="RatingCtrl" class="rating-div ">
+                {{data.user.name}}
+                <rating ng-model="data.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating()" titles="['0','1','2', '3', '4', '5', '6']"></rating><br>
+                 <span style="cursor:pointer;">
+                     <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
+                     <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
+                 </span>
+                 {{data.true_score}}<br>
+                 <small>{{rdata.cued.reason || data.reason }}</small>
+            </div>
+        </div>
+        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+            <hr>
+        </div>
+    </div> <!-- /ng-repeat="(key, rdata) in response.results"  -->
 </div>
 
 <pagination total-items="bigTotalItems" ng-model="bigCurrentPage" max-size="maxSize" class="pagination-sm" boundary-links="true" ng-change="pageChanged()" ng-show="!loadPageLocked"></pagination>

@@ -1,4 +1,8 @@
 
+from time import sleep
+from sqlalchemy.exc import InvalidRequestError
+import traceback
+
 def to_bool(value):
     if isinstance(value, bool):
         return value
@@ -10,3 +14,19 @@ def to_bool(value):
                                  'undefined'):
             return False
     return bool(value)
+
+def session_add(session, obj, commit=False, close=False):
+    added = False
+    while not added:
+        try:
+            session.add(obj)
+            added = True
+        except InvalidRequestError as e:
+            traceback.print_exc()
+            print("InvalidRequestError:", e)
+            sleep(0.1)
+
+    if commit:
+        session.commit()
+    if close:
+        session.close()

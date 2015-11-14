@@ -13,6 +13,7 @@ from random import shuffle
 from collections import defaultdict
 from pprint import pprint
 from fmp_utils.jobs import jobs
+from fmp_utils.misc import session_add
 import math
 
 true_score_pool = defaultdict(list)
@@ -43,15 +44,15 @@ def get_preload(uids=[]):
             users = session.query(User).all()
 
         for user in users:
-            session.add(user)
+            session_add(session, user)
             total = session.query(Preload)\
                            .filter(Preload.user_id==user.id)\
                            .count()
 
             if total == 0:
-                session.add(user)
+                session_add(session, user)
                 populate_preload([user])
-            session.add(user)
+            session_add(session, user)
             total = session.query(Preload)\
                            .filter(Preload.user_id==user.id)\
                            .count()
@@ -66,9 +67,7 @@ def get_preload(uids=[]):
 
             if pick:
                 pick.reason = preload.reason
-                session.add(pick)
-                session.commit()
-
+                session_add(session, pick, commit=True)
                 results.append(pick)
                 session.delete(preload)
                 session.commit()
@@ -196,7 +195,7 @@ def populate_pick_from(user_id=None, truncate=False):
 def insert_random_unplayed_for_user_from_pick_from(user):
     result = None
     with session_scope() as session:
-        session.add(user)
+        session_add(session, user)
         result = session.query(File).from_statement(
             text("""SELECT f.*
                     FROM pick_from pf, files f
@@ -211,14 +210,14 @@ def insert_random_unplayed_for_user_from_pick_from(user):
 
         remove_file_from_pick_from(result, session)
         if result:
-            session.add(user)
+            session_add(session, user)
             insert_into_preload(
                     user.id, result.id, "random unplayed for %s" % user.name)
     return result
 
 def insert_random_for_user_true_score_from_pick_from(user, true_score):
     with session_scope() as session:
-        session.add(user)
+        session_add(session, user)
         sql = """SELECT f.*
                  FROM files f,
                       user_file_info ufi,
@@ -237,7 +236,7 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
 
         if not result:
             return insert_random_unplayed_for_user_from_pick_from(user)
-        session.add(user)
+        session_add(session, user)
         insert_into_preload(
             user.id, result.id, "%s true_score >= %s" % (user.name, true_score))
         remove_file_from_pick_from(result, session)
@@ -247,7 +246,7 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
 def remove_file_from_pick_from(result, session):
     if not result:
         return
-    session.add(result)
+    session_add(session, result)
     session.execute(text("""DELETE FROM pick_from
                             WHERE file_id = :file_id"""),
                     {'file_id': result.id })
@@ -272,8 +271,7 @@ def insert_into_preload(user_id, file_id, reason="", from_search=False):
         preload.file_id = file_id
         preload.reason = reason
         preload.from_search = from_search
-        session.add(preload)
-        session.commit()
+        session_add(session, preload, commit=True)
 
 
 def populate_preload(users=[]):
@@ -289,7 +287,7 @@ def populate_preload(users=[]):
 
 
         for user in users:
-            session.add(user)
+            session_add(session, user)
             # Prepare a list that is safe for all our users.
             user_id = user.id
             populate_pick_from(user_id=user_id, truncate=False)
@@ -299,29 +297,29 @@ def populate_preload(users=[]):
             threashold = 1
 
         for user in users:
-            session.add(user)
+            session_add(session, user)
             populate_preload_for_user(user, threashold)
 
 def populate_preload_for_user(user, threashold=1):
     with session_scope() as session:
-        session.add(user)
+        session_add(session, user)
         true_score_pool[user.id] = build_truescore_list()
         cnt = 0
-        session.add(user)
+        session_add(session, user)
         for true_score in true_score_pool[user.id]:
             if cnt <= threashold:
                 # always run the first query.
-                session.add(user)
+                session_add(session, user)
                 insert_random_unplayed_for_user_from_pick_from(user)
-                session.add(user)
+                session_add(session, user)
                 insert_random_for_user_true_score_from_pick_from(user, true_score)
             else:
                 # Defer all the other queries.
-                session.add(user)
+                session_add(session, user)
                 jobs.append_picker(
                     user.id, insert_random_unplayed_for_user_from_pick_from, user)
 
-                session.add(user)
+                session_add(session, user)
                 jobs.append_picker(
                     user.id, insert_random_for_user_true_score_from_pick_from, user,
                     true_score)

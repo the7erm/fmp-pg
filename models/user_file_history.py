@@ -9,6 +9,7 @@ from datetime import date
 if "../" not in sys.path:
     sys.path.append("../")
 
+from fmp_utils.db_session import session_scope
 from .utils import do_commit
 
 try:
@@ -39,3 +40,13 @@ class UserFileHistory(Base):
         self.percent_played = kwargs.get('percent_played', 0)
         self.date_played = date.fromtimestamp(self.time_played)
         do_commit(self)
+
+    def json(self, user=False):
+        d = {}
+        with session_scope() as session:
+            session.add(self)
+            d = to_json(self, UserFileHistory)
+            if user:
+                session.add(self)
+                d['user'] = self.user.json()
+        return d

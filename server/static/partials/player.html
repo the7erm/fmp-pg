@@ -15,9 +15,7 @@
 </span>
 
 <div>
-
-    <span ng-repeat="(key, data) in PlayerData.collection.playingData.artists"
-          >
+    <span ng-repeat="(key, data) in PlayerData.collection.playingData.artists">
           <span ng-bind-html="data.name | searchLink"></span>
           <span ng-if="!$last">, </span>
     </span>
@@ -112,8 +110,41 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
              {{data.true_score}}
         </div>
         <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr/></div>
-    </div>
+    </div> <!-- ng-repeat="(key, data) in PlayerData.collection.playingData.user_file_info" -->
+    <h4 ng-click="PlayerData.collection.show_history=!PlayerData.collection.show_history;PlayerData.loadHistory(PlayerData.collection.playingData);"> <span ng-class="{
+        'glyphicon glyphicon-triangle-right':!PlayerData.collection.show_history,
+        'glyphicon glyphicon-triangle-bottom':PlayerData.collection.show_history,
+    }"></span> History</h4>
+    <div ng-if="PlayerData.collection.show_history">
 
+        <div ng-repeat="(key, user_file_info) in PlayerData.collection.playingData.user_file_info">
+            <table class="table table-striped table-hover table-condensed table-responsive" >
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Rating</th>
+                        <th>Skip Score</th>
+                        <th>True Score</th>
+                        <th>Reason</th>
+                        <th>Voted to skip</th>
+                        <th>%</th>
+                        <th>Date Played</th>
+                    </tr>
+                </thead>
+                <tr ng-repeat="(key, hdata) in user_file_info.history">
+                    <td>{{user_file_info.user.name}}</td>
+                    <td>{{hdata.rating}}</td>
+                    <td>{{hdata.skip_score}}</td>
+                    <td>{{hdata.true_score}}</td>
+                    <td>{{hdata.reason}}</td>
+                    <td>{{hdata.voted_to_skip}}</td>
+                    <td>{{hdata.percent_played.toFixed(2)}}%</td>
+                    <td>{{ hdata.time_played * 1000 | date : 'medium' }}</td>
+                    <td><pre>{{hdata | json}}</pre></td>
+                </tr>
+            </table>
+        </div>
+    </div>
 </div>
 <br clear="all">
 <br clear="all">

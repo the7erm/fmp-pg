@@ -12,7 +12,7 @@ from ws4py.messaging import TextMessage, BinaryMessage
 
 sys.path.append("../")
 from fmp_utils.db_session import session_scope, Session
-from fmp_utils.misc import to_bool
+from fmp_utils.misc import to_bool, session_add
 from fmp_utils.first_run import first_run, check_config
 from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
 from models.base import to_json
@@ -25,7 +25,9 @@ from models.artist import Artist
 from models.album import Album
 from models.genre import Genre
 from models.user import get_users
+from models.user_file_history import UserFileHistory
 from sqlalchemy.sql import not_, text, and_, func
+from sqlalchemy.exc import InvalidRequestError
 import subprocess
 from pprint import pprint
 import shlex
@@ -108,9 +110,7 @@ class FmpServer(object):
 
             if user:
                 user.admin = admin
-            session.add(user)
-            session.commit()
-            session.close()
+            session_add(session, user, commit=True)
 
         return self.listeners()
 
@@ -140,11 +140,11 @@ class FmpServer(object):
 
         user_file_info = self.get_user_file_info(file_id, user_id)
         with session_scope() as session:
-            session.add(user_file_info)
+            session_add(session, user_file_info)
             setattr(user_file_info, attr, value)
             user_file_info.calculate_true_score()
             session.commit()
-            response = json_dumps(user_file_info.json())
+            response = json_dumps(user_file_info.json(history=True))
             playlist.broadcast_playing()
         return response
 
@@ -152,21 +152,16 @@ class FmpServer(object):
         with session_scope() as session:
             user_file_info = None
             playing_file = playlist.files[playlist.index]
-            session.add(playing_file)
+            session_add(session, playing_file)
             for ufi in playing_file.user_file_info:
-                session.add(ufi)
+                session_add(session, ufi)
                 if ufi.file_id != file_id:
                     break
                 if ufi.user_id == user_id:
                     user_file_info = ufi
                     break;
 
-
-            if user_file_info:
-                created = False
-            else:
-                print("CREATING SESSION")
-                created = True
+            if not user_file_info:
                 user_file_info = session.query(UserFileInfo)\
                                         .filter(and_(
                                             UserFileInfo.file_id==file_id,
@@ -178,18 +173,20 @@ class FmpServer(object):
 
     @cherrypy.expose
     def mark_as_played(self, *args, **kwargs):
-        user_file_info = session.query(UserFileInfo)\
-                                .filter(and_(
-                                    UserFileInfo.file_id==kwargs.get('file_id'),
-                                    UserFileInfo.user_id==kwargs.get('user_id')
-                                ))\
-                                .first()
-        user_file_info.percent_played = kwargs.get('percent_played', 0)
-        user_file_info.date_played = date.today()
-        user_file_info.time_played = time()
-        commit(user_file_info)
-        response = json_dumps(user_file_info.json())
-        return response
+        with session_scope() as session:
+            user_file_info = session.query(UserFileInfo)\
+                                    .filter(and_(
+                                        UserFileInfo.file_id==kwargs.get('file_id'),
+                                        UserFileInfo.user_id==kwargs.get('user_id')
+                                    ))\
+                                    .first()
+            session_add(session, user_file_info)
+            user_file_info.percent_played = kwargs.get('percent_played', 0)
+            user_file_info.date_played = date.today()
+            user_file_info.time_played = time()
+            session.commit()
+            response = json_dumps(user_file_info.json())
+            return response
 
     @cherrypy.expose
     def next(self):
@@ -211,7 +208,7 @@ class FmpServer(object):
     def vote_to_skip(self, *args, **kwargs):
         playing_file = playlist.files[playlist.index]
         with session_scope() as session:
-            session.add(playing_file)
+            session_add(session, playing_file)
             file_id = kwargs.get('file_id')
             user_id = kwargs.get('user_id')
             voted_to_skip = to_bool(kwargs.get('voted_to_skip'))
@@ -233,11 +230,10 @@ class FmpServer(object):
                                  UserFileInfo.user_id==kwargs.get('user_id')
                              ))\
                              .first()
+                session_add(session, ufi)
                 ufi.voted_to_skip = voted_to_skip
 
-            session.add(ufi)
-            session.commit()
-
+            session_add(session, ufi, commit=True)
             if voted_to_skip:
                 playlist.skip_countdown = 5
             playlist.broadcast_playing()
@@ -362,9 +358,8 @@ class FmpServer(object):
                 genre = Genre()
                 genre.name = genre_name
                 genre.enabled = True
-                session.add(genre)
-                session.commit()
-            session.add(file)
+                session_add(session, genre, commit=True)
+            session_add(session, file)
             found = False
             for g in file.genres:
                 if g.id == genre.id:
@@ -405,14 +400,12 @@ class FmpServer(object):
                 genre = Genre()
                 genre.name = genre_name
                 genre.enabled = True
-                session.add(genre)
-                session.commit()
-            session.add(file)
+                session_add(session, genre, commit=True)
+            session_add(session, file)
             found = False
             for g in file.genres:
                 if g.id == genre.id:
                     file.genres.remove(g)
-                    break
             session.commit()
 
         return json_dumps({"RESULT": "OK"})
@@ -474,7 +467,7 @@ class FmpServer(object):
                 users = get_users(user_ids=kwargs.get('user_ids', []))
                 user_ids = []
                 for u in users:
-                    session.add(u)
+                    session_add(session, u)
                     user_ids.append(str(u.id))
                 USER_IDS = ",".join(user_ids)
                 query_spec["FROM"].append("preload p")
@@ -493,8 +486,6 @@ class FmpServer(object):
                 query_spec["WHERE"].append("query @@ to_tsvector('english', keywords_txt)")
                 query_args['q'] = q
                 query_spec['ORDER_BY'].append("rank DESC")
-
-
 
             query_spec['ORDER_BY'].append("time_played DESC NULLS LAST")
 
@@ -551,27 +542,24 @@ class FmpServer(object):
         _id = kwargs.get('id')
         user_id = kwargs.get('uid')
         cued = to_bool(kwargs.get('cued'))
-        session = Session()
-        is_cued = session.query(Preload).filter(and_(
-            Preload.file_id==_id
-        )).first()
-        if cued and not is_cued:
-            preload = Preload()
-            user = session.query(User)\
-                          .filter(User.id==user_id)\
-                          .first()
-            preload.file_id = _id
-            preload.user_id = user_id
-            preload.reason = "From Search for %s" % user.name
-            preload.from_search = True
-            session.add(preload)
-            session.commit()
-        elif not cued and is_cued:
-            session.add(is_cued)
-            session.delete(is_cued)
-            session.commit()
-
-        session.close()
+        with session_scope() as session:
+            is_cued = session.query(Preload).filter(and_(
+                Preload.file_id==_id
+            )).first()
+            if cued and not is_cued:
+                preload = Preload()
+                user = session.query(User)\
+                              .filter(User.id==user_id)\
+                              .first()
+                preload.file_id = _id
+                preload.user_id = user_id
+                preload.reason = "From Search for %s" % user.name
+                preload.from_search = True
+                session_add(session, preload, commit=True)
+            elif not cued and is_cued:
+                session_add(session, is_cued)
+                session.delete(is_cued)
+                session.commit()
         return
 
     @cherrypy.expose
@@ -683,17 +671,16 @@ class FmpServer(object):
         name = obj.get('name', '').strip()
         if not name:
             return self.listeners()
-        session = Session()
-        user = session.query(User)\
-                      .filter(User.name == obj['name'])\
-                      .first()
-        if user:
-            return self.listeners()
-        user = User()
-        user.name = obj.get('name')
-        session.add(user)
-        session.commit()
-        session.close()
+        with session_scope() as session:
+            user = session.query(User)\
+                          .filter(User.name == obj['name'])\
+                          .first()
+            if user:
+                return self.listeners()
+            user = User()
+            user.name = obj.get('name')
+            session_add(session, user, commit=True)
+
         return self.listeners()
 
     @cherrypy.expose
@@ -831,6 +818,19 @@ class FmpServer(object):
             })
         return folders
 
+    @cherrypy.expose
+    def history(self, file_id):
+        results = []
+        with session_scope() as session:
+            history = session.query(UserFileHistory)\
+                             .filter(UserFileHistory.file_id==file_id)\
+                             .order_by(UserFileHistory.user_id.asc(),
+                                       UserFileHistory.date_played.desc())
+            for h in history:
+                session.add(h)
+                results.append(h.json(user=True))
+
+        return json_dumps(results)
 
 def cherry_py_worker():
     doc_path = os.path.join(sys.path[0])

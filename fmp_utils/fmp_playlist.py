@@ -5,6 +5,7 @@ from fmp_utils.jobs import jobs
 
 from pprint import pprint, pformat
 from fmp_utils.db_session import Session, session_scope
+from fmp_utils.misc import session_add
 
 class FmpPlaylist(Playlist):
 
@@ -25,7 +26,7 @@ class FmpPlaylist(Playlist):
             self.player.state = 'PLAYING'
             try:
                 with session_scope() as session:
-                    session.add(self.files[self.index])
+                    session_add(session, self.files[self.index])
                     self.player.position = "%s%%" % \
                         self.files[self.index].percent_played
             except IndexError:
@@ -55,13 +56,13 @@ class FmpPlaylist(Playlist):
 
     def do_countdown(self, playing_item, pos_data):
         with session_scope() as session:
-            session.add(playing_item)
+            session_add(session, playing_item)
             users = playing_item.get_users()
             skip_cnt = 0
             skip_user_file_infos = []
             for user in users:
-                session.add(user)
-                session.add(playing_item)
+                session_add(session, user)
+                session_add(session, playing_item)
                 for ufi in playing_item.user_file_info:
                     if ufi.user_id == user.id and ufi.voted_to_skip:
                         skip_cnt += 1
@@ -82,7 +83,7 @@ class FmpPlaylist(Playlist):
     def skip_majority(self, skip_user_file_infos):
         with session_scope() as session:
             for ufi in skip_user_file_infos:
-                session.add(ufi)
+                session_add(session, ufi)
                 ufi.deinc_score()
 
         self.inc_index()
@@ -117,7 +118,7 @@ class FmpPlaylist(Playlist):
         self.player.last_time_status['skip_countdown'] = self.skip_countdown
         try:
             return {
-                'player-playing': self.files[self.index].json(),
+                'player-playing': self.files[self.index].json(history=True),
                 'time-status': self.player.last_time_status
             }
         except IndexError:
