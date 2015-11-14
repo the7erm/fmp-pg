@@ -16,6 +16,7 @@ class FmpPlaylist(Playlist):
         self.server.playlist = self
         self.files = []
         self.preload = []
+        self.broadcast_playing_cnt = 0
         if not kwargs.get('first_run'):
             self.files = picker.get_recently_played()
             if not self.files:
@@ -45,6 +46,7 @@ class FmpPlaylist(Playlist):
         except IndexError:
             jobs.run_next_job()
             return
+        self.broadcast_playing_cnt += -1
         playing_item.mark_as_played(**pos_data)
 
         skip_user_file_infos = self.do_countdown(playing_item, pos_data)
@@ -53,6 +55,8 @@ class FmpPlaylist(Playlist):
         if self.skip_countdown == 0:
             self.skip_majority(skip_user_file_infos)
         jobs.run_next_job()
+        if self.broadcast_playing_cnt <= 0:
+            self.broadcast_playing()
 
     def do_countdown(self, playing_item, pos_data):
         with session_scope() as session:
@@ -112,6 +116,7 @@ class FmpPlaylist(Playlist):
         self.broadcast_playing()
 
     def broadcast_playing(self):
+        self.broadcast_playing_cnt = 10
         self.server.broadcast(self.json())
 
     def json(self):
