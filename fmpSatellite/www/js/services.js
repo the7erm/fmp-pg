@@ -356,7 +356,7 @@ angular.module('starter.services', [])
     $http({
       method: 'POST',
       url: FmpConfig.url+"sync",
-      data: collection,
+      data: FmpPlaylist.collection,
       headers: {
           'Content-Type': "application/json"
       },

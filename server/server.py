@@ -897,9 +897,8 @@ class FmpServer(object):
         satellite_history = ufi.get('satellite_history')
         if satellite_history is None:
             return
-        print("satellite_history:", satellite_history)
         for _date, item in satellite_history.items():
-            print("_date:", _date, "item:", item)
+            # print("_date:", _date, "item:", item)
             rating = item.get("rating")
             if rating is not None:
                 print("RATING DETECTED")
@@ -938,6 +937,7 @@ class FmpServer(object):
         }
         post_data = cherrypy.request.json
         state = int(post_data.get("state", 0))
+        print("STATE:", state)
         if state != MEDIA_PLAYING:
             kwargs = {
                 "params": {
@@ -952,9 +952,10 @@ class FmpServer(object):
             kwargs["params"]["oc"] = True
             result['preload'] = self.search(**kwargs)
         else:
-            print("post_data:", pformat(post_data))
+            # print("post_data:", pformat(post_data))
             with session_scope() as session:
-                for f in post_data['files']:
+                files = post_data.get("files", [])
+                for f in files:
                     for ufi in f['user_file_info']:
                         self.process_satellite_ufi(ufi)
                     _f = session.query(File)\
