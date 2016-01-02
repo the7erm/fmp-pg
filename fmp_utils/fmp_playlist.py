@@ -39,9 +39,25 @@ class FmpPlaylist(Playlist):
         self.player.connect('time-status', self.on_time_status)
 
     def populate_preload(self, user_ids=[]):
-        items = preload = picker.get_preload(user_ids)
+        items = picker.get_preload(user_ids)
         for item in items:
             self.preload.append(item)
+
+    def reset(self):
+        print("PLAYLIST RESET");
+        self.index = 0
+        self.files = picker.get_recently_played()
+        self.preload = picker.get_preload()
+        self.set_player_uri()
+        print("/URI")
+        self.player.state = 'PAUSED'
+        print("/PAUSED")
+        with session_scope() as session:
+            session_add(session, self.files[self.index])
+            print("self.files[self.index]:",self.files[self.index].percent_played)
+            self.player.position = "%s%%" % self.files[self.index].percent_played
+        # self.player.position = "%s%%" % self.files[self.index].percent_played
+
 
     def on_time_status(self, player, pos_data):
         Gdk.threads_leave()
@@ -156,3 +172,7 @@ class FmpPlaylist(Playlist):
     def pause(self, *args, **kwargs):
         self.player.pause()
         self.server.broadcast({"time-status": self.player.get_time_status()})
+
+    @property
+    def last_action(self):
+        return self.action_tracker.last_action

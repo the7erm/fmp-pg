@@ -294,7 +294,7 @@ angular.module('starter.services', [])
         FmpUtils.addLocalData(file);
         FmpPlaylist.collection.files[idx] = file;
         if (file.id == FmpPlaylist.collection.playing.id) {
-          FmpPlaylist.collection.playing = collection.files[idx];
+          FmpPlaylist.collection.playing = FmpPlaylist.collection.files[idx];
           $rootScope.$broadcast("playing-data-changed");
         }
       }
@@ -352,7 +352,7 @@ angular.module('starter.services', [])
     if (!FmpConfig.url) {
       return;
     }
-    console.log("SYNC:", collection);
+    console.log("SYNC:", FmpPlaylist.collection);
     $http({
       method: 'POST',
       url: FmpConfig.url+"sync",
@@ -838,12 +838,12 @@ angular.module('starter.services', [])
     methods.next = function() {
       methods.deIncScore();
       methods.setIndex("+1");
-      FmpPlaylist.lastAction = FmpUtils.now().timestamp_UTC;
+      collection.lastAction = FmpUtils.now().timestamp_UTC;
     };
 
     methods.prev = function() {
       methods.setIndex("-1");
-      FmpPlaylist.lastAction = FmpUtils.now().timestamp_UTC;
+      collection.lastAction = FmpUtils.now().timestamp_UTC;
     };
 
     methods.markAsPlayed = function(position, remaining, duration) {
@@ -956,7 +956,7 @@ angular.module('starter.services', [])
       collection.playerState = Media.MEDIA_PAUSED;
     }
     FmpPlaylist.collection.state = collection.playerState;
-    FmpPlaylist.lastAction = FmpUtils.now().timestamp_UTC;
+    FmpPlaylist.collection.lastAction = FmpUtils.now().timestamp_UTC;
     methods.save();
   }
 

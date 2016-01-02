@@ -965,6 +965,18 @@ class FmpServer(object):
                         session.add(_f)
                         result['processed_history'].append(_f.json(history=True))
 
+
+        if playlist.player.state_string == "PAUSED" and \
+           state == MEDIA_PLAYING:
+            playing = post_data.get("playing", {})
+            if playing != {}:
+                playlist.reset()
+        elif playlist.player.state_string == 'PAUSED' and\
+             state == MEDIA_PAUSED:
+                print("playlist.last_action", playlist.last_action)
+                print("post_data.lastAction", post_data.get("lastAction", 0))
+        print("playlist.last_action", playlist.last_action)
+        print("post_data.lastAction", post_data.get("lastAction", 0))
         return result
 
 def cherry_py_worker():

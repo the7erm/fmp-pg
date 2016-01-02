@@ -557,7 +557,7 @@ class Player(GObject.GObject, Log):
         Gdk.threads_leave()
         self.state = 'TOGGLE'
         self.show_controls()
-        self.lastAction = time()
+        action_tracker.mark()
 
     def on_scroll(self, widget, event):
         # Player.on_scroll()
@@ -567,6 +567,7 @@ class Player(GObject.GObject, Log):
         if event.direction == Gdk.ScrollDirection.DOWN:
             self.position = "-5"
         self.show_controls()
+        action_tracker.mark()
 
     @property
     def position(self):
@@ -1003,6 +1004,7 @@ class Player(GObject.GObject, Log):
 class Playlist(Log):
     __name__ == 'Playlist'
     logger = logger
+    action_tracker = action_tracker
     def __init__(self, files=[], player=None, index=0, *args, **kwargs):
         self.index = index
         self.files = files
@@ -1045,11 +1047,13 @@ class Playlist(Log):
         # TODO emit next()
         self.inc_index()
         self.player.push_status("Next")
+        action_tracker.mark()
 
     def prev(self, *args, **kwargs):
         # TODO emit prev()
         self.deinc_index()
         self.player.push_status("Prev")
+        action_tracker.mark()
 
     def on_eos(self, bus, msg):
         self.log_debug(".on_eos()")
