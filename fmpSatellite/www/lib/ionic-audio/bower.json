@@ -1,0 +1,16 @@
+{
+  "name": "ionic-audio",
+  "description": "Ionic UI for the Cordova Media Plugin",
+  "version": "1.2.6",
+  "homepage": "https://github.com/arielfaur/ionic-audio.git",
+  "license": "MIT",
+  "private": false,
+  "main": ["dist/ion-audio.js", "dist/ion-audio.min.js"],
+  "dependencies": {
+    "angular": "1.4.3",
+    "angular-mocks": "1.4.3"
+  },
+  "devDependencies": {
+    "ionic": "driftyco/ionic-bower#1.1.0"
+  }
+}

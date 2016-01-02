@@ -34,6 +34,21 @@ VALID_EXT = AUDIO_EXT + VIDEO_EXT
 # This is for the player
 SUPPORTED_EXTENSIONS = [''] + VALID_EXT
 
+EXTRACTION_MATRIX = {
+    'aac': ('.m4a'),
+    'adpcm_ima_wav': ('.wav',),
+    'pcm_s16le': ('.wav',),
+    'mp3': ('.mp3',),
+    'wmapro': ('.wma',),
+    'wmav2': ('.wma',)
+
+}
+
+MIME_MATRIX = {
+    'audio/ogg': '.ogg',
+    'audio/mpeg': '.mp3'
+}
+
 import os
 import sys
 

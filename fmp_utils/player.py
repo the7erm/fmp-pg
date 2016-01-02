@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-# player1.py -- gstreamer 1.0 player
+# player.py -- gstreamer 1.0 player
 #    Copyright (C) 2015 Eugene Miller <theerm@gmail.com>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -92,6 +92,17 @@ class PlayerError(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)
+
+class ActionTracker(Log):
+    __name__ = "ActionTracker"
+    last_action = time()
+    def __init__(self):
+        self.initialized = time()
+
+    def mark(self):
+        self.last_action = time()
+
+action_tracker = ActionTracker()
 
 class Player(GObject.GObject, Log):
     __name__ = 'Player'
@@ -546,6 +557,7 @@ class Player(GObject.GObject, Log):
         Gdk.threads_leave()
         self.state = 'TOGGLE'
         self.show_controls()
+        self.lastAction = time()
 
     def on_scroll(self, widget, event):
         # Player.on_scroll()

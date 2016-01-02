@@ -5,6 +5,7 @@ import json
 from time import time
 from datetime import date, datetime
 import cherrypy
+from cherrypy.lib.static import serve_file
 import configparser
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
@@ -18,6 +19,7 @@ from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
 from models.base import to_json
 from models.user import User
 from models.file import File
+from models.location import Location
 from models.folder import Folder, scan_folder
 from models.user_file_info import UserFileInfo
 from models.preload import Preload
@@ -29,13 +31,21 @@ from models.user_file_history import UserFileHistory
 from sqlalchemy.sql import not_, text, and_, func
 from sqlalchemy.exc import InvalidRequestError
 import subprocess
-from pprint import pprint
+from pprint import pprint, pformat
 import shlex
 import re
+
+hostname = subprocess.check_output(['hostname'])
+hostname = hostname.strip()
 
 WebSocketPlugin(cherrypy.engine).subscribe()
 cherrypy.tools.websocket = WebSocketTool()
 
+MEDIA_NONE = 0
+MEDIA_STARTING = 1
+MEDIA_RUNNING = MEDIA_PLAYING = 2
+MEDIA_PAUSED = 3
+MEDIA_STOPPED = 4
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, m):
@@ -95,6 +105,9 @@ class FmpServer(object):
             if user:
                 user.listening = to_bool(listening)
                 session.commit()
+                session.add(user)
+                if user.listening:
+                    playlist.populate_preload([user.id])
 
         playlist.broadcast_playing()
         return self.listeners()
@@ -174,18 +187,24 @@ class FmpServer(object):
     @cherrypy.expose
     def mark_as_played(self, *args, **kwargs):
         with session_scope() as session:
-            user_file_info = session.query(UserFileInfo)\
-                                    .filter(and_(
-                                        UserFileInfo.file_id==kwargs.get('file_id'),
-                                        UserFileInfo.user_id==kwargs.get('user_id')
-                                    ))\
-                                    .first()
-            session_add(session, user_file_info)
-            user_file_info.percent_played = kwargs.get('percent_played', 0)
-            user_file_info.date_played = date.today()
-            user_file_info.time_played = time()
-            session.commit()
-            response = json_dumps(user_file_info.json())
+            f = session.query(File)\
+                       .filter(File.id==kwargs.get('file_id'))\
+                       .first()
+            session.add(f)
+            mark_as_played_kwargs = {
+                "user_ids": [kwargs.get('user_id')],
+                "percent_played": kwargs.get("percent_played", 0),
+                "now": int(kwargs.get("now", time()))
+            }
+            f.mark_as_played(**mark_as_played_kwargs)
+            cue_kwargs = {
+                "id": kwargs.get("file_id"),
+                "uid": kwargs.get("user_id"),
+                "cued": False
+            }
+            self.cue(**cue_kwargs)
+            session.add(f)
+            response = f.json()
             return response
 
     @cherrypy.expose
@@ -428,6 +447,9 @@ class FmpServer(object):
     def search(self, *args, **kwargs):
         with session_scope() as session:
             params = cherrypy.request.params
+            if 'params' in kwargs:
+                params = kwargs.get("params")
+
             cherrypy.log(("+"*20)+" SEARCH "+("+"*20))
             cherrypy.log("search: kwargs:%s" % ( kwargs,))
             start = int(params.get("s", 0))
@@ -519,12 +541,15 @@ class FmpServer(object):
 
             results = []
             for res in files:
-                results.append(res.json())
+                results.append(res.json(history=True))
 
             print ("counting total")
             total = session.execute(text(count_query),query_args).first()
 
             session.close()
+            if params.get("raw", False):
+                return results
+
             return json_dumps({
                 "results": results,
                 "total": total[0]
@@ -533,6 +558,15 @@ class FmpServer(object):
     @cherrypy.expose
     def users(self, *args, **kwargs):
         return []
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def fmp_version(self):
+        return {
+            "fmp": 0.01,
+            "api": 1,
+            "hostname": hostname.decode("utf8")
+        }
 
     @cherrypy.expose
     def cue(self, *args, **kwargs):
@@ -831,6 +865,106 @@ class FmpServer(object):
                 results.append(h.json(user=True))
 
         return json_dumps(results)
+
+    @cherrypy.expose
+    def download(self, file_id, convert=False, extract_audio=False):
+        location = None
+        with session_scope() as session:
+            locations = session.query(Location)\
+                               .filter(Location.file_id==file_id)\
+                               .all()
+            if not locations:
+                raise cherrypy.NotFound()
+
+            for loc in locations:
+                session.add(loc)
+                if not loc.exists:
+                    continue
+
+                if not convert:
+                    return serve_file(loc.filename,
+                                      "application/x-download",
+                                      "attachment")
+                ## TODO extract audio, then convert.
+                ### Extract audio
+                ### FILENAME="$1"
+                ### avconv -i "$FILENAME" -c:a copy -vn -sn "$FILENAME.m4a"
+
+
+            raise cherrypy.NotFound()
+
+    def process_satellite_ufi(self, ufi):
+        satellite_history = ufi.get('satellite_history')
+        if satellite_history is None:
+            return
+        print("satellite_history:", satellite_history)
+        for _date, item in satellite_history.items():
+            print("_date:", _date, "item:", item)
+            rating = item.get("rating")
+            if rating is not None:
+                print("RATING DETECTED")
+                res = self.set_rating_or_score(ufi.get('file_id'),
+                                               ufi.get('user_id'),
+                                               'rating',
+                                               rating)
+
+            skip_score = item.get("skip_score")
+            if skip_score is not None:
+                print("SKIP_SCORE DETECTED")
+                res = self.set_rating_or_score(ufi.get('file_id'),
+                                               ufi.get('user_id'),
+                                               'skip_score',
+                                               skip_score)
+
+            percent_played = item.get('percent_played')
+            if percent_played is not None:
+                print("PERCENT_PLAYED DETECTED")
+                self.mark_as_played(**{
+                    "user_id": ufi.get('user_id'),
+                    "file_id": ufi.get('file_id'),
+                    "now": item.get('timestamp_UTC', time()),
+                    "percent_played": percent_played
+                })
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def sync(self, *args, **kwargs):
+        result = {
+            "result": "OK",
+            "processed_history": [],
+            "preload": [],
+            "history": []
+        }
+        post_data = cherrypy.request.json
+        state = int(post_data.get("state", 0))
+        if state != MEDIA_PLAYING:
+            kwargs = {
+                "params": {
+                    "s": 0,
+                    "l": 10,
+                    "oc": False,
+                    "raw": True
+                }
+            }
+            result['history'] = self.search(**kwargs)
+            result['history'].reverse()
+            kwargs["params"]["oc"] = True
+            result['preload'] = self.search(**kwargs)
+        else:
+            print("post_data:", pformat(post_data))
+            with session_scope() as session:
+                for f in post_data['files']:
+                    for ufi in f['user_file_info']:
+                        self.process_satellite_ufi(ufi)
+                    _f = session.query(File)\
+                                .filter(File.id==f.get("id"))\
+                                .first()
+                    if _f:
+                        session.add(_f)
+                        result['processed_history'].append(_f.json(history=True))
+
+        return result
 
 def cherry_py_worker():
     doc_path = os.path.join(sys.path[0])

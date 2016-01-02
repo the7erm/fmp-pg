@@ -48,6 +48,9 @@ class User(Base):
 def get_users(user_ids=[]):
     users = []
     with session_scope() as session:
+        if isinstance(user_ids, (str,)) and user_ids != "":
+            user_ids = user_ids.split(",")
+        print("get_users() USER IDS:", user_ids )
         user_query = session.query(User)
         if user_ids:
             user_query = user_query.filter(User.id.in_(user_ids))

@@ -1,0 +1,44 @@
+/* Empty. Add your own CSS if you like */
+
+.yellow-star  {
+    background-image: url("images/star.hover.png");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}
+.red-no  {
+    background-image: url("images/no.star.png");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}
+.grey-no  {
+    background-image: url("images/no.star.grey.png");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}
+.grey-star  {
+    background-image: url("images/star.grey.png");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}
+.question-mark-on {
+    background-image: url("images/question.mark.svg");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}
+.question-mark-off {
+    background-image: url("images/question.mark.grey.svg");
+    background-size: 30px 30px;
+    background-repeat: no-repeat;
+    min-height: 30px;
+    min-width: 30px;
+}

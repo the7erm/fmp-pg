@@ -121,8 +121,8 @@ with session_scope() as session:
             if not user_file_info:
                 user_file_info = UserFileInfo()
 
-            if user_file_info.true_score == r['true_score']:
-                continue
+            # if user_file_info.true_score == r['true_score']:
+            #    continue
 
             user_file_info.user_id = r['uid']
             user_file_info.rating = r['rating']
@@ -145,6 +145,7 @@ with session_scope() as session:
                 'fid': r['fid']
             })
             session.add(user_file_info)
+            session.commit()
             for h in history:
                 user_file_history = None
                 for uh in user_file_info.history:
@@ -153,8 +154,8 @@ with session_scope() as session:
                         break
                 if user_file_history:
                     continue
-
                 user_file_history = UserFileHistory()
+                user_file_history.user_file_id = user_file_info.id
                 user_file_history.user_id = user_file_info.user_id
                 user_file_history.file_id = user_file_info.file_id
                 user_file_history.time_played = \
@@ -166,5 +167,7 @@ with session_scope() as session:
                 user_file_history.rating = h['rating']
                 user_file_history.skip_score = h['score']
                 user_file_history.true_score = h['true_score']
+                # print ("adding:", h)
+                # print ("adding:", user_file_history)
                 session.add(user_file_history)
                 session.commit()

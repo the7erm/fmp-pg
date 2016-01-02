@@ -38,6 +38,11 @@ class FmpPlaylist(Playlist):
     def init_connections(self):
         self.player.connect('time-status', self.on_time_status)
 
+    def populate_preload(self, user_ids=[]):
+        items = preload = picker.get_preload(user_ids)
+        for item in items:
+            self.preload.append(item)
+
     def on_time_status(self, player, pos_data):
         Gdk.threads_leave()
         # print("on_time_status:", pos_data)

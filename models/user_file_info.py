@@ -17,6 +17,7 @@ except SystemError:
 from .user_file_history import UserFileHistory
 from .utils import do_commit
 from datetime import date
+from pprint import pprint
 
 class UserFileInfo(Base):
     __tablename__ = "user_file_info"
@@ -34,13 +35,18 @@ class UserFileInfo(Base):
 
     file_id = Column(Integer, ForeignKey('files.id'))
     user_id = Column(Integer, ForeignKey('users.id'))
-    history = relationship("UserFileHistory", backref="user_file_info")
+    history = relationship("UserFileHistory", backref="user_file_info",
+                           order_by="UserFileHistory.date_played.desc()")
 
     def mark_as_played(self, **kwargs):
         with session_scope() as session:
             session.add(self)
             print ("UserFileInfo.mark_as_played()")
+            pprint(kwargs)
             self.time_played = int(kwargs.get('now', time()))
+            print("time():", time())
+            print("kwargs.now:", kwargs.get("now", time()))
+            print("kwargs.percent_played:", kwargs.get("percent_played", 0))
             self.percent_played = kwargs.get('percent_played', 0)
             self.date_played = date.fromtimestamp(self.time_played)
             do_commit(self)
@@ -48,7 +54,8 @@ class UserFileInfo(Base):
 
             for h in self.history:
                 print("H:",h)
-                if h.date_played == self.date_played and h.user_id == self.user_id:
+                if h.date_played == self.date_played and \
+                   h.user_id == self.user_id:
                     self.update_ufh(h, session)
                     h.mark_as_played(**kwargs)
                     return

@@ -1,6 +1,9 @@
 
 import os
 import sys
+from subprocess import check_output
+import json
+
 from math import floor
 if "../" not in sys.path:
     sys.path.append("../")
@@ -165,6 +168,28 @@ class Location(DiskEntitiy, Base):
 
         self.fingerprint = hasher.hexdigest()
         do_commit(self)
+
+    def converter(self):
+        # avprobe -of json -show_format -v quiet -pretty -show_streams \
+        # './T/The Erm/The Erm -  You'\''re Gonna Die.avi'
+        info = self.avprobe()
+        for stream in info.get('streams', []):
+            codec_type = stream.get("codec_type", "")
+            if codec_type != "audio":
+                continue
+
+        return
+
+    def avprobe(self):
+        result = {}
+        args = [
+            'avprobe', '-of', 'json', '-show_format', '-pretty',
+            '-v', 'quiet', '-show_streams',
+            self.filename
+        ]
+        txt = check_output(args)
+        result = json.loads(txt)
+        return result
 
     def json(self):
         return to_json(self, Location)
