@@ -1,16 +1,36 @@
 
-from fmp_utils.player import Player, Playlist, TrayIcon, Gdk
+from fmp_utils.player import Player, Playlist, TrayIcon, Gdk, ActionTracker
 from fmp_utils import picker
 from fmp_utils.jobs import jobs
 
 from pprint import pprint, pformat
 from fmp_utils.db_session import Session, session_scope
 from fmp_utils.misc import session_add
+from fmp_utils.constants import CONFIG_DIR
+import os
+
+class FmpActionTracker(ActionTracker):
+    __name__ = "FmpActionTracker"
+    def __init__(self, *args, **kwargs):
+        super(FmpActionTracker, self).__init__(*args, **kwargs)
+        self.tracking_file = os.path.join(CONFIG_DIR, 'last_action')
+        if os.path.exists(self.tracking_file):
+            with open(self.tracking_file, 'r') as fp:
+                self.last_action = float(fp.read())
+
+    def mark(self, *args, **kwargs):
+        super(FmpActionTracker, self).mark(*args, **kwargs)
+        with open(self.tracking_file, 'w') as fp:
+            fp.write("%s" % self.last_action)
+
+action_tracker = FmpActionTracker()
 
 class FmpPlaylist(Playlist):
 
     def __init__(self, *args, **kwargs):
         super(FmpPlaylist, self).__init__(*args, **kwargs)
+        self.action_tracker = action_tracker
+        self.player.action_tracker = action_tracker
         self.skip_countdown = 5
         self.server = kwargs.get('server')
         self.server.playlist = self

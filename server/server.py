@@ -936,47 +936,43 @@ class FmpServer(object):
             "history": []
         }
         post_data = cherrypy.request.json
-        state = int(post_data.get("state", 0))
-        print("STATE:", state)
-        if state != MEDIA_PLAYING:
-            kwargs = {
-                "params": {
-                    "s": 0,
-                    "l": 10,
-                    "oc": False,
-                    "raw": True
-                }
+        satellite_state = int(post_data.get("state", 0))
+        with session_scope() as session:
+            # Always sync this data so it's marked as played.
+            files = post_data.get("files", [])
+            for f in files:
+                for ufi in f['user_file_info']:
+                    self.process_satellite_ufi(ufi)
+                _f = session.query(File)\
+                            .filter(File.id==f.get("id"))\
+                            .first()
+                if _f:
+                    session.add(_f)
+                    result['processed_history'].append(_f.json(history=True))
+
+        print("satellite_state:", satellite_state)
+        kwargs = {
+            "params": {
+                "s": 0,
+                "l": 10,
+                "oc": False,
+                "raw": True
             }
-            result['history'] = self.search(**kwargs)
-            result['history'].reverse()
-            kwargs["params"]["oc"] = True
-            result['preload'] = self.search(**kwargs)
-        else:
-            # print("post_data:", pformat(post_data))
-            with session_scope() as session:
-                files = post_data.get("files", [])
-                for f in files:
-                    for ufi in f['user_file_info']:
-                        self.process_satellite_ufi(ufi)
-                    _f = session.query(File)\
-                                .filter(File.id==f.get("id"))\
-                                .first()
-                    if _f:
-                        session.add(_f)
-                        result['processed_history'].append(_f.json(history=True))
+        }
+        result['history'] = self.search(**kwargs)
+        result['history'].reverse()
+        kwargs["params"]["oc"] = True
+        result['preload'] = self.search(**kwargs)
 
+        satellite_last_action = float(post_data.get("lastAction", 0))
 
-        if playlist.player.state_string == "PAUSED" and \
-           state == MEDIA_PLAYING:
+        if (playlist.player.state_string == "PAUSED" and \
+            satellite_state == MEDIA_PLAYING) or satellite_last_action > playlist.last_action:
             playing = post_data.get("playing", {})
             if playing != {}:
                 playlist.reset()
-        elif playlist.player.state_string == 'PAUSED' and\
-             state == MEDIA_PAUSED:
-                print("playlist.last_action", playlist.last_action)
-                print("post_data.lastAction", post_data.get("lastAction", 0))
         print("playlist.last_action", playlist.last_action)
-        print("post_data.lastAction", post_data.get("lastAction", 0))
+        print("satellite_last_action", satellite_last_action)
         return result
 
 def cherry_py_worker():

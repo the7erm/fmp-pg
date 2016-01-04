@@ -672,8 +672,17 @@ angular.module('starter.services', [])
         collection: collection
       };
 
+    methods.markAction = function() {
+      collection.lastAction = FmpUtils.now().timestamp_UTC;
+      localStorage.lastAction = collection.lastAction;
+    }
+
     methods.load = function() {
       console.log("LOAD");
+      if (localStorage.lastAction) {
+        collection.lastAction = parseFloat(localStorage.lastAction);
+      }
+
       try {
         collection.files = JSON.parse(localStorage.playlistFiles) || [];
       } catch (e) {
@@ -838,12 +847,12 @@ angular.module('starter.services', [])
     methods.next = function() {
       methods.deIncScore();
       methods.setIndex("+1");
-      collection.lastAction = FmpUtils.now().timestamp_UTC;
+      methods.markAction();
     };
 
     methods.prev = function() {
       methods.setIndex("-1");
-      collection.lastAction = FmpUtils.now().timestamp_UTC;
+      methods.markAction();
     };
 
     methods.markAsPlayed = function(position, remaining, duration) {
@@ -956,7 +965,7 @@ angular.module('starter.services', [])
       collection.playerState = Media.MEDIA_PAUSED;
     }
     FmpPlaylist.collection.state = collection.playerState;
-    FmpPlaylist.collection.lastAction = FmpUtils.now().timestamp_UTC;
+    FmpPlaylist.markAction();
     methods.save();
   }
 
