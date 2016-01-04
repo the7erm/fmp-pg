@@ -163,8 +163,76 @@ starterServices
       console.log("FmpPlaylist.setIndex collection.idx:", collection.idx);
       collection.playing = collection.files[idx];
       methods.save();
+      methods.initMusicControls();
       $rootScope.$broadcast("index-changed");
     }
+
+    methods.initMusicControls = function() {
+      if (collection.musicControls) {
+        collection.musicControls.destroy();
+      }
+      collection.musicControls = MusicControls.create({
+          track       : collection.playing['titles'][0].name,        // optional, default : ''
+          artist      : collection.playing['artists'][0].name,                       // optional, default : ''
+          // cover       : 'albums/absolution.jpg',      // optional, default : nothing
+          isPlaying   : true,                         // optional, default : true
+          dismissable : true,                         // optional, default : false
+
+          // hide previous/next/close buttons:
+          hasPrev   : true,      // show previous button, optional, default: true
+          hasNext   : true,      // show next button, optional, default: true
+          hasClose  : true,       // show close button, optional, default: false
+
+          // Android only, optional
+          // text displayed in the status bar when the notification (and the ticker) are updated
+          ticker    : collection.playing['titles'][0].name+" "+collection.playing['artists'][0].name
+      }, function(){
+          // on success
+      }, function(){
+          // on error
+      });
+      // Register callback
+      collection.musicControls.subscribe(methods.onButtonEvents);
+      collection.musicControls.listen();
+    };
+
+    methods.onButtonEvents = function() {
+      switch(action) {
+        case 'music-controls-next':
+            // Do something
+            methods.next();
+            break;
+        case 'music-controls-previous':
+            // Do something
+            methods.prev();
+            break;
+        case 'music-controls-pause':
+            // Do something
+            collection.player.pause();
+            break;
+        case 'music-controls-play':
+            // Do something
+            collection.player.pause();
+            break;
+        case 'music-controls-destroy':
+            // Do something
+            break;
+
+        // Headset events (Android only)
+        case 'music-controls-media-button' :
+            // Do something
+            collection.player.pause();
+            break;
+        case 'music-controls-headset-unplugged':
+            // Do something
+            break;
+        case 'music-controls-headset-plugged':
+            // Do something
+            break;
+        default:
+            break;
+    }
+    };
 
     methods.updateSkipScore = function(value) {
       var now = FmpUtils.now();

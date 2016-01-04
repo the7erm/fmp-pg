@@ -34,6 +34,7 @@ class FmpPlaylist(Playlist):
         self.skip_countdown = 5
         self.server = kwargs.get('server')
         self.server.playlist = self
+        self.server.picker = picker
         self.files = []
         self.preload = []
         self.broadcast_playing_cnt = 0

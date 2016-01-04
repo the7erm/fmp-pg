@@ -444,6 +444,74 @@ class FmpServer(object):
         return json_dumps(results)
 
     @cherrypy.expose
+    def preload(self, *args, **kwargs):
+        params = cherrypy.request.params
+        user_ids = self.get_user_ids(user_ids=kwargs.get('user_ids', []))
+        user_sql = """SELECT user_id AS id
+                      FROM preload
+                      WHERE user_id IN(%s)
+                      GROUP BY user_id"""  % ",".join(user_ids)
+
+        sql = """SELECT f.*
+                 FROM files f,
+                      preload p
+                 WHERE user_id IN (%s) AND
+                       f.id = p.file_id
+                 OFFSET 0 LIMIT 10""" % ",".join(user_ids)
+
+        results = []
+        preload_user_ids = []
+        with session_scope() as session:
+            user_count = session.query(User)\
+                                .from_statement(
+                                    user_sql)\
+                                .all()
+
+            for user_id in user_ids:
+                found = False
+                for user in user_count:
+                    session.add(user)
+                    if str(user.id) == user_id:
+                        found = True
+                        break
+                if not found:
+                    preload_user_ids.append(user_id)
+
+            if preload_user_ids:
+                preloaded = picker.get_preload(preload_user_ids)
+                for p in preloaded:
+                    results.append(p.json(user_ids=user_ids))
+
+            files = session.query(File)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+            for f in files:
+                results.append(f.json(user_ids=user_ids))
+
+
+        return json_dumps(results)
+
+
+    def get_user_ids(self, *args, **kwargs):
+        user_ids = []
+        with session_scope() as session:
+            params = cherrypy.request.params
+            users = get_users(user_ids=kwargs.get('user_ids', []))
+            for u in users:
+                session_add(session, u)
+                user_ids.append(str(u.id))
+            users = get_users(user_ids=params.get('user_ids', []))
+            for u in users:
+                session_add(session, u)
+                u_id = str(u.id)
+                if u_id not in user_ids:
+                    user_ids.append(u_id)
+
+        return user_ids
+
+
+    @cherrypy.expose
     def search(self, *args, **kwargs):
         with session_scope() as session:
             params = cherrypy.request.params
@@ -486,11 +554,7 @@ class FmpServer(object):
                                   WHERE {WHERE}"""
 
             if only_cued:
-                users = get_users(user_ids=kwargs.get('user_ids', []))
-                user_ids = []
-                for u in users:
-                    session_add(session, u)
-                    user_ids.append(str(u.id))
+                user_ids = self.get_user_ids(user_ids=kwargs.get('user_ids', []))
                 USER_IDS = ",".join(user_ids)
                 query_spec["FROM"].append("preload p")
                 query_spec["COUNT_FROM"].append("preload p")
@@ -534,10 +598,11 @@ class FmpServer(object):
             print("count_query:", count_query)
 
             print ("FETCHING 'files'")
-            files = session.query(File).from_statement(
-                text(search_query))\
-                .params(**query_args)\
-                .all()
+            files = session.query(File)\
+                           .from_statement(
+                                text(search_query))\
+                           .params(**query_args)\
+                           .all()
 
             results = []
             for res in files:

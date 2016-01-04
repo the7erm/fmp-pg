@@ -18,6 +18,7 @@ starterServices
       };
 
   FmpPlaylist.collection.state = playerState;
+  FmpPlaylist.player = methods;
 
   methods.onComplete = function() {
     // TODO incScore
