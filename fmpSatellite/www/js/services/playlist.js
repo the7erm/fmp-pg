@@ -17,6 +17,12 @@ starterServices
       localStorage.lastAction = collection.lastAction;
     }
 
+    methods.reset = function() {
+      collection.files = [];
+      collection.playing = {};
+      collection.idx = 0;
+    };
+
     methods.load = function() {
       console.log("LOAD");
       if (localStorage.lastAction) {
@@ -155,6 +161,7 @@ starterServices
                       collection.playing.id);
           console.log("collection.files.length:", collection.files.length);
           console.log("collection.files:", collection.files);
+          methods.initMusicControls();
           $rootScope.$broadcast("index-changed");
           return;
         }
@@ -162,41 +169,13 @@ starterServices
       collection.idx = idx;
       console.log("FmpPlaylist.setIndex collection.idx:", collection.idx);
       collection.playing = collection.files[idx];
-      methods.save();
       methods.initMusicControls();
+      methods.save();
       $rootScope.$broadcast("index-changed");
     }
 
-    methods.initMusicControls = function() {
-      if (collection.musicControls) {
-        collection.musicControls.destroy();
-      }
-      collection.musicControls = MusicControls.create({
-          track       : collection.playing['titles'][0].name,        // optional, default : ''
-          artist      : collection.playing['artists'][0].name,                       // optional, default : ''
-          // cover       : 'albums/absolution.jpg',      // optional, default : nothing
-          isPlaying   : true,                         // optional, default : true
-          dismissable : true,                         // optional, default : false
-
-          // hide previous/next/close buttons:
-          hasPrev   : true,      // show previous button, optional, default: true
-          hasNext   : true,      // show next button, optional, default: true
-          hasClose  : true,       // show close button, optional, default: false
-
-          // Android only, optional
-          // text displayed in the status bar when the notification (and the ticker) are updated
-          ticker    : collection.playing['titles'][0].name+" "+collection.playing['artists'][0].name
-      }, function(){
-          // on success
-      }, function(){
-          // on error
-      });
-      // Register callback
-      collection.musicControls.subscribe(methods.onButtonEvents);
-      collection.musicControls.listen();
-    };
-
-    methods.onButtonEvents = function() {
+    methods.onButtonEvents = function(action) {
+      console.log("onButtonEvents:", action);
       switch(action) {
         case 'music-controls-next':
             // Do something
@@ -231,8 +210,71 @@ starterServices
             break;
         default:
             break;
-    }
+      }
     };
+
+    methods.initMusicControls = function() {
+      console.log("**** INIT MUSIC CONTROLS");
+      var title = "",
+          artist = "",
+          artist_title = "";
+
+      if (typeof collection.playing == 'undefined') {
+        return;
+      }
+      if (collection.playing.artist  && collection.playing.artist.length > 0) {
+        artist = collection.playing.artist[0].name;
+      }
+
+      if (collection.playing.titles && collection.playing.titles.length > 0) {
+        title = collection.playing.titles[0].name;
+      }
+
+      artist_title = artist;
+      if (artist_title && title) {
+        artist_title += " - "+ title;
+      }
+      if (!artist && title) {
+        artist_title = title;
+      }
+      if (artist_title &&
+          collection.playing.locations &&
+          collection.playing.locations.length > 0) {
+        artist_title = collection.playing.locations[0].basename;
+      }
+
+      MusicControls.create({
+          track       : name,        // optional, default : ''
+          artist      : artist,                       // optional, default : ''
+          // cover       : 'albums/absolution.jpg',      // optional, default : nothing
+          isPlaying   : true,                         // optional, default : true
+          dismissable : true,                         // optional, default : false
+
+          // hide previous/next/close buttons:
+          hasPrev   : true,      // show previous button, optional, default: true
+          hasNext   : true,      // show next button, optional, default: true
+          hasClose  : true,       // show close button, optional, default: false
+
+          // Android only, optional
+          // text displayed in the status bar when the notification (and the ticker) are updated
+          ticker    : artist+" - "+title
+      }, function(res){
+          // on success
+          console.log("**** SUCCESS");
+          console.log("initMusicControls success:", res);
+          MusicControls.subscribe(methods.onButtonEvents);
+          MusicControls.listen();
+          console.log("SUBSCRIBED & LISTENING");
+      }, function(err){
+          // on error
+          console.log("**** FAILURE");
+          console.log("initMusicControls ERROR:", err);
+      });
+      // Register callback
+
+    };
+
+
 
     methods.updateSkipScore = function(value) {
       var now = FmpUtils.now();

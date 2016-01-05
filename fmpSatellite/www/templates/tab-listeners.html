@@ -1,0 +1,16 @@
+<ion-view view-title="Listeners">
+  <ion-content class="padding">
+    <h1>Listeners</h1>
+    <ul class="list">
+      <li class="item item-toggle" ng-repeat="(key, user) in users">
+         {{user.name}}
+         <label class="toggle toggle-assertive">
+           <input type="checkbox"  ng-model="user.listening" ng-change="updateUids">
+           <div class="track">
+             <div class="handle"></div>
+           </div>
+         </label>
+      </li>
+    </ul>
+  </ion-content>
+</ion-view>

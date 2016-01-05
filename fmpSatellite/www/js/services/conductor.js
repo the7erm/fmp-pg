@@ -6,6 +6,7 @@ starterServices
                                   FmpConfig,
                                   FmpDownloader,
                                   FmpIpScanner,
+                                  FmpListeners,
                                   FmpPlayer,
                                   FmpPlaylist,
                                   FmpPreload,
@@ -19,6 +20,7 @@ starterServices
           "FmpConfig": FmpConfig,
           "FmpDownloader": FmpDownloader,
           "FmpIpScanner": FmpIpScanner,
+          "FmpListeners": FmpListeners,
           "FmpPlayer": FmpPlayer,
           "FmpPlaylist": FmpPlaylist,
           "FmpPreload": FmpPreload,
@@ -62,49 +64,31 @@ starterServices
     }
   }
 
-  methods.processFiles = function(files, collection) {
-    collection.files = [];
-    for(var i=0;i<files.length;i++){
-      var file = files[i];
-      FmpUtils.addLocalData(file);
-      if (!FmpUtils.validFile(file.locations[0].basename)) {
-        continue;
-      }
-      FmpDownloader.checkExisting(file);
-      collection.files.push(file);
-      console.log("file:", file);
-    }
-  };
+  methods.updateSyncData = function(data){
+    var playlist = FmpUtils.sanitize(data.history),
+        preload = FmpUtils.sanitize(data.preload);
 
-  methods.syncAll = function(data) {
-    console.log("syncAll:", data);
-    console.log("playlist");
-    methods.processFiles(data.history, FmpPlaylist.collection);
-    console.log("preload");
-    methods.processFiles(data.preload, FmpPreload.collection);
-    FmpPlaylist.collection.idx = FmpPlaylist.collection.files.length - 1;
-    FmpPlaylist.collection.playing = FmpPlaylist.collection.files[FmpPlaylist.collection.idx];
-    var percent_played = parseFloat(FmpPlaylist.collection.playing['percent_played']);
-    FmpPlayer.setMedia();
-    FmpPlayer.collection.media.pause();
-    var duration = FmpPlayer.collection.media.getDuration();
-    console.log("duration:", duration, "percent_played:", percent_played);
-    var tmp = function() {
-        var duration = FmpPlayer.collection.media.getDuration();
-        console.log("duration:", duration);
-        if (duration == -1) {
-          setTimeout(tmp, 500);
-          return;
-        }
-        var decimal = percent_played * 0.01;
-        localStorage.position = decimal * duration;
-        FmpPlayer.collection.media.seekTo(localStorage.position * 1000);
-        FmpPlayer.save();
-    };
-    if (percent_played) {
-      setTimeout(tmp, 500);
+    for (var i=0;i<playlist.length;i++) {
+      var file = playlist[i],
+          idx = FmpUtils.indexOfFile(FmpPlaylist.collection.files, file);
+      if (idx == -1) {
+        // wasn't found so we add it.
+        FmpPlaylist.collection.files.push(file);
+        FmpDownloader.checkExisting(file);
+      }
     }
-  }
+
+    for (var i=0;i<preload.length;i++) {
+      var file = preload[i],
+          idx = FmpUtils.indexOfFile(FmpPreload.collection.files, file);
+      if (idx == -1) {
+        // wasn't found so we add it.
+        FmpPreload.collection.files.push(file);
+        FmpDownloader.checkExisting(file);
+      }
+    }
+
+  };
 
   methods.sync = function() {
     /*
@@ -114,31 +98,39 @@ starterServices
       return;
     }
     console.log("SYNC:", FmpPlaylist.collection);
+    var data = {
+      "playlist": FmpPlaylist.collection,
+      "listeners": FmpListeners.collection
+    };
     $http({
       method: 'POST',
       url: FmpConfig.url+"sync",
-      data: FmpPlaylist.collection,
+      data: data,
       headers: {
           'Content-Type': "application/json"
-      },
+      }
     }).then(function(response) {
       console.log("SYNC response.data:", response.data);
-      // TODO Loop through response.data and update the playlist/preload
-      if (FmpPlaylist.collection.state == Media.MEDIA_RUNNING) {
-        // The player is playing so don't change the file that's playing
-        // or the playlist
-        methods.updateSyncHistory(response.data.processed_history);
-      } else {
-        // The player isn't playing so we'll change the playing song
-        // and also change the playlist
-        methods.syncAll(response.data);
+      if (response.data.sync_priority == "mothership") {
+        FmpPlaylist.reset();
+        FmpPreload.reset();
+      }
+      if (response.data.sync_priority == "satellite") {
+        FmpPreload.reset();
+      }
+      methods.updateSyncData(response.data);
+      if (response.data.sync_priority == "mothership") {
+        FmpPlaylist.collection.idx = FmpPlaylist.collection.files.length - 1;
+        FmpPlaylist.collection.playing = FmpPlaylist.collection.files[FmpPlaylist.collection.idx];
+        FmpPlayer.resume();
       }
       FmpPlayer.save();
       FmpPlaylist.save();
-
+      FmpPreload.save();
     }, function errorCallback(response) {
       // called asynchronously if an error occurs
       // or server returns response with an error status.
+      console.log("SYNC ERROR:", response);
     });
   };
 
@@ -147,10 +139,15 @@ starterServices
   $rootScope.$on("server-found", function(){
     // This trigger happens whenever FmpIpScanner finds an address.
     FmpConfig.url = FmpIpScanner.collection.url;
-    // Get the preload
-    FmpPreload.fetch();
+    // Fetch the listeners
+    FmpListeners.fetch();
     // Sync the playlist to the server.
-    // FmpPlaylist.sync();
+  });
+
+  $rootScope.$on("listeners-loaded", function(){
+    // Get the preload
+    // FmpPreload.fetch();
+    methods.sync();
   });
 
   $ionicPlatform.ready(function() {

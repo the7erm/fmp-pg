@@ -205,6 +205,12 @@ class FmpServer(object):
             self.cue(**cue_kwargs)
             session.add(f)
             response = f.json()
+            preload = []
+            for p in playlist.preload:
+                session.add(p)
+                if p.id != kwargs.get("file_id"):
+                    preload.append(p)
+            playlist.preload = preload
             return response
 
     @cherrypy.expose
@@ -280,7 +286,8 @@ class FmpServer(object):
             artists = session.query(Artist)\
                              .filter(and_(
                                 Artist.name.ilike("%s%%" % word),
-                                func.length(Artist.name) < (word_len + lower_search)
+                                func.length(Artist.name) < (
+                                    word_len + lower_search)
                               ))\
                              .order_by(Artist.name)\
                              .limit(limit)
@@ -290,7 +297,8 @@ class FmpServer(object):
                 genres = session.query(Genre)\
                              .filter(and_(
                                 Genre.name.ilike("%s%%" % word),
-                                func.length(Genre.name) < (word_len + lower_search)
+                                func.length(Genre.name) < (
+                                    word_len + lower_search)
                               ))\
                              .order_by(Genre.name)\
                              .limit(limit)
@@ -457,7 +465,7 @@ class FmpServer(object):
                       preload p
                  WHERE user_id IN (%s) AND
                        f.id = p.file_id
-                 OFFSET 0 LIMIT 10""" % ",".join(user_ids)
+                 ORDER BY p.from_search DESC, p.id ASC""" % ",".join(user_ids)
 
         results = []
         preload_user_ids = []
@@ -489,8 +497,10 @@ class FmpServer(object):
             for f in files:
                 results.append(f.json(user_ids=user_ids))
 
+        if not kwargs.get("raw"):
+            return json_dumps(results)
 
-        return json_dumps(results)
+        return results
 
 
     def get_user_ids(self, *args, **kwargs):
@@ -640,6 +650,8 @@ class FmpServer(object):
         # cued
         _id = kwargs.get('id')
         user_id = kwargs.get('uid')
+        if not user_id:
+            user_id = kwargs.get("user_id")
         cued = to_bool(kwargs.get('cued'))
         with session_scope() as session:
             is_cued = session.query(Preload).filter(and_(
@@ -684,7 +696,6 @@ class FmpServer(object):
             fmp_session.create_all(Base)
 
         return json_dumps(cfg)
-
 
 
     def validate_db_config(self, obj, required=['database', 'username']):
@@ -1001,10 +1012,12 @@ class FmpServer(object):
             "history": []
         }
         post_data = cherrypy.request.json
-        satellite_state = int(post_data.get("state", 0))
+        user_ids = post_data.get("listeners", {}).get("user_ids", [])
+        satellite_playlist_collection = post_data.get("playlist",{})
+        files = satellite_playlist_collection.get("files", [])
+        satellite_state = int(satellite_playlist_collection.get("state", 0))
         with session_scope() as session:
             # Always sync this data so it's marked as played.
-            files = post_data.get("files", [])
             for f in files:
                 for ufi in f['user_file_info']:
                     self.process_satellite_ufi(ufi)
@@ -1022,20 +1035,36 @@ class FmpServer(object):
                 "l": 10,
                 "oc": False,
                 "raw": True
-            }
+            },
+            "user_ids": user_ids
         }
         result['history'] = self.search(**kwargs)
         result['history'].reverse()
-        kwargs["params"]["oc"] = True
-        result['preload'] = self.search(**kwargs)
+        result['preload'] = self.preload(**{
+            "user_ids": user_ids,
+            "raw": True
+        })
+
+        result["sync_priority"] = ""
 
         satellite_last_action = float(post_data.get("lastAction", 0))
 
-        if (playlist.player.state_string == "PAUSED" and \
-            satellite_state == MEDIA_PLAYING) or satellite_last_action > playlist.last_action:
-            playing = post_data.get("playing", {})
-            if playing != {}:
-                playlist.reset()
+        if playlist.player.state_string == "PLAYING" and\
+           satellite_state == MEDIA_PLAYING:
+            print("Mothership & satellite are playing")
+        elif playlist.player.state_string == "PLAYING" and\
+            satellite_state != MEDIA_PLAYING:
+            result["sync_priority"] = "mothership"
+        else:
+            # Neither are playing.
+            if satellite_last_action > playlist.last_action:
+                playing = post_data.get("playing", {})
+                if playing and playing != {}:
+                    playlist.reset()
+                    result["sync_priority"] = "satellite"
+            else:
+                result["sync_priority"] = "mothership"
+
         print("playlist.last_action", playlist.last_action)
         print("satellite_last_action", satellite_last_action)
         return result

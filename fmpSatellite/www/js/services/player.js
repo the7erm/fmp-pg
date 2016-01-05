@@ -18,7 +18,7 @@ starterServices
       };
 
   FmpPlaylist.collection.state = playerState;
-  FmpPlaylist.player = methods;
+  FmpPlaylist.collection.player = methods;
 
   methods.onComplete = function() {
     // TODO incScore
@@ -176,6 +176,31 @@ starterServices
         collection.releasing = false;
       }, 1000);
   };
+
+  methods.resume = function() {
+    console.log("RESUME");
+    methods.setMedia();
+    methods.collection.media.pause();
+    var duration = methods.collection.media.getDuration(),
+        percent_played = parseFloat(FmpPlaylist.collection.playing.percent_played);
+    console.log("duration:", duration, "percent_played:", percent_played);
+    var tmp = function() {
+        var duration = methods.collection.media.getDuration();
+        console.log("duration:", duration);
+        if (duration == -1) {
+          setTimeout(tmp, 500);
+          return;
+        }
+        var decimal = percent_played * 0.01;
+        localStorage.position = decimal * duration;
+        methods.collection.media.seekTo(localStorage.position * 1000);
+        console.log("RESUME SEEK:", localStorage.position);
+        methods.save();
+    };
+    if (percent_played) {
+      setTimeout(tmp, 500);
+    }
+  }
 
   $rootScope.$on("index-changed", methods.setMedia);
   return methods;

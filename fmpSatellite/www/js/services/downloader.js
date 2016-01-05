@@ -77,7 +77,7 @@ starterServices
                               var downloadProgress = Math.floor((progress.loaded / progress.total) * 100);
                               if (methods.collection.downloading.progress != downloadProgress) {
                                 methods.collection.downloading.progress = downloadProgress;
-                                console.log(url+" methods.download progress timeout:", collection.downloading.progress);
+                                console.log(url+" methods.download progress:", collection.downloading.progress);
                                 methods.progress = downloadProgress;
                               }
                               $rootScope.$broadcast("download-progress");

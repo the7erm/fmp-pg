@@ -65,7 +65,7 @@ class FmpPlaylist(Playlist):
             self.preload.append(item)
 
     def reset(self):
-        print("PLAYLIST RESET");
+        print("PLAYLIST RESET")
         self.index = 0
         self.files = picker.get_recently_played()
         self.preload = picker.get_preload()

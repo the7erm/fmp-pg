@@ -90,6 +90,23 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
   });
 })
 
+.controller('ListenerCtrl', function($scope, FmpConductor){
+  $scope.users = FmpConductor.collection.FmpListeners.collection.users;
+  $scope.$on("listeners-loaded", function(){
+    $scope.users = FmpConductor.collection.FmpListeners.collection.users;
+  });
+  $scope.updateUids = function(){
+    var user_ids = [];
+    for(var i=0;i<$scope.users.length;i++) {
+      var user = $scope.users[i];
+      if (user.listening) {
+        user_ids.push(user.id);
+      }
+    }
+    FmpConductor.collection.FmpListeners.collection.user_ids = user_ids;
+    FmpConductor.collection.FmpListeners.save();
+  };
+})
 .controller('ChatsCtrl', function($scope, Chats) {
   // With the new view caching in Ionic, Controllers are only called
   // when they are recreated or on app start, instead of every page change.

@@ -127,6 +127,7 @@ starterServices
   }
 
   methods.validFile = function(file) {
+    // TODO: Make this unique to the device.
     var ignore = ['flv', 'wma', 'wmv'];
 
     if (ignore.indexOf(file.ext) != -1) {
@@ -134,6 +135,21 @@ starterServices
     }
     return true;
   }
+
+  methods.sanitize = function(list) {
+    /* Prepare a list of files, skip any that don't have a valid extension. */
+    var newList = [];
+    for (var i=0;i<list.length;i++) {
+      var file = list[i];
+      methods.addLocalData(file);
+      if (!methods.validFile(file)) {
+        console.log("invalid extension:", file);
+        continue;
+      }
+      newList.push(file);
+    }
+    return newList;
+  };
 
   return methods;
 });
