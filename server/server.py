@@ -43,7 +43,8 @@ cherrypy.tools.websocket = WebSocketTool()
 
 MEDIA_NONE = 0
 MEDIA_STARTING = 1
-MEDIA_RUNNING = MEDIA_PLAYING = 2
+MEDIA_RUNNING = 2
+MEDIA_PLAYING = 2
 MEDIA_PAUSED = 3
 MEDIA_STOPPED = 4
 
@@ -460,6 +461,7 @@ class FmpServer(object):
                       WHERE user_id IN(%s)
                       GROUP BY user_id"""  % ",".join(user_ids)
 
+
         sql = """SELECT f.*
                  FROM files f,
                       preload p
@@ -470,23 +472,31 @@ class FmpServer(object):
         results = []
         preload_user_ids = []
         with session_scope() as session:
-            user_count = session.query(User)\
-                                .from_statement(
-                                    user_sql)\
+            user_count = session.query(Preload.user_id,
+                                       func.count(Preload.user_id))\
+                                .filter(Preload.user_id.in_(user_ids))\
+                                .group_by(Preload.user_id)\
                                 .all()
 
+            for user in user_count:
+                print ("USER:", user)
+            print("/"*100)
             for user_id in user_ids:
                 found = False
-                for user in user_count:
-                    session.add(user)
-                    if str(user.id) == user_id:
+                for count_user_id, total in user_count:
+                    if total <= 10:
+                        preload_user_ids.append(user_id)
+                        continue
+
+                    if str(user.user_id) == user_id:
                         found = True
                         break
                 if not found:
                     preload_user_ids.append(user_id)
 
             if preload_user_ids:
-                preloaded = picker.get_preload(preload_user_ids)
+                preloaded = picker.get_preload(user_ids=preload_user_ids,
+                                               remove_item=False)
                 for p in preloaded:
                     results.append(p.json(user_ids=user_ids))
 
@@ -1009,15 +1019,30 @@ class FmpServer(object):
             "result": "OK",
             "processed_history": [],
             "preload": [],
-            "history": []
+            "history": [],
+            "playing": {}
         }
         post_data = cherrypy.request.json
         user_ids = post_data.get("listeners", {}).get("user_ids", [])
+        satellite_preload_collection = post_data.get("preload",{})
         satellite_playlist_collection = post_data.get("playlist",{})
-        files = satellite_playlist_collection.get("files", [])
+
         satellite_state = int(satellite_playlist_collection.get("state", 0))
+        print("*"*100)
+        print("satellite_state:", satellite_state)
         with session_scope() as session:
             # Always sync this data so it's marked as played.
+            files = satellite_playlist_collection.get("files", [])
+            for f in files:
+                for ufi in f['user_file_info']:
+                    self.process_satellite_ufi(ufi)
+                _f = session.query(File)\
+                            .filter(File.id==f.get("id"))\
+                            .first()
+                if _f:
+                    session.add(_f)
+                    result['processed_history'].append(_f.json(history=True))
+            files = satellite_preload_collection.get("files", [])
             for f in files:
                 for ufi in f['user_file_info']:
                     self.process_satellite_ufi(ufi)
@@ -1055,16 +1080,25 @@ class FmpServer(object):
         elif playlist.player.state_string == "PLAYING" and\
             satellite_state != MEDIA_PLAYING:
             result["sync_priority"] = "mothership"
+        elif playlist.player.state_string != "PLAYING" and\
+             satellite_state == MEDIA_PLAYING:
+                result["sync_priority"] = "satellite"
+                playing = satellite_playlist_collection.get("playing", {})
+                if playing and playing != {}:
+                    playlist.reset()
         else:
             # Neither are playing.
             if satellite_last_action > playlist.last_action:
-                playing = post_data.get("playing", {})
+                playing = satellite_playlist_collection.get("playing", {})
                 if playing and playing != {}:
                     playlist.reset()
                     result["sync_priority"] = "satellite"
             else:
                 result["sync_priority"] = "mothership"
 
+        result['playing'] = playlist.files[playlist.index].json(
+            history=True,
+            user_ids=user_ids)
         print("playlist.last_action", playlist.last_action)
         print("satellite_last_action", satellite_last_action)
         return result

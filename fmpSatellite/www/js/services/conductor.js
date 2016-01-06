@@ -4,6 +4,7 @@ starterServices
                                   $rootScope,
                                   FmpCache,
                                   FmpConfig,
+                                  FmpConstants,
                                   FmpDownloader,
                                   FmpIpScanner,
                                   FmpListeners,
@@ -18,6 +19,7 @@ starterServices
   var collection = {
           "FmpCache": FmpCache,
           "FmpConfig": FmpConfig,
+          "FmpConstants": FmpConstants,
           "FmpDownloader": FmpDownloader,
           "FmpIpScanner": FmpIpScanner,
           "FmpListeners": FmpListeners,
@@ -61,6 +63,13 @@ starterServices
           $rootScope.$broadcast("playing-data-changed");
         }
       }
+      var idx = FmpUtils.indexOfFile(FmpPreload.collection.files, file);
+      console.log("checking:", file);
+      if (idx != -1) {
+        console.log("updating file.id:", file.id, "idx:", idx);
+        FmpUtils.addLocalData(file);
+        FmpPreload.collection.files[idx] = file;
+      }
     }
   }
 
@@ -100,6 +109,7 @@ starterServices
     console.log("SYNC:", FmpPlaylist.collection);
     var data = {
       "playlist": FmpPlaylist.collection,
+      "preload": FmpPreload.collection,
       "listeners": FmpListeners.collection
     };
     $http({
@@ -123,10 +133,14 @@ starterServices
         FmpPlaylist.collection.idx = FmpPlaylist.collection.files.length - 1;
         FmpPlaylist.collection.playing = FmpPlaylist.collection.files[FmpPlaylist.collection.idx];
         FmpPlayer.resume();
+        $rootScope.$broadcast("index-changed");
       }
       FmpPlayer.save();
       FmpPlaylist.save();
       FmpPreload.save();
+      $rootScope.$broadcast("preload-changed");
+      FmpCache.clean(FmpPlaylist.collection.files,
+                     FmpPreload.collection.files);
     }, function errorCallback(response) {
       // called asynchronously if an error occurs
       // or server returns response with an error status.
@@ -134,7 +148,7 @@ starterServices
     });
   };
 
-  setInterval(methods.sync, 60000); // sync once a minutes
+  // setInterval(methods.sync, 60000); // sync once a minutes
 
   $rootScope.$on("server-found", function(){
     // This trigger happens whenever FmpIpScanner finds an address.
@@ -184,6 +198,45 @@ starterServices
 
     collection.mediaTimer = setInterval(FmpPlayer.timeStatus, 1000);
   });
+
+  methods.updateCollection = function(ufi, collection) {
+    for (var i=0;i<collection.files.length;i++) {
+      var file = collection.files[i];
+      if (file.id == ufi.file_id) {
+        for (var i2=0;i2<file.user_file_info.length;i2++) {
+          var ufi2 = file.user_file_info[i2];
+          if (ufi2.id == ufi.id) {
+            file.user_file_info[i2] = ufi;
+          }
+        }
+      }
+    }
+  };
+
+  methods.setRating = function(ufi) {
+
+      console.log("setRating:", ufi);
+      if (typeof ufi.satellite_history == 'undefined') {
+        ufi.satellite_history = {};
+      }
+
+      if (typeof ufi.satellite_history == 'undefined') {
+        ufi.satellite_history = {};
+      }
+
+      FmpUtils.calculateTrueScore(ufi);
+
+      FmpUtils.updateHistory(ufi, {
+        "rating": ufi.rating,
+        "skip_score": ufi.skip_score,
+        "true_score": ufi.true_score
+      });
+
+      methods.updateCollection(ufi, FmpPlaylist.collection);
+      methods.updateCollection(ufi, FmpPreload.collection);
+  };
+
+  methods.stars = FmpConstants.stars;
 
   return methods;
 });

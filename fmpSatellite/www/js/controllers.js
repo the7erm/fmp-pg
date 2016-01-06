@@ -31,12 +31,12 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
     $scope.position = "0:00";
     $scope.duration = "0:00";
     $scope.remaining = "0:00";
-    $scope.playing = FmpPlaylist.collection.playing;
+    $scope.file = FmpPlaylist.collection.playing;
     $scope.state = FmpPlayer.collection.desiredState;
 
     $scope.$on("index-changed", function(){
         console.log("+++++++ index-changed", FmpPlaylist.collection.playing);
-        $scope.playing = FmpPlaylist.collection.playing;
+        $scope.file = FmpPlaylist.collection.playing;
     });
 
     $scope.$on("playing-data-changed", function(){
@@ -57,35 +57,9 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
       $scope.$apply();
     });
 
-    $scope.setRating = function(ufi) {
-      console.log("setRating:", ufi);
-      if (typeof ufi.satellite_history == 'undefined') {
-        ufi.satellite_history = {};
-      }
+    $scope.setRating = FmpConductor.setRating;
 
-      if (typeof ufi.satellite_history == 'undefined') {
-        ufi.satellite_history = {};
-      }
-
-      FmpUtils.calculateTrueScore(ufi);
-
-      FmpUtils.updateHistory(ufi, {
-        "rating": ufi.rating,
-        "skip_score": ufi.skip_score,
-        "true_score": ufi.true_score
-      });
-
-    };
-
-    $scope.ratingStates = [
-      {stateOn: 'red-no', stateOff: 'grey-no'},
-      {stateOn: 'yellow-star', stateOff: 'grey-star'},
-      {stateOn: 'yellow-star', stateOff: 'grey-star'},
-      {stateOn: 'yellow-star', stateOff: 'grey-star'},
-      {stateOn: 'yellow-star', stateOff: 'grey-star'},
-      {stateOn: 'yellow-star', stateOff: 'grey-star'},
-      {stateOn: 'question-mark-on', stateOff: 'question-mark-off'}
-    ];
+    $scope.ratingStates = FmpConductor.stars;
 
   });
 })
@@ -106,6 +80,43 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
     FmpConductor.collection.FmpListeners.collection.user_ids = user_ids;
     FmpConductor.collection.FmpListeners.save();
   };
+})
+.controller("PreloadCtrl", function($location, $anchorScroll, $scope, FmpConductor){
+  $scope.gotoAnchor = function(x) {
+    var newHash = 'anchor-' + x;
+    $location.hash('anchor-' + x);
+    console.log("gotoAnchor:", x);
+    if ($location.hash() !== newHash) {
+      // set the $location.hash to `newHash` and
+      // $anchorScroll will automatically scroll to it
+
+      console.log("$location.hash()");
+    } else {
+      // call $anchorScroll() explicitly,
+      // since $location.hash hasn't changed
+      $anchorScroll();
+      console.log("$anchorScroll()");
+    }
+  };
+  $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
+  $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
+  $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
+  $scope.gotoAnchor($scope.playing.id);
+  $scope.$on("preload-changed", function(){
+    $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
+    $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
+    $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
+    $scope.gotoAnchor($scope.playing.id);
+  });
+  $scope.$on("media-set", function(){
+    $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
+    $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
+    $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
+    $scope.gotoAnchor($scope.playing.id);
+  });
+
+  $scope.setRating = FmpConductor.setRating;
+  $scope.ratingStates = FmpConductor.stars;
 })
 .controller('ChatsCtrl', function($scope, Chats) {
   // With the new view caching in Ionic, Controllers are only called

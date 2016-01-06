@@ -17,15 +17,15 @@
       this.stateOff = angular.isDefined($attrs.stateOff) ? $scope.$parent.$eval($attrs.stateOff) : ratingConfig.stateOff;
       max = angular.isDefined($attrs.max) ? $scope.$parent.$eval($attrs.max) : ratingConfig.max;
       ratingStates = angular.isDefined($attrs.ratingStates) ? $scope.$parent.$eval($attrs.ratingStates) : new Array(max);
-      console.log("RATING STATES:", ratingStates);
+      // console.log("RATING STATES:", ratingStates);
       var res = $scope.range = this.buildTemplateObjects(ratingStates);
-      console.log("RES:", res);
+      // console.log("RES:", res);
       return res;
     };
     this.buildTemplateObjects = function(states) {
       var i, j, len, ref;
       ref = states.length;
-      console.log("BUILD");
+      // console.log("BUILD");
       for (j = 0, len = ref.length; j < len; j++) {
         i = ref[j];
         states[i] = angular.extend({
@@ -35,7 +35,7 @@
           stateOff: this.stateOff
         }, states[i]);
       }
-      console.log("buildTemplateObjects:", states);
+      // console.log("buildTemplateObjects:", states);
       return states;
     };
     $scope.rate = function(value) {

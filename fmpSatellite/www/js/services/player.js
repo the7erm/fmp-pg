@@ -175,6 +175,7 @@ starterServices
       setTimeout(function(){
         collection.releasing = false;
       }, 1000);
+      $rootScope.$broadcast("media-set");
   };
 
   methods.resume = function() {

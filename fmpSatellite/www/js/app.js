@@ -51,6 +51,17 @@ angular.module('starter', ['ionic', 'starter.controllers', 'starter.services',
     }
   })
 
+  .state('tab.preload', {
+    url: '/preload',
+    views: {
+      'tab-preload': {
+        templateUrl: 'templates/tab-preload.html',
+        controller: 'PreloadCtrl'
+      }
+    }
+  })
+
+
   .state('tab.listeners', {
     url: '/listeners',
     views: {

@@ -6,6 +6,7 @@
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center;
 }
 .red-no  {
     background-image: url("images/no.star.png");
@@ -13,6 +14,7 @@
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center;
 }
 .grey-no  {
     background-image: url("images/no.star.grey.png");
@@ -20,6 +22,7 @@
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center;
 }
 .grey-star  {
     background-image: url("images/star.grey.png");
@@ -27,18 +30,25 @@
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center;
 }
 .question-mark-on {
     background-image: url("images/question.mark.svg");
-    background-size: 30px 30px;
+    background-size: 27px 30px;
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center center;
 }
 .question-mark-off {
     background-image: url("images/question.mark.grey.svg");
-    background-size: 30px 30px;
+    background-size: 27px 30px;
     background-repeat: no-repeat;
     min-height: 30px;
     min-width: 30px;
+    background-position: center center;
+}
+
+div.playing, span.playing  {
+    background: #DDD !important;
 }

@@ -31,6 +31,7 @@ starterServices
       return;
     }
     collection.files.splice(idx, 1);
+    $rootScope.$broadcast("preload-changed");
   };
 
   methods.reset = function () {

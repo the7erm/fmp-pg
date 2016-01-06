@@ -50,8 +50,12 @@ starterServices
     console.log("FmpDownloader.download:", url, "=>", dst);
 
     collection.downloading = file;
+    collection.lastUpdate = new Date();
+    methods.collection.downloading.progress = 0;
+    $timeout(function(){
+      $rootScope.$broadcast("download-progress");
+    });
     console.log("collection.downloading:", collection.downloading);
-
     $cordovaFileTransfer.download(url, dst)
                         .then(function(result) {
                           // Success!
@@ -73,15 +77,19 @@ starterServices
                           console.log("error:", err);
                           methods.download();
                         }, function (progress) {
-                            $timeout(function(){
-                              var downloadProgress = Math.floor((progress.loaded / progress.total) * 100);
-                              if (methods.collection.downloading.progress != downloadProgress) {
-                                methods.collection.downloading.progress = downloadProgress;
-                                console.log(url+" methods.download progress:", collection.downloading.progress);
-                                methods.progress = downloadProgress;
-                              }
-                              $rootScope.$broadcast("download-progress");
-                            });
+                            var now = new Date();
+                            if (collection.lastUpdate.valueOf() + 500 < now.valueOf()) {
+                              collection.lastUpdate = new Date();
+                              $timeout(function(){
+                                var downloadProgress = Math.floor((progress.loaded / progress.total) * 100);
+                                if (methods.collection.downloading.progress != downloadProgress) {
+                                  methods.collection.downloading.progress = downloadProgress;
+                                  console.log(url+" methods.download progress:", collection.downloading.progress);
+                                  methods.progress = downloadProgress;
+                                }
+                                $rootScope.$broadcast("download-progress");
+                              });
+                            }
                         });
   }
 

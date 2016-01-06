@@ -28,7 +28,9 @@ def build_truescore_list():
     return scores
 
 
-def get_preload(uids=[]):
+def get_preload(uids=[], remove_item=True, user_ids=[]):
+    if user_ids:
+        uids = user_ids
 
     results = []
     with session_scope() as session:
@@ -69,7 +71,8 @@ def get_preload(uids=[]):
                 pick.reason = preload.reason
                 session_add(session, pick, commit=True)
                 results.append(pick)
-                session.delete(preload)
+                if remove_item:
+                    session.delete(preload)
                 session.commit()
 
     return results
