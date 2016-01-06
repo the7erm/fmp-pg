@@ -1,0 +1,24 @@
+<span id="anchor-{{file.id}}"></span>
+<span ng-if="file.artists.length>0">
+  <span ng-repeat="(key, artist) in file.artists">
+    {{artist.name}}<span ng-if="file.aritsts.length>1">, </span>
+  </span>
+  <span ng-if="file.titles.length>0"> - </span>
+</span>
+<span ng-if="file.titles.length>0">
+  <span ng-repeat="(key, title) in file.titles">
+    {{title.name}}<span ng-if="file.titles.length>1">, </span>
+  </span>
+</span>
+<span ng-if="file.artists.length==0 && file.titles.length==0">
+  {{file.locations[0].basename}}
+</span>
+<br>
+<div ng-repeat="(i, ufi) in file.user_file_info">
+    <span>{{ufi.user.name}}</span>
+    <rating ng-model="ufi.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating(ufi)" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+    Rating:{{ufi.rating}}
+    skip_score:{{ufi.skip_score}}
+    true_score:{{ufi.true_score}}
+</div>
+<hr>

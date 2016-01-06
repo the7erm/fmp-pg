@@ -33,7 +33,7 @@ angular.module('starter', ['ionic', 'starter.controllers', 'starter.services',
   $stateProvider
 
   // setup an abstract state for the tabs directive
-    .state('tab', {
+  .state('tab', {
     url: '/tab',
     abstract: true,
     templateUrl: 'templates/tabs.html'
@@ -51,12 +51,12 @@ angular.module('starter', ['ionic', 'starter.controllers', 'starter.services',
     }
   })
 
-  .state('tab.preload', {
-    url: '/preload',
+  .state('tab.playlist', {
+    url: '/playlist',
     views: {
-      'tab-preload': {
-        templateUrl: 'templates/tab-preload.html',
-        controller: 'PreloadCtrl'
+      'tab-playlist': {
+        templateUrl: 'templates/tab-playlist.html',
+        controller: 'PlaylistCtrl'
       }
     }
   })

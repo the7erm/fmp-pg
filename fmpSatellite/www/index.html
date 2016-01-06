@@ -60,5 +60,19 @@
       have templates inline in this html file if you'd like).
     -->
     <ion-nav-view></ion-nav-view>
+    <ion-footer-bar class="bar-stable" ng-controller="PlayerCtrl">
+      <div class="button-bar">
+        <a class="button button-clear" ng-click="prev()">
+          <span class="icon ion-ios-skipbackward"></span>
+        </a>
+        <a class="button button-clear" ng-click="pause()">
+          <span ng-if="playerState==FmpConstants.PLAYING" class="icon ion-ios-pause"></span>
+          <span ng-if="playerState!=FmpConstants.PLAYING" class="icon ion-ios-play"></span>
+        </a>
+        <a class="button button-clear" ng-click="next()">
+          <span class="icon ion-ios-skipforward"></span>
+        </a>
+      </div>
+    </ion-footer-bar>
   </body>
 </html>

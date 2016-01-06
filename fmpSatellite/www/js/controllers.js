@@ -81,7 +81,7 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
     FmpConductor.collection.FmpListeners.save();
   };
 })
-.controller("PreloadCtrl", function($location, $anchorScroll, $scope, FmpConductor){
+.controller("PlaylistCtrl", function($location, $anchorScroll, $scope, FmpConductor){
   $scope.gotoAnchor = function(x) {
     var newHash = 'anchor-' + x;
     $location.hash('anchor-' + x);

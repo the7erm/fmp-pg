@@ -1,0 +1,13 @@
+<ion-view view-title="Playlist">
+  <ion-content>
+    <div ng-repeat="(key, file) in playlist">
+      <div ng-class="{'playing':playing.id==file.id}">
+        <div ng-include="'templates/playlist-item.html'"></div>
+      </div>
+    </div>
+    <hr>
+    <div ng-repeat="(key, file) in preload">
+      <div ng-include="'templates/playlist-item.html'"></div>
+    </div>
+  </ion-content>
+</ion-view>
