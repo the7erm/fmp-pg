@@ -78,14 +78,15 @@ def get_preload(uids=[], remove_item=True, user_ids=[]):
     return results
 
 def get_recently_played(limit=1):
-    file = None
+    files = None
     with session_scope() as session:
-        file = session.query(File)\
+        files = session.query(File)\
                       .filter(File.time_played!=None)\
                       .order_by(File.time_played.desc())\
                       .limit(limit)\
                       .all()
-    return file
+        files.reverse()
+    return files
 
 def populate_pick_from(user_id=None, truncate=False):
     with session_scope() as session:

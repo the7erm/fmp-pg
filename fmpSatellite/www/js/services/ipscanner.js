@@ -3,7 +3,8 @@ starterServices.factory("FmpIpScanner", function($http, $rootScope){
   var collection = {
         "knownHosts": [],
         "scanHosts": [],
-        "url": ""
+        "url": "",
+        "socketUrl": ""
       },
       methods = {
         collection: collection
@@ -50,7 +51,8 @@ starterServices.factory("FmpIpScanner", function($http, $rootScope){
       if (response.data.fmp) {
         collection.found = true;
         collection.url = host;
-        scanEnd = new Date();
+        collection.socketUrl = host.replace("http://", "ws://")+"ws";
+        var scanEnd = new Date();
         if (collection.knownHosts.indexOf(host) == -1) {
           collection.knownHosts.push(host);
           localStorage.knownHosts = JSON.stringify(collection.knownHosts);

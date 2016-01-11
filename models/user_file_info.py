@@ -137,3 +137,4 @@ class UserFileInfo(Base):
                     session.add(h)
                     ufi['history'].append(h.json())
         return ufi
+

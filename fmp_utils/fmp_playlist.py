@@ -25,12 +25,42 @@ class FmpActionTracker(ActionTracker):
 
 action_tracker = FmpActionTracker()
 
+class StateKeeper:
+    def __init__(self, *args, **kwargs):
+        self.state = "PAUSED"
+        self.state_file = os.path.join(CONFIG_DIR, "fmp-state")
+        self.valid_states = ("PAUSED", "PLAYING")
+        self.load()
+
+    def load(self):
+        if os.path.exists(self.state_file):
+            fp = open(self.state_file, "r")
+            state = fp.read().strip().upper()
+            if state in self.valid_states:
+                self.state = state
+            fp.close()
+
+    def set_state(self, state):
+        state = state.upper()
+        if state in self.valid_states:
+            self.state = state
+            self.save()
+
+    def save(self):
+        if self.state in self.valid_states:
+            fp = open(self.state_file,"w")
+            fp.write(self.state)
+            fp.close()
+
+state_keeper = StateKeeper()
+
 class FmpPlaylist(Playlist):
 
     def __init__(self, *args, **kwargs):
         super(FmpPlaylist, self).__init__(*args, **kwargs)
         self.action_tracker = action_tracker
         self.player.action_tracker = action_tracker
+        self.player.state_keeper = state_keeper
         self.skip_countdown = 5
         self.server = kwargs.get('server')
         self.server.playlist = self
@@ -39,20 +69,7 @@ class FmpPlaylist(Playlist):
         self.preload = []
         self.broadcast_playing_cnt = 0
         if not kwargs.get('first_run'):
-            self.files = picker.get_recently_played()
-            if not self.files:
-                self.files = picker.get_preload()
-            self.preload = picker.get_preload()
-
-            self.set_player_uri()
-            self.player.state = 'PLAYING'
-            try:
-                with session_scope() as session:
-                    session_add(session, self.files[self.index])
-                    self.player.position = "%s%%" % \
-                        self.files[self.index].percent_played
-            except IndexError:
-                pass
+            self.reset()
         self.tray_icon = TrayIcon(playlist=self)
 
 
@@ -66,17 +83,20 @@ class FmpPlaylist(Playlist):
 
     def reset(self):
         print("PLAYLIST RESET")
-        self.index = 0
-        self.files = picker.get_recently_played()
+        self.files = picker.get_recently_played(10)
+        if not self.files:
+            self.files = picker.get_preload()
         self.preload = picker.get_preload()
+        self.index = len(self.files) - 1
         self.set_player_uri()
-        print("/URI")
-        self.player.state = 'PAUSED'
-        print("/PAUSED")
-        with session_scope() as session:
-            session_add(session, self.files[self.index])
-            print("self.files[self.index]:",self.files[self.index].percent_played)
-            self.player.position = "%s%%" % self.files[self.index].percent_played
+        self.player.state = state_keeper.state
+        try:
+            with session_scope() as session:
+                session_add(session, self.files[self.index])
+                self.player.position = "%s%%" % \
+                    self.files[self.index].percent_played
+        except IndexError:
+            pass
         # self.player.position = "%s%%" % self.files[self.index].percent_played
 
 
@@ -89,7 +109,8 @@ class FmpPlaylist(Playlist):
             jobs.run_next_job()
             return
         self.broadcast_playing_cnt += -1
-        playing_item.mark_as_played(**pos_data)
+        if self.player.state_string in("PLAYING", "READY"):
+            playing_item.mark_as_played(**pos_data)
 
         skip_user_file_infos = self.do_countdown(playing_item, pos_data)
         self.server.broadcast({"time-status": pos_data})

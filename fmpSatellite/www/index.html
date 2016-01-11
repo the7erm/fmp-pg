@@ -25,14 +25,15 @@
     <script src="lib/ngCordova/dist/ng-cordova.js"></script>
     <script src="cordova.js"></script>
     <script src="lib/ionic-rating/ionic-rating.js"></script>
+    <script src="www/lib/angular-websocket/angular-websocket.js"></script>
 
     <!-- your app's js -->
     <script src="js/app.js"></script>
     <script src="js/controllers.js"></script>
     <script type="text/javascript">
       starterServices = angular.module('starter.services', []);
-      console.log("STARTER SERVICES CREATED");
     </script>
+
     <script src="js/services/cache.js"></script>
     <script src="js/services/conductor.js"></script>
     <script src="js/services/config.js"></script>
@@ -43,8 +44,12 @@
     <script src="js/services/player.js"></script>
     <script src="js/services/playlist.js"></script>
     <script src="js/services/preload.js"></script>
+    <script src="js/services/socket.js"></script>
+    <script src="js/services/storage.js"></script>
+    <script src="js/services/sync.js"></script>
     <script src="js/services/utils.js"></script>
     <script src="js/services.js"></script>
+
   </head>
   <body ng-app="starter">
     <!--

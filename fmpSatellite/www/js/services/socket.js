@@ -1,0 +1,57 @@
+starterServices.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope) {
+  // Open a WebSocket connection
+
+  var collection = {
+    dataStream: false,
+    connected: false,
+    queue: []
+  };
+
+  var methods = {
+    collection: collection,
+    send: function(obj) {
+      if (collection.dataStream) {
+        while (collection.queue.length>0) {
+          var msg = queue.shift();
+          collection.dataStream.send(JSON.stringify(msg));
+        }
+        collection.dataStream.send(JSON.stringify(obj));
+      } else {
+        collection.queue.push(obj);
+      }
+    },
+    onMessage: function(message) {
+      collection.connected = true;
+      var data = JSON.parse(message.data);
+      console.log("onMessage:", data);
+    },
+    onError: function() {
+      collection.connected = false;
+      console.error("socket onError:", arguments);
+    },
+    onOpen: function() {
+      collection.connected = true;
+      console.log("onOpen:", arguments);
+    },
+    onClose: function() {
+      collection.connected = false;
+      console.log("onClose:", arguments);
+    }
+  };
+
+  methods.connect = function() {
+    if (collection.dataStream) {
+      collection.dataStream.close();
+      collection.dataStream = false;
+    }
+    collection.dataStream = $websocket(FmpIpScanner.collection.socketUrl);
+    collection.dataStream.onOpen(methods.onOpen);
+    collection.dataStream.onMessage(methods.onMessage);
+    collection.dataStream.onError(methods.onClose);
+    collection.dataStream.onClose(methods.onClose);
+  };
+
+  $rootScope.$on("server-found", methods.connect);
+
+  return methods;
+});

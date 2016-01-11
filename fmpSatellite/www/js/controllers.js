@@ -26,7 +26,7 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
       FmpConductor.sync();
     }
     $scope.FmpConstants = FmpConstants;
-
+    $scope.FmpDownloader = FmpDownloader;
     $scope.downloading = FmpDownloader.collection.downloading;
     $scope.position = "0:00";
     $scope.duration = "0:00";
@@ -41,8 +41,7 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
 
     $scope.$on("playing-data-changed", function(){
       console.log("+++++++ playing-data-changed", FmpPlaylist.collection.playing);
-      $scope.playing = FmpPlaylist.collection.playing;
-
+      $scope.file = FmpPlaylist.collection.playing;
     });
 
     $scope.$on("time-status", function(){
@@ -52,11 +51,15 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
       $scope.$apply();
     });
 
-    $scope.$on("download-progress", function () {
-      $scope.downloading = FmpDownloader.collection.downloading;
-      $scope.$apply();
+    $scope.$watch("FmpDownloader.collection.downloading", function(newValue, oldValue, scope){
+      scope.downloading = FmpDownloader.collection.downloading;
     });
 
+    $scope.$on("synced", function(){
+      $scope.syncTime = FmpConductor.collection.syncTime;
+    });
+
+    $scope.syncTime = FmpConductor.collection.syncTime;
     $scope.setRating = FmpConductor.setRating;
 
     $scope.ratingStates = FmpConductor.stars;
@@ -66,57 +69,88 @@ angular.module('starter.controllers', ['ionic', 'ngCordova',
 
 .controller('ListenerCtrl', function($scope, FmpConductor){
   $scope.users = FmpConductor.collection.FmpListeners.collection.users;
+  $scope.FmpListeners = FmpConductor.collection.FmpListeners;
+  $scope.sync = FmpConductor.sync;
+
   $scope.$on("listeners-loaded", function(){
     $scope.users = FmpConductor.collection.FmpListeners.collection.users;
   });
+  $scope.$watch("users", function(newValue, oldValue, scope){
+    console.log("USER NEW VALUE:", newValue);
+  });
   $scope.updateUids = function(){
     var user_ids = [];
-    for(var i=0;i<$scope.users.length;i++) {
-      var user = $scope.users[i];
+    for(var i=0;i<FmpConductor.collection.FmpListeners.collection.users.length;i++) {
+      var user = FmpConductor.collection.FmpListeners.collection.users[i];
       if (user.listening) {
         user_ids.push(user.id);
       }
     }
-    FmpConductor.collection.FmpListeners.collection.user_ids = user_ids;
+    if (user_ids.indexOf(FmpConductor.collection.FmpListeners.collection.primary_user_id) == -1) {
+      user_ids.push(FmpConductor.collection.FmpListeners.collection.primary_user_id);
+    }
+    console.log("USER IDS:", user_ids);
+    FmpConductor.collection.FmpListeners.collection.secondary_user_ids = user_ids;
     FmpConductor.collection.FmpListeners.save();
   };
-})
-.controller("PlaylistCtrl", function($location, $anchorScroll, $scope, FmpConductor){
-  $scope.gotoAnchor = function(x) {
-    var newHash = 'anchor-' + x;
-    $location.hash('anchor-' + x);
-    console.log("gotoAnchor:", x);
-    if ($location.hash() !== newHash) {
-      // set the $location.hash to `newHash` and
-      // $anchorScroll will automatically scroll to it
 
-      console.log("$location.hash()");
-    } else {
-      // call $anchorScroll() explicitly,
-      // since $location.hash hasn't changed
-      $anchorScroll();
-      console.log("$anchorScroll()");
-    }
+  $scope.updateSecondaryUserIds = FmpConductor.collection.FmpListeners.updateSecondaryUserIds;
+  $scope.setPrimaryUserId = FmpConductor.collection.FmpListeners.setPrimaryUserId;
+})
+.controller("PlaylistCtrl", function($ionicPosition, $ionicScrollDelegate,
+                                     $scope, FmpConductor, $timeout){
+  console.log("PlaylistCtrl LOADED");
+  $scope.shouldShowReorder = true;
+  $scope.gotoAnchor = function(x) {
+    var newHash = 'anchor' + x;
+    console.log("gotoAnchor:", newHash);
+    var pos = $ionicPosition.position(angular.element(document.getElementById(newHash)));
+    console.log("POS:", pos);
+    $ionicScrollDelegate.scrollTo(pos.left, pos.top-25);
   };
-  $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
-  $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
-  $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
-  $scope.gotoAnchor($scope.playing.id);
+  $scope.loading = true;
   $scope.$on("preload-changed", function(){
     $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
     $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
     $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
-    $scope.gotoAnchor($scope.playing.id);
   });
   $scope.$on("media-set", function(){
     $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
     $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
     $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
-    $scope.gotoAnchor($scope.playing.id);
   });
+
+  $scope.$on("playlist-changed", function(){
+    $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
+    $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
+    $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
+  });
+
+  $scope.moveItem = function(item, fromIndex, toIndex) {
+    console.log("moveItem:", {
+      "item": item,
+      "fromIndex": fromIndex,
+      "toIndex": toIndex
+    });
+    var item = $scope.playlist[fromIndex];
+    $scope.playlist.splice(fromIndex, 1);
+    $scope.playlist.splice(toIndex, 0, item);
+  };
+
+  $scope.playFile = FmpConductor.collection.FmpPlaylist.playFile;
 
   $scope.setRating = FmpConductor.setRating;
   $scope.ratingStates = FmpConductor.stars;
+
+  $timeout(function(){
+    $scope.preload = FmpConductor.collection.FmpPreload.collection.files;
+    $scope.playlist = FmpConductor.collection.FmpPlaylist.collection.files;
+    $scope.playing = FmpConductor.collection.FmpPlaylist.collection.playing;
+    $timeout(function(){
+      $scope.loading = false;
+      $scope.gotoAnchor($scope.playing.id);
+    });
+  }, 100);
 })
 .controller('ChatsCtrl', function($scope, Chats) {
   // With the new view caching in Ionic, Controllers are only called

@@ -1,23 +1,11 @@
 <ion-view view-title="Music">
   <ion-content class="padding">
-    <div ng-include="'templates/playlist-item.html'"></div>
-    <div class="button-bar">
-      <button class="button button-stable" ng-click="prev()">
-        <span class="icon ion-ios-skipbackward"></span>
-      </button>
-      <button class="button button-stable" ng-click="pause()">
-        <span ng-if="playerState==FmpConstants.PLAYING" class="icon ion-ios-pause"></span>
-        <span ng-if="playerState!=FmpConstants.PLAYING" class="icon ion-ios-play"></span>
-        {{playerState}}
-      </button>
-      <button class="button button-stable" ng-click="next()">
-        <span class="icon ion-ios-skipforward"></span>
-      </button>
-    </div>
+    <div ng-include="'templates/playlist-item.html'" ng-init="noAnchor=1"></div>
     <button class="button button-stable" ng-click="sync()">
         sync()
     </button>
     <br>
+    SyncTime:{{syncTime}}
     <div ng-if="downloading.progress>0&&downloading.progress<100">
       Downloading: {{downloading.locations[0].basename}} {{downloading.progress}}%
     </div>

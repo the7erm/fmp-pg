@@ -49,12 +49,24 @@ MEDIA_PAUSED = 3
 MEDIA_STOPPED = 4
 
 class ChatWebSocketHandler(WebSocket):
-    def received_message(self, m):
+    def received_message(self, message):
         try:
             playlist.broadcast_playing()
         except NameError:
             print("Playlist not initialized")
             pass
+
+        try:
+            obj = json.loads(message.data.decode("utf-8"))
+        except Exception as e:
+            print("Exception:", e)
+            pass
+
+        print(">"*80)
+        print("json.loads()", obj)
+
+        self.process_action(obj)
+
         #  print ("json.loads()", json.loads(str_mdata))
 
         # cherrypy.engine.publish('websocket-broadcast', m)
@@ -66,6 +78,106 @@ class ChatWebSocketHandler(WebSocket):
 
     def closed(self, code, reason="A client left the room without a proper explanation."):
         cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
+
+    def process_action(self, obj):
+        action = obj.get('action')
+        if action == "broadcast-playing":
+            playlist.broadcast_playing()
+            return
+
+        if action == "sync":
+            payload = obj.get('payload', {})
+            self.sync(payload)
+
+        if action == "test":
+            json_broadcast({"processed", [{
+                'spec': obj
+            }]})
+
+    def sync(self, payload):
+        for _date, files in payload.items():
+            self.process_files(files)
+            # collection.sync[today][file_id][elementType][action]
+
+
+    def process_files(self, files):
+        # collection.sync[today][file_id][elementType][action]
+        for file_id, element_types in files.items():
+            self.process_element_types(element_types)
+
+
+    def process_element_types(self, element_types):
+        for element_type, actions in element_types.items():
+            if element_type == 'object':
+                for action, action_spec in actions:
+                    self.process_action_spec(action, action_spec)
+                continue
+
+            if element_type == 'list':
+                for action, action_specs in actions:
+                    for action_spec in action_specs:
+                        self.process_action_spec(action, action_spec)
+
+    def process_action_spec(self, action, action_spec):
+        with session_scope() as session:
+            file_id = action_spec.get("file_id")
+            user_id = action_spec.get("user_id")
+            user_ids = obj.get('user_ids', [])
+
+            if action == 'mark_as_played':
+                file = session.query(File)\
+                              .filter(File.id==file_id)\
+                              .first()
+                if not file:
+                    return {
+                        "error": "no file for file_id %s" % file_id
+                    }
+                session.add(file)
+                kwargs = {
+                    "user_ids": user_ids,
+                    "percent_played": action_spec.get("percent_played"),
+                    "now": int(action_spec.get("percent_played"))
+                }
+                file.mark_as_played(**kwargs)
+                session.add(file)
+                json_broadcast({"processed", [{
+                    'file': file.json(user_ids=user_ids),
+                    'spec': action_spec
+                }]})
+            if action in ("rating", "skip_score", "voted_to_skip"):
+                ufi = session.query(UserFileInfo)\
+                             .filter(and_(
+                                User.file_id==file_id,
+                                User.id==user_id
+                              ))\
+                             .first()
+                if not ufi:
+                    return {
+                        "error": "UserFileInfo for file_id:%s user_id:%s" % (
+                            file_id, user_id)
+                    }
+                session.add(ufi)
+                attr = action_spec.get('attr')
+                value = int(action_spec.get('value'))
+                if attr == 'rating':
+                    if value >= 0 and value <= 5:
+                        ufi.rating = value
+
+                if attr == 'skip_score':
+                    if value >= -15 and value <= 15:
+                        ufi.skip_score = value
+
+                if attr == 'voted_to_skip':
+                    value = to_bool(value)
+
+                ufi.calculate_true_score()
+                session.add(ufi)
+                session.commit()
+                json_broadcast({"processed", [{
+                    'ufi': ufi.json(),
+                    'spec': action_spec
+                }]})
+
 
 cherrypy.config.update({
     'server.socket_port': 5050,
@@ -151,7 +263,8 @@ class FmpServer(object):
 
     @cherrypy.expose
     def set_rating_or_score(self, file_id, user_id, attr, value):
-
+        print("set_rating_or_score file_id:%s user_id:%s attr:%s value:%s" % (
+            file_id, user_id, attr, value))
         user_file_info = self.get_user_file_info(file_id, user_id)
         with session_scope() as session:
             session_add(session, user_file_info)
@@ -159,7 +272,13 @@ class FmpServer(object):
             user_file_info.calculate_true_score()
             session.commit()
             response = json_dumps(user_file_info.json(history=True))
-            playlist.broadcast_playing()
+            try:
+                session_add(session, playlist.files[playlist.index])
+                if playlist.files[playlist.index].id == file_id:
+                    playlist.broadcast_playing()
+            except IndexError:
+                pass
+
         return response
 
     def get_user_file_info(self, file_id, user_id):
@@ -984,8 +1103,16 @@ class FmpServer(object):
         if satellite_history is None:
             return
         for _date, item in satellite_history.items():
-            # print("_date:", _date, "item:", item)
             rating = item.get("rating")
+            skip_score = item.get("skip_score")
+            percent_played = item.get('percent_played')
+            if rating is None and skip_score is None and \
+               percent_played is None:
+               continue
+
+            pprint(ufi)
+            print("_date:", _date, "item:", pformat(item))
+
             if rating is not None:
                 print("RATING DETECTED")
                 res = self.set_rating_or_score(ufi.get('file_id'),
@@ -993,7 +1120,6 @@ class FmpServer(object):
                                                'rating',
                                                rating)
 
-            skip_score = item.get("skip_score")
             if skip_score is not None:
                 print("SKIP_SCORE DETECTED")
                 res = self.set_rating_or_score(ufi.get('file_id'),
@@ -1001,7 +1127,6 @@ class FmpServer(object):
                                                'skip_score',
                                                skip_score)
 
-            percent_played = item.get('percent_played')
             if percent_played is not None:
                 print("PERCENT_PLAYED DETECTED")
                 self.mark_as_played(**{
@@ -1023,13 +1148,17 @@ class FmpServer(object):
             "playing": {}
         }
         post_data = cherrypy.request.json
-        user_ids = post_data.get("listeners", {}).get("user_ids", [])
+        listener_user_ids = post_data.get("listeners", {}).get("listener_user_ids", [])
+        secondary_user_ids = post_data.get("listeners", {}).get("secondary_user_ids", [])
         satellite_preload_collection = post_data.get("preload",{})
         satellite_playlist_collection = post_data.get("playlist",{})
 
         satellite_state = int(satellite_playlist_collection.get("state", 0))
         print("*"*100)
         print("satellite_state:", satellite_state)
+        # with session_scope() as session:
+
+
         with session_scope() as session:
             # Always sync this data so it's marked as played.
             files = satellite_playlist_collection.get("files", [])
@@ -1041,7 +1170,8 @@ class FmpServer(object):
                             .first()
                 if _f:
                     session.add(_f)
-                    result['processed_history'].append(_f.json(history=True))
+                    result['processed_history'].append(
+                        _f.json(history=True, user_ids=user_ids))
             files = satellite_preload_collection.get("files", [])
             for f in files:
                 for ufi in f['user_file_info']:
@@ -1051,7 +1181,8 @@ class FmpServer(object):
                             .first()
                 if _f:
                     session.add(_f)
-                    result['processed_history'].append(_f.json(history=True))
+                    result['processed_history'].append(
+                        _f.json(history=True, user_ids=user_ids))
 
         print("satellite_state:", satellite_state)
         kwargs = {
@@ -1061,12 +1192,12 @@ class FmpServer(object):
                 "oc": False,
                 "raw": True
             },
-            "user_ids": user_ids
+            "user_ids": listener_user_ids
         }
         result['history'] = self.search(**kwargs)
         result['history'].reverse()
         result['preload'] = self.preload(**{
-            "user_ids": user_ids,
+            "user_ids": listener_user_ids,
             "raw": True
         })
 

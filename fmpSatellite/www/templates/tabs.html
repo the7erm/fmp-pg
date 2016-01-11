@@ -10,8 +10,8 @@ navigation history that also transitions its views in and out.
     <ion-nav-view name="tab-player"></ion-nav-view>
   </ion-tab>
 
-  <ion-tab title="Playlist" icon-off="ion-ios-list-outline" icon-on="ion-ios-list" href="#/tab/preload" >
-    <ion-nav-view name="tab-preload"></ion-nav-view>
+  <ion-tab title="Playlist" icon-off="ion-ios-list-outline" icon-on="ion-ios-list" href="#/tab/playlist" on-select="gotoAnchor(playing.id)">
+    <ion-nav-view name="tab-playlist"></ion-nav-view>
   </ion-tab>
 
   <ion-tab title="Listeners" icon-off="ion-ios-personadd-outline" icon-on="ion-ios-personadd" href="#/tab/listeners">

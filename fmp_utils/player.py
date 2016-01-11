@@ -559,6 +559,7 @@ class Player(GObject.GObject, Log):
         self.state = 'TOGGLE'
         self.show_controls()
         self.action_tracker.mark()
+        self.state_keeper.set_state(self.state_string)
 
     def on_scroll(self, widget, event):
         # Player.on_scroll()

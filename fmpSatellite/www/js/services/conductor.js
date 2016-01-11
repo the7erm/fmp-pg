@@ -26,7 +26,9 @@ starterServices
           "FmpPlayer": FmpPlayer,
           "FmpPlaylist": FmpPlaylist,
           "FmpPreload": FmpPreload,
-          "FmpUtils": FmpUtils
+          "FmpUtils": FmpUtils,
+          "syncLock": false,
+          "syncTime": 0
       },
       methods = {
           collection: collection
@@ -73,6 +75,18 @@ starterServices
     }
   }
 
+  methods.addFilesToPlaylist = function(files) {
+    for (var i=0;i<files.length;i++) {
+      var file = files[i],
+          idx = FmpUtils.indexOfFile(FmpPlaylist.collection.files, file);
+      if (idx == -1) {
+        // wasn't found so we add it.
+        FmpPlaylist.collection.files.push(file);
+      }
+      FmpDownloader.checkExisting(file);
+    }
+  };
+
   methods.updateSyncData = function(data){
     var playlist = FmpUtils.sanitize(data.history),
         preload = FmpUtils.sanitize(data.preload);
@@ -90,6 +104,7 @@ starterServices
     for (var i=0;i<preload.length;i++) {
       var file = preload[i],
           idx = FmpUtils.indexOfFile(FmpPreload.collection.files, file);
+      idx = FmpUtils.indexOfFile(FmpPreload.collection.files, file);
       if (idx == -1) {
         // wasn't found so we add it.
         FmpPreload.collection.files.push(file);
@@ -103,15 +118,17 @@ starterServices
     /*
       Connect to the server send the current playlist & state.
     */
-    if (!FmpConfig.url) {
+    if (!FmpConfig.url || collection.syncLock) {
       return;
     }
-    console.log("SYNC:", FmpPlaylist.collection);
+    collection.syncLock = true;
+
     var data = {
       "playlist": FmpPlaylist.collection,
       "preload": FmpPreload.collection,
       "listeners": FmpListeners.collection
     };
+    console.log("SYNC:", data);
     $http({
       method: 'POST',
       url: FmpConfig.url+"sync",
@@ -141,10 +158,17 @@ starterServices
       $rootScope.$broadcast("preload-changed");
       FmpCache.clean(FmpPlaylist.collection.files,
                      FmpPreload.collection.files);
+      collection.syncLock = false;
+      collection.syncTime = new Date();
+      console.log("SYNC TIME:", collection.syncTime);
+      $rootScope.$broadcast("synced");
     }, function errorCallback(response) {
+      collection.syncLock = false;
       // called asynchronously if an error occurs
       // or server returns response with an error status.
       console.log("SYNC ERROR:", response);
+      FmpConfig.url = "";
+      FmpIpScanner.startScan();
     });
   };
 

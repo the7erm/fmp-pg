@@ -1,12 +1,14 @@
 starterServices
 .factory('FmpPlaylist', function($ionicPlatform, $rootScope, FmpPreload,
-                                 FmpUtils, $http, FmpConfig){
+                                 FmpUtils, $http, FmpConfig, FmpLocalStorage,
+                                 FmpSocket, FmpSync){
   var collection = {
         files: [],
         idx: 0,
         playing: {},
         lastSave: 0,
-        lastAction: 0
+        lastAction: 0,
+        "sync": {}
       },
       methods = {
         collection: collection
@@ -15,6 +17,13 @@ starterServices
     methods.markAction = function() {
       collection.lastAction = FmpUtils.now().timestamp_UTC;
       localStorage.lastAction = collection.lastAction;
+      FmpSocket.send({
+        "action": "test",
+        "payload": {
+          "satellite": "user_action",
+          "time": Date.now() / 1000
+        }
+      });
     }
 
     methods.reset = function() {
@@ -30,10 +39,17 @@ starterServices
       }
 
       try {
+        collection.sync = JSON.parse(localStorage.sync) || {};
+      } catch (e) {
+        console.error("load collection.sync err:", e);
+        console.error("data:", localStorage.sync);
+      }
+
+      try {
         collection.files = JSON.parse(localStorage.playlistFiles) || [];
       } catch (e) {
-        console.log("load collection.files err:", e);
-        console.log("data:", localStorage.playlistFiles);
+        console.error("load collection.files err:", e);
+        console.error("data:", localStorage.playlistFiles);
       }
 
       try {
@@ -92,10 +108,11 @@ starterServices
     }
 
     console.log("FmpPlaylist.collection:", collection);
-    methods.save = function(){
+    methods.save = function() {
       localStorage.playlistFiles = JSON.stringify(collection.files);
       localStorage.playlistIdx = collection.idx;
       localStorage.playlistPlaying = JSON.stringify(collection.playing);
+      localStorage.sync = JSON.stringify(collection.sync);
       var now = new Date();
       collection.lastSave = now.valueOf();
     };
@@ -222,8 +239,9 @@ starterServices
       if (typeof collection.playing == 'undefined') {
         return;
       }
-      if (collection.playing.artist  && collection.playing.artist.length > 0) {
-        artist = collection.playing.artist[0].name;
+      console.log("playlist.collection.playing:", collection.playing);
+      if (collection.playing.artists  && collection.playing.artists.length > 0) {
+        artist = collection.playing.artists[0].name;
       }
 
       if (collection.playing.titles && collection.playing.titles.length > 0) {
@@ -237,14 +255,20 @@ starterServices
       if (!artist && title) {
         artist_title = title;
       }
-      if (artist_title &&
+      if (!artist_title &&
           collection.playing.locations &&
           collection.playing.locations.length > 0) {
-        artist_title = collection.playing.locations[0].basename;
+        var basename = collection.playing.locations[0].basename;
+        if (basename.indexOf("-") != -1) {
+          var parts = basename.split("-",2);
+          artist = parts[0];
+          title = parts[1];
+        }
+        artist_title = basename;
       }
 
-      MusicControls.create({
-          track       : name,        // optional, default : ''
+      var spec = {
+          track       : title,        // optional, default : ''
           artist      : artist,                       // optional, default : ''
           // cover       : 'albums/absolution.jpg',      // optional, default : nothing
           isPlaying   : true,                         // optional, default : true
@@ -257,8 +281,11 @@ starterServices
 
           // Android only, optional
           // text displayed in the status bar when the notification (and the ticker) are updated
-          ticker    : artist+" - "+title
-      }, function(res){
+          ticker    : artist_title
+      };
+      console.log("MC SPEC:", spec);
+
+      var mc = MusicControls.create(spec, function(res){
           // on success
           console.log("**** SUCCESS");
           console.log("initMusicControls success:", res);
@@ -270,11 +297,10 @@ starterServices
           console.log("**** FAILURE");
           console.log("initMusicControls ERROR:", err);
       });
+      console.log("MC Object:", mc);
       // Register callback
 
     };
-
-
 
     methods.updateSkipScore = function(value) {
       var now = FmpUtils.now();
@@ -319,6 +345,67 @@ starterServices
         methods.save();
       }
     };
+
+    methods.playFile = function (file) {
+      var idx = FmpUtils.indexOfFile(collection.files, file);
+      if (idx != -1) {
+        console.log("playFile:", "IDX:",idx, "file:", file);
+        if (collection.idx == idx) {
+          return;
+        }
+        methods.setIndex(idx);
+        return;
+      }
+      console.log("playFile from preload:", file);
+      FmpPreload.removeFile(file);
+      collection.files.push(file);
+      idx = FmpUtils.indexOfFile(collection.files, file);
+      if (idx != -1) {
+        console.log("ADDED playFile:", "IDX:",idx, "file:", file);
+        methods.setIndex(idx);
+        return;
+      }
+      console.log("ERROR didn't find in PRELOAD or PLAYLIST file:", file);
+    };
+
+    $rootScope.$on("synced", function(){
+      var groupedByUsers = {};
+      for (var i=0;i<FmpPreload.collection.files.length;i++){
+        var file = FmpPreload.collection.files[i],
+            user_id = "";
+        if (file.cued && file.cued.user_id) {
+          user_id = file.cued.user_id;
+        }
+        if (typeof groupedByUsers[user_id] == 'undefined') {
+          groupedByUsers[user_id] = [];
+        }
+        groupedByUsers[user_id].push(file);
+      }
+
+      var stillHasFiles = true,
+          pushedFiles = false;
+
+      while(stillHasFiles) {
+        stillHasFiles = false;
+        for (var user_id in groupedByUsers) {
+          var files = groupedByUsers[user_id];
+          if (files.length == 0) {
+            continue;
+          }
+          stillHasFiles = true;
+          var file = files.shift(),
+              idx = FmpUtils.indexOfFile(collection.files, file);
+          if (idx != -1) {
+            continue;
+          }
+          pushedFiles = true;
+          collection.files.push(file);
+        }
+      }
+      if (pushedFiles) {
+        $rootScope.$broadcast("playlist-changed");
+      }
+    });
 
     $ionicPlatform.ready(function(){
 

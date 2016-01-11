@@ -41,6 +41,14 @@ starterServices
     return value;
   }
 
+  methods.today = function() {
+      var today = new Date(),
+          year = today.getUTCFullYear(),
+          month = methods.pad(today.getUTCMonth() + 1),
+          day = methods.pad(today.getUTCDate());
+      return year+"-"+month+"-"+day;
+  }
+
   methods.formatTime = function(seconds){
     var secs = Math.floor(seconds);
     var hr = Math.floor(secs / (60 * 60));

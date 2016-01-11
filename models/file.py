@@ -137,7 +137,6 @@ class File(Base):
     def create_ufi(self, user_id, **kwargs):
         with session_scope() as session:
 
-
             if 'user' not in kwargs or not kwargs.get('user'):
                 kwargs['user'] = session.query(User).filter(id=user_id).first()
 

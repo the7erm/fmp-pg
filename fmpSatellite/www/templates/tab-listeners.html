@@ -1,16 +1,60 @@
 <ion-view view-title="Listeners">
   <ion-content class="padding">
-    <h1>Listeners</h1>
+    <label class="item item-input item-select">
+      <div class="input-label">
+        Device Primary User
+      </div>
+      <select ng-model="FmpListeners.collection.primary_user_id" name="primary_user_id" ng-change="FmpListeners.setPrimaryUserId(this)">
+        <option ng-repeat="(key, user) in FmpListeners.collection.users" value="{{user.id}}" ng-selected="FmpListeners.collection.primary_user_id==user.id">{{user.name}}</option>
+      </select>
+    </label>
+    <small>The primary user is this device's owner.  FMP will always sync files for this user.</small>
+    <label class="item item-input">
+      <span class="input-label">
+        Prefetch
+      </span>
+      <input type="number" ng-model="FmpListeners.collection.prefetchNum">
+    </label>
+    <br>
+    <h2>Listeners</h2>
+    <div ng-if="!FmpListeners.collection.secondary_user_ids||FmpListeners.collection.secondary_user_ids.length<=0">
+      <p>Before you can add other listeners, you must first add them as a secondary user.</p>
+    </div>
+    <div ng-if="FmpListeners.collection.secondary_user_ids.length>0">
+      <ul class="list">
+        <button ng-click="sync()" class="button button-assertive">Sync</button>
+        <li class="item item-toggle" ng-repeat="(key, user) in FmpListeners.collection.users" ng-if="FmpListeners.collection.primary_user_id != user.id && user.secondary">
+           {{user.name}}
+           <label class="toggle toggle-assertive">
+             <input type="checkbox" ng-model="user.listening" ng-change="updateUids(this, {{user.id}})" >
+             <div class="track">
+               <div class="handle"></div>
+             </div>
+           </label>
+        </li>
+      </ul>
+    </div>
+
+    <h2>Secondary Users</h2>
+    <small>Secondary users are users who's ratings will always be included, and {{FmpListeners.collection.secondaryPrefetchNum}} files for them will be synced.</small><br>
+    <label class="item item-input">
+      <span class="input-label">Pre-fetch</span>
+      <input ng-model="FmpListeners.collection.secondaryPrefetchNum" placeholder="pre-fetch" type="number">
+    </label>
     <ul class="list">
-      <li class="item item-toggle" ng-repeat="(key, user) in users">
+      <li class="item item-toggle" ng-repeat="(key, user) in FmpListeners.collection.users" ng-if="FmpListeners.collection.primary_user_id != user.id">
          {{user.name}}
          <label class="toggle toggle-assertive">
-           <input type="checkbox"  ng-model="user.listening" ng-change="updateUids">
+           <input type="checkbox" ng-model="user.secondary" ng-change="updateSecondaryUserIds(this, {{user.id}})" >
            <div class="track">
              <div class="handle"></div>
            </div>
          </label>
       </li>
     </ul>
+
+    <br clear="all">
+    <br clear="all">
+    <br clear="all">
   </ion-content>
 </ion-view>

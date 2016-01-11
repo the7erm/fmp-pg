@@ -1,6 +1,6 @@
 starterServices
 .factory('FmpPlayer', function($ionicPlatform, FmpPreload, FmpPlaylist,
-                               $rootScope, FmpUtils){
+                               $rootScope, FmpUtils, FmpLocalStorage){
   var playerState = localStorage.playerState || Media.MEDIA_PAUSED,
       collection = {
         "duration": -1,
@@ -11,7 +11,17 @@ starterServices
         "state": 0, /* Media object's state. */
         "playerState": playerState, /* The Media object's state is not the
                                        actual state of the player. */
-        "initializing": true
+        "initializing": true,
+        storeFields: {
+            "ints": [
+                "playerState"
+            ],
+            "objects" : [
+
+            ],
+            "strings": [],
+            "floats": []
+        }
       },
       methods = {
         collection: collection
@@ -74,10 +84,12 @@ starterServices
       console.log(".play();");
       collection.media.play();
       collection.playerState = Media.MEDIA_RUNNING;
+      MusicControls.updateIsPlaying(true);
     } else {
       console.log(".pause();");
       collection.media.pause();
       collection.playerState = Media.MEDIA_PAUSED;
+      MusicControls.updateIsPlaying(false);
     }
     FmpPlaylist.collection.state = collection.playerState;
     FmpPlaylist.markAction();
@@ -153,7 +165,6 @@ starterServices
         console.log("SRC IS UNDEFINED fullFilename?:",
                     FmpPlaylist.collection.playing);
 
-
         src = FmpPlaylist.collection.playing.fullFilename;
         if (typeof src == 'undefined') {
           console.log("reconstruction failed")
@@ -167,6 +178,9 @@ starterServices
       collection.media.play();
       if (collection.playerState != Media.MEDIA_RUNNING) {
           collection.media.pause();
+          MusicControls.updateIsPlaying(false);
+      } else {
+        MusicControls.updateIsPlaying(true);
       }
       if (collection.initializing && localStorage.position) {
             collection.media.seekTo(localStorage.position * 1000);
