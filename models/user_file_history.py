@@ -9,14 +9,13 @@ from datetime import date
 if "../" not in sys.path:
     sys.path.append("../")
 
-from fmp_utils.db_session import session_scope
-from .utils import do_commit
-
 try:
     from .base import Base, to_json
 except SystemError:
     from base import Base, to_json
 
+from fmp_utils.db_session import session_scope
+from .utils import do_commit
 
 class UserFileHistory(Base):
     __tablename__ = "user_file_history"
@@ -33,6 +32,7 @@ class UserFileHistory(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     file_id = Column(Integer, ForeignKey('files.id'))
     user_file_id = Column(Integer, ForeignKey('user_file_info.id'))
+    timestamp = Column(BigInteger, onupdate=time)
 
     def mark_as_played(self, **kwargs):
         print ("UserFileHistory.mark_as_played()")

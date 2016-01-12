@@ -11,6 +11,7 @@ starterServices
                                   FmpPlayer,
                                   FmpPlaylist,
                                   FmpPreload,
+                                  FmpSync,
                                   FmpUtils){
   // The conductor is sort of a 'main' service of sorts.
   // It's intended to keep all the services synced, and execute
@@ -26,6 +27,7 @@ starterServices
           "FmpPlayer": FmpPlayer,
           "FmpPlaylist": FmpPlaylist,
           "FmpPreload": FmpPreload,
+          "FmpSync": FmpSync,
           "FmpUtils": FmpUtils,
           "syncLock": false,
           "syncTime": 0
@@ -33,6 +35,10 @@ starterServices
       methods = {
           collection: collection
       };
+
+  FmpSync.collection.FmpPreload = FmpPreload;
+  FmpSync.collection.FmpPlaylist = FmpPlaylist;
+
 
   methods.updateSyncHistory = function(processed_history) {
     if (!processed_history) {
@@ -122,7 +128,7 @@ starterServices
       return;
     }
     collection.syncLock = true;
-
+    FmpSync.sync();
     var data = {
       "playlist": FmpPlaylist.collection,
       "preload": FmpPreload.collection,
@@ -238,28 +244,33 @@ starterServices
   };
 
   methods.setRating = function(ufi) {
-
       console.log("setRating:", ufi);
-      if (typeof ufi.satellite_history == 'undefined') {
-        ufi.satellite_history = {};
-      }
-
-      if (typeof ufi.satellite_history == 'undefined') {
-        ufi.satellite_history = {};
-      }
-
-      FmpUtils.calculateTrueScore(ufi);
-
-      FmpUtils.updateHistory(ufi, {
-        "rating": ufi.rating,
-        "skip_score": ufi.skip_score,
-        "true_score": ufi.true_score
-      });
-
-      methods.updateCollection(ufi, FmpPlaylist.collection);
-      methods.updateCollection(ufi, FmpPreload.collection);
+      FmpSync.set_attr(ufi.file_id, ufi.user_id, 'rating', ufi.rating);
+      methods.processUfi(ufi);
   };
 
+  methods.processUfi = function(ufi){
+    if (typeof ufi.satellite_history == 'undefined') {
+      ufi.satellite_history = {};
+    }
+
+    if (typeof ufi.satellite_history == 'undefined') {
+      ufi.satellite_history = {};
+    }
+
+    FmpUtils.calculateTrueScore(ufi);
+
+    FmpUtils.updateHistory(ufi, {
+      "rating": ufi.rating,
+      "skip_score": ufi.skip_score,
+      "true_score": ufi.true_score
+    });
+
+    methods.updateCollection(ufi, FmpPlaylist.collection);
+    methods.updateCollection(ufi, FmpPreload.collection);
+  }
+
+  FmpSync.processUfi = methods.processUfi;
   methods.stars = FmpConstants.stars;
 
   return methods;

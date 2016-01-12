@@ -1,7 +1,7 @@
 starterServices
 .factory('FmpPlaylist', function($ionicPlatform, $rootScope, FmpPreload,
                                  FmpUtils, $http, FmpConfig, FmpLocalStorage,
-                                 FmpSocket, FmpSync){
+                                 FmpSocket, FmpSync, FmpListeners){
   var collection = {
         files: [],
         idx: 0,
@@ -21,7 +21,7 @@ starterServices
         "action": "test",
         "payload": {
           "satellite": "user_action",
-          "time": Date.now() / 1000
+          "time": Math.fllor(Date.now() / 1000)
         }
       });
     }
@@ -283,7 +283,7 @@ starterServices
           // text displayed in the status bar when the notification (and the ticker) are updated
           ticker    : artist_title
       };
-      console.log("MC SPEC:", spec);
+      console.log("MusicControls spec:", spec);
 
       var mc = MusicControls.create(spec, function(res){
           // on success
@@ -333,12 +333,16 @@ starterServices
 
     methods.markAsPlayed = function(position, remaining, duration) {
       // FmpPlaylist.markAsPlayed(position, remaining, duration)
-      var percent = (position / duration) * 100;
-      console.log("percent:", percent);
+      var percent_played = (position / duration) * 100;
+      console.log("percent_played:", percent_played);
       for (var i=0;i<collection.playing.user_file_info.length;i++) {
           var ufi = collection.playing.user_file_info[i];
-          FmpUtils.updateHistory(ufi, {"percent_played": percent});
+          FmpUtils.updateHistory(ufi, {"percent_played": percent_played});
       }
+      // markAsPlayed = function(file_id, user_ids, percent_played)
+      FmpSync.markAsPlayed(collection.playing.id,
+                           FmpListeners.collection.listener_user_ids,
+                           percent_played);
       var now = new Date();
       if (collection.lastSave < now.valueOf() - 5000) {
         console.log("++++++++++SAVE");

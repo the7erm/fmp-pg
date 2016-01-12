@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 import json
 from datetime import datetime, date
+
 from fmp_utils.db_session import Session, session_scope
 
 Base = declarative_base()

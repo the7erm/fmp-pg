@@ -1,7 +1,10 @@
 
+print ("IMPORTED __init__")
+
+from .base import *
+from .associations import *
 from .album import *
 from .artist import *
-from .associations import *
 from .disk_entity import *
 from .file import *
 from .folder import *
@@ -15,4 +18,3 @@ from .user import *
 from .user_file_info import *
 from .user_file_history import *
 from .utils import *
-

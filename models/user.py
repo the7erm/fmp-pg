@@ -12,6 +12,8 @@ from .base import Base, to_json
 from .user_file_info import UserFileInfo
 from .associations import folder_assocation_table, netcast_assocation_table
 
+from time import time
+
 class User(Base):
     __tablename__ = 'users'
 
@@ -21,6 +23,7 @@ class User(Base):
     admin = Column(Boolean)
     listening = Column(Boolean)
     listen_to_netcasts = Column(Boolean)
+    timestamp = Column(BigInteger, onupdate=time)
     user_file_info = relationship("UserFileInfo", backref="user")
     history = relationship("UserFileHistory", backref="user")
     folders = relationship("Folder",
@@ -53,6 +56,7 @@ def get_users(user_ids=[]):
         print("get_users() USER IDS:", user_ids )
         user_query = session.query(User)
         if user_ids:
+            print("get_users() in_(user_ids)")
             user_query = user_query.filter(User.id.in_(user_ids))
         else:
             user_query = user_query.filter(User.listening==True)

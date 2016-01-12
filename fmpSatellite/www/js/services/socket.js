@@ -1,10 +1,12 @@
-starterServices.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope) {
+starterServices.factory('FmpSocket', function($websocket, FmpIpScanner,
+                                              $rootScope) {
   // Open a WebSocket connection
 
   var collection = {
     dataStream: false,
     connected: false,
-    queue: []
+    queue: [],
+    processed: []
   };
 
   var methods = {
@@ -13,8 +15,10 @@ starterServices.factory('FmpSocket', function($websocket, FmpIpScanner, $rootSco
       if (collection.dataStream) {
         while (collection.queue.length>0) {
           var msg = queue.shift();
+          console.log("SEND:", msg);
           collection.dataStream.send(JSON.stringify(msg));
         }
+        console.log("SEND:", obj);
         collection.dataStream.send(JSON.stringify(obj));
       } else {
         collection.queue.push(obj);
@@ -23,7 +27,13 @@ starterServices.factory('FmpSocket', function($websocket, FmpIpScanner, $rootSco
     onMessage: function(message) {
       collection.connected = true;
       var data = JSON.parse(message.data);
-      console.log("onMessage:", data);
+      if (typeof data['time-status'] == 'undefined') {
+        console.log("onMessage:", data);
+        if (typeof data['processed'] != 'undefined') {
+          collection.processed.push(data);
+          $rootScope.$broadcast("sync-processed");
+        }
+      }
     },
     onError: function() {
       collection.connected = false;

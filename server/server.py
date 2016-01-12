@@ -50,22 +50,23 @@ MEDIA_STOPPED = 4
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, message):
-        try:
-            playlist.broadcast_playing()
-        except NameError:
-            print("Playlist not initialized")
-            pass
-
+        print(">"*80)
+        print("message.data:", message.data)
+        obj = "FAILED"
         try:
             obj = json.loads(message.data.decode("utf-8"))
+
+            print("json.loads()", pformat(obj))
+            self.process_action(obj)
         except Exception as e:
             print("Exception:", e)
-            pass
+            try:
+                playlist.broadcast_playing()
+            except NameError:
+                print("Playlist not initialized")
+                pass
 
-        print(">"*80)
-        print("json.loads()", obj)
 
-        self.process_action(obj)
 
         #  print ("json.loads()", json.loads(str_mdata))
 
@@ -80,6 +81,7 @@ class ChatWebSocketHandler(WebSocket):
         cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
 
     def process_action(self, obj):
+
         action = obj.get('action')
         if action == "broadcast-playing":
             playlist.broadcast_playing()
@@ -90,12 +92,18 @@ class ChatWebSocketHandler(WebSocket):
             self.sync(payload)
 
         if action == "test":
-            json_broadcast({"processed", [{
-                'spec': obj
-            }]})
+            broadcast({
+                "processed": [
+                    {
+                        'spec': obj
+                    }
+                ]
+            })
 
     def sync(self, payload):
+        print("-sync")
         for _date, files in payload.items():
+            print("-sync %s:" % _date)
             self.process_files(files)
             # collection.sync[today][file_id][elementType][action]
 
@@ -103,13 +111,15 @@ class ChatWebSocketHandler(WebSocket):
     def process_files(self, files):
         # collection.sync[today][file_id][elementType][action]
         for file_id, element_types in files.items():
+            print("-process_files file_id:%s:" % file_id)
             self.process_element_types(element_types)
 
 
     def process_element_types(self, element_types):
         for element_type, actions in element_types.items():
+            print("-process_element_types element_type:%s:" % element_type)
             if element_type == 'object':
-                for action, action_spec in actions:
+                for action, action_spec in actions.items():
                     self.process_action_spec(action, action_spec)
                 continue
 
@@ -122,7 +132,7 @@ class ChatWebSocketHandler(WebSocket):
         with session_scope() as session:
             file_id = action_spec.get("file_id")
             user_id = action_spec.get("user_id")
-            user_ids = obj.get('user_ids', [])
+            user_ids = action_spec.get('user_ids', [])
 
             if action == 'mark_as_played':
                 file = session.query(File)\
@@ -132,18 +142,27 @@ class ChatWebSocketHandler(WebSocket):
                     return {
                         "error": "no file for file_id %s" % file_id
                     }
-                session.add(file)
+                session_add(session, file)
                 kwargs = {
                     "user_ids": user_ids,
                     "percent_played": action_spec.get("percent_played"),
                     "now": int(action_spec.get("percent_played"))
                 }
+                # print("DISABLED mark_as_played")
                 file.mark_as_played(**kwargs)
-                session.add(file)
-                json_broadcast({"processed", [{
-                    'file': file.json(user_ids=user_ids),
-                    'spec': action_spec
-                }]})
+                session_add(session, file)
+                # import pdb; pdb.set_trace()
+                file_json = file.json(user_ids=user_ids)
+                processed = {
+                    "processed": [{
+                        'file': file_json,
+                        'spec': action_spec
+                    }]
+                }
+                print("-="*40)
+                pprint(processed)
+                broadcast(processed)
+                return
             if action in ("rating", "skip_score", "voted_to_skip"):
                 ufi = session.query(UserFileInfo)\
                              .filter(and_(
@@ -173,7 +192,7 @@ class ChatWebSocketHandler(WebSocket):
                 ufi.calculate_true_score()
                 session.add(ufi)
                 session.commit()
-                json_broadcast({"processed", [{
+                broadcast({"processed", [{
                     'ufi': ufi.json(),
                     'spec': action_spec
                 }]})
@@ -1171,7 +1190,7 @@ class FmpServer(object):
                 if _f:
                     session.add(_f)
                     result['processed_history'].append(
-                        _f.json(history=True, user_ids=user_ids))
+                        _f.json(history=True, user_ids=listener_user_ids))
             files = satellite_preload_collection.get("files", [])
             for f in files:
                 for ufi in f['user_file_info']:
@@ -1182,7 +1201,7 @@ class FmpServer(object):
                 if _f:
                     session.add(_f)
                     result['processed_history'].append(
-                        _f.json(history=True, user_ids=user_ids))
+                        _f.json(history=True, user_ids=listener_user_ids))
 
         print("satellite_state:", satellite_state)
         kwargs = {
@@ -1229,7 +1248,7 @@ class FmpServer(object):
 
         result['playing'] = playlist.files[playlist.index].json(
             history=True,
-            user_ids=user_ids)
+            user_ids=listener_user_ids)
         print("playlist.last_action", playlist.last_action)
         print("satellite_last_action", satellite_last_action)
         return result
@@ -1280,11 +1299,12 @@ def json_broadcast(data):
     cherrypy.engine.publish('websocket-broadcast', JsonTextMessage(data))
 
 def broadcast(data):
-    print("BROADCAST:", data)
+    if not data.get('time-status'):
+        print("BROADCAST:", data)
     json_broadcast(data)
     return
     if not data.get('time-status'):
-        print ("broadcast:", json.dumps(data, sort_keys=True,
+        print ("BROADCAST:", json.dumps(data, sort_keys=True,
                             indent=4, separators=(',', ': ')))
 
     broadcast_countdown()

@@ -10,6 +10,8 @@ try:
     from .base import Base
 except SystemError:
     from base import Base
+except ImportError:
+    from base import Base
 
 artist_association_table = Table('artist_association', Base.metadata,
     Column('file_id', Integer, ForeignKey('files.id')),

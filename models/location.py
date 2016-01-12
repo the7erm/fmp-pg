@@ -8,6 +8,11 @@ from math import floor
 if "../" not in sys.path:
     sys.path.append("../")
 
+try:
+    from .base import Base, to_json
+except SystemError:
+    from base import Base, to_json
+
 from fmp_utils.constants import VALID_EXT
 from fmp_utils.media_tags import MediaTags
 from .utils import do_commit
@@ -19,14 +24,8 @@ from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
 import hashlib
 BLOCKSIZE = 65536
 
+
 from .disk_entity import DiskEntitiy
-
-
-try:
-    from .base import Base, to_json
-except SystemError:
-    from base import Base, to_json
-
 from .file import File
 from .artist import Artist
 from .title import Title

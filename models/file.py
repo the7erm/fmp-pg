@@ -3,16 +3,17 @@ import sys
 if "../" not in sys.path:
     sys.path.append("../")
 
+try:
+    from .base import Base, to_json
+except SystemError:
+    from base import Base, to_json
+
 from sqlalchemy import Column, Integer, String, BigInteger,\
                        Float, Boolean
 
 from sqlalchemy.orm import relationship
 from fmp_utils.db_session import Session, session_scope
 
-try:
-    from .base import Base, to_json
-except SystemError:
-    from base import Base, to_json
 
 from math import floor
 import re
@@ -50,6 +51,7 @@ class File(Base):
     fingerprint = Column(String)
     keywords_txt = Column(String)
     reason = Column(String)
+    timestamp = Column(BigInteger, onupdate=time)
 
     artists = relationship("Artist", secondary=artist_association_table,
                            backref="files",
@@ -216,7 +218,6 @@ class File(Base):
             session_add(session, self)
 
             users = get_users(user_ids)
-
             keys = ['artists', 'titles', 'genres', 'locations']
             for k in keys:
                 session_add(session, self)
@@ -235,9 +236,12 @@ class File(Base):
                         found = True
                         break
                 if found:
+                    session_add(session, user)
+
                     continue
                 ufi = self.create_ufi(user.id, user=user)
                 do_commit(ufi)
                 json['user_file_info'].append(ufi.json(history=history))
+                session_add(session, user)
 
         return json

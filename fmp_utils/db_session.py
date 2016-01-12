@@ -1,12 +1,15 @@
 
 import os
 import sys
-import configparser
+
+try:
+    import config as fmp_config
+except ImportError:
+    import fmp_utils.config as fmp_config
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from contextlib import contextmanager
-
 
 class FmpSession():
     # This is a simpleton class so we can replace the Session object when
@@ -20,27 +23,9 @@ class FmpSession():
     def connect(self):
         if self.Session:
             self.Session = None
-
-        config = configparser.RawConfigParser()
-        config.read(os.path.expanduser('~/.fmp/config'))
-        try:
-            user = config.get('postgres', 'username')
-            pword = config.get('postgres', 'password')
-            host = config.get('postgres', 'host')
-            port = config.get('postgres', 'port')
-            database = config.get("postgres", "database")
-            self.user = user
-            self.pword = pword
-            connection_string = 'postgresql+psycopg2://{user}:{pword}@{host}:{port}/{database}'
-            self.connection_string = connection_string.format(
-                user=user, pword=pword, host=host, port=port,
-                database=database)
-            # print("self.connection_string:", self.connection_string)
-            self.db = 'postgres'
-        except:
-            self.connection_string = "sqlite://"
-            self.db = 'sqlite'
-            print("FALLBACK")
+        print("fmp_config:", dir(fmp_config))
+        self.connection_string = fmp_config.connection_string
+        self.db = fmp_config.db_type
 
         try:
             self.engine = create_engine(self.connection_string, echo=False)
@@ -107,6 +92,5 @@ def session_scope():
         session.close()
 
 
-from models.folder import Folder
 fmp_session = FmpSession()
 

@@ -3,6 +3,12 @@ import os
 import sys
 if "../" not in sys.path:
     sys.path.append("../")
+
+try:
+    from .base import Base, to_json
+except SystemError:
+    from base import Base, to_json
+
 import feedparser
 import re
 from fmp_utils.constants import CACHE_DIR
@@ -13,9 +19,8 @@ from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import not_, and_, text
 from pprint import pprint
-from time import mktime
+from time import mktime, time
 from .user import User
-from .base import Base, to_json
 
 class Rss(Base):
     __tablename__ = "rss"
@@ -38,6 +43,7 @@ class Rss(Base):
     updated = Column(Integer)
     url = Column(String, unique=True)
     entries = relationship("Entry", backref="rss")
+    timestamp = Column(BigInteger, onupdate=time)
 
     def update(self):
         feed = feedparser.parse(self.url)
@@ -101,6 +107,7 @@ class Entry(Base):
     rss_id = Column(Integer, ForeignKey('rss.id'))
     contents = relationship("Content", backref="entry")
     enclosures = relationship("Enclosure", backref="entry")
+    timestamp = Column(BigInteger, onupdate=time)
 
     def sync(self, item):
         self.author = item.author
@@ -157,6 +164,7 @@ class Content(Base):
     value = Column(String)
 
     entry_id = Column(Integer, ForeignKey('entries.id'))
+    timestamp = Column(BigInteger, onupdate=time)
 
     def sync(self, item):
         self.base = item.base
@@ -174,6 +182,7 @@ class Enclosure(Base):
     length = Column(Integer)
 
     entry_id = Column(Integer, ForeignKey('entries.id'))
+    timestamp = Column(BigInteger, onupdate=time)
 
     def sync(self, item):
         self.href = item.href

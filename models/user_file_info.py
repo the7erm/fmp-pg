@@ -18,6 +18,7 @@ from .user_file_history import UserFileHistory
 from .utils import do_commit
 from datetime import date
 from pprint import pprint
+from time import time
 
 class UserFileInfo(Base):
     __tablename__ = "user_file_info"
@@ -35,6 +36,7 @@ class UserFileInfo(Base):
 
     file_id = Column(Integer, ForeignKey('files.id'))
     user_id = Column(Integer, ForeignKey('users.id'))
+    timestamp = Column(BigInteger, onupdate=time)
     history = relationship("UserFileHistory", backref="user_file_info",
                            order_by="UserFileHistory.date_played.desc()")
 

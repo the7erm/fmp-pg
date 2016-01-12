@@ -2,10 +2,10 @@
 import os
 from math import floor
 
-from .base import Base, to_json
-
 from sqlalchemy import Column, Integer, BigInteger, Boolean, String
 from fmp_utils.db_session import Session, session_scope
+
+from time import time
 
 class DiskEntitiy(object):
     id = Column(Integer, primary_key=True)
@@ -13,6 +13,7 @@ class DiskEntitiy(object):
     mtime = Column(BigInteger)
     file_exists = Column(Boolean)
     type = Column(String(50))
+    timestamp = Column(BigInteger, onupdate=time)
 
     @property
     def exists(self):
