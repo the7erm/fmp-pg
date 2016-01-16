@@ -4,6 +4,7 @@ starterServices
                              FmpSocket){
     var collection = {
             payload: {},
+            transactionIds: [],
             storeFields: {
                 "objects": [
                     "payload"
@@ -18,41 +19,68 @@ starterServices
 
     FmpLocalStorage.load(collection);
 
+    methods.cleanPayloadItems = function (payload, depth) {
+        console.log("depth:", depth, "payload before:", payload, 'typeof:', typeof payload);
+        if (depth == 0) {
+            return;
+        }
+        if (angular.isArray(payload)) {
+            for (var i=0;i<payload.length;i++) {
+                if (!payload[i] ||
+                    angular.equals(payload[i], {}) ||
+                    angular.equals(payload[i], [])) {
+                    console.log("removing i:", i, "depth:", depth);
+                    payload.splice(i,1);
+                    i--;
+                    continue;
+                }
+                methods.cleanPayloadItems(payload[i], depth-1);
+                if (!payload[i] ||
+                    angular.equals(payload[i], {}) ||
+                    angular.equals(payload[i], [])) {
+                    console.log("removing i:", i, "depth:", depth);
+                    payload.splice(i,1);
+                    i--;
+                }
+            }
+            return;
+        }
+        if (typeof payload == 'object') {
+            for (var k in payload) {
+                console.log("k:",k);
+                if (!payload[k] ||
+                    angular.equals(payload[k], {}) ||
+                    angular.equals(payload[k], [])) {
+                    console.log("removing k:", k, "depth:", depth);
+                    if (angular.isArray(payload)) {
+                        console.log("IS ARRAY");
+                        payload.splice(k,1);
+                        continue;
+                    }
+                    delete payload[k];
+                    continue;
+                }
+                methods.cleanPayloadItems(payload[k], depth-1);
+                if (!payload[k] ||
+                    angular.equals(payload[k], {}) ||
+                    angular.equals(payload[k], [])) {
+                    console.log("removing k:", k, "depth:", depth);
+                    if (angular.isArray(payload)) {
+                        console.log("IS ARRAY");
+                        payload.splice(k,1);
+                        continue;
+                    }
+                    delete payload[k];
+                }
+            }
+        }
+
+        console.log("payload after:", payload);
+    }
 
     methods.cleanPayload = function() {
         // [day][file_id][elementType][action]
-        var cleaned = false;
-        for(var day in collection.payload) {
-            for (var file_id in collection.payload[day]) {
-                for (var elementType in collection.payload[day][file_id]) {
-                    for (var action in collection.payload[day][file_id][elementType]) {
-                        if (!collection.payload[day][file_id][elementType][action] ||
-                            angular.equals(collection.payload[day][file_id][elementType][action], {}) ||
-                            angular.equals(collection.payload[day][file_id][elementType][action], [])
-                        ) {
-                            delete collection.payload[day][file_id][elementType][action];
-                            cleaned = true;
-                        }
-                    }
-                    if (!collection.payload[day][file_id][elementType] ||
-                        angular.equals({}, collection.payload[day][file_id][elementType]) ) {
-                        delete collection.payload[day][file_id][elementType];
-                        cleaned = true;
-                    }
-                } // end of elementType loop
-
-                if (!collection.payload[day][file_id] ||
-                    angular.equals({}, collection.payload[day][file_id]) ) {
-                    delete collection.payload[day][file_id];
-                    cleaned = true;
-                }
-            } // end of file_id loop
-            if (!collection.payload[day] ||
-                angular.equals({}, collection.payload[day]) ) {
-                delete collection.payload[day];
-                cleaned = true;
-            }
-        } // end of day loop
+        methods.cleanPayloadItems(collection.payload, 5);
     };
 
     methods.save = function() {
@@ -68,8 +96,10 @@ starterServices
         }
         methods.cleanPayload();
         if (!collection.payload || angular.equals(collection.payload, {})) {
+            console.log("!collection.payload");
             return;
         }
+        console.log("collection.payload:", collection.payload);
         FmpSocket.send({"action": "sync",
                         "payload": collection.payload});
     }
@@ -113,7 +143,7 @@ starterServices
     methods.removeDayPayload = function(day, payload) {
         // [today][file_id][elementType][action]
         for (var file_id in collection.payload[day]) {
-            console.log("file_id:", day);
+            console.log("file_id:", file_id);
             if (payload.file_id != file_id) {
                 console.log("file_id != payload.file_id");
                 continue;
@@ -139,9 +169,9 @@ starterServices
                 console.log("item:", item);
                 methods.removeSyncedPayload(item.spec);
                 if (typeof item.file != 'undefined' && item.file) {
-                    if (typeof file.user_file_info != 'undefined') {
-                        for(var i=0;i<file.user_file_info.length;i++) {
-                            var ufi = file.user_file_info[i];
+                    if (typeof item.file.user_file_info != 'undefined') {
+                        for(var i=0;i<item.file.user_file_info.length;i++) {
+                            var ufi = item.file.user_file_info[i];
                             methods.processUfi(ufi);
                         }
                     }
@@ -254,6 +284,59 @@ starterServices
         });
         methods.sync();
     };
+
+    methods.syncCollections = function() {
+        if (!FmpSocket.collection.connected) {
+            return;
+        }
+        var transaction_id = Math.random().toString(36).replace(/[^a-z0-9]+/g, '');
+        collection.transactionIds.push(transaction_id);
+        var payload = {
+            "transaction_id": transaction_id,
+            "playlist_ids": [],
+            "preload_ids": [],
+            "primary_user_id": collection.FmpListeners.collection.primary_user_id,
+            "listener_user_ids": collection.FmpListeners.collection.listener_user_ids,
+            "secondary_user_ids": collection.FmpListeners.collection.secondary_user_ids,
+            "prefetchNum": collection.FmpListeners.collection.prefetchNum,
+            "secondaryPrefetchNum": collection.FmpListeners.collection.secondaryPrefetchNum
+        };
+        for(var i=0;i<collection.FmpPreload.collection.files.length;i++) {
+            var file = collection.FmpPreload.collection.files[i];
+            payload.preload_ids.push(file.id);
+        }
+        for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
+            var file = collection.FmpPlaylist.collection.files[i];
+            payload.playlist_ids.push(file.id);
+        }
+        FmpSocket.send({"action": "sync-collections",
+                        "payload": payload});
+    };
+
+    methods.processFileData = function(fileList) {
+        fileList = FmpUtils.sanitize(fileList);
+        for(var i=0;i<fileList.length;i++) {
+            var file = fileList[i];
+            FmpUtils.addLocalData(file);
+            var idx = FmpUtils.indexOfFile(FmpPlaylist.collection.files);
+            if (idx == -1) {
+                FmpPreload.collection.files.push(file);
+            } else {
+                FmpPlaylist[idx].user_file_info = file.user_file_info;
+            }
+        }
+    };
+
+    methods.onPlaylistData = function () {
+        methods.processFileData(FmpSocket.collection.playlistData);
+    };
+
+    methods.onPreloadData = function() {
+        methods.processFileData(FmpSocket.collection.preloadData);
+    };
+
+    $rootScope.$on("playlist-data", methods.onPlaylistData);
+    $rootScope.$on("preload-data", methods.onPreloadData);
 
     return methods;
 });

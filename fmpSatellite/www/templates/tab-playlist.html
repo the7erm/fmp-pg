@@ -1,9 +1,12 @@
 <ion-view view-title="Playlist">
   <ion-content class="padding">
     <div ng-if="loading" style="position:absolute;margin:auto;">Loading ....</div>
-    <ion-list show-reorder="shouldShowReorder">
-      <ion-item ng-repeat="(key, file) in playlist track by $index" item="file">
-          <ion-reorder-button class="ion-navicon" on-reorder="moveItem(item, $fromIndex, $toIndex)"></ion-reorder-button>
+    <ion-list show-reorder="true" class="card list item-text-wrap">
+      <ion-item  class="item item-body " ng-repeat="(key, file) in playlist track by $index" item="file" ng-class="{
+          'playing':playing.id==file.id,
+          'not-playing':playing.id!=file.id
+        }">
+          <ion-reorder-button class="ion-android-more-vertical" on-reorder="moveItem(item, $fromIndex, $toIndex)"></ion-reorder-button>
           <span ng-if="file.artists.length>0">
             <span ng-repeat="(key, artist) in file.artists">
               {{artist.name}}<span ng-if="file.aritsts.length>1">, </span>
@@ -21,7 +24,13 @@
           <br clear="all">
           <div ng-repeat="(i, ufi) in file.user_file_info">
               <span>{{ufi.user.name}}</span>
-              <rating ng-model="ufi.rating" min="0" max="6" readonly="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" rating-states="ratingStates" ng-click="setRating(ufi)" titles="['0','1','2', '3', '4', '5', '6']"></rating>
+              <span ng-repeat="rating in [0,1,2,3,4,5]" class='rating'>
+                <a ng-click="console.log('clicked',rating)" class='rating' ng-class="{
+                  'red-no': rating==0&&rating<=ufi.rating,
+                  'yellow-star': rating>=1&&rating<=5&&rating<=ufi.rating,
+                  'grey-star': rating>=1&&rating<=5&&rating>ufi.rating
+                }">&nbsp;</a>
+              </span>
               Rating:{{ufi.rating}}
               skip_score:{{ufi.skip_score}}
               true_score:{{ufi.true_score}}

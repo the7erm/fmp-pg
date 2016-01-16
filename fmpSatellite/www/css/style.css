@@ -49,7 +49,7 @@
     background-position: center center;
 }
 
-div.playing, span.playing  {
+div.playing, span.playing, .playing, ion-item .playing, .playing .item-content {
     background: #DDD !important;
 }
 
@@ -58,4 +58,21 @@ div.playlist-anchor {
     padding-left: 5px;
     padding-right: 5px;
     font-size: 3em;
+}
+
+ul.rating li {
+    padding: 0px 3px;
+}
+
+.item-body {
+    padding:0px;
+}
+
+.item-right-edit {
+    width:40px;
+}
+
+a.rating {
+    display: inline-block;
+    min-width: 30px;
 }

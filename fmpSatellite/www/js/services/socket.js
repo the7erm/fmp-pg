@@ -6,7 +6,9 @@ starterServices.factory('FmpSocket', function($websocket, FmpIpScanner,
     dataStream: false,
     connected: false,
     queue: [],
-    processed: []
+    processed: [],
+    playlistData: [],
+    preloadData: []
   };
 
   var methods = {
@@ -32,6 +34,14 @@ starterServices.factory('FmpSocket', function($websocket, FmpIpScanner,
         if (typeof data['processed'] != 'undefined') {
           collection.processed.push(data);
           $rootScope.$broadcast("sync-processed");
+        }
+        if (typeof data.playlist != 'undefined') {
+          playlistData = data.playlist;
+          $rootScope.$broadcast("playlist-data");
+        }
+        if (typeof data.preload != 'undefined') {
+          preloadData = data.preload;
+          $rootScope.$broadcast("preload-data");
         }
       }
     },

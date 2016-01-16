@@ -28,7 +28,9 @@ def build_truescore_list():
     return scores
 
 
-def get_preload(uids=[], remove_item=True, user_ids=[]):
+def get_preload(uids=[], remove_item=True, user_ids=[], minimum=0,
+                primary_user_id=None, prefetch_num=None,
+                secondary_prefetch_num=None):
     if user_ids:
         uids = user_ids
 
@@ -47,25 +49,33 @@ def get_preload(uids=[], remove_item=True, user_ids=[]):
 
         for user in users:
             session_add(session, user)
+            if primary_user_id is not None:
+                if user.id == primary_user_id:
+                    minimum = prefetch_num
+                if user.id != primary_user_id:
+                    minimum = secondary_prefetch_num
+
             total = session.query(Preload)\
                            .filter(Preload.user_id==user.id)\
                            .count()
 
-            if total == 0:
+            if total <= minimum:
                 session_add(session, user)
-                populate_preload([user])
+                populate_preload([user], primary_user_id=primary_user_id,
+                                 prefetch_num=prefetch_num,
+                                 secondary_prefetch_num=secondary_prefetch_num)
             session_add(session, user)
             total = session.query(Preload)\
                            .filter(Preload.user_id==user.id)\
                            .count()
-            if total == 0:
+            if total <= minimum:
                 continue
 
             pick, preload = session.query(File, Preload)\
-                           .join(Preload, Preload.file_id == File.id)\
-                           .filter(Preload.user_id==user.id)\
-                           .order_by(Preload.from_search.desc(), Preload.id)\
-                           .first()
+                                   .join(Preload, Preload.file_id == File.id)\
+                                   .filter(Preload.user_id==user.id)\
+                                   .order_by(Preload.from_search.desc(), Preload.id)\
+                                   .first()
 
             if pick:
                 pick.reason = preload.reason
@@ -278,7 +288,8 @@ def insert_into_preload(user_id, file_id, reason="", from_search=False):
         session_add(session, preload, commit=True)
 
 
-def populate_preload(users=[]):
+def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
+                     secondary_prefetch_num=None):
     with session_scope() as session:
         populate_pick_from(truncate=True)
         if not users:
@@ -302,6 +313,24 @@ def populate_preload(users=[]):
 
         for user in users:
             session_add(session, user)
+            if primary_user_id is not None:
+                if user.id == primary_user_id:
+                    if prefetch_num is not None:
+                        try:
+                            threashold = int(prefetch_num)
+                        except:
+                            threashold = 50
+                    else:
+                        threashold = 50
+                else:
+                    if secondary_prefetch_num is not None:
+                        try:
+                            threashold = int(secondary_prefetch_num)
+                        except:
+                            threashold = 10
+                    else:
+                        threashold = 10
+
             populate_preload_for_user(user, threashold)
 
 def populate_preload_for_user(user, threashold=1):
@@ -309,10 +338,13 @@ def populate_preload_for_user(user, threashold=1):
         session_add(session, user)
         true_score_pool[user.id] = build_truescore_list()
         cnt = 0
+        if threashold <= 0:
+            threashold = 1
+
         session_add(session, user)
         for true_score in true_score_pool[user.id]:
             if cnt <= threashold:
-                # always run the first query.
+                # Run queries up to the threashold.
                 session_add(session, user)
                 insert_random_unplayed_for_user_from_pick_from(user)
                 session_add(session, user)

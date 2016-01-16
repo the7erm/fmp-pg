@@ -21,7 +21,7 @@ starterServices
         "action": "test",
         "payload": {
           "satellite": "user_action",
-          "time": Math.fllor(Date.now() / 1000)
+          "time": Math.floor(Date.now() / 1000)
         }
       });
     }

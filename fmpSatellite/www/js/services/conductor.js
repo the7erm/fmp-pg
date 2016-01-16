@@ -38,7 +38,7 @@ starterServices
 
   FmpSync.collection.FmpPreload = FmpPreload;
   FmpSync.collection.FmpPlaylist = FmpPlaylist;
-
+  FmpSync.collection.FmpListeners = FmpListeners;
 
   methods.updateSyncHistory = function(processed_history) {
     if (!processed_history) {
@@ -127,8 +127,9 @@ starterServices
     if (!FmpConfig.url || collection.syncLock) {
       return;
     }
-    collection.syncLock = true;
     FmpSync.sync();
+    FmpSync.syncCollections();
+    return;
     var data = {
       "playlist": FmpPlaylist.collection,
       "preload": FmpPreload.collection,

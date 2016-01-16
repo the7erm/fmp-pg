@@ -81,7 +81,8 @@ class ChatWebSocketHandler(WebSocket):
         cherrypy.engine.publish('websocket-broadcast', TextMessage(reason))
 
     def process_action(self, obj):
-
+        if not isinstance(obj, dict):
+            return
         action = obj.get('action')
         if action == "broadcast-playing":
             playlist.broadcast_playing()
@@ -90,6 +91,10 @@ class ChatWebSocketHandler(WebSocket):
         if action == "sync":
             payload = obj.get('payload', {})
             self.sync(payload)
+
+        if action == "sync-collections":
+            payload = obj.get('payload', {})
+            self.sync_collections(payload);
 
         if action == "test":
             broadcast({
@@ -107,6 +112,134 @@ class ChatWebSocketHandler(WebSocket):
             self.process_files(files)
             # collection.sync[today][file_id][elementType][action]
 
+    def sync_collections(self, payload):
+        print("****** sync_collections:", pformat(payload))
+        transaction_id = payload.get("transaction_id");
+        if transaction_id is None:
+            return;
+        playlist_ids = payload.get("playlist_ids", [])
+        preload_ids = payload.get("preload_ids", [])
+        primary_user_id = payload.get("primary_user_id", 0)
+        listener_user_ids = payload.get("listener_user_ids", [])
+        secondary_user_ids = payload.get("secondary_user_ids", [])
+        prefetchNum = payload.get("prefetchNum", 50)
+        secondaryPrefetchNum = payload.get("secondaryPrefetchNum", 10)
+        user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
+        user_ids = list(set(user_ids))
+        self.send_playlist_data(transaction_id, playlist_ids, user_ids)
+
+        try:
+            self.send_preload_data(transaction_id,
+                                   preload_ids,
+                                   primary_user_id,
+                                   listener_user_ids,
+                                   secondary_user_ids,
+                                   prefetchNum,
+                                   secondaryPrefetchNum)
+        except Exception as e:
+            print ("Exception send_playlist_data :", e)
+
+    def send_playlist_data(self, transaction_id, playlist_ids, user_ids):
+        response = []
+        print("user_ids:", user_ids)
+        with session_scope() as session:
+            files = session.query(File)\
+                           .filter(File.id.in_(playlist_ids))\
+                           .all()
+
+            for f in files:
+                session_add(session, f)
+                response.append(f.json(user_ids=user_ids))
+
+        json_broadcast({
+            "transaction_id": transaction_id,
+            "playlist": response
+        })
+
+    def send_preload_data(self,
+                          transaction_id,
+                          preload_ids,
+                          primary_user_id,
+                          listener_user_ids,
+                          secondary_user_ids,
+                          prefetchNum,
+                          secondaryPrefetchNum):
+
+        prefetchNum = int(prefetchNum)
+        secondaryPrefetchNum = int(secondaryPrefetchNum)
+        primary_user_id = int(primary_user_id)
+        listener_user_ids = listener_user_ids + [primary_user_id]
+        listener_user_ids = list(set(listener_user_ids))
+        user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
+        user_ids = list(set(user_ids))
+        user_ids = [int(x) for x in user_ids]
+
+        sql = """SELECT f.*
+                 FROM files f,
+                      preload p
+                 WHERE user_id IN (%s) AND
+                       f.id = p.file_id
+                 ORDER BY p.from_search DESC, p.id ASC""" % ",".join(
+                    str(x) for x in user_ids)
+
+        results = []
+        group_by_user = {}
+        with session_scope() as session:
+            # Check the preload and make sure all the users have files
+            # up to their minimums ready.
+            preloaded = picker.get_preload(
+                user_ids=user_ids,
+                remove_item=False,
+                primary_user_id=primary_user_id,
+                prefetch_num=prefetchNum,
+                secondary_prefetch_num=secondaryPrefetchNum
+            )
+
+            for p in preloaded:
+                session_add(session, p)
+
+            # TODO wait
+
+            # 1. Select prefetchNum files for primary_user_id
+            # 2. Select secondaryPrefetchNum for secondary_user_ids
+            files = session.query(File)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+            for f in files:
+                user_id = 0
+                session_add(session, f)
+                if f.cued:
+                    user_id = f.cued['user_id']
+                if not group_by_user.get(user_id):
+                    group_by_user[user_id] = []
+                if user_id != primary_user_id:
+                    if len(group_by_user[user_id]) >= secondaryPrefetchNum:
+                        # skip because we've fetched enough.
+                        continue
+                elif user_id == primary_user_id:
+                    if len(group_by_user[user_id]) >= prefetchNum:
+                        # skip because we've fetched enough.
+                        continue
+
+                # Group the files by their user_id.
+                group_by_user[user_id].append(f.json(user_ids=user_ids))
+
+        # Stagger the result so each user gets a turn.
+        has_files = True
+        while has_files:
+            has_files = False
+            for user_id, items in group_by_user.items():
+                if len(items) == 0:
+                    continue
+                has_files = True
+                item = items.pop(0)
+                results.append(item)
+
+        json_broadcast({
+            "transaction_id": transaction_id,
+            "preload": results
+        })
 
     def process_files(self, files):
         # collection.sync[today][file_id][elementType][action]
@@ -124,8 +257,20 @@ class ChatWebSocketHandler(WebSocket):
                 continue
 
             if element_type == 'list':
-                for action, action_specs in actions:
+                print("**** ACTIONS **** ")
+                pprint(actions)
+                for action, action_specs in actions.items():
+                    print("action:", action)
+                    print("action_specs:", action_specs)
                     for action_spec in action_specs:
+                        print("action_spec:", action_spec)
+                        if action_spec is None:
+                            broadcast({
+                                "processed": [{
+                                    'spec': action_spec
+                                }]
+                            })
+                            continue
                         self.process_action_spec(action, action_spec)
 
     def process_action_spec(self, action, action_spec):
@@ -146,7 +291,7 @@ class ChatWebSocketHandler(WebSocket):
                 kwargs = {
                     "user_ids": user_ids,
                     "percent_played": action_spec.get("percent_played"),
-                    "now": int(action_spec.get("percent_played"))
+                    "now": int(action_spec.get("now"))
                 }
                 # print("DISABLED mark_as_played")
                 file.mark_as_played(**kwargs)
@@ -166,8 +311,8 @@ class ChatWebSocketHandler(WebSocket):
             if action in ("rating", "skip_score", "voted_to_skip"):
                 ufi = session.query(UserFileInfo)\
                              .filter(and_(
-                                User.file_id==file_id,
-                                User.id==user_id
+                                UserFileInfo.file_id==file_id,
+                                UserFileInfo.user_id==user_id
                               ))\
                              .first()
                 if not ufi:
@@ -192,10 +337,13 @@ class ChatWebSocketHandler(WebSocket):
                 ufi.calculate_true_score()
                 session.add(ufi)
                 session.commit()
-                broadcast({"processed", [{
-                    'ufi': ufi.json(),
-                    'spec': action_spec
-                }]})
+                print("/calculate_true_score")
+                broadcast({
+                    "processed": [{
+                        'ufi': ufi.json(),
+                        'spec': action_spec
+                    }]
+                })
 
 
 cherrypy.config.update({
