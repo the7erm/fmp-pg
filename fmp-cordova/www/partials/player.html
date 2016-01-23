@@ -1,5 +1,47 @@
 <h1>Player.html</h1>
 
-<button class="btn" ng-click="syncCollections()">sync</button>
-<pre>{{FmpPlayerCollection | json}}</pre>
+<button class="btn btn-default" ng-click="syncCollections()">sync</button>
+<button class="btn btn-default" ng-click="organize()">organize</button>
+<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing">
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <button class="btn btn-xs btn-default glyphicon glyphicon-play"
+                ng-click="item.play()"
+                ng-if="player.file.id!=item.id"></button>
+        <button class="btn btn-xs btn-primary glyphicon"
+                ng-click="item.pause()"
+                ng-class="{'glyphicon-pause': player.state=='PLAYING',
+                           'glyphicon-play': player.state!='PLAYING'}"
+                ng-if="player.file.id==item.id"></button>
+        {{item.artist_title}}<br>
+        {{item.spec.cued.reason}}
+        <div ng-if="item.playing&&item.duration>-1&&item.position>-1&&item.remaining>-1">
+        -{{item.remaining|formatTimer}} {{item.position|formatTimer}}/{{item.duration|formatTimer}}</div>
+    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id">
+        <span ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id)!=-1">
+            <div ng-include src="'partials/ufi.html'"></div>
+        </span>
+    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-if="item.err||!item.exists">
+        <div ng-if="item.err" class="alert alert-danger">{{item.err}}</div>
+        <div ng-if="!item.exists">
+            progress: {{item.progress}}
+            <div class="progress" width="100%">
+              <div class="progress-bar" ng-class="{
+                'progress-bar-success': item.progress == 100,
+                'progress-bar-warning': item.progress>=10 && item.progress<100,
+                'progress-bar-danger': item.progress <= 10
+              }" role="progressbar" aria-valuenow="{{item.progress}}" aria-valuemin="0" aria-valuemax="100" ng-style="{'width': item.progress + '%'}">
+                <span>{{item.progress}}%</span>
+              </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+    <input type="range" min="0" max="{{item.duration}}" ng-bind="item.position">
+    </div>
+</div>
+<br clear="all">
+<br clear="all">
+<br clear="all">
 

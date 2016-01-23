@@ -7,7 +7,7 @@ fmpApp.config(['$routeProvider', '$locationProvider', function($routeProvider, $
     })
     .when('/player', {
         templateUrl: 'partials/player.html',
-        controller: 'PlayerController'
+        controller: 'PlaylistCtrl'
     })
     .when("/listeners", {
         templateUrl: 'partials/listeners.html',

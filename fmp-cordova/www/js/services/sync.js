@@ -107,31 +107,22 @@ fmpApp
     };
 
     methods.processFileData = function(fileList) {
-        fileList = FmpUtils.sanitize(fileList);
+        fileList = FmpUtils.sanitize(fileList)
         while(fileList.length>0) {
-            console.log("processFileData");
             var fileData = fileList.shift();
             if (collection.deleted.indexOf(fileData.id) != -1) {
                 continue;
             }
-
-            var file = new FmpFile(fileData);
-            file.$rootScope = $rootScope;
-            file.$timeout = $timeout;
-            // Put it in a timeout so the file will download in the right order.
-            $timeout(file.download_if_not_exists);
-            console.log("FmpFile:", file);
-            idx = FmpUtils.indexOfFile(collection.FmpPlaylist.collection.files, file);
-            console.log("idx1:", idx);
-            if (idx == -1) {
-                collection.FmpPlaylist.collection.files.push(file);
-            } else {
+            var idx = FmpUtils.indexOfFile(collection.FmpPlaylist.collection.files, fileData);
+            if (idx != -1) {
                 var plfile = collection.FmpPlaylist.collection.files[idx];
-                if (file.spec.needsSyncedProcessed) {
+                if (plfile.spec.needsSyncedProcessed) {
                     plfile.spec.needsSync = false;
                 }
-                plfile.spec.user_file_info = file.spec.user_file_info;
-                plfile.dirty = true;
+                if (!angular.equals(plfile.spec.user_file_info, fileData.user_file_info)) {
+                    plfile.spec.user_file_info = fileData.user_file_info;
+                    plfile.dirty = true;
+                }
                 // array.splice(index, 1);
                 if (plfile.played && !plfile.playing) {
                     console.log("******** DELETING ***");
@@ -139,7 +130,17 @@ fmpApp
                     collection.deleted.push(plfile.id);
                     plfile.delete();
                 }
+                continue;
             }
+
+            console.log("processFileData");
+            var file = new FmpFile(fileData);
+            file.$rootScope = $rootScope;
+            file.$timeout = $timeout;
+            // Put it in a timeout so the file will download in the right order.
+            $timeout(file.download_if_not_exists);
+            console.log("FmpFile:", file);
+            collection.FmpPlaylist.collection.files.push(file);
         }
         collection.FmpPlaylist.save();
     };

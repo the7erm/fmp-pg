@@ -132,22 +132,16 @@ class ChatWebSocketHandler(WebSocket):
         print("PROCESS NEEDS SYNCED")
         for needs_synced in needs_synced_files:
             with session_scope() as session:
+                needs_marked_as_played = False
                 if needs_synced.get("played", False):
+                    needs_marked_as_played = True
                     session.query(Preload)\
                            .filter(Preload.file_id==needs_synced['id'])\
                            .delete()
+
                 dbInfo = session.query(File)\
                                 .filter(File.id==needs_synced.get("id"))\
                                 .first()
-                if not dbInfo.timestamp or \
-                   dbInfo.timestamp < needs_synced.get("timestamp", 0):
-                    kwargs = {
-                        "user_ids": needs_synced.get("listener_user_ids", user_ids),
-                        "percent_played": needs_synced.get("percent_played", 0),
-                        "now": needs_synced.get("time_played", 0)
-                    }
-                    dbInfo.mark_as_played(**kwargs)
-
 
                 for ns_ufi in needs_synced.get("user_file_info",[]):
                     print("needs_synced:", pformat(needs_synced))
@@ -173,9 +167,19 @@ class ChatWebSocketHandler(WebSocket):
                             print("set %s to %s" % (k, value))
                             setattr(db_ufi, k, value)
                         db_ufi.calculate_true_score()
+                    else:
+                        print("db_ufi.timestamp > ns_ufi['timestamp']")
+                        print(db_ufi.timestamp, ns_ufi['timestamp'])
                     session.commit()
                 # End of for ns_ufi in needs_synced.get("user_file_info",[]):
 
+                if needs_marked_as_played:
+                    kwargs = {
+                        "user_ids": needs_synced.get("listener_user_ids", user_ids),
+                        "percent_played": needs_synced.get("percent_played", 0),
+                        "now": needs_synced.get("time_played", 0)
+                    }
+                    dbInfo.mark_as_played(**kwargs)
                 json_broadcast({"playlist-item": dbInfo.json(user_ids=user_ids),
                                 "transaction_id": transaction_id,
                                 "needsSyncedProcessed": True})

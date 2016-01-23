@@ -279,7 +279,7 @@ var FmpFile = function (spec) {
             if (ufi.user_id == user_id && ufi.file_id == thisFile.file_id &&
                 ufi[name] != value) {
                 ufi[name] = value;
-                ufi.timestamp = timestamp;
+                ufi.timestamp = thisFile.get_timestamp();
                 thisFile.dirty = true;
                 dirty = true;
                 thisFile.calculateTrueScore(ufi);
@@ -312,7 +312,7 @@ var FmpFile = function (spec) {
         if (score < -15 || score > 15) {
             return;
         }
-        thisFile.setUserValue('rating', user_id, rating, forceSave);
+        thisFile.setUserValue('score', user_id, score, forceSave);
     };
     thisFile.calculateTrueScore = function(ufi) {
         var true_score = (
