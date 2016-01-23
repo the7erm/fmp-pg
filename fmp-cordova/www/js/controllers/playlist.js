@@ -10,4 +10,9 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
     $scope.organize = FmpPlaylist.organize;
     $scope.rate = FmpPlaylist.rate;
     $scope.score = FmpPlaylist.score;
+
+    $scope.onStart = window.player.onDragStart;
+
+    $scope.onChange = window.player.onDragChange;
+    $scope.onEnd = window.player.onDragEnd;
 });

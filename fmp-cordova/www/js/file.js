@@ -655,6 +655,7 @@ var Player = function() {
     thisPlayer.file = null;
     thisPlayer.realState = "STOPPED";
     thisPlayer.lastPosition = 0;
+    thisPlayer.dragging = false;
 
     thisPlayer.completeCb = function(file) {
         console.log("completeCb*********************");
@@ -797,6 +798,9 @@ var Player = function() {
         thisPlayer.media.getCurrentPosition(
             // success callback
             function (position) {
+                if (thisPlayer.dragging) {
+                    return;
+                }
                 position = parseFloat(position);
                 if (position <= -1 || position == thisPlayer.lastPosition) {
                     return;
@@ -816,6 +820,23 @@ var Player = function() {
                 thisPlayer.file.err = "Error getting pos=" + e;
             }
         );
+    };
+    thisPlayer.seekTo = function(ms) {
+        console.log("SEEK TO:", ms);
+        // thisPlayer.media.seekTo(mil);
+    };
+    thisPlayer.onDragStart = function() {
+        thisPlayer.dragging = true;
+        console.log("DRAG START:", arguments);
+    };
+    thisPlayer.onDragEnd = function() {
+        thisPlayer.dragging = false;
+        console.log("DRAG END:", arguments);
+        thisPlayer.media.seekTo(thisPlayer.file.position*1000);
+    };
+    thisPlayer.onDragChange = function() {
+        console.log("DRAG onDragChange:", arguments);
+        // thisPlayer.media.seekTo(thisPlayer.file.position*1000);
     };
     setInterval(thisPlayer.timeStatus,1000);
     Object.defineProperty(thisPlayer, "state", {

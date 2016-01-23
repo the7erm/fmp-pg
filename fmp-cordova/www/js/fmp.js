@@ -1,7 +1,8 @@
 var fmpApp = angular.module('fmpApp', [
     'ngRoute',
     'ngTouch',
-    'ngWebSocket'
+    'ngWebSocket',
+    'rzModule'
 ]);
 
 fmpApp.filter('formatTimer', function () {

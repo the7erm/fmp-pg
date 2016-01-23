@@ -14,6 +14,6 @@ fmpApp.config(['$routeProvider', '$locationProvider', function($routeProvider, $
         controller: 'ListenersController'
     })
     .otherwise({
-        redirectTo: '/playlist'
+        redirectTo: '/player'
     });
 }]);
