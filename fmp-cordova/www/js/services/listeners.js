@@ -69,9 +69,7 @@ fmpApp
                 var listener_user_ids = [];
                 for (var i=0;i<collection.users.length;i++) {
                     var user = collection.users[i];
-                    if (user.listening) {
-                        listener_user_ids.push(user.id);
-                    }
+                    user.listening = false;
                 }
                 collection.listener_user_ids = listener_user_ids;
             }

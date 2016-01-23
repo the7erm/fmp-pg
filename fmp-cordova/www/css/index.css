@@ -62,3 +62,19 @@ code {
     font-size: 1em;
     */
 }
+
+input[type=checkbox] {
+  /* All browsers except webkit*/
+  transform: scale(2);
+
+  /* Webkit browsers*/
+  -webkit-transform: scale(2);
+}
+
+input[type=radio] {
+  /* All browsers except webkit*/
+  transform: scale(2);
+
+  /* Webkit browsers*/
+  -webkit-transform: scale(2);
+}
