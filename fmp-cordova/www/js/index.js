@@ -33,7 +33,10 @@ var app = {
     // The scope of 'this' is the event. In order to call the 'receivedEvent'
     // function, we must explicitly call 'app.receivedEvent(...);'
     onDeviceReady: function() {
-        app.receivedEvent('deviceready');
+        // app.receivedEvent('deviceready');
+        console.log("device is ready resuming angular bootstrap");
+        angular.resumeBootstrap();
+
     },
     // Update DOM on a Received Event
     receivedEvent: function(id) {
@@ -49,3 +52,9 @@ var app = {
 };
 
 app.initialize();
+
+$(document).ready(function(){
+    $("#navbar ul li").click(function(){
+        $(".navbar-toggle").click();
+    });
+});

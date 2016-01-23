@@ -1,5 +1,5 @@
 starterServices
-.factory('FmpSync', function($ionicPlatform, $rootScope, $http,
+.factory('FmpSync', function($rootScope, $http,
                              FmpLocalStorage, FmpUtils, FmpIpScanner,
                              FmpSocket){
     var collection = {
