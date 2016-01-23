@@ -322,12 +322,15 @@ var FmpFile = function (spec) {
         ufi.true_score = true_score;
     };
 
-    thisFile.multiSetSkipScore = function(user_ids, by) {
+    thisFile.multiSetSkipScore = function(user_ids, by, voted_to_skip) {
         var file_id = parseInt(thisFile.spec.id),
             timestamp = thisFile.get_timestamp();
         for (var i=0;i<thisFile.spec.user_file_info.length;i++) {
             var ufi = thisFile.spec.user_file_info[i];
-            if(user_ids.indexOf(ufi.user_ids) != -1 && ufi.file_id == file_id) {
+            if(user_ids.indexOf(ufi.user_id) != -1 && ufi.file_id == file_id) {
+                if (typeof voted_to_skip != "undefined") {
+                    voted_to_skip = voted_to_skip;
+                }
                 ufi.skip_score = parseInt(ufi.skip_score) + parseInt(by);
                 ufi.timestamp = timestamp;
                 thisFile.calculateTrueScore(ufi);
@@ -362,10 +365,10 @@ var FmpFile = function (spec) {
         }
     };
     thisFile.inc_score = function(user_ids) {
-        thisFile.multiSetSkipScore(user_ids, 1);
+        thisFile.multiSetSkipScore(user_ids, 1, false);
     };
     thisFile.deinc_score = function(user_ids) {
-        thisFile.multiSetSkipScore(user_ids, -1);
+        thisFile.multiSetSkipScore(user_ids, -1, true);
     };
     thisFile.mark_as_played = function (listener_user_ids, percent_played, now) {
         console.log("Mark as played NAME:", arguments);
@@ -417,8 +420,8 @@ var FmpFile = function (spec) {
             }
         };
 
-        thisFile.multiSetSkipScore(voted_to_skip_user_ids, -2);
-        thisFile.multiSetSkipScore(didnt_vote_to_skip_user_ids, 1);
+        thisFile.multiSetSkipScore(voted_to_skip_user_ids, -2, true);
+        thisFile.multiSetSkipScore(didnt_vote_to_skip_user_ids, 1, false);
 
     };
 

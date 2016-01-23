@@ -55,7 +55,6 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
           playingIdx = i;
           if (skipped) {
             file.spec.skipped = true;
-            // TODO add 'vote to skip'
             file.deinc_score(FmpListeners.collection.listener_user_ids);
           }
           break;
