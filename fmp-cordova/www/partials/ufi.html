@@ -1,0 +1,12 @@
+{{ufi.user.name}}<br>
+Rating:<a class="glyphicon"
+          ng-repeat="(key, rating) in [0,1,2,3,4,5]"
+          ng-class="{
+            'glyphicon-ban-circle': rating==0&&ufi.rating>=0,
+            'glyphicon-star': rating>0&&ufi.rating>=rating&&ufi.rating!=6,
+            'glyphicon-star-empty': (rating>0&&ufi.rating<rating)||ufi.rating==6
+         }"
+         ng-click="ufi.rating=rating;rate(ufi)"></a>
+    <span ng-if="ufi.rating==6" class="glyphicon glyphicon-question-sign"></span><br>
+Score: {{ufi.skip_score}} <a class="glyphicon glyphicon-thumbs-down" ng-click="ufi.skip_score=ufi.skip_score-1;score(ufi);"></a> <a class="glyphicon glyphicon-thumbs-up" ng-click="ufi.skip_score=ufi.skip_score+1;score(ufi);"></a><br>
+True Score: {{(((ufi.rating * 2 * 10) +(ufi.skip_score * 10)) / 2) | number:0}}

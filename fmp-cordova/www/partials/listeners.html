@@ -1,0 +1,29 @@
+<h1>Listeners</h1>
+
+<table class="table table-striped">
+    <tr>
+        <th>Primary</th>
+        <th>Username</th>
+        <th>Secondary</th>
+        <th>Listening</th>
+    </tr>
+    <tr ng-repeat="user in listenersCollection.users">
+        <td><input type="radio"
+                   name="primary_user_id"
+                   ng-model="listenersCollection.primary_user_id"
+                   ng-click="listenersCollection.primary_user_id=user.id;save()"
+                   ng-checked="listenersCollection.primary_user_id==user.id"></td>
+        <td>{{user.name}}</td>
+        <td><input type="checkbox"
+                   name="secondary"
+                   ng-model="user.secondary"
+                   ng-if="listenersCollection.primary_user_id!=user.id"
+                   ng-click="save()"></td>
+        <td><input type="checkbox"
+                   name="listening"
+                   ng-model="user.listening"
+                   ng-if="user.secondary || listenersCollection.primary_user_id==user.id"
+                   ng-click="save()"></td>
+    </tr>
+</table>
+<pre>{{ listenersCollection|json }}</pre>
