@@ -1,5 +1,6 @@
 fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
-                                            FmpPreload, FmpListeners) {
+                                            FmpPreload, FmpListeners,
+                                            FmpUtils) {
     $scope.FmpPlaylistCollection = FmpPlaylist.collection;
     $scope.FmpPreloadCollection = FmpPreload.collection;
     $scope.syncCollections = FmpSync.syncCollections;
@@ -15,4 +16,5 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
 
     $scope.onChange = window.player.onDragChange;
     $scope.onEnd = window.player.onDragEnd;
+    $scope.translate = FmpUtils.formatTime;
 });
