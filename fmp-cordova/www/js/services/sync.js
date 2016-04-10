@@ -119,7 +119,8 @@ fmpApp
         fileList = FmpUtils.sanitize(fileList);
         while(fileList.length>0) {
             var fileData = fileList.shift();
-            if (collection.deleted.indexOf(fileData.id) != -1) {
+            if (collection.deleted.indexOf(fileData.id) != -1 ||
+                collection.deleted.indexOf(parseInt(fileData.id)) != -1) {
                 continue;
             }
             if (collection.played_files.indexOf(fileData.id) != -1) {
@@ -142,7 +143,7 @@ fmpApp
                 }
                 // array.splice(index, 1);
                 if (plfile.played && !plfile.playing) {
-                    console.log("******** DELETING ***");
+                    console.log("******** DELETING ***",plfile);
                     collection.FmpPlaylist.collection.files.splice(idx,1);
                     collection.deleted.push(plfile.id);
                     plfile.delete();
