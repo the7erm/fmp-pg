@@ -13,7 +13,8 @@ fmpApp
             deleted: [],
             lastSyncTime: 0,
             FmpPlaylist: null, // Assigned by FmpConductor
-            FmpPreload: null   // Assigned by FmpConductor
+            FmpPreload: null,   // Assigned by FmpConductor,
+            played_files: []
         },
         methods = {
             collection:collection
@@ -82,9 +83,13 @@ fmpApp
             "needs_synced_files": []
         };
         console.log("3");
+        collection.played_files = [];
         if (collection.FmpPreload.collection.files) {
             for(var i=0;i<collection.FmpPreload.collection.files.length;i++) {
                 var file = collection.FmpPreload.collection.files[i];
+                if (file.played || file.spec.played) {
+                    collection.played_files.push(file.id);
+                }
                 payload.preload_ids.push(file.id);
                 if (file.needsSync) {
                     payload.needs_synced_files.push(file.spec);
@@ -96,6 +101,10 @@ fmpApp
             for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
                 var file = collection.FmpPlaylist.collection.files[i];
                 payload.playlist_ids.push(file.id);
+                if ((file.played || file.spec.played ) &&
+                    collection.played_files.indexOf(file.id) == -1) {
+                    collection.played_files.push(file.id);
+                }
                 if (file.needsSync) {
                     payload.needs_synced_files.push(file.spec);
                 }
@@ -107,19 +116,27 @@ fmpApp
     };
 
     methods.processFileData = function(fileList) {
-        fileList = FmpUtils.sanitize(fileList)
+        fileList = FmpUtils.sanitize(fileList);
         while(fileList.length>0) {
             var fileData = fileList.shift();
             if (collection.deleted.indexOf(fileData.id) != -1) {
                 continue;
             }
-            var idx = FmpUtils.indexOfFile(collection.FmpPlaylist.collection.files, fileData);
+            if (collection.played_files.indexOf(fileData.id) != -1) {
+                fileData.played = true;
+            }
+            var idx = FmpUtils.indexOfFile(collection.FmpPlaylist.collection.files,
+                                           fileData);
             if (idx != -1) {
                 var plfile = collection.FmpPlaylist.collection.files[idx];
+                if (collection.played_files.indexOf(plfile.id) != -1) {
+                    plfile.played = true;
+                }
                 if (plfile.spec.needsSyncedProcessed) {
                     plfile.spec.needsSync = false;
                 }
-                if (!angular.equals(plfile.spec.user_file_info, fileData.user_file_info)) {
+                if (!angular.equals(plfile.spec.user_file_info,
+                                    fileData.user_file_info)) {
                     plfile.spec.user_file_info = fileData.user_file_info;
                     plfile.dirty = true;
                 }
@@ -135,6 +152,9 @@ fmpApp
 
             console.log("processFileData");
             var file = new FmpFile(fileData);
+            if (collection.played_files.indexOf(file.id) != -1) {
+                file.played = true;
+            }
             file.$rootScope = $rootScope;
             file.$timeout = $timeout;
             // Put it in a timeout so the file will download in the right order.

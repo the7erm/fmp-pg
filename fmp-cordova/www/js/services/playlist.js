@@ -1,12 +1,14 @@
 fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
-                                       FmpSync){
+                                       FmpSync, FmpPreload){
   var collection = {
         files: [],
         lastSave: 0,
         lastAction: 0,
         "sync": {},
         FmpSync: FmpSync,
-        lastSyncTime: 0
+        lastSyncTime: 0,
+        organizeLock:false,
+        saveLock: false
       },
       methods = {
         collection: collection
@@ -35,6 +37,10 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     methods.save = function() {
+      if (collection.saveLock) {
+        return;
+      }
+      collection.saveLock = true;
       var files = [];
       for (var i=0;i<collection.files.length;i++) {
         var file = collection.files[i];
@@ -42,6 +48,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
         files.push("file-"+file.file_id);
       }
       localStorage.playlist = JSON.stringify(files);
+      collection.saveLock = false;
     };
 
     methods.incTrack = function(by, skipped, user_ids) {
@@ -87,19 +94,51 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     methods.organize = function() {
-      var newOrder = [],
+      if (collection.organizeLock) {
+        return;
+      }
+      collection.organizeLock = true;
+      var files = [],
+          newOrder = [],
           playedFiles = [],
           unplayedFiles = [],
           playingFile = null,
           groupedByUsers = {};
 
+      for (var i=0;i<FmpPreload.collection.files.length;i++) {
+          var file = FmpPreload.collection.files[i];
+          console.log("file:", file);
+          files.push(file);
+      }
       for (var i=0;i<collection.files.length;i++) {
-        var file = collection.files[i],
-            user_id = file.spec.cued.user_id;
+          var file = collection.files[i];
+          files.push(file);
+      }
+      FmpPreload.collection.files = [];
+      for (var i=0;i<files.length;i++) {
+        var file = files[i];
+        if (!file) {
+          console.log("FILE IS NULL!");
+          continue;
+        }
+        if (!file.spec) {
+          console.log("!file.spec", file);
+          continue;
+        }
+        if (file.spec.cued) {
+          var user_id = file.spec.cued.user_id;
+        }
+
+
         if (typeof groupedByUsers[user_id] == "undefined"){
           groupedByUsers[user_id] = [];
         }
-        groupedByUsers[user_id].push(file);
+        if (!user_id || FmpListeners.collection.listener_user_ids.indexOf(user_id) != -1) {
+            groupedByUsers[user_id].push(file);
+        } else {
+            FmpPreload.collection.files.push(file);
+            console.log("fallback push:", file.id);
+        }
       }
       var hasFiles = true;
       while(hasFiles) {
@@ -111,11 +150,12 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
           }
           hasFiles = true;
           var file = files.shift();
-          if (file.played) {
-            if (file.playing) {
+          if (file.played || file.spec.played) {
+            if (file.playing || file.spec.playing) {
               playingFile = file;
             } else {
               playedFiles.push(file);
+              console.log("PLAYED:", file.id);
             }
           } else {
             unplayedFiles.push(file);
@@ -135,6 +175,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
         newOrder.push(unplayedFiles[i]);
       }
       collection.files = newOrder;
+      collection.organizeLock = false;
     };
 
     methods.rate = function(ufi) {

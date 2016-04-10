@@ -852,6 +852,15 @@ var fmpApp = angular.module('fmpApp', [
       }
       return null;
     }
+
+    $http({
+        method: 'GET',
+        url: "/ip_addresses"
+    }).then(function(response){
+        $scope.ip_addresses = response.data.ip_addresses;
+        $scope.port = response.data.port;
+    });
+
     $scope.addUser = function(newUser) {
       console.log("newUser:", newUser);
       for(var i=0;i<$scope.listeners.length; i++) {

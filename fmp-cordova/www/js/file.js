@@ -690,6 +690,7 @@ var Player = function() {
                 - state changed fired
                 - completed called
             */
+
         };
         if (thisPlayer.file) {
             thisPlayer.file.playing = false;
@@ -750,19 +751,100 @@ var Player = function() {
         thisPlayer.waitForRelease();
     };
 
+    thisPlayer.setMusicControls = function() {
+        // MusicControls.destroy(function(){}, function(){});
+        var isPlaying = false;
+        if (thisPlayer.realState == "PLAYING") {
+            isPlaying = true;
+        }
+        MusicControls.create({
+            track       : thisPlayer.file.get_title(),        // optional, default : ''
+            artist      : thisPlayer.file.get_artist(),       // optional, default : ''
+            // cover       : 'albums/absolution.jpg',      // optional, default : nothing
+            // cover can be a local path (use fullpath 'file:///storage/emulated/...', or only 'my_image.jpg' if my_image.jpg is in the www folder of your app)
+            //           or a remote url ('http://...', 'https://...', 'ftp://...')
+            isPlaying   : isPlaying,  // optional, default : true
+            dismissable : false,                         // optional, default : false
+
+            // hide previous/next/close buttons:
+            hasPrev   : true,      // show previous button, optional, default: true
+            hasNext   : true,      // show next button, optional, default: true
+            hasClose  : false,       // show close button, optional, default: false
+
+            // Android only, optional
+            // text displayed in the status bar when the notification (and the ticker) are updated
+            ticker    : 'Now playing '+thisPlayer.file.get_artist_title()
+        }, function(){
+
+        }, function() {
+
+        });
+
+        function events(action) {
+            switch(action) {
+                case 'music-controls-next':
+                    // Do something
+                    thisPlayer.next();
+                    thisPlayer.setMusicControls();
+                    break;
+                case 'music-controls-previous':
+                    // Do something
+                    thisPlayer.prev();
+                    thisPlayer.setMusicControls();
+                    break;
+                case 'music-controls-pause':
+                    // Do something
+                    thisPlayer.pause();
+                    break;
+                case 'music-controls-play':
+                    // Do something
+                    thisPlayer.pause();
+                    break;
+                case 'music-controls-destroy':
+                    // Do something
+                    break;
+
+                // Headset events (Android only)
+                case 'music-controls-media-button' :
+                    // Do something
+                    thisPlayer.pause();
+                    break;
+                case 'music-controls-headset-unplugged':
+                    // Do something
+                    break;
+                case 'music-controls-headset-plugged':
+                    // Do something
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Register callback
+        MusicControls.subscribe(events);
+
+        // Start listening for events
+        // The plugin will run the events function each time an event is fired
+        MusicControls.listen();
+    }
+
     thisPlayer.play = function(file) {
         if (typeof file == 'undefined' || !file ||
             (thisPlayer.file && thisPlayer.file.id == file.id)) {
             thisPlayer.pause();
+            thisPlayer.setMusicControls();
             return;
         }
         thisPlayer.prepare(file);
+        thisPlayer.setMusicControls();
     };
     thisPlayer.pause = function() {
         console.log("PAUSE");
+
         if (!thisPlayer.media) {
             return;
         }
+
         if (thisPlayer.state != "PLAYING") {
             thisPlayer.media.play();
             thisPlayer.state = "PLAYING";
@@ -770,6 +852,7 @@ var Player = function() {
             thisPlayer.media.pause();
             thisPlayer.state = "PAUSED";
         }
+        thisPlayer.setMusicControls();
     };
     thisPlayer.get_state = function() {
         return thisPlayer.realState;

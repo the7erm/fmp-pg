@@ -21,6 +21,24 @@ files_to_scan = []
 
 print("Getting files/folders list")
 for arg in sys.argv[1:]:
+
+    if arg in ("-folders", "--folders"):
+        root_folders = []
+        with session_scope() as session:
+            for result in session.query(Location.dirname)\
+                                  .distinct()\
+                                  .order_by(Location.dirname):
+                found = False
+                for root in root_folders:
+                    if result.dirname.startswith(root):
+                        found = True
+                        break
+                if not found:
+                    print ("adding root folder:", result.dirname)
+                    root_folders.append(result.dirname)
+                    if result.dirname not in dirs_to_scan:
+                        dirs_to_scan.append(result.dirname)
+
     realpath = os.path.realpath(
         os.path.expanduser(arg)
     )

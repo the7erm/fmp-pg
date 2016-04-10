@@ -9,9 +9,6 @@ fmpApp
         collection: collection
       };
 
-  if (typeof localStorage.preloadFiles != 'undefined') {
-    collection.files = JSON.parse(localStorage.preloadFiles);
-  }
 
   methods.fileInPreload = function(file) {
     if (FmpUtils.isEmpty(collection.files)) {
@@ -37,9 +34,38 @@ fmpApp
     collection.files = [];
   }
 
-  methods.save = function() {
-    localStorage.preloadFiles = JSON.stringify(collection.files);
+  methods.load = function() {
+    collection.files = [];
+    if (typeof localStorage["preload"] == "undefined" ||
+        !localStorage["preload"]) {
+      return;
+    }
+    var files = JSON.parse(localStorage["preload"]);
+    for (var i=0;i<files.length;i++) {
+      var key = files[i];
+      if (typeof localStorage[key] == "undefined") {
+        // the file doesn't exist.
+        continue;
+      }
+      var file = new FmpFile(key);
+      collection.files.push(file);
+    }
   };
+
+  methods.save = function() {
+    var files = [];
+    for (var i=0;i<collection.files.length;i++) {
+      var file = collection.files[i];
+      file.save();
+      files.push("file-"+file.file_id);
+    }
+    localStorage.preload = JSON.stringify(files);
+  };
+
+  if (typeof localStorage.preload != 'undefined') {
+    methods.load();
+  }
+
 
   return methods;
 });

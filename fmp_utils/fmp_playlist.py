@@ -8,6 +8,55 @@ from fmp_utils.db_session import Session, session_scope
 from fmp_utils.misc import session_add
 from fmp_utils.constants import CONFIG_DIR
 import os
+import sys
+from subprocess import check_output
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import GObject
+
+GObject.threads_init()
+class HostnameTracker:
+    def __init__(self):
+        self.ip_address_file = os.path.join(sys.path[0], "ip_addresses.py")
+        GObject.timeout_add_seconds(30, self.check_host)
+        self.check_host()
+
+    def check_host(self):
+        print("CHECK HOST")
+        file_ip_data = self.read_ip_address_file()
+        current_ip_data = self.format_ip_data(check_output(["hostname","-I"]))
+        print ("self.ip_address_file:",self.ip_address_file)
+
+        if not os.path.exists(self.ip_address_file) or \
+           file_ip_data != current_ip_data:
+            self.write_ip_address_file(current_ip_data)
+        return True
+
+    def format_ip_data(self, ip_data):
+        ip_data = ip_data.decode("utf8")
+        ip_data = ip_data.strip()
+        if '"' in ip_data:
+            return ""
+
+        ips = ip_data.split(" ")
+        return "IP_ADDRESSES = %s\n" % ips
+
+    def write_ip_address_file(self, ip_data):
+        with open(self.ip_address_file, 'w') as fp:
+            fp.write(ip_data)
+
+    def read_ip_address_file(self):
+        if not os.path.exists(self.ip_address_file):
+            return ""
+
+        with open(self.ip_address_file, 'r') as fp:
+            file_ip_data = fp.read()
+        return file_ip_data
+
+host_tracker = HostnameTracker()
+
+import ip_addresses
+
 
 class FmpActionTracker(ActionTracker):
     __name__ = "FmpActionTracker"
@@ -64,6 +113,7 @@ class FmpPlaylist(Playlist):
         self.skip_countdown = 5
         self.server = kwargs.get('server')
         self.server.playlist = self
+        self.server.IP_ADDRESSES = ip_addresses.IP_ADDRESSES
         self.server.picker = picker
         self.files = []
         self.preload = []

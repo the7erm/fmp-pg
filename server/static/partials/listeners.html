@@ -16,6 +16,12 @@
     </div> -->
     <a ng-click="addUser(newUser)" class="btn btn-default">Add</a>
 </form>
+This server can be reached with the following urls:
+<div class="table-responsive">
+    <table class="table table-hover table-striped">
+        <tr ng-repeat="(key, ip) in ip_addresses"><td><a href="http://{{ip}}:{{port}}">{{ip}}:{{port}}</a></td></tr>
+    </table>
+</div>
 <hr>
 <div class="table-responsive">
 	<table class="table table-hover table-striped">

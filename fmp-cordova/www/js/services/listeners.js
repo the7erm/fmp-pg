@@ -29,7 +29,8 @@ fmpApp
                 ],
                 "strings": [],
                 "floats": []
-            }
+            },
+            "ip_addresses": []
         },
         methods = {
             "collection": collection
@@ -58,6 +59,13 @@ fmpApp
             // return;
         }
         collection.fetchLock = true;
+
+        $http({
+            method: 'GET',
+            url: FmpConfig.url+"ip_addresses"
+        }).then(function(response) {
+            collection.ip_addresses = response.ip_addresses;
+        });
 
         $http({
             method: 'GET',

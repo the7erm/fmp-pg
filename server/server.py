@@ -142,6 +142,7 @@ class ChatWebSocketHandler(WebSocket):
                 dbInfo = session.query(File)\
                                 .filter(File.id==needs_synced.get("id"))\
                                 .first()
+                session_add(session, dbInfo)
 
                 for ns_ufi in needs_synced.get("user_file_info",[]):
                     print("needs_synced:", pformat(needs_synced))
@@ -154,7 +155,7 @@ class ChatWebSocketHandler(WebSocket):
                                     .first()
                     session_add(session, db_ufi)
 
-                    if not db_ufi.timestamp or db_ufi.timestamp < ns_ufi['timestamp']:
+                    if not db_ufi.timestamp or int(db_ufi.timestamp) < int(ns_ufi.get("timestamp", 0)):
                         sync_keys = ["time_played", "rating", "skip_score",
                                      "true_score", "voted_to_skip",
                                      "timestamp"]
@@ -164,8 +165,13 @@ class ChatWebSocketHandler(WebSocket):
                                 continue
                             if k == "voted_to_skip":
                                 value = to_bool(value)
+                            if k in("timestamp", "time_played") and not value:
+                                continue
+
                             print("set %s to %s" % (k, value))
+                            session_add(session, db_ufi)
                             setattr(db_ufi, k, value)
+                        session_add(session, db_ufi)
                         db_ufi.calculate_true_score()
                     else:
                         print("db_ufi.timestamp > ns_ufi['timestamp']")
@@ -179,7 +185,9 @@ class ChatWebSocketHandler(WebSocket):
                         "percent_played": needs_synced.get("percent_played", 0),
                         "now": needs_synced.get("time_played", 0)
                     }
+                    session_add(session, dbInfo)
                     dbInfo.mark_as_played(**kwargs)
+                    session_add(session, dbInfo)
                 json_broadcast({"playlist-item": dbInfo.json(user_ids=user_ids),
                                 "transaction_id": transaction_id,
                                 "needsSyncedProcessed": True})
@@ -800,6 +808,12 @@ class FmpServer(object):
     def listeners(self, *args, **kwargs):
         results = get_all_users()
         return json_dumps(results)
+
+    @cherrypy.expose
+    def ip_addresses(self, *args, **kwargs):
+        local = cherrypy.request.local
+        return json_dumps({"ip_addresses": IP_ADDRESSES,
+                           "port": local.port})
 
     @cherrypy.expose
     def preload(self, *args, **kwargs):
