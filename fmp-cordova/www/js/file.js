@@ -31,6 +31,7 @@ var FmpFile = function (spec) {
             console.log("!saved !dirty:", thisFile.basename);
             return;
         }
+        thisFile.spec["needsSync"] = true;
         console.log("saved dirty:", thisFile.basename);
         thisFile.spec.saved = thisFile.timestamp;
         localStorage[key] = JSON.stringify(thisFile.spec);
