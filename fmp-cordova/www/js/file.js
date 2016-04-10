@@ -583,7 +583,7 @@ var FmpFile = function (spec) {
         }
         functionName = "set_"+k;
         if (typeof thisFile[functionName] == "undefined" && typeof thisFile[k] == "undefined") {
-            var funct = "thisFile['"+functionName+"'] = function (value) { thisFile.spec['"+k+"'] = value;  thisFile.needsSync = true; }";
+            var funct = "thisFile['"+functionName+"'] = function (value) { thisFile.spec['"+k+"'] = value;  thisFile.needsSync = true; thisFile.spec.needsSync = true; }";
             var x = function(str){
               eval(str);
             }.call(thisFile, funct);
