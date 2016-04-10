@@ -91,7 +91,7 @@ fmpApp
                     collection.played_files.push(file.id);
                 }
                 payload.preload_ids.push(file.id);
-                if (file.needsSync) {
+                if (file.needsSync || file.spec.needsSync) {
                     payload.needs_synced_files.push(file.spec);
                 }
             }
