@@ -8,53 +8,53 @@
 }
 .yellow-star  {
     background-image: url("/static/images/star.hover.png");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 .red-no  {
     background-image: url("/static/images/no.star.png");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 .grey-no  {
     background-image: url("/static/imagesno.star.grey.png");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 .grey-star  {
     background-image: url("/static/images/star.grey.png");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 .question-mark-on {
     background-image: url("/static/images/question.mark.svg");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 .question-mark-off {
     background-image: url("/static/images/question.mark.grey.svg");
-    background-size: 30px 30px;
+    background-size: 25px 25px;
     background-repeat: no-repeat;
-    min-height: 30px;
-    min-width: 30px;
+    min-height: 25px;
+    min-width: 25px;
 }
 
 body { font-size:2em !important; }
 
 .rating-div {
     padding:5px;
-    margin:5px;
-    font-size:1.80em;
+    margin:0px;
+    font-size:1.50em;
     background: #EEE;
 }
 
@@ -91,7 +91,7 @@ a.search-link:hover {
     text-decoration: none;
 }
 .tree-node-content {
-    padding:30px;
+    padding:25px;
     background: #DDD;
     margin-bottom: 5px;
 }

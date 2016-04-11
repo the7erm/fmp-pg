@@ -21,7 +21,7 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
         console.error("empty sync object:", obj);
         return;
       }
-      if (collection.dataStream) {
+      if (collection.dataStream && navigator.connection.type == "wifi") {
         while (collection.queue.length>0) {
           var msg = collection.queue.shift();
           console.log("SEND queued:", msg);
@@ -91,6 +91,7 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
       if (!collection.hasError) {
         setTimeout(methods.connect, 5000);
       }
+      FmpIpScanner.collection.socketUrl = null;
     }
   };
 

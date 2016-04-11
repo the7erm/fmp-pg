@@ -13,7 +13,7 @@ from ws4py.messaging import TextMessage, BinaryMessage
 
 sys.path.append("../")
 from fmp_utils.db_session import session_scope, Session
-from fmp_utils.misc import to_bool, session_add
+from fmp_utils.misc import to_bool, session_add, to_int
 from fmp_utils.first_run import first_run, check_config
 from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
 from models.base import to_json
@@ -59,7 +59,12 @@ class ChatWebSocketHandler(WebSocket):
             print("json.loads()", pformat(obj))
             self.process_action(obj)
         except Exception as e:
-            print("Exception:", e)
+            print("ChatWebSocketHandler Exception:", e)
+            try:
+                print("ChatWebSocketHandler Exception data:",
+                      message.data.decode("utf-8"))
+            except Exception as e:
+                print("ChatWebSocketHandler ERROR DECODING:", e)
             try:
                 playlist.broadcast_playing()
             except NameError:
@@ -128,8 +133,23 @@ class ChatWebSocketHandler(WebSocket):
             self.process_files(files)
             # collection.sync[today][file_id][elementType][action]
 
-    def process_needs_synced(self, needs_synced_files, transaction_id, user_ids=[]):
+    def process_needs_synced(self, needs_synced_files, transaction_id,
+                             user_ids=[], deleted=[]):
         print("PROCESS NEEDS SYNCED")
+        for file_id in deleted:
+            with session_scope() as session:
+                    needs_marked_as_played = True
+                    session.query(Preload)\
+                           .filter(Preload.file_id==file_id)\
+                           .delete()
+                    session.commit()
+
+                    exists = session.query(Preload)\
+                                    .filter(Preload.file_id==file_id)\
+                                    .first()
+                    print("removed file_id from preload:", file_id)
+                    print("proof:", exists)
+
         for needs_synced in needs_synced_files:
             with session_scope() as session:
                 needs_marked_as_played = False
@@ -138,6 +158,13 @@ class ChatWebSocketHandler(WebSocket):
                     session.query(Preload)\
                            .filter(Preload.file_id==needs_synced['id'])\
                            .delete()
+                    session.commit()
+
+                    exists = session.query(Preload)\
+                                    .filter(Preload.file_id==needs_synced['id'])\
+                                    .first()
+                    print("removed needs_synced['id']", needs_synced['id'])
+                    print("proof:", exists)
 
                 dbInfo = session.query(File)\
                                 .filter(File.id==needs_synced.get("id"))\
@@ -155,7 +182,12 @@ class ChatWebSocketHandler(WebSocket):
                                     .first()
                     session_add(session, db_ufi)
 
-                    if not db_ufi.timestamp or int(db_ufi.timestamp) < int(ns_ufi.get("timestamp", 0)):
+                    db_ufi_timestamp = to_int(db_ufi.timestamp)
+                    ns_ufi_timestamp = to_int(ns_ufi.get("timestamp", 0))
+                    force = True
+
+                    if not db_ufi.timestamp or force or \
+                       db_ufi_timestamp < ns_ufi_timestamp:
                         sync_keys = ["time_played", "rating", "skip_score",
                                      "true_score", "voted_to_skip",
                                      "timestamp"]
@@ -183,11 +215,16 @@ class ChatWebSocketHandler(WebSocket):
                     kwargs = {
                         "user_ids": needs_synced.get("listener_user_ids", user_ids),
                         "percent_played": needs_synced.get("percent_played", 0),
-                        "now": needs_synced.get("time_played", 0)
+                        "now": needs_synced.get("time_played", 0),
+                        "force": True
                     }
                     session_add(session, dbInfo)
-                    dbInfo.mark_as_played(**kwargs)
+                    try:
+                        dbInfo.mark_as_played(**kwargs)
+                    except Exception as e:
+                        print("dbInfo.mark_as_played Exception:", e)
                     session_add(session, dbInfo)
+                print("MADE IT TO THE END")
                 json_broadcast({"playlist-item": dbInfo.json(user_ids=user_ids),
                                 "transaction_id": transaction_id,
                                 "needsSyncedProcessed": True})
@@ -211,7 +248,13 @@ class ChatWebSocketHandler(WebSocket):
         user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
         user_ids = list(set(user_ids))
 
-        self.process_needs_synced(needs_synced_files, transaction_id, user_ids)
+        deleted = payload.get("deleted", [])
+
+        try:
+            self.process_needs_synced(needs_synced_files, transaction_id,
+                                      user_ids, deleted)
+        except Exception as e:
+            print ("self.process_needs_synced Exception:", e)
 
         try:
             self.send_playlist_data(transaction_id, playlist_ids, user_ids)

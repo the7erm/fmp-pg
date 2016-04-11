@@ -3,6 +3,7 @@
 <button class="btn btn-default" ng-click="organize()">organize</button>
 <div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <a class="glyphicon glyphicon-remove pull-right" ng-click="trash(item)"></a>
         <button class="btn btn-xs btn-default glyphicon glyphicon-play"
                 ng-click="item.play()"
                 ng-if="player.file.id!=item.id"></button>
@@ -15,6 +16,7 @@
         {{item.spec.cued.reason}}
         <div ng-if="item.playing&&item.duration>-1&&item.position>-1&&item.remaining>-1">
         -{{item.remaining|formatTimer}} {{item.position|formatTimer}}/{{item.duration|formatTimer}}</div>
+
     </div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id">
         <span ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id)!=-1">

@@ -202,8 +202,8 @@ fmpApp.factory('FmpLocalStorage', function(){
             console.error("Fallback parse worked.");
             collection[colKey] = [val];
           } catch(e) {
-            console.error("");
-            continue
+            console.error("Error with parsing:0", e);
+            continue;
           }
         }
         // This is fallback code to handle old style of list.

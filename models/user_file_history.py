@@ -15,6 +15,7 @@ except SystemError:
     from base import Base, to_json
 
 from fmp_utils.db_session import session_scope
+from fmp_utils.misc import to_int
 from .utils import do_commit
 
 class UserFileHistory(Base):
@@ -36,7 +37,7 @@ class UserFileHistory(Base):
 
     def mark_as_played(self, **kwargs):
         print ("UserFileHistory.mark_as_played()")
-        self.time_played = int(kwargs.get('now', time()))
+        self.time_played = to_int(kwargs.get('now', time()))
         self.percent_played = kwargs.get('percent_played', 0)
         self.date_played = date.fromtimestamp(self.time_played)
         do_commit(self)

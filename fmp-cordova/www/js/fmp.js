@@ -7,6 +7,7 @@ var fmpApp = angular.module('fmpApp', [
 
 fmpApp.filter('formatTimer', function () {
     return function (input) {
+        // console.log("formatTimer:", input);
         var z = function (n) { return (n < 10 ? '0' : '') + n; }
         var seconds = Math.floor(input % 60);
         var minutes = Math.floor((input % 3600) / 60);

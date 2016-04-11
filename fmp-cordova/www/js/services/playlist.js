@@ -214,11 +214,20 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     window.player.timeStatusCb = function(file) {
+      // console.log("window.player.timeStatusCb");
+      // console.log("file.duration:", file.duration, "file.position:", file.position);
       if (file.duration <= 0 || file.position <= 0) {
+        // console.log("return;");
         return;
       }
       var percent_played = (file.position / file.duration) * 100;
+      file.spec.duration = file.duration;
+      file.spec.position = file.position;
       file.mark_as_played(FmpListeners.collection.listener_user_ids, percent_played);
+      file.spec.percent_played = percent_played;
+      // console.log("percent_played:", file.percent_played);
+      collection.playingFile = file;
+      $rootScope.$broadcast("time-status", file);
     }
     window.player.next = methods.next;
     window.player.prev = methods.prev;

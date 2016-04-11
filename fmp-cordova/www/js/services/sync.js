@@ -7,7 +7,8 @@ fmpApp
             transactions: [],
             storeFields: {
                 "objects": [
-                    "payload"
+                    "payload",
+                    "deleted"
                 ]
             },
             deleted: [],
@@ -25,8 +26,15 @@ fmpApp
 
 
     methods.save = function() {
-        methods.cleanPayload();
+        if (collection.deleted.length > 100) {
+            var start = collection.deleted.length - 100;
+            if (start > 0) {
+                collection.deleted = collection.deleted.splice(start);
+            }
+        }
+        // methods.cleanPayload();
         FmpLocalStorage.save(collection);
+        console.log("localStorage.deleted",localStorage.deleted);
     };
 
     methods.onSyncProcessed = function(){
@@ -64,10 +72,9 @@ fmpApp
     methods.syncCollections = function() {
         console.log("sync-collections()");
         console.log("1");
-        if (!FmpSocket.collection.connected) {
+        if (!FmpSocket.collection.connected) {v
             return;
         }
-        collection.deleted = [];
         var transaction_id = Math.random().toString(36).replace(/[^a-z0-9]+/g, '');
         collection.transactionIds.push(transaction_id);
         console.log("2");
@@ -80,7 +87,8 @@ fmpApp
             "secondary_user_ids": collection.FmpListeners.collection.secondary_user_ids,
             "prefetchNum": collection.FmpListeners.collection.prefetchNum,
             "secondaryPrefetchNum": collection.FmpListeners.collection.secondaryPrefetchNum,
-            "needs_synced_files": []
+            "needs_synced_files": [],
+            "deleted": collection.deleted
         };
         console.log("3");
         collection.played_files = [];
@@ -103,7 +111,7 @@ fmpApp
                 payload.playlist_ids.push(file.id);
                 if ((file.played || file.spec.played ) &&
                     collection.played_files.indexOf(file.id) == -1) {
-                    collection.played_files.push(file.id);
+                        collection.played_files.push(file.id);
                 }
                 if (file.needsSync) {
                     payload.needs_synced_files.push(file.spec);
@@ -119,8 +127,10 @@ fmpApp
         fileList = FmpUtils.sanitize(fileList);
         while(fileList.length>0) {
             var fileData = fileList.shift();
+            console.log("fileData:",fileData.id);
             if (collection.deleted.indexOf(fileData.id) != -1 ||
                 collection.deleted.indexOf(parseInt(fileData.id)) != -1) {
+                console.log("Not adding, in deleted files:", fileData.id);
                 continue;
             }
             if (collection.played_files.indexOf(fileData.id) != -1) {
@@ -145,8 +155,12 @@ fmpApp
                 if (plfile.played && !plfile.playing) {
                     console.log("******** DELETING ***",plfile);
                     collection.FmpPlaylist.collection.files.splice(idx,1);
-                    collection.deleted.push(plfile.id);
+                    if (collection.deleted.indexOf(plfile.id) == -1) {
+                        collection.deleted.push(plfile.id);
+                    }
                     plfile.delete();
+                } else {
+                    $timeout(collection.FmpPlaylist.collection.files.download_if_not_exists);
                 }
                 continue;
             }
@@ -164,6 +178,7 @@ fmpApp
             collection.FmpPlaylist.collection.files.push(file);
         }
         collection.FmpPlaylist.save();
+        methods.save();
     };
 
     methods.onPlaylistData = function () {

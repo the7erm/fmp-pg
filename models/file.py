@@ -110,7 +110,9 @@ class File(Base):
             session_add(session, self)
             print("File.mark_as_played()")
             percent_played = kwargs.get('percent_played', 0)
-            if self.percent_played and int(self.percent_played) == int(percent_played):
+            if self.percent_played and not kwargs.get("force", False) and\
+               int(self.percent_played) == int(percent_played):
+                print("not marking as played")
                 return
             self.time_played = int(kwargs.get('now', time()))
             self.percent_played = percent_played
@@ -128,7 +130,10 @@ class File(Base):
             for user in session.query(User).filter(User.listening==True).all():
                 session_add(session, user)
                 kwargs['user'] = user
-                cmd(user.id, **kwargs)
+                try:
+                    cmd(user.id, **kwargs)
+                except Exception as e:
+                    print("iterate_user_ids Exception:", cmd, e)
 
         # The goal here is to make it so files are not marked as played
         # when no one is listening, or inc de_inc score.

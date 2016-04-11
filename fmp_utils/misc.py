@@ -11,9 +11,21 @@ def to_bool(value):
         if value in ('t','true','1','on'):
             return True
         if not value or value in('f', '0', 'false', 'off', 'null',
-                                 'undefined'):
+                                 'undefined', ''):
             return False
     return bool(value)
+
+def to_int(value):
+    if isinstance(value, int):
+        return value
+    if not value:
+        return 0
+    try:
+        value = int(value)
+    except Exception as e:
+        value = 0
+    return value
+
 
 def session_add(session, obj, commit=False, close=False):
     added = False

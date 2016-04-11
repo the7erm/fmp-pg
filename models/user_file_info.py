@@ -8,6 +8,7 @@ from sqlalchemy import ForeignKey, Column, Integer, String, BigInteger,\
                        Float, Date, Boolean
 from sqlalchemy.orm import relationship
 from fmp_utils.db_session import Session, session_scope
+from fmp_utils.misc import to_int
 
 try:
     from .base import Base, to_json
@@ -45,11 +46,11 @@ class UserFileInfo(Base):
             session.add(self)
             print ("UserFileInfo.mark_as_played()")
             pprint(kwargs)
-            self.time_played = int(kwargs.get('now', time()))
+            self.time_played = to_int(kwargs.get('now', time()))
             print("time():", time())
             print("kwargs.now:", kwargs.get("now", time()))
             print("kwargs.percent_played:", kwargs.get("percent_played", 0))
-            self.percent_played = kwargs.get('percent_played', 0)
+            self.percent_played = to_int(kwargs.get('percent_played', 0))
             self.date_played = date.fromtimestamp(self.time_played)
             do_commit(self)
             session.add(self)

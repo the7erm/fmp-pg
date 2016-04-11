@@ -31,8 +31,8 @@ var FmpFile = function (spec) {
             console.log("!saved !dirty:", thisFile.basename);
             return;
         }
-        thisFile.spec["needsSync"] = true;
-        console.log("saved dirty:", thisFile.basename);
+        // thisFile.spec["needsSync"] = true;
+        // console.log("saved dirty:", thisFile.basename);
         thisFile.spec.saved = thisFile.timestamp;
         localStorage[key] = JSON.stringify(thisFile.spec);
         thisFile.dirty = false;
@@ -372,9 +372,14 @@ var FmpFile = function (spec) {
         thisFile.multiSetSkipScore(user_ids, -1, true);
     };
     thisFile.mark_as_played = function (listener_user_ids, percent_played, now) {
-        console.log("Mark as played NAME:", arguments);
+        /*
+        console.log("Mark as played NAME:",
+                    "listener_user_ids:", listener_user_ids,
+                    "percent_played:", percent_played,
+                    "now:", now); */
         percent_played = parseFloat(percent_played);
-        if (percent_played == thisFile.spec.percent_played) {
+        if (percent_played == parseFloat(thisFile.spec.percent_played)) {
+            // console.log("mlp return;");
             return;
         }
         if (typeof now == 'undefined') {
@@ -384,6 +389,7 @@ var FmpFile = function (spec) {
         thisFile.spec["timestamp"] = now;
         thisFile.spec["now"] = now;
         thisFile.spec["percent_played"] = percent_played;
+
         thisFile.spec["needsSync"] = true;
         thisFile.spec['listener_user_ids'] = listener_user_ids;
         thisFile.spec["played"] = true;
@@ -403,7 +409,7 @@ var FmpFile = function (spec) {
             }
         }
         thisFile.dirty = true;
-
+        // console.log("/mark_as_played");
     };
     thisFile.completed = function(listener_user_ids) {
         var voted_to_skip_user_ids = [],
@@ -437,9 +443,13 @@ var FmpFile = function (spec) {
         // TODO Still need to make a downloading class/object that will
         // check.
         console.log("DOWNLOAD:", thisFile.filename);
+        console.log("fmpHost:",window.fmpHost);
+        if (!window.fmpHost) {
+            return;
+        }
         // download(self, file_id, convert=False, extract_audio=False)
         var fileTransfer = new FileTransfer(),
-            source = encodeURI("http://192.168.1.117:5050/download?file_id="+thisFile.file_id),
+            source = encodeURI(window.fmpHost+"download?file_id="+thisFile.file_id),
             target = thisFile.filename+".tmp";
 
         fileTransfer.download(
@@ -523,9 +533,11 @@ var FmpFile = function (spec) {
         window.resolveLocalFileSystemURL(thisFile.filename,
             function(){
                 thisFile.exists = true;
+                console.log("exists:",thisFile.filename);
             },
             function(){
                 thisFile.exists = false;
+                thisFile.download_if_not_exists();
             }
         );
     };
@@ -877,23 +889,29 @@ var Player = function() {
             if (duration > 0) {
                 console.log("duration:", duration);
                 thisPlayer.file.set_spec_value("duration", parseFloat(duration), false);
+                thisPlayer.file.duration = parseFloat(duration);
             }
         }
         thisPlayer.media.getCurrentPosition(
             // success callback
             function (position) {
                 if (thisPlayer.dragging) {
+                    console.log("thisPlayer.dragging return;");
                     return;
                 }
                 position = parseFloat(position);
                 if (position <= -1 || position == thisPlayer.lastPosition) {
+                    console.log("position <= -1 || position == thisPlayer.lastPosition");
                     return;
                 }
                 thisPlayer.lastPosition = position;
-                console.log("position:", position);
+                // console.log("position:", position);
                 var remaining = (thisPlayer.file.duration - position);
-                thisPlayer.file.set_spec_value("position", position, false);
+                thisPlayer.file.position = position;
+                thisPlayer.file.remaining = remaining;
+
                 thisPlayer.file.set_spec_value("remaining", remaining, false);
+                thisPlayer.file.set_spec_value("position", position, false);
                 thisPlayer.timeStatusCb(thisPlayer.file);
                 if (thisPlayer.file.dirty) {
                     thisPlayer.file.save();
