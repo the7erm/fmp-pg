@@ -10,12 +10,16 @@ import configparser
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from ws4py.messaging import TextMessage, BinaryMessage
+from base64 import b64encode
+import threading
 
 sys.path.append("../")
 from fmp_utils.db_session import session_scope, Session
 from fmp_utils.misc import to_bool, session_add, to_int
 from fmp_utils.first_run import first_run, check_config
-from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT
+from fmp_utils.media_tags import MediaTags
+from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT, CONVERT_DIR
+from fmp_utils.jobs import jobs
 from models.base import to_json
 from models.user import User
 from models.file import File
@@ -34,6 +38,7 @@ import subprocess
 from pprint import pprint, pformat
 import shlex
 import re
+import os
 
 hostname = subprocess.check_output(['hostname'])
 hostname = hostname.strip()
@@ -47,6 +52,48 @@ MEDIA_RUNNING = 2
 MEDIA_PLAYING = 2
 MEDIA_PAUSED = 3
 MEDIA_STOPPED = 4
+
+class Converter(object):
+    def __init__(self):
+        self.files = []
+        self.converting = False
+
+    def append(self, src, tmp_dst, dst):
+        self.files.append([src, tmp_dst, dst])
+        self.start()
+
+    def start(self):
+        if self.converting:
+            return
+        self.converting = True
+        t = threading.Thread(target=self.do)
+        t.start()
+
+    def do(self):
+        if len(self.files) == 0:
+            self.converting = False
+            return
+        while len(self.files) > 0:
+            src, tmp_dst, dst = self.files.pop(0) # Grab the first set of files.
+            print ("DOING:",src, "=>", dst)
+            ex = [
+                "avconv", "-y", "-i", src, tmp_dst
+            ]
+            try:
+                output = subprocess.check_output(ex)
+            except Exception as e:
+                print("Conversion Exception:", e)
+                self.do()
+                return
+
+            print ("output:", output)
+            os.rename(tmp_dst, dst)
+
+        self.converting = False
+
+
+converter = Converter()
+
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, message):
@@ -171,8 +218,9 @@ class ChatWebSocketHandler(WebSocket):
                                 .first()
                 session_add(session, dbInfo)
 
+
                 for ns_ufi in needs_synced.get("user_file_info",[]):
-                    print("needs_synced:", pformat(needs_synced))
+                    # print("needs_synced:", pformat(needs_synced))
                     db_ufi = session.query(UserFileInfo)\
                                     .filter(
                                         and_(
@@ -1344,6 +1392,11 @@ class FmpServer(object):
             })
         return folders
 
+    def convert_filename(self, file_id):
+        dst_basename = "%s%s" % (file_id, ".mp3")
+        dst = os.path.join(CONVERT_DIR, dst_basename)
+        return dst;
+
     @cherrypy.expose
     def history(self, file_id):
         results = []
@@ -1362,11 +1415,20 @@ class FmpServer(object):
     def download(self, file_id, convert=False, extract_audio=False):
         location = None
         with session_scope() as session:
+            dst = self.convert_filename(file_id)
+
+            if os.path.exists(dst):
+                return serve_file(dst,
+                                  "application/x-download",
+                                  "attachment")
+
             locations = session.query(Location)\
                                .filter(Location.file_id==file_id)\
                                .all()
             if not locations:
                 raise cherrypy.NotFound()
+
+
 
             for loc in locations:
                 session.add(loc)
@@ -1422,6 +1484,269 @@ class FmpServer(object):
                     "now": item.get('timestamp_UTC', time()),
                     "percent_played": percent_played
                 })
+
+    def convert(self, id=None, locations=[], to=".mp3", unique=True,
+                *args, **kwargs):
+        # convert
+        print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
+        if not to.startswith("."):
+            to = ".%s" % to
+        dst = self.convert_filename(id)
+        if os.path.exists(dst):
+            print("EXISTS:", dst)
+            return
+        src = None
+        base = None
+        ext = None
+
+        for l in locations:
+            src = os.path.join(l['dirname'], l['basename'])
+            if os.path.exists(src):
+                print ("location:",l)
+                base, ext = os.path.splitext(l['basename'])
+                print("base:%s ext:%s" % (base, ext))
+                break
+
+        if src is None:
+            print("NO SRC:", dst)
+            return
+        ### avconv -i "$FILENAME" -c:a copy -vn -sn "$FILENAME.m4a"
+
+        tmp_dst = "%s.%s.mp3" % (dst, ext)
+
+        converter.append(src, tmp_dst, dst)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def preloadSync(self, *args, **kwargs):
+        post_data = cherrypy.request.json
+        # print("newSync:", args, kwargs)
+        # print("post_data:", post_data)
+        result = []
+
+        listener_user_ids = post_data.get('listener_user_ids',[])
+        primary_user_id = int(post_data.get('primary_user_id'))
+        secondary_user_ids = post_data.get('secondary_user_ids', [])
+
+        prefetchNum = 50
+        secondaryPrefetchNum = 10
+        primary_user_id = int(primary_user_id)
+        listener_user_ids = listener_user_ids + [primary_user_id]
+        listener_user_ids = list(set(listener_user_ids))
+        user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
+        user_ids = list(set(user_ids))
+        user_ids = [int(x) for x in user_ids]
+
+        print("PRIMARY USER ID:",primary_user_id)
+
+        sql = """SELECT f.*, l.basename
+                 FROM files f,
+                      preload p,
+                      locations l
+                 WHERE user_id IN (%s) AND
+                       f.id = p.file_id AND
+                       l.file_id = f.id
+                 ORDER BY p.from_search DESC, p.id ASC;""" % ",".join(
+                    str(x) for x in user_ids)
+
+        group_by_user = {}
+        with session_scope() as session:
+            # Check the preload and make sure all the users have files
+            # up to their minimums ready.
+            preloaded = picker.get_preload(
+                user_ids=user_ids,
+                remove_item=False,
+                primary_user_id=primary_user_id,
+                prefetch_num=prefetchNum,
+                secondary_prefetch_num=secondaryPrefetchNum
+            )
+
+            for p in preloaded:
+                session_add(session, p)
+
+            # TODO wait
+
+            # 1. Select prefetchNum files for primary_user_id
+            # 2. Select secondaryPrefetchNum for secondary_user_ids
+            files = session.query(File)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+            already_added = []
+
+            for f in files:
+                user_id = 0
+                session_add(session, f)
+                filename = f.filename
+                print("f.filename:",f.filename)
+                if not filename.lower().endswith(".mp3"):
+                    session_add(session, f)
+                    _id = f.id
+                    dst = self.convert_filename(_id)
+                    if not os.path.exists(dst):
+                        locations = []
+                        for l in f.locations:
+                            session_add(session, l)
+                            locations.append(l.json())
+
+                        jobs.append(cmd=self.convert,
+                                    id=_id,
+                                    locations=locations,
+                                    to='.mp3',
+                                    unique=True)
+
+                        continue # for f in files:
+                if f.cued:
+                    user_id = f.cued['user_id']
+                if not group_by_user.get(user_id):
+                    group_by_user[user_id] = []
+                if user_id != primary_user_id:
+                    if len(group_by_user[user_id]) >= secondaryPrefetchNum:
+                        # skip because we've fetched enough.
+                        continue
+                elif user_id == primary_user_id:
+                    if len(group_by_user[user_id]) >= prefetchNum:
+                        # skip because we've fetched enough.
+                        continue
+
+                # Group the files by their user_id.
+                session_add(session, f)
+                item = f.json(user_ids=user_ids, get_image=False)
+                if item['id'] not in already_added:
+                    group_by_user[user_id].append(item)
+                    already_added.append(item['id'])
+
+        file_found = True
+        result = []
+        while file_found:
+            file_found = False
+            for user_id in group_by_user:
+                if len(group_by_user[user_id]) > 0:
+                    item = group_by_user[user_id].pop()
+                    file_found = True
+                    result.append(item)
+
+        return {"STATUS": "OK",
+                "preload": result}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def fileSync(self, *args, **kwargs):
+        post_data = cherrypy.request.json
+        # print("newSync:", args, kwargs)
+        # print("post_data:", post_data)
+        result = {}
+        user_ids = []
+        for user in post_data.get('user_file_info',[]):
+            user_ids.append(user.get('user_id'))
+
+        # print("post_data:",pformat(post_data))
+
+        with session_scope() as session:
+            file_id = post_data.get("id")
+            dbInfo = session.query(File)\
+                            .filter(File.id==file_id)\
+                            .first()
+            if not dbInfo:
+                return {"STATUS": "ERROR",
+                        "result": result,
+                        "ERROR": "No dbInfo for file_id: %s" % file_id}
+
+            if post_data.get("played", False):
+                session.query(Preload)\
+                               .filter(Preload.file_id==file_id)\
+                               .delete()
+                session.commit()
+
+                exists = session.query(Preload)\
+                                .filter(Preload.file_id==file_id)\
+                                .first()
+                print("removed file_id from preload:", file_id)
+                print("proof:", exists)
+
+            session.add(dbInfo)
+
+            post_data_timestamp = to_int(post_data.get('timestamp', 0))
+            dbInfo_timestamp = to_int(dbInfo.timestamp)
+
+            if post_data_timestamp > dbInfo_timestamp:
+                mark_as_played_kwargs = {
+                    "user_ids": user_ids,
+                    "percent_played": to_int(post_data.get('percent_played', 0)),
+                    "now": to_int(post_data.get('now', 0)),
+                    "force": True
+                }
+
+                try:
+                    dbInfo.mark_as_played(**mark_as_played_kwargs)
+                except Exception as e:
+                    print("dbInfo.mark_as_played Exception:", e)
+                session_add(session, dbInfo)
+                session.commit()
+
+                for ns_ufi in post_data.get("user_file_info",[]):
+                    print("ns_ufi:", pformat(ns_ufi))
+                    db_ufi = session.query(UserFileInfo)\
+                                    .filter(
+                                        and_(
+                                            UserFileInfo.file_id==ns_ufi['file_id'],
+                                            UserFileInfo.user_id==ns_ufi['user_id']
+                                        ))\
+                                    .first()
+                    session_add(session, db_ufi)
+
+                    db_ufi_timestamp = to_int(db_ufi.timestamp)
+                    ns_ufi_timestamp = to_int(ns_ufi.get("timestamp", 0))
+                    force = False
+
+                    print("db_ufi_timestamp:",db_ufi_timestamp)
+                    print("ns_ufi_timestamp:",ns_ufi_timestamp)
+
+                    if not db_ufi.timestamp or force or \
+                       db_ufi_timestamp <= (ns_ufi_timestamp + 10):
+                        sync_keys = ["time_played", "rating", "skip_score",
+                                     "true_score", "voted_to_skip",
+                                     "timestamp"]
+                        for k in sync_keys:
+                            value = ns_ufi.get(k)
+                            if value is None:
+                                continue
+                            if k == "voted_to_skip":
+                                value = to_bool(value)
+                            if k in("timestamp", "time_played") and not value:
+                                continue
+
+                            print("set %s => %s" % (k, value))
+                            session_add(session, db_ufi)
+                            setattr(db_ufi, k, value)
+                        session_add(session, db_ufi)
+                        db_ufi.calculate_true_score()
+                    else:
+                        print("db_ufi.timestamp > ns_ufi['timestamp']")
+                        print(db_ufi.timestamp, ns_ufi['timestamp'])
+                    session.commit()
+
+            elif dbInfo_timestamp > post_data_timestamp:
+                print("dbInfo_timestamp > post_data_timestamp")
+
+            session.commit()
+
+            dbInfo = session.query(File)\
+                            .filter(File.id==file_id)\
+                            .first()
+
+            session.add(dbInfo)
+
+            result = dbInfo.json(history=True, user_ids=user_ids,
+                                 get_image=False)
+
+            # print("dbInfo:", result)
+
+
+        return {"STATUS": "OK",
+                "result": result};
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
@@ -1558,12 +1883,18 @@ def json_dumps(obj):
     return json.dumps(obj).encode("utf8")
 
 def JsonTextMessage(data):
+    """
+    if isinstance(data,dict):
+        print("data:",)
+        pprint(data)
+    """
     return TextMessage(json.dumps(data))
 
 def broadcast_jobs():
     json_broadcast({'jobs': job_data})
 
 def json_broadcast(data):
+    # print("json_broadcast:", data)
     cherrypy.engine.publish('websocket-broadcast', JsonTextMessage(data))
 
 def broadcast(data):

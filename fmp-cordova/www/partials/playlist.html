@@ -39,6 +39,10 @@
         </div>
     </div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+    <span class="badge" ng-if="item.played">played</span>
+    <span class="badge" ng-if="item.skipped">skipped</span>
+    <span class="badge" ng-if="item.needsSync"><a ng-click="syncFile(item)">needs sync</a></span>
+    <span class="badge" ng-if="item.playing">playing</span>
     <hr>
     </div>
 </div>

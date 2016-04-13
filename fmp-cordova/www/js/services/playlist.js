@@ -51,18 +51,35 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       collection.saveLock = false;
     };
 
-    methods.incTrack = function(by, skipped, user_ids) {
+    methods.incTrack = function(by, incScore, user_ids) {
+      if (typeof by == 'undefined') {
+        by = 1;
+      }
+      if (typeof incScore == 'undefined') {
+        incScore = 0;
+      }
+      if (typeof user_ids == 'undefined') {
+        user_ids = [];
+      }
       if (!collection.files || collection.files.length == 0) {
         return;
       }
-      var playingIdx = -1;
+      var playingIdx = -1,
+          prevIdx = -1;
       for (var i=0;i<collection.files.length;i++) {
         var file = collection.files[i];
         if (file.playing) {
           playingIdx = i;
-          if (skipped) {
+          prevIdx = i;
+          if (incScore == -1) {
             file.spec.skipped = true;
             file.deinc_score(FmpListeners.collection.listener_user_ids);
+            file.save();
+          }
+          if (incScore == 1) {
+            file.spec.skipped = false;
+            file.inc_score(FmpListeners.collection.listener_user_ids);
+            file.save();
           }
           break;
         }
@@ -74,6 +91,14 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       if (playingIdx > collection.files.length) {
         playingIdx = 0;
       }
+
+      if (prevIdx != playingIdx && prevIdx != -1 &&
+          typeof collection.files[prevIdx] != 'undefined') {
+            var file = collection.files[prevIdx];
+            file.playing = false;
+            file.save();
+      }
+
       for (var i=0;i<collection.files.length;i++) {
         if (i == playingIdx) {
           var file = collection.files[i];
@@ -85,12 +110,12 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
 
     methods.next = function() {
       console.log("PLAYLIST NEXT");
-      methods.incTrack(1, true, []);
+      methods.incTrack(1, -1, []);
     };
 
     methods.prev = function() {
       console.log("PLAYLIST PREV");
-      methods.incTrack(-1, false);
+      methods.incTrack(-1, 0, []);
     };
 
     methods.organize = function() {
@@ -206,11 +231,11 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
 
     window.player.completeCb = function(file) {
       console.log("PLAYLIST COMPLETED CB:", file.basename);
-      methods.incTrack(1, false);
+      methods.incTrack(1, 1, []);
     };
     window.player.errorCb = function(file) {
       console.error("PLAYLIST ERROR CB:", file.basename);
-      methods.incTrack(1, false);
+      methods.incTrack(1, 0, []);
     };
 
     window.player.timeStatusCb = function(file) {

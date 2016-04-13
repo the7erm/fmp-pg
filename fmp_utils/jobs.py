@@ -22,7 +22,7 @@ class Jobs():
         self.job_lock = True
         end_time = time() + 0.5
 
-        print("end_time:", end_time, 'time:', time())
+        # print("end_time:", end_time, 'time:', time())
         self.run_picker_jobs(end_time)
 
         while self.high:
@@ -47,7 +47,7 @@ class Jobs():
                 return
 
         self.job_lock = False
-        print ("jobs complete")
+        # print ("jobs complete")
 
     def run_picker_jobs(self, end_time):
 

@@ -36,7 +36,7 @@ var app = {
         // app.receivedEvent('deviceready');
         console.log("device is ready resuming angular bootstrap");
         angular.resumeBootstrap();
-
+        // listDir(cordova.file.externalDataDirectory, initalizeLocalStorageProxy);
     },
     // Update DOM on a Received Event
     receivedEvent: function(id) {

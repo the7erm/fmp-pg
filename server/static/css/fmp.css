@@ -185,3 +185,9 @@ dl.sub-diagnostic dd {
 .connected_db {
   font-weight: bold;
 }
+
+.item-img {
+  height:105px;
+  width:auto;
+  padding-right:6px;
+}

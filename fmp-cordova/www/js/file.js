@@ -3,6 +3,126 @@ window.transactionId = function() {
     return Math.random().toString(36).replace(/[^a-z0-9]+/g, '')+"-"+(Date.now() / 1000);
 }
 
+window.Logger = function(name, debug) {
+    if (typeof debug == "undefined") {
+        debug = false;
+    }
+    var thisLogger = this;
+    thisLogger.name = name;
+    thisLogger.debug = debug;
+
+    thisLogger.log = function() {
+        if (!thisLogger.debug) {
+          return;
+        }
+        var args = [
+          thisLogger.name+" -"
+        ];
+        for (var i=0;i<arguments.length;i++) {
+          args.push(arguments[i]);
+        }
+        (function() {
+          "use strict";
+          console.log.apply(console, args);
+        }());
+    };
+
+    thisLogger.error = function() {
+        var args = [
+          thisLogger.name+" -"
+        ];
+        for (var i=0;i<arguments.length;i++) {
+          args.push(arguments[i]);
+        }
+        (function() {
+          "use strict";
+          console.error.apply(console, args);
+        }());
+    };
+};
+
+var listDir = function (path, successCb, errorCb){
+    if (typeof successCb == 'undefined') {
+      successCb = function(entries) {
+        console.log("listDir successCb:", entries);
+      };
+    }
+    if (typeof errorCb == 'undefined') {
+      errorCb = function(err) {
+          console.log("listDir errorCb:", err);
+      };
+    }
+    /* listDir stolen from
+       https://github.com/driftyco/ng-cordova/issues/697#issuecomment-136957324 */
+    window.resolveLocalFileSystemURL(path,
+      function (fileSystem) {
+        var reader = fileSystem.createReader();
+        reader.readEntries(successCb, errorCb);
+      },
+      errorCb);
+};
+
+var proxyWriters = {};
+
+var ProxyWriter = function(name) {
+    var thisWriter = this;
+    thisWriter.name = name;
+    thisWriter.logger = new Logger("ProxyWriter - "+name, true);
+    // angular.equals(purple, drank)
+
+    thisWriter.write = function(value) {
+        /*insert or replace into Book (ID, Name, TypeID, Level, Seen) values (
+   (select ID from Book where Name = "SearchName"),
+   "SearchName",
+    5,
+    6,
+    (select Seen from Book where Name = "SearchName"));*/
+        db.transaction('')
+    };
+
+}
+
+var proxyWriter = function (name, value) {
+    var writer = null;
+    if (typeof proxyWriters[name] == "undefined") {
+        proxyWriters[name] = new ProxyWriter(name);
+    }
+    writer = proxyWriters[name];
+    writer.write(value);
+}
+
+var proxyReader = function(name, value) {
+
+};
+
+var proxyLogger = new Logger("proxyLogger", true);
+
+var localStorageProxy = new Proxy({}, {
+    get: function(target, name) {
+        if (!(name in target)) {
+            return undefined;
+        }
+        return target[name];
+    },
+    set: function(target, name, value) {
+        target[name] = value;
+        proxyWriter(name, value);
+    }
+});
+
+var initalizeLocalStorageProxy = function(entries) {
+    var patt = new RegExp("$.storage");
+    for (var i=0;i<entries.length;i++) {
+        var entry = entries[i];
+        proxyLogger.log("entry:", entry);
+        if (!patt.test(entry.name)) {
+            proxyLogger.log("!process");
+            continue;
+        }
+
+    }
+};
+
 var FmpFile = function (spec) {
     var thisFile = this;
     thisFile.dirty = false;
@@ -14,12 +134,28 @@ var FmpFile = function (spec) {
     thisFile.exists = null;
     thisFile.$rootScope = null;
     thisFile.$timeout = null;
+    thisFile.removeIfPlayed = false;
+
+    var logger = new Logger("FmpFile", false);
+
     thisFile.load = function(key) {
         if (typeof localStorage[key] == "undefined" || !localStorage[key]) {
             thisFile.spec = {};
             return;
         }
         thisFile.spec = JSON.parse(localStorage[key]);
+        if (typeof thisFile.spec.image != 'undefined') {
+            // var img = thisFile.spec.image;
+            delete thisFile.spec.image;
+            thisFile.dirty = true;
+            thisFile.save();
+        }
+        if (typeof thisFile.spec.image != 'undefined') {
+            // var img = thisFile.spec.image;
+            delete thisFile.spec.image;
+            thisFile.dirty = true;
+            thisFile.save();
+        }
     };
     thisFile.save = function() {
         if (!thisFile.file_id) {
@@ -28,11 +164,19 @@ var FmpFile = function (spec) {
         var key = "file-"+thisFile.file_id;
         if (typeof localStorage[key] != "undefined" &&
             !thisFile.dirty) {
-            console.log("!saved !dirty:", thisFile.basename);
+            logger.log("!saved !dirty:", thisFile.basename);
             return;
         }
+        if (typeof thisFile.spec.image != 'undefined') {
+            // var img = thisFile.spec.image;
+            delete thisFile.spec.image;
+        }
+        if (typeof thisFile.image != 'undefined') {
+            // var img = thisFile.spec.image;
+            delete thisFile.image;
+        }
         // thisFile.spec["needsSync"] = true;
-        // console.log("saved dirty:", thisFile.basename);
+        // logger.log("saved dirty:", thisFile.basename);
         thisFile.spec.saved = thisFile.timestamp;
         localStorage[key] = JSON.stringify(thisFile.spec);
         thisFile.dirty = false;
@@ -40,20 +184,20 @@ var FmpFile = function (spec) {
 
     thisFile.delete = function() {
         delete localStorage["file-"+thisFile.id];
-        console.log("***** REMOVE FILE *****");
+        logger.log("***** REMOVE FILE *****");
         window.resolveLocalFileSystemURL(
                 thisFile.filename,
                 function(fileEntry) {
                     fileEntry.remove(function(file){
-                        console.log("File removed!");
+                        logger.log("File removed!");
                     },function(error){
-                        console.log("error deleting the file " + error.code);
+                        logger.log("error deleting the file " + error.code);
 
                     },function(){
-                        console.log("file does not exist");
+                        logger.log("file does not exist");
                     });
                 }, function(error){
-                    console.log("Couldn't resolve:", thisFile.filename,
+                    logger.log("Couldn't resolve:", thisFile.filename,
                                 "error:", error);
                 }
         );
@@ -67,6 +211,15 @@ var FmpFile = function (spec) {
     } else {
         thisFile.spec = spec;
     }
+
+    if (typeof thisFile.spec.image != "undefined") {
+        delete thisFile.spec.image;
+    }
+
+    if (typeof thisFile.image != "undefined") {
+        delete thisFile.image;
+    }
+
     if(typeof thisFile.spec.played == 'undefined') {
         thisFile.spec.played = false;
     }
@@ -373,13 +526,13 @@ var FmpFile = function (spec) {
     };
     thisFile.mark_as_played = function (listener_user_ids, percent_played, now) {
         /*
-        console.log("Mark as played NAME:",
+        logger.log("Mark as played NAME:",
                     "listener_user_ids:", listener_user_ids,
                     "percent_played:", percent_played,
                     "now:", now); */
         percent_played = parseFloat(percent_played);
         if (percent_played == parseFloat(thisFile.spec.percent_played)) {
-            // console.log("mlp return;");
+            // logger.log("mlp return;");
             return;
         }
         if (typeof now == 'undefined') {
@@ -389,7 +542,6 @@ var FmpFile = function (spec) {
         thisFile.spec["timestamp"] = now;
         thisFile.spec["now"] = now;
         thisFile.spec["percent_played"] = percent_played;
-
         thisFile.spec["needsSync"] = true;
         thisFile.spec['listener_user_ids'] = listener_user_ids;
         thisFile.spec["played"] = true;
@@ -409,7 +561,7 @@ var FmpFile = function (spec) {
             }
         }
         thisFile.dirty = true;
-        // console.log("/mark_as_played");
+        // logger.log("/mark_as_played");
     };
     thisFile.completed = function(listener_user_ids) {
         var voted_to_skip_user_ids = [],
@@ -442,8 +594,8 @@ var FmpFile = function (spec) {
         thisFile.progressLock = false;
         // TODO Still need to make a downloading class/object that will
         // check.
-        console.log("DOWNLOAD:", thisFile.filename);
-        console.log("fmpHost:",window.fmpHost);
+        logger.log("DOWNLOAD:", thisFile.filename);
+        logger.log("fmpHost:",window.fmpHost);
         if (!window.fmpHost) {
             return;
         }
@@ -456,8 +608,8 @@ var FmpFile = function (spec) {
             source,
             target,
             function(fileEntry) {
-                console.log("download complete: " + fileEntry.toURL());
-                console.log("fileEntry:", fileEntry);
+                logger.log("download complete: " + fileEntry.toURL());
+                logger.log("fileEntry:", fileEntry);
                 var newFileName = thisFile.file_id+"."+thisFile.ext;
                 thisFile.progress = 100;
                 // move the file to a new directory and rename it
@@ -469,17 +621,17 @@ var FmpFile = function (spec) {
                             dirEntry,
                             newFileName,
                             function(entry){
-                                console.log("New Path: ", entry);
-                                // thisFile.exists = true;
+                                logger.log("New Path: ", entry);
+                                thisFile.exists = true;
                                 thisFile.progress = 100;
                                 thisFile.dlCompleteCallback();
                             }, function(error){
-                                console.log("DIDN'T MOVE:",error.code);
+                                logger.log("DIDN'T MOVE:",error.code);
                                 thisFile.dlFailCallback();
                             }
                         );
                     }, function(error){
-                        console.log("Couldn't resolve:", thisFile.dirname,
+                        logger.log("Couldn't resolve:", thisFile.dirname,
                                     "error:", error);
                         thisFile.dlFailCallback();
                     }
@@ -487,9 +639,9 @@ var FmpFile = function (spec) {
 
             },
             function(error) {
-                console.log("download error source " + error.source);
-                console.log("download error target " + error.target);
-                console.log("download error code" + error.code);
+                logger.log("download error source " + error.source);
+                logger.log("download error target " + error.target);
+                logger.log("download error code" + error.code);
                 thisFile.dlFailCallback();
             },
             false /*
@@ -502,7 +654,7 @@ var FmpFile = function (spec) {
             } */
         );
         fileTransfer.onprogress = function(progressEvent) {
-            // console.log("onprogress:", progressEvent);
+            // logger.log("onprogress:", progressEvent);
             if (progressEvent.lengthComputable) {
                 // loadingStatus.setPercentage(progressEvent.loaded / progressEvent.total);
                 var progress = Math.floor((progressEvent.loaded / progressEvent.total) * 100);
@@ -510,13 +662,13 @@ var FmpFile = function (spec) {
                     thisFile.progressLock = true;
                     if (progress != thisFile.progress && progress > thisFile.progress) {
                         thisFile.progress = progress;
-                        console.log("progress:", thisFile.progress, thisFile.basename);
+                        logger.log("progress:", thisFile.progress, thisFile.basename);
                         try {
                             thisFile.$timeout(function(){
                                 thisFile.progressLock = false;
                             });
                         } catch (e) {
-                            console.log("caught:", e);
+                            logger.log("caught:", e);
                             thisFile.progressLock = false;
                         }
                     } else {
@@ -524,16 +676,16 @@ var FmpFile = function (spec) {
                     }
                 }
             } else {
-                console.log("incerment");
+                logger.log("incerment");
             }
         };
     };
+
     thisFile.check_existing = function() {
-        console.log("filename:", thisFile.filename);
+        logger.log("filename:", thisFile.filename);
         window.resolveLocalFileSystemURL(thisFile.filename,
             function(){
-                thisFile.exists = true;
-                console.log("exists:",thisFile.filename);
+                thisFile.exists = true
             },
             function(){
                 thisFile.exists = false;
@@ -567,7 +719,7 @@ var FmpFile = function (spec) {
           get: thisFile['get_'+key],
           set: function() { }
         });
-        // console.log("test getter", key, ":", thisFile[key]);
+        // logger.log("test getter", key, ":", thisFile[key]);
     };
 
     var getterSetterKeys = ["playing", "playing", "playingState", "duration",
@@ -578,13 +730,13 @@ var FmpFile = function (spec) {
           get: thisFile['get_'+key],
           set: thisFile['set_'+key]
         });
-        // console.log("test getter", key, ":", thisFile[key]);
+        // logger.log("test getter", key, ":", thisFile[key]);
     };
 
     for (var k in thisFile.spec) {
         // This is a messed up hack.
         // It basically creates setters & getters based on thisFile.spec
-        // console.log("k:",k);
+        // logger.log("k:",k);
         var functionName = "get_"+k,
             ds = {};
         if (typeof thisFile[functionName] == "undefined" && typeof thisFile[k] == "undefined") {
@@ -606,18 +758,18 @@ var FmpFile = function (spec) {
             continue;
         }
         Object.defineProperty(thisFile, k, ds);
-        // console.log("test getter", k, ":", thisFile[k]);
+        // logger.log("test getter", k, ":", thisFile[k]);
     }
     thisFile.check_existing();
 
 };
-
 
 var Downloader = function(){
     var thisDownloader = this;
 
     thisDownloader.queue = [];
     thisDownloader.downloading = null;
+    var logger = new Logger("Downloader", false);
 
     thisDownloader.append = function(file) {
         if (thisDownloader.downloading && thisDownloader.downloading.id == file.id) {
@@ -632,7 +784,7 @@ var Downloader = function(){
             }
         }
         if (!found) {
-            console.log("thisDownloader append:", file.basename);
+            logger.log("thisDownloader append:", file.basename);
             file.dlCompleteCallback = thisDownloader.onComplete;
             file.dlFailCallback = thisDownloader.onFail;
             thisDownloader.queue.push(file);
@@ -656,7 +808,7 @@ var Downloader = function(){
             return;
         }
         var file = thisDownloader.queue.shift();
-        console.log("thisDownloader file:", file.basename);
+        logger.log("thisDownloader file:", file.basename);
         thisDownloader.downloading = file;
         setTimeout(thisDownloader.downloading.download, 1000);
     };
@@ -670,31 +822,33 @@ var Player = function() {
     thisPlayer.lastPosition = 0;
     thisPlayer.dragging = false;
 
+    var logger = new Logger("Player", false);
+
     thisPlayer.completeCb = function(file) {
-        console.log("completeCb*********************");
+        logger.log("completeCb*********************");
     };
 
     thisPlayer.errorCb = function(file) {
-        console.log("errorCb*********************");
+        logger.log("errorCb*********************");
     };
 
     thisPlayer.timeStatusCb = function(file) {
-        console.log("timeStatusCb*********************");
+        logger.log("timeStatusCb*********************");
     };
 
     thisPlayer.waitForRelease = function() {
-        console.log("waitForRelease");
+        logger.log("waitForRelease");
         if (thisPlayer.state == "RELEASING") {
             setTimeout(thisPlayer.waitForRelease, 500);
             return;
         }
-        console.log("-waitForRelease");
+        logger.log("-waitForRelease");
         thisPlayer.state = "PLAYING";
         thisPlayer.media.play();
     };
     thisPlayer.prepare = function(file) {
         if (thisPlayer.media) {
-            console.log("SETTING RELEASING 2");
+            logger.log("SETTING RELEASING 2");
             thisPlayer.state = "RELEASING";
             thisPlayer.media.stop();
             thisPlayer.media.release();
@@ -708,19 +862,26 @@ var Player = function() {
         if (thisPlayer.file) {
             thisPlayer.file.playing = false;
         }
+
         thisPlayer.file = file;
         thisPlayer.file.playing = true;
         thisPlayer.file.played = true;
         thisPlayer.file.err = "";
+
+        var media = new Media(thisPlayer.file.filename);
+        media.play();
+        media.stop();
+        media.release();
+
         thisPlayer.media = new Media(thisPlayer.file.filename,
             function(){
                 if (thisPlayer.state == "RELEASING") {
-                    console.log("COMPLETED CALLLED BUT RELEASING");
+                    logger.log("COMPLETED CALLLED BUT RELEASING");
                     thisPlayer.state = "RELEASED";
                     return;
                 } else {
                     thisPlayer.state = "STOPPED";
-                    console.log("completed");
+                    logger.log("completed");
                     thisPlayer.completeCb(thisPlayer.file);
                 }
             },
@@ -744,9 +905,9 @@ var Player = function() {
                 thisPlayer.state = "STOPPED";
             },
             function(state){
-                console.log("state changed:", state);
+                logger.log("state changed:", state);
                 if (thisPlayer.state == "RELEASING") {
-                    console.log("STATE CHANGED BUT RELEASING");
+                    logger.log("STATE CHANGED BUT RELEASING");
                     return;
                 }
                 if (state == Media.MEDIA_RUNNING) {
@@ -765,15 +926,16 @@ var Player = function() {
     };
 
     thisPlayer.setMusicControls = function() {
-        // MusicControls.destroy(function(){}, function(){});
+        MusicControls.destroy(function(){}, function(){});
         var isPlaying = false;
         if (thisPlayer.realState == "PLAYING") {
             isPlaying = true;
         }
+
         MusicControls.create({
             track       : thisPlayer.file.get_title(),        // optional, default : ''
             artist      : thisPlayer.file.get_artist(),       // optional, default : ''
-            // cover       : 'albums/absolution.jpg',      // optional, default : nothing
+            cover       : 'img/logo.png',      // optional, default : nothing
             // cover can be a local path (use fullpath 'file:///storage/emulated/...', or only 'my_image.jpg' if my_image.jpg is in the www folder of your app)
             //           or a remote url ('http://...', 'https://...', 'ftp://...')
             isPlaying   : isPlaying,  // optional, default : true
@@ -852,7 +1014,7 @@ var Player = function() {
         thisPlayer.setMusicControls();
     };
     thisPlayer.pause = function() {
-        console.log("PAUSE");
+        logger.log("PAUSE");
 
         if (!thisPlayer.media) {
             return;
@@ -871,7 +1033,7 @@ var Player = function() {
         return thisPlayer.realState;
     };
     thisPlayer.set_state = function(value) {
-        console.log("set_state:", value);
+        logger.log("set_state:", value);
         thisPlayer.realState = value;
         if (typeof thisPlayer.file != "undefined") {
             thisPlayer.file.playingState = value;
@@ -887,7 +1049,7 @@ var Player = function() {
         if (!thisPlayer.file.spec.duration || thisPlayer.file.spec.duration < 0) {
             var duration = thisPlayer.media.getDuration();
             if (duration > 0) {
-                console.log("duration:", duration);
+                logger.log("duration:", duration);
                 thisPlayer.file.set_spec_value("duration", parseFloat(duration), false);
                 thisPlayer.file.duration = parseFloat(duration);
             }
@@ -896,16 +1058,16 @@ var Player = function() {
             // success callback
             function (position) {
                 if (thisPlayer.dragging) {
-                    console.log("thisPlayer.dragging return;");
+                    logger.log("thisPlayer.dragging return;");
                     return;
                 }
                 position = parseFloat(position);
                 if (position <= -1 || position == thisPlayer.lastPosition) {
-                    console.log("position <= -1 || position == thisPlayer.lastPosition");
+                    logger.log("position <= -1 || position == thisPlayer.lastPosition");
                     return;
                 }
                 thisPlayer.lastPosition = position;
-                // console.log("position:", position);
+                // logger.log("position:", position);
                 var remaining = (thisPlayer.file.duration - position);
                 thisPlayer.file.position = position;
                 thisPlayer.file.remaining = remaining;
@@ -924,20 +1086,20 @@ var Player = function() {
         );
     };
     thisPlayer.seekTo = function(ms) {
-        console.log("SEEK TO:", ms);
+        logger.log("SEEK TO:", ms);
         // thisPlayer.media.seekTo(mil);
     };
     thisPlayer.onDragStart = function() {
         thisPlayer.dragging = true;
-        console.log("DRAG START:", arguments);
+        logger.log("DRAG START:", arguments);
     };
     thisPlayer.onDragEnd = function() {
         thisPlayer.dragging = false;
-        console.log("DRAG END:", arguments);
+        logger.log("DRAG END:", arguments);
         thisPlayer.media.seekTo(thisPlayer.file.position*1000);
     };
     thisPlayer.onDragChange = function() {
-        console.log("DRAG onDragChange:", arguments);
+        logger.log("DRAG onDragChange:", arguments);
         // thisPlayer.media.seekTo(thisPlayer.file.position*1000);
     };
     setInterval(thisPlayer.timeStatus,1000);

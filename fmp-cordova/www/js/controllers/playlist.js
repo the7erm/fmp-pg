@@ -3,7 +3,7 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
                                             FmpUtils, $rootScope) {
     $scope.FmpPlaylistCollection = FmpPlaylist.collection;
     $scope.FmpPreloadCollection = FmpPreload.collection;
-    $scope.syncCollections = FmpSync.syncCollections;
+    $scope.syncCollections = FmpSync.newSync;
     $scope.listenersCollection = FmpListeners.collection;
     $scope.next = FmpPlaylist.next;
     $scope.prev = FmpPlaylist.prev;
@@ -45,5 +45,12 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
         }
         FmpSync.save();
     };
+
+    $scope.syncFile = function(file) {
+        console.log("$scole.syncFile:",file);
+        file.spec.removeIfPlayed = false;
+        console.log("/removeIfPlayed");
+        FmpSync.syncFile(file.spec);
+    }
 
 });

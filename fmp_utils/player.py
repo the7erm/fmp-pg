@@ -76,15 +76,15 @@ PACK_PADDING = 0
 
 class Log(object):
     def log_debug(self, *args, **kwargs):
-        print("log_debug:", args, kwargs)
+        # print("log_debug:", args, kwargs)
         return
 
     def log_info(self, *args, **kwargs):
-        print("log_info:", args, kwargs)
+        # print("log_info:", args, kwargs)
         return
 
     def log_error(self, *args, **kwargs):
-        print("log_error:", args, kwargs)
+        # print("log_error:", args, kwargs)
         return
 
 class PlayerError(Exception):
@@ -322,11 +322,11 @@ class Player(GObject.GObject, Log):
 
     def on_state_change(self, player, state):
         # Player.on_state_change()
-        print("on_state_change")
+        # print("on_state_change")
         self.show_video_window()
 
     def show_video_window(self):
-        print("show_video_window")
+        # print("show_video_window")
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
@@ -380,7 +380,7 @@ class Player(GObject.GObject, Log):
         return string
 
     def time_status(self):
-        print("time_status()")
+        # print("time_status()")
         # Player.time_status()
         Gdk.threads_leave()
         obj = self.get_time_status()
@@ -431,7 +431,7 @@ class Player(GObject.GObject, Log):
         self.on_check_resize()
 
     def on_check_resize(self, *args):
-        print("on_check_resize()")
+        # print("on_check_resize()")
         # Player.on_check_resize()
         if not hasattr(self, 'pixbuf'):
             return
@@ -440,7 +440,7 @@ class Player(GObject.GObject, Log):
         self.resizeImage(boxAllocation.width, boxAllocation.height)
 
     def resizeImage(self, allocation_width, allocation_height, force=False):
-        print("resizeImage()")
+        # print("resizeImage()")
         # Player.resizeImage()
         # allocation_height = allocation_height - 40
         if self.temp_height != allocation_height or self.temp_width != allocation_width or force:

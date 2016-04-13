@@ -124,7 +124,7 @@ fmpApp
   methods.addLocalData = function(fileFromServer) {
     fileFromServer.ext = methods.getExt(fileFromServer.locations[0].basename);
     var url = FmpConfig.url+"download?file_id="+fileFromServer.id,
-        filename = fileFromServer.id+"."+fileFromServer.ext,
+        filename = fileFromServer.id+".mp3",
         tmpFile = filename + ".tmp",
         dst = FmpConfig.cacheDir+tmpFile;
     fileFromServer['dl-url'] = url;
@@ -135,6 +135,7 @@ fmpApp
   }
 
   methods.validFile = function(file) {
+    return true;
     // TODO: Make this unique to the device.
     var ignore = ['flv', 'wma', 'wmv'];
 

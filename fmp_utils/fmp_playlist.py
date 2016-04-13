@@ -22,10 +22,10 @@ class HostnameTracker:
         self.check_host()
 
     def check_host(self):
-        print("CHECK HOST")
+        # print("CHECK HOST")
         file_ip_data = self.read_ip_address_file()
         current_ip_data = self.format_ip_data(check_output(["hostname","-I"]))
-        print ("self.ip_address_file:",self.ip_address_file)
+        # print ("self.ip_address_file:",self.ip_address_file)
 
         if not os.path.exists(self.ip_address_file) or \
            file_ip_data != current_ip_data:

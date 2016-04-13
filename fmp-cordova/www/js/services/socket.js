@@ -14,6 +14,7 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
     hasError: false
   };
 
+  var logger = new Logger("FmpSocket", false);
   var methods = {
     collection: collection,
     send: function(obj) {
@@ -21,24 +22,31 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
         console.error("empty sync object:", obj);
         return;
       }
-      if (collection.dataStream && navigator.connection.type == "wifi") {
+      if (collection.connected && collection.dataStream && navigator.connection.type == "wifi") {
         while (collection.queue.length>0) {
           var msg = collection.queue.shift();
-          console.log("SEND queued:", msg);
+          logger.log("SEND queued:", msg);
           collection.dataStream.send(JSON.stringify(msg));
         }
-        console.log("SEND:", obj);
+        logger.log("SEND:", obj);
         collection.dataStream.send(JSON.stringify(obj));
       } else {
-        console.log("SEND deferred:", obj);
+        logger.log("SEND deferred:", obj);
         collection.queue.push(obj);
       }
     },
     onMessage: function(message) {
       collection.connected = true;
-      var data = JSON.parse(message.data);
+      collection.connectionLock = false;
+      collection.hasError = false;
+      try {
+        var data = JSON.parse(message.data);
+      } catch (e) {
+        console.error("var data = JSON.parse(message.data):",e);
+        return;
+      }
       if (typeof data['time-status'] == 'undefined') {
-        console.log("onMessage:", data);
+        logger.log("onMessage:", data);
         if (typeof data['processed'] != 'undefined') {
           collection.processed.push(data);
           $rootScope.$broadcast("sync-processed");
@@ -69,25 +77,26 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
         }
       }
     },
-    onError: function() {
+    onError: function(arg1, arg2) {
       collection.connected = false;
       collection.connectionLock = false;
       collection.hasError = true;
-      console.error("socket onError:", arguments);
-      console.log("waiting 10 seconds to reconnect");
+      console.error("socket onError:", arg1, arg2);
+      logger.log("waiting 10 seconds to reconnect");
+      collection.dataStream.close();
       setTimeout(methods.connect, 10000);
     },
     onOpen: function() {
       collection.connected = true;
       collection.connectionLock = false;
       collection.hasError = false;
-      console.log("socket onOpen:", arguments);
+      logger.log("socket onOpen:", arguments);
       $rootScope.$broadcast("socket-open");
     },
     onClose: function() {
       collection.connected = false;
       collection.connectionLock = false;
-      console.log("socket onClose:", arguments);
+      logger.log("socket onClose:", arguments);
       if (!collection.hasError) {
         setTimeout(methods.connect, 5000);
       }
@@ -99,17 +108,31 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
     if (collection.connectionLock || collection.connected) {
       // Don't run if we are already connected or in the process of
       // connecting.
+      logger.log("!connect collection.connectionLock:",
+                  collection.connectionLock,
+                  "collection.connected:", collection.connected)
       return;
     }
     collection.connectionLock = true;
-    console.log("connecting to socket");
+    logger.log("connecting to socket");
     if (collection.dataStream) {
       if (collection.connected) {
-        collection.dataStream.close();
+        try {
+          collection.dataStream.close();
+
+        } catch(e) {
+          console.error("collection.dataStream.close():", e);
+        }
       }
       collection.dataStream = false;
     }
     collection.hasError = false;
+    logger.log("FmpIpScanner.collection.socketUrl:", FmpIpScanner.collection.socketUrl);
+    if (!FmpIpScanner.collection.socketUrl) {
+        FmpIpScanner.startScan();
+        collection.connectionLock = false;
+        return;
+    }
     collection.dataStream = $websocket(FmpIpScanner.collection.socketUrl);
     collection.dataStream.onOpen(methods.onOpen);
     collection.dataStream.onMessage(methods.onMessage);

@@ -2,6 +2,8 @@ fmpApp
 .factory('FmpListeners', function($http, $rootScope, FmpConfig,
                                   FmpLocalStorage, FmpSocket){
 
+    var logger = new Logger("FmpListeners", false);
+
     var collection = {
             fetchLock: false,
             listener_user_ids: [],
@@ -37,10 +39,10 @@ fmpApp
         };
 
     methods.load = function() {
-        console.log("LOAD LISTENERS <<<<<<<<<<<<<<<<<<<");
+        logger.log("LOAD LISTENERS <<<<<<<<<<<<<<<<<<<");
         FmpLocalStorage.load(collection);
         collection.loaded = true;
-        console.log(">>>> LISTENERS LOADED", collection);
+        logger.log(">>>> LISTENERS LOADED", collection);
     }
 
     methods.load();
@@ -54,7 +56,7 @@ fmpApp
     }
 
     methods.fetch = function() {
-        console.log("FETCHING LISTENERS");
+        logger.log("FETCHING LISTENERS");
         if (collection.fetchLock) {
             // return;
         }
@@ -71,7 +73,7 @@ fmpApp
             method: 'GET',
             url: FmpConfig.url+"listeners"
         }).then(function(response) {
-            console.log("FETCHED:", response);
+            logger.log("FETCHED:", response);
             collection.users = response.data;
             if (collection.listener_user_ids.length == 0) {
                 var listener_user_ids = [];
@@ -96,12 +98,12 @@ fmpApp
             // called asynchronously if an error occurs
             // or server returns response with an error status.
             collection.fetchLock = false;
-            console.log("ERROR FETCHING LISTENERS:", response);
+            logger.log("ERROR FETCHING LISTENERS:", response);
         });
     };
 
     methods.setPrimaryUserId = function() {
-        console.log("-----------> setPrimaryUser:", collection.primary_user_id);
+        logger.log("-----------> setPrimaryUser:", collection.primary_user_id);
         localStorage.primary_user_id = collection.primary_user_id;
     };
     methods.save = function() {
@@ -119,14 +121,14 @@ fmpApp
                 collection.primary_user_id = user.id;
             }
         }
-        console.log("SAVE collection:", collection);
+        logger.log("SAVE collection:", collection);
         FmpLocalStorage.save(collection);
-        console.log("localStorage:", localStorage);
+        logger.log("localStorage:", localStorage);
     };
     methods.updateSecondaryUserIds = function(scope, user_id) {
-        console.log("updateSecondaryUserIds:", scope, user_id);
+        logger.log("updateSecondaryUserIds:", scope, user_id);
         if (scope.user.secondary) {
-            console.log("ADD");
+            logger.log("ADD");
             if (typeof collection.secondary_user_ids == "string") {
                 collection.secondary_user_ids = collection.secondary_user_ids.split(",");
             }
@@ -134,12 +136,12 @@ fmpApp
                 collection.secondary_user_ids.push(user_id);
             }
         } else {
-            console.log("remove");
+            logger.log("remove");
             methods.removeId(collection.secondary_user_ids, user_id);
         }
         collection.secondary_user_ids.sort();
         methods.save();
-        console.log("collection.secondary_user_ids:", collection.secondary_user_ids);
+        logger.log("collection.secondary_user_ids:", collection.secondary_user_ids);
     };
 
     methods.syncUsers = function() {

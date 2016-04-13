@@ -39,7 +39,8 @@ class MediaTags(object):
             'album': [],
             'year': [],
             'track': [],
-            'keywords': []
+            'keywords': [],
+            'images': []
         }
         self.exists = os.path.exists(self.filename)
         self.add_keyword(self.basename)
@@ -57,6 +58,9 @@ class MediaTags(object):
         genre_keys = ('genre', 'wm/genre', 'wm/providerstyle', 'providerstyle',
                       'tcon')
         track_keys = ('wm/tracknumber', 'track', 'trck')
+
+        image_keys = ('apic', 'apic:')
+
         for k in tags:
             # print ("k:",k,":",end="")
             try:
@@ -78,6 +82,8 @@ class MediaTags(object):
                 self.add_to_combined('genre', tags[k])
             if k_lower in track_keys:
                 self.add_to_combined('track', tags[k])
+            if k_lower in image_keys:
+                self.add_to_combined('images', tags[k])
 
     def add_to_combined(self, tag, value):
         if tag not in self.tags_combined:
@@ -146,11 +152,11 @@ class MediaTags(object):
             _word = re.sub("[^A-z0-9]+", "", word)
             if _word and _word != word and \
                _word not in self.tags_combined['keywords']:
-                print ("sub _word:", word)
+                # print ("sub _word:", word)
                 self.tags_combined['keywords'].append(_word)
 
             _word = re.split("[^A-z0-9]+", word)
             for w in _word:
-                print ("split _word:", w)
+                # print ("split _word:", w)
                 if w and w not in self.tags_combined['keywords']:
                     self.tags_combined['keywords'].append(w)

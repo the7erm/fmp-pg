@@ -14,7 +14,9 @@
     </span>
 </span>
 
+<img ng-src="{{PlayerData.collection.playingData.image}}" class="pull-left item-img">
 <div>
+
     <span ng-repeat="(key, data) in PlayerData.collection.playingData.artists">
           <span ng-bind-html="data.name | searchLink"></span>
           <span ng-if="!$last">, </span>

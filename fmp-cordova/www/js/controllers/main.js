@@ -10,8 +10,8 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
     $scope.swipeRight = function() {
         console.log("swipeRight main")
         window.location = "#/playlist";
-    }; */
-
+    };
+    */
 
     FmpSync.collection.FmpPlaylist = FmpPlaylist;
     FmpSync.collection.FmpPlayer = FmpPlayer;
@@ -19,6 +19,8 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
     FmpSync.collection.FmpListeners = FmpListeners;
     FmpSync.collection.FmpSocket = FmpSocket;
 
+    $scope.newSync = FmpSync.newSync;
+    $scope.FmpSyncCollection = FmpSync.collection;
 
     FmpIpScanner.startScan();
 });

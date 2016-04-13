@@ -78,3 +78,23 @@ input[type=radio] {
   /* Webkit browsers*/
   -webkit-transform: scale(2);
 }
+
+
+.item-img {
+  height:100px;
+  width:100px;
+  margin:auto;
+  text-align: center;
+  margin-right: 5px;
+  margin-top: 5px;
+}
+
+.item-img button {
+    margin-top:34%;
+    opacity: 0.5;
+    color: #000 !important;
+    background: #fff !important;
+    border:0px;
+    outline: 0px;
+    outline-offset: 0px;
+}

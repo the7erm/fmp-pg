@@ -1,5 +1,7 @@
 
 import sys
+import os
+from base64 import b64encode
 if "../" not in sys.path:
     sys.path.append("../")
 
@@ -40,6 +42,14 @@ from fmp_utils.misc import session_add
 # from .location import Location
 
 import hashlib
+fp = open(os.path.join(sys.path[0],"images/fmp-logo.square.png"), "rb")
+img = fp.read()
+fp.close()
+
+encoded = b64encode(img).decode('utf-8')
+DEFAULT_IMG = "data:image/png;base64,%s" % encoded
+
+
 BLOCKSIZE = 65536
 
 class File(Base):
@@ -213,14 +223,30 @@ class File(Base):
     def get_users(self, user_ids=[]):
         return get_users(user_ids)
 
-    def json(self, user_ids=[], history=False):
+    def json(self, user_ids=[], history=False, get_image=False):
+
         json = {}
         with session_scope() as session:
+
             session_add(session, self)
             json = to_json(self, File)
             session_add(session, self)
             json['cued'] = self.cued
             session_add(session, self)
+
+            if not hasattr(self, "image") and get_image:
+                media_tags = MediaTags(filename=self.filename)
+
+                if not media_tags.tags_combined['images']:
+                    self.image = DEFAULT_IMG
+                    json['image'] = DEFAULT_IMG
+                else:
+                    for img in media_tags.tags_combined['images']:
+                        encoded = b64encode(img.data).decode('utf-8')
+                        self.image = "data:%s;base64,%s" % (img.mime, encoded)
+                        json['image'] = self.image
+            elif get_image:
+                json['image'] = self.image
 
             users = get_users(user_ids)
             keys = ['artists', 'titles', 'genres', 'locations']

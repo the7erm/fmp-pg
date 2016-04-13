@@ -1,5 +1,6 @@
 fmpApp.factory("FmpIpScanner", function($http, $rootScope){
-  console.log("Connection:", navigator.connection);
+  var logger = new Logger("FmpIpScanner", false);
+  logger.log("Connection:", navigator.connection);
   var collection = {
         "knownHosts": [],
         "scanHosts": [],
@@ -10,13 +11,14 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         collection: collection
       };
 
+
   methods.getKnownHosts = function() {
     var knownHosts = [];
     if (localStorage.knownHosts) {
       knownHosts = JSON.parse(localStorage.knownHosts);
     }
     collection.knownHosts = knownHosts;
-    console.log("collection.knownHosts:", collection.knownHosts);
+    logger.log("collection.knownHosts:", collection.knownHosts);
   }
 
   methods.generateHosts = function() {
@@ -26,7 +28,7 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
       var host = collection.knownHosts[i];
       if (collection.scanHosts.indexOf(host) == -1) {
         collection.scanHosts.push(host);
-        console.log("adding known host:", host);
+        logger.log("adding known host:", host);
       }
     }
     for(var i=1;i<255;i++) {
@@ -41,13 +43,12 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
     if (collection.found || collection.scanHosts.length == 0) {
       return;
     }
-    console.log("skipping ", Connection.WIFI);
-    if (navigator.connection.type != "wifi") {
-      console.log("skipping ", Connection.WIFI);
+    if (navigator.connection.type != Connection.WIFI) {
+      logger.log("skipping !",Connection.WIFI);
       return;
     }
     var host = collection.scanHosts.shift();
-    // console.log("scan thread:", thread, host);
+    // logger.log("scan thread:", thread, host);
     try {
 
       $http({
@@ -65,8 +66,8 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
             localStorage.knownHosts = JSON.stringify(collection.knownHosts);
           }
           window.fmpHost = host;
-          console.log("found fmp server at host:", host);
-          console.log("Running time:", scanEnd.valueOf() -
+          logger.log("found fmp server at host:", host);
+          logger.log("Running time:", scanEnd.valueOf() -
                                        collection.scanStart.valueOf());
           $rootScope.$broadcast("server-found");
         }
@@ -74,24 +75,25 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         try {
           methods.scan(thread, FmpConfig);
         } catch(e) {
-          console.log("methods.scan:",e);
+          logger.log("methods.scan:",e);
         }
       });
     } catch(e) {
-      console.log("$http catch", e);
+      logger.log("$http catch", e);
     }
 
 
   };
 
   methods.startScan = function(FmpConfig) {
+    collection.found = false;
     methods.generateHosts();
     collection.scanStart = new Date();
     for (var i=1;i<5;i++) {
       try {
         methods.scan(i, FmpConfig);
       } catch(e) {
-        console.log("methods.scan:",e);
+        logger.log("methods.scan:",e);
       }
     }
   }
