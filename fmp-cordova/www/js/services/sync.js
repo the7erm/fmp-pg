@@ -411,6 +411,7 @@ fmpApp
         }
         logger.log("FmpIpScanner.collection.url:", FmpIpScanner.collection.url);
         if (!FmpIpScanner.collection.url) {
+            FmpIpScanner.scan()
             return;
         }
         collection.filesToRemove = [];

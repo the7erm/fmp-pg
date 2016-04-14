@@ -5,7 +5,8 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         "knownHosts": [],
         "scanHosts": [],
         "url": "",
-        "socketUrl": ""
+        "socketUrl": "",
+        "scanLock": false
       },
       methods = {
         collection: collection
@@ -40,6 +41,9 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
   }
 
   methods.scan = function(thread, FmpConfig) {
+    if (collection.scanLock) {
+        return;
+    }
     if (collection.found || collection.scanHosts.length == 0) {
       return;
     }
@@ -47,6 +51,7 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
       logger.log("skipping !",Connection.WIFI);
       return;
     }
+    collection.scanLock = true;
     var host = collection.scanHosts.shift();
     // logger.log("scan thread:", thread, host);
     try {
@@ -70,6 +75,7 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
           logger.log("Running time:", scanEnd.valueOf() -
                                        collection.scanStart.valueOf());
           $rootScope.$broadcast("server-found");
+          collection.scanLock = false;
         }
       }, function errorCallback(response) {
         try {
@@ -77,6 +83,7 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         } catch(e) {
           logger.log("methods.scan:",e);
         }
+        collection.scanLock = false;
       });
     } catch(e) {
       logger.log("$http catch", e);
