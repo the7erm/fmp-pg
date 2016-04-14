@@ -328,6 +328,11 @@ fmpApp
     };
 
     methods.syncFile = function(fileData) {
+        if (navigator.connection.type != Connection.WIFI) {
+            collection.syncQue = [];
+            collection.syncFileLock = false;
+            return;
+        }
         if (collection.syncFileLock) {
             logger.log("que:", fileData.id);
             collection.syncQue.push(fileData);
@@ -409,9 +414,12 @@ fmpApp
             logger.log("syncLock");
             return;
         }
+        if (navigator.connection.type != Connection.WIFI) {
+            return;
+        }
         logger.log("FmpIpScanner.collection.url:", FmpIpScanner.collection.url);
         if (!FmpIpScanner.collection.url) {
-            FmpIpScanner.scan()
+            FmpIpScanner.scan();
             return;
         }
         collection.filesToRemove = [];

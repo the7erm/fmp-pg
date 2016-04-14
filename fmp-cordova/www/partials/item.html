@@ -1,0 +1,25 @@
+<a ng-if="!item.playing" class="glyphicon glyphicon-remove pull-right" ng-click="trash(item)"></a>
+<div class="item-img pull-left" ng-if="item.image" style="background:url({{item.image}}) no-repeat fixed center; background-size: cover;background-color:rgba(0, 0, 0, 0.7);">
+    <button class="btn btn-xs btn-default glyphicon glyphicon-play"
+            ng-click="item.play()"
+            ng-if="player.file.id!=item.id"></button>
+    <button class="btn btn-xs btn-primary glyphicon"
+            ng-click="item.pause()"
+            ng-class="{'glyphicon-pause': player.state=='PLAYING',
+                       'glyphicon-play': player.state!='PLAYING'}"
+            ng-if="player.file.id==item.id"></button>
+</div>
+<div ng-if="!item.image">
+    <button class="btn btn-xs btn-default glyphicon glyphicon-play"
+            ng-click="item.play()"
+            ng-if="player.file.id!=item.id"></button>
+    <button class="btn btn-xs btn-primary glyphicon"
+            ng-click="item.pause()"
+            ng-class="{'glyphicon-pause': player.state=='PLAYING',
+                       'glyphicon-play': player.state!='PLAYING'}"
+            ng-if="player.file.id==item.id"></button>
+</div>
+{{item.artist_title}}<br>
+{{item.spec.cued.reason}}
+<div ng-if="item.playing&&item.duration>-1&&item.position>-1&&item.remaining>-1">
+-{{item.remaining|formatTimer}} {{item.position|formatTimer}}/{{item.duration|formatTimer}}</div>

@@ -1,24 +1,8 @@
 <h3>Playlist</h3>
-<button class="btn btn-default glyphicon glyphicon-transfer" ng-click="syncCollections()"><span ng-if="FmpSyncCollection.syncQue.length>0" style="position: relative; padding-left: 5px;"> <small>{{FmpSyncCollection.syncTotal}}:{{FmpSyncCollection.syncQue.length}}</small></span></button>
-<button class="btn btn-default glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button>
-<button class="btn btn-default" ng-click="organize()">organize</button>
+<span ng-include src="'partials/top-buttons.html'"></span>
 <div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id">
-    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
-        <a class="glyphicon glyphicon-remove pull-right" ng-click="trash(item)"></a>
-        <button class="btn btn-xs btn-default glyphicon glyphicon-play"
-                ng-click="item.play()"
-                ng-if="player.file.id!=item.id"></button>
-        <button class="btn btn-xs btn-primary glyphicon"
-                ng-click="item.pause()"
-                ng-class="{'glyphicon-pause': player.state=='PLAYING',
-                           'glyphicon-play': player.state!='PLAYING'}"
-                ng-if="player.file.id==item.id"></button>
-        {{item.artist_title}}<br>
-        {{item.spec.cued.reason}}
-        <div ng-if="item.playing&&item.duration>-1&&item.position>-1&&item.remaining>-1">
-        -{{item.remaining|formatTimer}} {{item.position|formatTimer}}/{{item.duration|formatTimer}}</div>
-
-    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
+         ng-include src="'partials/item.html'"></div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id">
         <span ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id)!=-1">
             <div ng-include src="'partials/ufi.html'"></div>
@@ -29,22 +13,28 @@
         <div ng-if="!item.exists">
             progress: {{item.progress}}
             <div class="progress" width="100%">
-              <div class="progress-bar" ng-class="{
-                'progress-bar-success': item.progress == 100,
-                'progress-bar-warning': item.progress>=10 && item.progress<100,
-                'progress-bar-danger': item.progress <= 10
-              }" role="progressbar" aria-valuenow="{{item.progress}}" aria-valuemin="0" aria-valuemax="100" ng-style="{'width': item.progress + '%'}">
+              <div class="progress-bar"
+                   ng-class="{
+                    'progress-bar-success': item.progress == 100,
+                    'progress-bar-warning': item.progress>=10 && item.progress<100,
+                    'progress-bar-danger': item.progress <= 10
+                   }"
+                   role="progressbar"
+                   aria-valuenow="{{item.progress}}"
+                   aria-valuemin="0"
+                   aria-valuemax="100"
+                   ng-style="{'width': item.progress + '%'}">
                 <span>{{item.progress}}%</span>
               </div>
             </div>
         </div>
     </div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
-    <span class="badge" ng-if="item.played">played</span>
-    <span class="badge" ng-if="item.skipped">skipped</span>
-    <span class="badge" ng-if="item.needsSync"><a ng-click="syncFile(item)">needs sync</a></span>
-    <span class="badge" ng-if="item.playing">playing</span>
-    <hr>
+        <span class="badge" ng-if="item.played">played</span>
+        <span class="badge" ng-if="item.skipped">skipped</span>
+        <span class="badge" ng-if="item.needsSync"><a ng-click="syncFile(item)">needs sync</a></span>
+        <span class="badge" ng-if="item.playing">playing</span>
+        <hr>
     </div>
 </div>
 <br clear="all">

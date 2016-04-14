@@ -1,0 +1,10 @@
+connection:{{connection.type}}
+<span ng-if="connection.type=='wifi'">
+    <button class="btn btn-default glyphicon glyphicon-transfer" ng-click="syncCollections()">
+        <span ng-if="FmpSyncCollection.syncQue.length>0" style="position: relative; padding-left: 5px;">
+            <small>{{FmpSyncCollection.syncTotal}}:{{FmpSyncCollection.syncQue.length}}</small>
+        </span>
+    </button>
+    <button class="btn btn-default glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button>
+</span>
+<button class="btn btn-default" ng-click="organize()">organize</button><br>

@@ -21,6 +21,7 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
 
     $scope.newSync = FmpSync.newSync;
     $scope.FmpSyncCollection = FmpSync.collection;
+    $scope.connection = navigator.connection;
 
     FmpIpScanner.startScan();
 });
