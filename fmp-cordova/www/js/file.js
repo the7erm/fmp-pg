@@ -442,7 +442,7 @@ var FmpFile = function (spec) {
         }
         if (dirty || forceSave) {
             thisFile.dirty = true;
-
+            thisFile.spec.needsSync = true;
             thisFile.save();
         }
     };
@@ -816,6 +816,7 @@ var Downloader = function(){
 
 var Player = function() {
     var thisPlayer = this;
+    thisPlayer.resume = true;
     thisPlayer.media = null;
     thisPlayer.file = null;
     thisPlayer.realState = "STOPPED";
@@ -845,6 +846,7 @@ var Player = function() {
         logger.log("-waitForRelease");
         thisPlayer.state = "PLAYING";
         thisPlayer.media.play();
+        localStorage['player-playing-id'] = thisPlayer.file.id;
     };
     thisPlayer.prepare = function(file) {
         if (thisPlayer.media) {
@@ -867,11 +869,6 @@ var Player = function() {
         thisPlayer.file.playing = true;
         thisPlayer.file.played = true;
         thisPlayer.file.err = "";
-
-        var media = new Media(thisPlayer.file.filename);
-        media.play();
-        media.stop();
-        media.release();
 
         thisPlayer.media = new Media(thisPlayer.file.filename,
             function(){
@@ -921,6 +918,9 @@ var Player = function() {
                 thisPlayer.state = "STOPPED";
             }
         );
+        if (thisPlayer.resume) {
+            thisPlayer.media.pause();
+        }
 
         thisPlayer.waitForRelease();
     };
@@ -1064,7 +1064,26 @@ var Player = function() {
                 position = parseFloat(position);
                 if (position <= -1 || position == thisPlayer.lastPosition) {
                     logger.log("position <= -1 || position == thisPlayer.lastPosition");
+                    if(position == thisPlayer.lastPosition && position != -1) {
+                        localStorage['player-state'] = "paused";
+                    }
                     return;
+                }
+                if (thisPlayer.resume) {
+                    thisPlayer.resume = false;
+                    var position = localStorage['player-position'];
+                    if (typeof localStorage['player-position'] != "undefined") {
+                        logger.log("RESUME:", position);
+                        thisPlayer.media.seekTo(localStorage['player-position'] * 1000);
+                        if (localStorage['player-state'] == "playing") {
+                            thisPlayer.play();
+                        }
+                    }
+                } else {
+                    localStorage['player-position'] = position;
+                }
+                if(position == thisPlayer.lastPosition) {
+                    localStorage['player-state'] = "playing";
                 }
                 thisPlayer.lastPosition = position;
                 // logger.log("position:", position);
@@ -1074,8 +1093,11 @@ var Player = function() {
 
                 thisPlayer.file.set_spec_value("remaining", remaining, false);
                 thisPlayer.file.set_spec_value("position", position, false);
+                thisPlayer.file.spec.needsSync = true;
+
                 thisPlayer.timeStatusCb(thisPlayer.file);
                 if (thisPlayer.file.dirty) {
+
                     thisPlayer.file.save();
                 }
             },

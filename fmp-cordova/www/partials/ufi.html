@@ -11,4 +11,4 @@ Rating:<a class="glyphicon"
 Score: {{ufi.skip_score}} <a class="glyphicon glyphicon-thumbs-down" ng-click="ufi.skip_score=ufi.skip_score-1;score(ufi);" ng-if="ufi.skip_score>-15"></a> <a class="glyphicon glyphicon-thumbs-up" ng-click="ufi.skip_score=ufi.skip_score+1;score(ufi);" ng-if="ufi.skip_score<15"></a><br>
 True Score: {{(((ufi.rating * 2 * 10) +(ufi.skip_score * 10)) / 2) | number:0}}
 
-<button class="btn btn-default btn-xs glyphicon glyphicon-transfer" ng-click="syncCollections();"></button>
+<button class="btn btn-default btn-xs glyphicon glyphicon-transfer" ng-click="syncFile(item);"></button>

@@ -1642,7 +1642,12 @@ class FmpServer(object):
         for user in post_data.get('user_file_info',[]):
             user_ids.append(user.get('user_id'))
 
-        # print("post_data:",pformat(post_data))
+        print("post_data:",pformat(post_data))
+
+        deviceTimestamp = float(post_data.get("deviceTimestamp"))
+        serverTimestamp = time()
+        print ("deviceTimestamp:%s\n"
+               "serverTimestamp:%s" % (deviceTimestamp, serverTimestamp))
 
         with session_scope() as session:
             file_id = post_data.get("id")
@@ -1653,6 +1658,12 @@ class FmpServer(object):
                 return {"STATUS": "ERROR",
                         "result": result,
                         "ERROR": "No dbInfo for file_id: %s" % file_id}
+
+            post_data_timestamp = to_int(post_data.get('timestamp', 0))
+            dbInfo_timestamp = to_int(dbInfo.timestamp)
+
+            print("post_data_timestamp:%s\n"
+                  "dbInfo_timestamp:   %s" % (post_data_timestamp, dbInfo_timestamp))
 
             if post_data.get("played", False):
                 session.query(Preload)\
@@ -1668,24 +1679,10 @@ class FmpServer(object):
 
             session.add(dbInfo)
 
-            post_data_timestamp = to_int(post_data.get('timestamp', 0))
-            dbInfo_timestamp = to_int(dbInfo.timestamp)
 
-            if post_data_timestamp > dbInfo_timestamp:
-                mark_as_played_kwargs = {
-                    "user_ids": user_ids,
-                    "percent_played": to_int(post_data.get('percent_played', 0)),
-                    "now": to_int(post_data.get('now', 0)),
-                    "force": True
-                }
 
-                try:
-                    dbInfo.mark_as_played(**mark_as_played_kwargs)
-                except Exception as e:
-                    print("dbInfo.mark_as_played Exception:", e)
-                session_add(session, dbInfo)
-                session.commit()
 
+            if post_data_timestamp >= dbInfo_timestamp:
                 for ns_ufi in post_data.get("user_file_info",[]):
                     print("ns_ufi:", pformat(ns_ufi))
                     db_ufi = session.query(UserFileInfo)\
@@ -1718,15 +1715,34 @@ class FmpServer(object):
                             if k in("timestamp", "time_played") and not value:
                                 continue
 
-                            print("set %s => %s" % (k, value))
+                            old_value = getattr(db_ufi,k)
+                            if old_value == value:
+                                continue
+                            print("set %s => %s was:%s" % (k, value, old_value))
                             session_add(session, db_ufi)
                             setattr(db_ufi, k, value)
                         session_add(session, db_ufi)
+                        session.commit()
                         db_ufi.calculate_true_score()
                     else:
                         print("db_ufi.timestamp > ns_ufi['timestamp']")
                         print(db_ufi.timestamp, ns_ufi['timestamp'])
                     session.commit()
+
+                # mark as played AFTER
+                mark_as_played_kwargs = {
+                    "user_ids": user_ids,
+                    "percent_played": to_int(post_data.get('percent_played', 0)),
+                    "now": to_int(post_data.get('now', 0)),
+                    "force": True
+                }
+
+                try:
+                    dbInfo.mark_as_played(**mark_as_played_kwargs)
+                except Exception as e:
+                    print("dbInfo.mark_as_played Exception:", e)
+                session_add(session, dbInfo)
+                session.commit()
 
             elif dbInfo_timestamp > post_data_timestamp:
                 print("dbInfo_timestamp > post_data_timestamp")
@@ -1742,7 +1758,7 @@ class FmpServer(object):
             result = dbInfo.json(history=True, user_ids=user_ids,
                                  get_image=False)
 
-            # print("dbInfo:", result)
+            print("AFTER dbInfo:", pformat(result))
 
 
         return {"STATUS": "OK",

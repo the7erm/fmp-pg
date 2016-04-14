@@ -221,6 +221,8 @@ fmpApp
     }
 
     methods.removeFiles = function() {
+        // logger.log("DISABLED removeFiles()", collection.filesToRemove.length);
+        // collection.filesToRemove = [];
         if (collection.filesToRemove.length == 0) {
             return;
         }
@@ -309,8 +311,6 @@ fmpApp
             logger.log("preload response.data:", response.data);
             collection.syncPreloadLock = false;
         });
-
-
     };
 
     methods.syncNext = function() {
@@ -318,6 +318,7 @@ fmpApp
             methods.save();
             methods.removeFiles();
             collection.FmpPlaylist.save();
+            // logger.log("disabled: methods.syncPreload()");
             methods.syncPreload();
             return;
         }
@@ -335,6 +336,7 @@ fmpApp
         collection.syncFileLock = true;
         // delete file['image'];
         logger.log("syncFile:", fileData);
+        fileData.deviceTimestamp = Date.now() / 1000;
         $http({
           method: 'POST',
           url: FmpIpScanner.collection.url+"fileSync",
@@ -398,10 +400,11 @@ fmpApp
             file.syncing = false;
             methods.syncNext();
         });
-    }
+    };
 
-    methods.newSync = function() {
+    methods.newSync = function(removeIfPlayed) {
         console.log("CALLED newSync");
+
         if (collection.syncLock) {
             logger.log("syncLock");
             return;
@@ -419,14 +422,21 @@ fmpApp
             return;
         }
         collection.syncTotal = parseInt(files.length);
+        if (typeof removeIfPlayed == "undefined") {
+            removeIfPlayed = false;
+        }
         $.each(files, function(idx, file){
-            file.removeIfPlayed = true;
+            file.removeIfPlayed = removeIfPlayed;
             methods.syncFile(file);
         });
         collection.syncLock = false;
     };
 
-    $rootScope.$on("socket-open", methods.newSync);
+    methods.onSocketOpen = function() {
+        methods.newSync(false);
+    }
+
+    $rootScope.$on("socket-open", methods.onSocketOpen);
 
     return methods;
 });

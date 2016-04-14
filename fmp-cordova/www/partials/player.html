@@ -1,6 +1,7 @@
 <h3>Player</h3>
 <!-- ng-if="FmpSyncCollection.syncQue.length>0" -->
 <button class="btn btn-default glyphicon glyphicon-transfer" ng-click="syncCollections()"><span ng-if="FmpSyncCollection.syncQue.length>0" style="position: relative; padding-left: 5px;"> <small>{{FmpSyncCollection.syncTotal}}:{{FmpSyncCollection.syncQue.length}}</small></span></button>
+<button class="btn btn-default glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button>
 <button class="btn btn-default" ng-click="organize()">organize</button>
 <div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" >
@@ -39,6 +40,7 @@
             </div>
         </div>
         <pre>
+        item.needsSync:{{item.needSync}}
         item.image{{item.image}}
         item.spec.image{{item.image}}
         </pre>

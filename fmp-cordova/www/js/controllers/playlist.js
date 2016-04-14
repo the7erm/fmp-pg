@@ -3,6 +3,7 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
                                             FmpUtils, $rootScope) {
     $scope.FmpPlaylistCollection = FmpPlaylist.collection;
     $scope.FmpPreloadCollection = FmpPreload.collection;
+    $scope.FmpSyncCollection = FmpSync.collection;
     $scope.syncCollections = FmpSync.newSync;
     $scope.listenersCollection = FmpListeners.collection;
     $scope.next = FmpPlaylist.next;
