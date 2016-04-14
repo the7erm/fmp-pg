@@ -817,13 +817,15 @@ var Downloader = function(){
 var Player = function() {
     var thisPlayer = this;
     thisPlayer.resume = true;
+    thisPlayer.resuming = true;
     thisPlayer.media = null;
     thisPlayer.file = null;
     thisPlayer.realState = "STOPPED";
     thisPlayer.lastPosition = 0;
     thisPlayer.dragging = false;
+    thisPlayer.mediaState = null;
 
-    var logger = new Logger("Player", false);
+    var logger = new Logger("Player", true);
 
     thisPlayer.completeCb = function(file) {
         logger.log("completeCb*********************");
@@ -845,7 +847,23 @@ var Player = function() {
         }
         logger.log("-waitForRelease");
         thisPlayer.state = "PLAYING";
-        thisPlayer.media.play();
+        if (thisPlayer.resume) {
+            thisPlayer.resume = false;
+            if (typeof localStorage['player-position'] != "undefined") {
+                thisPlayer.media.play();
+                thisPlayer.media.seekTo(localStorage['player-position'] * 1000);
+                logger.log("RESUME-waitForRelease");
+                if (localStorage['player-state'] != "playing") {
+                    thisPlayer.media.pause();
+                } else {
+                    thisPlayer.media.play();
+                }
+            }
+            thisPlayer.resuming = false;
+        } else {
+            thisPlayer.media.play();
+        }
+
         localStorage['player-playing-id'] = thisPlayer.file.id;
     };
     thisPlayer.prepare = function(file) {
@@ -872,6 +890,7 @@ var Player = function() {
 
         thisPlayer.media = new Media(thisPlayer.file.filename,
             function(){
+                // mediaSuccess
                 if (thisPlayer.state == "RELEASING") {
                     logger.log("COMPLETED CALLLED BUT RELEASING");
                     thisPlayer.state = "RELEASED";
@@ -883,6 +902,7 @@ var Player = function() {
                 }
             },
             function(err){
+                // mediaError
                 console.error("failed:", err);
                 if (err.code != 0) {
                     if (err.code == 1) {
@@ -903,6 +923,7 @@ var Player = function() {
             },
             function(state){
                 logger.log("state changed:", state);
+                thisPlayer.mediaState = state;
                 if (thisPlayer.state == "RELEASING") {
                     logger.log("STATE CHANGED BUT RELEASING");
                     return;
@@ -918,9 +939,7 @@ var Player = function() {
                 thisPlayer.state = "STOPPED";
             }
         );
-        if (thisPlayer.resume) {
-            thisPlayer.media.pause();
-        }
+
 
         thisPlayer.waitForRelease();
     };
@@ -1064,26 +1083,22 @@ var Player = function() {
                 position = parseFloat(position);
                 if (position <= -1 || position == thisPlayer.lastPosition) {
                     logger.log("position <= -1 || position == thisPlayer.lastPosition");
-                    if(position == thisPlayer.lastPosition && position != -1) {
+                    if(!thisPlayer.resume && !thisPlayer.resuming &&
+                       thisPlayer.mediaState == Media.MEDIA_PAUSED) {
                         localStorage['player-state'] = "paused";
                     }
                     return;
                 }
-                if (thisPlayer.resume) {
-                    thisPlayer.resume = false;
-                    var position = localStorage['player-position'];
-                    if (typeof localStorage['player-position'] != "undefined") {
-                        logger.log("RESUME:", position);
-                        thisPlayer.media.seekTo(localStorage['player-position'] * 1000);
-                        if (localStorage['player-state'] == "playing") {
-                            thisPlayer.play();
-                        }
-                    }
-                } else {
+                if (!thisPlayer.resume) {
                     localStorage['player-position'] = position;
                 }
-                if(position == thisPlayer.lastPosition) {
-                    localStorage['player-state'] = "playing";
+                if(!thisPlayer.resume && !thisPlayer.resuming) {
+                    if (thisPlayer.mediaState == Media.MEDIA_RUNNING) {
+                        localStorage['player-state'] = "playing";
+                    }
+                    if (thisPlayer.mediaState == Media.MEDIA_PAUSED) {
+                        localStorage['player-state'] = "paused";
+                    }
                 }
                 thisPlayer.lastPosition = position;
                 // logger.log("position:", position);

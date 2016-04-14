@@ -81,7 +81,7 @@
             <form style="width:100%;">
                 <div class="btn-group btn-group-justified" role="group" aria-label="..." style="width:100%;" >
                     <button class="btn navbar-btn btn-default btn-small" id="prev" ng-click="body.focus();player.prev();" style="width:33%;"><span class="glyphicon glyphicon-fast-backward"></span></button>
-                    <button style="width:33%;" class="btn navbar-btn btn-default btn-small" ng-click="body.focus();player.pause();"><span ng-class="{
+                    <button style="width:33%;" class="btn navbar-btn btn-default btn-small" ng-click="body.focus();player.pause();"><span class="glyphicon glyphicon-pause" ng-class="{
                         'glyphicon glyphicon-pause':(player.state=='PLAYING'),
                         'glyphicon glyphicon-play':(player.state!='PLAYING')
                     }"></span></button>
