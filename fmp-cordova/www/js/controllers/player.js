@@ -9,5 +9,5 @@ fmpApp.controller('PlayerController', function ($scope, FmpSync, PlayerData,
     $rootScope.$on("time-status", function(scope, file){
         $scope.$apply();
     });
-
+    $scope.downloader = window.downloader;
 });

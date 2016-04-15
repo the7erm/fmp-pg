@@ -64,6 +64,9 @@ CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
 
 CONVERT_DIR = os.path.join(CONFIG_DIR, "convert")
 
+TMP_DIR = os.path.join(CONFIG_DIR, "tmp")
+
 os.makedirs(CONFIG_DIR, 0o775, True)
 os.makedirs(CACHE_DIR, 0o775, True)
 os.makedirs(CONVERT_DIR, 0o775, True)
+os.makedirs(TMP_DIR, 0o775, True)

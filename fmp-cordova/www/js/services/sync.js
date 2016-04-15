@@ -1,6 +1,5 @@
-fmpApp
-.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
-                             FmpIpScanner, FmpSocket, $timeout){
+fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
+                                   FmpIpScanner, FmpSocket, $timeout){
     var collection = {
             payload: {},
             transactionIds: [],
@@ -76,7 +75,8 @@ fmpApp
     };
 
     methods.syncCollections = function() {
-        logger.log("sync-collections()");
+        console.log("syncCollections DEPRECATED");
+        return;
         logger.log("1");
         if (!FmpSocket.collection.connected) {
             logger.log("FmpIpScanner.collection.socketUrl:",

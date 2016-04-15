@@ -18,10 +18,12 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
     FmpSync.collection.FmpPreload = FmpPreload;
     FmpSync.collection.FmpListeners = FmpListeners;
     FmpSync.collection.FmpSocket = FmpSocket;
+    FmpListeners.collection.FmpSync = FmpSync;
 
     $scope.newSync = FmpSync.newSync;
     $scope.FmpSyncCollection = FmpSync.collection;
     $scope.connection = navigator.connection;
+
 
     FmpIpScanner.startScan();
 });

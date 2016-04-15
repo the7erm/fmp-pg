@@ -78,7 +78,8 @@
             <div ng-view class="container-fluid" ></div>
         </div>
         <nav class="navbar navbar-fixed-bottom navbar-default " role="navigation" bs-navbar ng-controller="PlayerController">
-            <form style="width:100%;">
+            <form style="width:100%; text-align: center;">
+
                 <div class="btn-group btn-group-justified" role="group" aria-label="..." style="width:100%;" >
                     <button class="btn navbar-btn btn-default btn-small" id="prev" ng-click="body.focus();player.prev();" style="width:33%;"><span class="glyphicon glyphicon-fast-backward"></span></button>
                     <button style="width:33%;" class="btn navbar-btn btn-default btn-small" ng-click="body.focus();player.pause();"><span class="glyphicon glyphicon-pause" ng-class="{
@@ -87,6 +88,12 @@
                     }"></span></button>
                     <button class="btn navbar-btn btn-default btn-small" style="width:33%;"
                     ng-click="body.focus();player.next();"><span class="glyphicon glyphicon-fast-forward"></span></button>
+                </div>
+                <div sytle="width:100%; height:3px !important;">
+                    <div style="height:3px !important; background:red; width:{{downloader.downloading.progress}}%"
+                        ng-if="downloader.downloading&&downloader.downloading.progress<=100"></div>
+                    <div style="height:3px !important; background:green; width:100%"
+                        ng-if="!downloader.downloading"></div>
                 </div>
             </form>
         </nav>

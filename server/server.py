@@ -2,7 +2,7 @@
 import os
 import sys
 import json
-from time import time
+from time import time, sleep
 from datetime import date, datetime
 import cherrypy
 from cherrypy.lib.static import serve_file
@@ -18,7 +18,8 @@ from fmp_utils.db_session import session_scope, Session
 from fmp_utils.misc import to_bool, session_add, to_int
 from fmp_utils.first_run import first_run, check_config
 from fmp_utils.media_tags import MediaTags
-from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT, CONVERT_DIR
+from fmp_utils.constants import CONFIG_DIR, CONFIG_FILE, VALID_EXT, \
+                                CONVERT_DIR, TMP_DIR
 from fmp_utils.jobs import jobs
 from models.base import to_json
 from models.user import User
@@ -59,11 +60,20 @@ class Converter(object):
         self.converting = False
 
     def append(self, src, tmp_dst, dst):
-        self.files.append([src, tmp_dst, dst])
+        found = False
+        for f in self.files:
+            _src, _tmp_dst, _dst = f
+            if _dst == dst:
+                found = True
+                break
+
+        if not found:
+            self.files.append([src, tmp_dst, dst])
         self.start()
 
     def start(self):
         if self.converting:
+            print("current conversion:",self.converting)
             return
         self.converting = True
         t = threading.Thread(target=self.do)
@@ -75,24 +85,193 @@ class Converter(object):
             return
         while len(self.files) > 0:
             src, tmp_dst, dst = self.files.pop(0) # Grab the first set of files.
+            if os.path.exists(dst):
+                continue
+
+            tmp_basename = os.path.basename(tmp_dst)
+            tmp_dst = os.path.join(TMP_DIR, tmp_basename)
+
+            self.converting = "%s => %s" %(src, dst)
             print ("DOING:",src, "=>", dst)
+            ## avconv -i "$FILENAME" -c:a copy -vn -sn "$FILENAME.m4a"
+            base, ext = os.path.splitext(os.path.basename(src))
+            ext = ext.lower()
+
+            output = ""
+            audio_tmp = ""
+            if ext in (".mp4", ".wmv", ".flv", ".avi"):
+
+                # avprobe -v quiet -show_format -of json -pretty  -show_streams
+                # '/home/erm/disk2/acer-home/media/video/c/child beater/Child Beater - not really.flv'
+                ex = [
+                    "avprobe", "-v", "quiet", "-show_format", "-show_streams",
+                               "-of", "json", "-pretty",
+                               src
+                ]
+                try:
+                    output = subprocess.check_output(ex)
+                except Exception as e:
+                    print("Probe Error:", e)
+                    continue
+
+                avprobe = json.loads(output)
+                for s in avprobe['streams']:
+                    if s['codec_name'] == "mp3" and s['codec_type'] == 'audio':
+                        ex = [
+                            "avconv", "-y", "-i", src, "-c:a", "copy", "-vn", "-sn",
+                            tmp_dst
+                        ]
+                        try:
+                            output = subprocess.check_output(ex)
+                        except Exception as e:
+                            print("Conversion Exception:", e)
+                        if os.path.exists(tmp_dst):
+                            os.rename(tmp_dst, dst)
+                            break
+
+                    if s['codec_name'] in ("aac",) and \
+                       s['codec_type'] == "audio":
+                            ext = ".m4a"
+
+                    if s['codec_name'] in ('wmav2', ) and s['codec_type'] == 'audio':
+                        ext = ".wma"
+
+                    if s['codec_name'] in ('pcm_s16le', ) and s['codec_type'] == 'audio':
+                        ext = ".wav"
+
+                if os.path.exists(dst):
+                    continue
+
+                # extracting the audio and then converting that to mp3
+                # is faster
+                if ext in (".m4a", ".wma", ".wav"):
+                    tmp_basename += ext
+                    audio_tmp = os.path.join(TMP_DIR, tmp_basename)
+                    print("extracting audio:%s => %s" % (src, audio_tmp))
+                    ex = [
+                        "avconv", "-y", "-i", src, "-c:a", "copy", "-vn", "-sn",
+                        audio_tmp
+                    ]
+                    try:
+                        output = subprocess.check_output(ex)
+                    except Exception as e:
+                        print("Conversion Exception:", e)
+
+                    if os.path.exists(audio_tmp):
+                        src = audio_tmp
+
+            print("final conversion:%s => %s" % (src, tmp_dst))
+
             ex = [
                 "avconv", "-y", "-i", src, tmp_dst
             ]
+
+            output = ""
             try:
                 output = subprocess.check_output(ex)
             except Exception as e:
                 print("Conversion Exception:", e)
-                self.do()
-                return
+
 
             print ("output:", output)
-            os.rename(tmp_dst, dst)
+            if os.path.exists(tmp_dst):
+                os.rename(tmp_dst, dst)
+            if audio_tmp and os.path.exists(audio_tmp):
+                os.unlink(audio_tmp)
 
         self.converting = False
 
 
 converter = Converter()
+
+def convert(id=None, locations=[], to=".mp3", unique=True,  *args, **kwargs):
+    # convert
+    print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
+    if not to.startswith("."):
+        to = ".%s" % to
+    dst = convert_filename(id)
+    if os.path.exists(dst):
+        print("EXISTS:", dst)
+        return
+    src = None
+    base = None
+    ext = None
+
+    for l in locations:
+        src = os.path.join(l['dirname'], l['basename'])
+        if os.path.exists(src):
+            print ("location:",l)
+            base, ext = os.path.splitext(l['basename'])
+            print("base:%s ext:%s" % (base, ext))
+            break
+
+    if src is None:
+        print("NO SRC:", dst)
+        return
+    ### avconv -i "$FILENAME" -c:a copy -vn -sn "$FILENAME.m4a"
+
+    tmp_dst = "%s.%s.mp3" % (dst, ext)
+
+    converter.append(src, tmp_dst, dst)
+
+def convert_filename(file_id):
+    dst_basename = "%s%s" % (file_id, ".mp3")
+    dst = os.path.join(CONVERT_DIR, dst_basename)
+    return dst;
+
+def check_for_files_that_need_converting():
+    print("- STARTTED -", "-"*100)
+    while True:
+        awaiting_download = []
+        with session_scope() as session:
+            sql = """SELECT f.*
+                     FROM files f,
+                          preload p
+                     WHERE f.id = p.file_id
+                     ORDER BY p.from_search DESC, p.id ASC"""
+            files = session.query(File)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+
+            for f in files:
+                user_id = 0
+                session_add(session, f)
+                filename = f.filename
+                print("f.filename:",f.filename)
+                if filename.lower().endswith(".mp3"):
+                    continue
+
+                session_add(session, f)
+                _id = f.id
+                dst = convert_filename(_id)
+                if os.path.exists(dst):
+                    awaiting_download.append(dst)
+                    continue
+
+                locations = []
+                for l in f.locations:
+                    session_add(session, l)
+                    locations.append(l.json())
+                jobs.append(cmd=convert,
+                            id=_id,
+                            locations=locations,
+                            to='.mp3',
+                            unique=True)
+
+        for root, dirs, files in os.walk(CONVERT_DIR):
+            for name in files:
+                fn = os.path.join(root,name)
+                if fn not in awaiting_download:
+                    print("__"*100)
+                    print("remove:",fn)
+                    os.unlink(fn)
+                    continue
+                print("keep:", fn)
+        sleep(60)
+
+t = threading.Thread(target=check_for_files_that_need_converting)
+t.start()
 
 
 class ChatWebSocketHandler(WebSocket):
@@ -1392,11 +1571,6 @@ class FmpServer(object):
             })
         return folders
 
-    def convert_filename(self, file_id):
-        dst_basename = "%s%s" % (file_id, ".mp3")
-        dst = os.path.join(CONVERT_DIR, dst_basename)
-        return dst;
-
     @cherrypy.expose
     def history(self, file_id):
         results = []
@@ -1415,7 +1589,7 @@ class FmpServer(object):
     def download(self, file_id, convert=False, extract_audio=False):
         location = None
         with session_scope() as session:
-            dst = self.convert_filename(file_id)
+            dst = convert_filename(file_id)
 
             if os.path.exists(dst):
                 return serve_file(dst,
@@ -1485,37 +1659,6 @@ class FmpServer(object):
                     "percent_played": percent_played
                 })
 
-    def convert(self, id=None, locations=[], to=".mp3", unique=True,
-                *args, **kwargs):
-        # convert
-        print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
-        if not to.startswith("."):
-            to = ".%s" % to
-        dst = self.convert_filename(id)
-        if os.path.exists(dst):
-            print("EXISTS:", dst)
-            return
-        src = None
-        base = None
-        ext = None
-
-        for l in locations:
-            src = os.path.join(l['dirname'], l['basename'])
-            if os.path.exists(src):
-                print ("location:",l)
-                base, ext = os.path.splitext(l['basename'])
-                print("base:%s ext:%s" % (base, ext))
-                break
-
-        if src is None:
-            print("NO SRC:", dst)
-            return
-        ### avconv -i "$FILENAME" -c:a copy -vn -sn "$FILENAME.m4a"
-
-        tmp_dst = "%s.%s.mp3" % (dst, ext)
-
-        converter.append(src, tmp_dst, dst)
-
     @cherrypy.expose
     @cherrypy.tools.json_in()
     @cherrypy.tools.json_out()
@@ -1583,14 +1726,14 @@ class FmpServer(object):
                 if not filename.lower().endswith(".mp3"):
                     session_add(session, f)
                     _id = f.id
-                    dst = self.convert_filename(_id)
+                    dst = convert_filename(_id)
                     if not os.path.exists(dst):
                         locations = []
                         for l in f.locations:
                             session_add(session, l)
                             locations.append(l.json())
 
-                        jobs.append(cmd=self.convert,
+                        jobs.append(cmd=convert,
                                     id=_id,
                                     locations=locations,
                                     to='.mp3',
