@@ -1,13 +1,12 @@
 <h3>Playlist</h3>
 <span ng-include src="'partials/top-buttons.html'"></span>
-<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id">
+<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing || typeof item.cued == 'undefined' || !item.cued || listenersCollection.listener_user_ids.indexOf(cued.user_id) != -1 || listenersCollection.primary_user_id==cued.user_id">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
          ng-include src="'partials/item.html'"></div>
-    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id">
-        <span ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id)!=-1">
-            <div ng-include src="'partials/ufi.html'"></div>
-        </span>
-    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
+         ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id"
+         ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id) != -1 || ufi.user.id == listenersCollection.primary_user_id"
+         ng-include src="'partials/ufi.html'"></div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" ng-if="item.err||!item.exists">
         <div ng-if="item.err" class="alert alert-danger">{{item.err}}</div>
         <div ng-if="!item.exists">

@@ -1,6 +1,6 @@
 fmpApp.controller('PlayerController', function ($scope, FmpSync, PlayerData,
                                                 FmpPlayer, $rootScope) {
-    $scope.PlayerData = PlayerData;
+    console.log("PlayerController");
     $scope.FmpPlayerCollection = FmpPlayer.collection;
     $scope.syncCollections = FmpSync.newSync;
     $scope.syncFile = FmpSync.syncFile;
@@ -10,4 +10,5 @@ fmpApp.controller('PlayerController', function ($scope, FmpSync, PlayerData,
         $scope.$apply();
     });
     $scope.downloader = window.downloader;
+    console.log("/PlayerController");
 });

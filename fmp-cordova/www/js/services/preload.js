@@ -1,6 +1,6 @@
 fmpApp
 .factory('FmpPreload', function(FmpConfig, $http, FmpUtils, FmpDownloader, $rootScope){
-
+  var logger = new Logger("FmpPreload", false);
   var collection = {
         fetchLock: false,
         files: [],
@@ -66,6 +66,6 @@ fmpApp
     methods.load();
   }
 
-
+  logger.log("Initialized");
   return methods;
 });

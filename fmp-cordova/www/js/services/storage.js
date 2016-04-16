@@ -1,5 +1,5 @@
 fmpApp.factory('FmpLocalStorage', function(){
-
+  var logger = new Logger("FmpLocalStorage", false);
   var methods = {};
 
   methods.getColKey = function(storageField) {
@@ -262,6 +262,7 @@ fmpApp.factory('FmpLocalStorage', function(){
     methods.loadObject(collection);
   };
 
+  logger.log("initialized");
   return methods;
 
 });

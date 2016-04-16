@@ -17,6 +17,9 @@ from subprocess import Popen
 server_thread = Thread(target=server.cherry_py_worker)
 server_thread.start()
 
+t = Thread(target=server.check_for_files_that_need_converting)
+t.start()
+
 if first_run:
     print("FIRST RUN", first_run)
     Popen(["xdg-open", "http://localhost:5050/#/setup"])

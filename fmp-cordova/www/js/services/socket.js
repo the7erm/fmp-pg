@@ -141,6 +141,6 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
   };
 
   $rootScope.$on("server-found", methods.connect);
-
+  logger.log("initialized");
   return methods;
 });

@@ -1,4 +1,5 @@
 fmpApp.factory('FmpConfig', function($rootScope){
+  var logger = new Logger("FmpConfig", false);
   /*
       Media.MEDIA_NONE = 0;
       Media.MEDIA_STARTING = 1;
@@ -11,5 +12,6 @@ fmpApp.factory('FmpConfig', function($rootScope){
     'cacheDir': null
   };
 
+  logger.log("initialized");
   return collection;
 });

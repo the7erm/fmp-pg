@@ -54,12 +54,16 @@ MEDIA_PLAYING = 2
 MEDIA_PAUSED = 3
 MEDIA_STOPPED = 4
 
+fnCache = {}
+
 class Converter(object):
     def __init__(self):
         self.files = []
         self.converting = False
+        self.die = False
 
     def append(self, src, tmp_dst, dst):
+        return
         found = False
         for f in self.files:
             _src, _tmp_dst, _dst = f
@@ -185,8 +189,10 @@ class Converter(object):
 converter = Converter()
 
 def convert(id=None, locations=[], to=".mp3", unique=True,  *args, **kwargs):
+    if converter.converting and len(converter.files) > 10:
+        return
     # convert
-    print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
+    # print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
     if not to.startswith("."):
         to = ".%s" % to
     dst = convert_filename(id)
@@ -200,9 +206,9 @@ def convert(id=None, locations=[], to=".mp3", unique=True,  *args, **kwargs):
     for l in locations:
         src = os.path.join(l['dirname'], l['basename'])
         if os.path.exists(src):
-            print ("location:",l)
+            # print ("location:",l)
             base, ext = os.path.splitext(l['basename'])
-            print("base:%s ext:%s" % (base, ext))
+            # print("base:%s ext:%s" % (base, ext))
             break
 
     if src is None:
@@ -222,6 +228,11 @@ def convert_filename(file_id):
 def check_for_files_that_need_converting():
     print("- STARTTED -", "-"*100)
     while True:
+        if converter.die:
+            break;
+        if converter.converting and len(converter.files) > 10:
+            sleep(60)
+            continue
         awaiting_download = []
         with session_scope() as session:
             sql = """SELECT f.*
@@ -237,8 +248,10 @@ def check_for_files_that_need_converting():
             for f in files:
                 user_id = 0
                 session_add(session, f)
-                filename = f.filename
-                print("f.filename:",f.filename)
+                filename = fnCache.get(f.id, f.filename)
+                session_add(session, f)
+                fnCache[f.id] = filename
+                # print("f.filename:",filename)
                 if filename.lower().endswith(".mp3"):
                     continue
 
@@ -263,16 +276,12 @@ def check_for_files_that_need_converting():
             for name in files:
                 fn = os.path.join(root,name)
                 if fn not in awaiting_download:
-                    print("__"*100)
-                    print("remove:",fn)
+                    # print("__"*100)
+                    # print("remove:",fn)
                     os.unlink(fn)
                     continue
-                print("keep:", fn)
+                # print("keep:", fn)
         sleep(60)
-
-t = threading.Thread(target=check_for_files_that_need_converting)
-t.start()
-
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, message):
@@ -1168,6 +1177,9 @@ class FmpServer(object):
     def search(self, *args, **kwargs):
         with session_scope() as session:
             params = cherrypy.request.params
+            print("KWARGS:")
+            pprint(kwargs)
+            print("PARAMS:", params)
             if 'params' in kwargs:
                 params = kwargs.get("params")
 
@@ -1177,10 +1189,6 @@ class FmpServer(object):
             limit = int(params.get("l", 10))
             only_cued = params.get('oc', False)
             owner = params.get("owner",'')
-            try:
-                uid = int(params.get('uid', 0))
-            except:
-                uid = 0
 
             only_cued = to_bool(only_cued)
 
@@ -1206,9 +1214,10 @@ class FmpServer(object):
                                   FROM {COUNT_FROM}
                                   WHERE {WHERE}"""
 
+            user_ids = self.get_user_ids(user_ids=kwargs.get('user_ids', []))
+            USER_IDS = ",".join(user_ids)
             if only_cued:
-                user_ids = self.get_user_ids(user_ids=kwargs.get('user_ids', []))
-                USER_IDS = ",".join(user_ids)
+
                 query_spec["FROM"].append("preload p")
                 query_spec["COUNT_FROM"].append("preload p")
                 query_spec["WHERE"].append("f.id = p.file_id AND "
@@ -1258,8 +1267,9 @@ class FmpServer(object):
                            .all()
 
             results = []
+
             for res in files:
-                results.append(res.json(history=True))
+                results.append(res.json(history=True, user_ids=user_ids))
 
             print ("counting total")
             total = session.execute(text(count_query),query_args).first()
@@ -1695,6 +1705,8 @@ class FmpServer(object):
 
         group_by_user = {}
         with session_scope() as session:
+            ufi_user_ids = get_all_user_ids(session)
+
             # Check the preload and make sure all the users have files
             # up to their minimums ready.
             preloaded = picker.get_preload(
@@ -1719,11 +1731,22 @@ class FmpServer(object):
             already_added = []
 
             for f in files:
+                session_add(session, f)
+                f_id = f.id
                 user_id = 0
                 session_add(session, f)
-                filename = f.filename
-                print("f.filename:",f.filename)
+                if f_id in already_added:
+                    continue
+                already_added.append(f_id)
+
+                filename = fnCache.get(f_id, f.filename)
+                session_add(session, f)
+                fnCache[f_id] = filename
+                # print("f.filename:", filename)
+
                 if not filename.lower().endswith(".mp3"):
+                    if converter.converting and len(converter.files) > 10:
+                        continue
                     session_add(session, f)
                     _id = f.id
                     dst = convert_filename(_id)
@@ -1755,10 +1778,8 @@ class FmpServer(object):
 
                 # Group the files by their user_id.
                 session_add(session, f)
-                item = f.json(user_ids=user_ids, get_image=False)
-                if item['id'] not in already_added:
-                    group_by_user[user_id].append(item)
-                    already_added.append(item['id'])
+                item = f.json(user_ids=ufi_user_ids, get_image=False)
+                group_by_user[user_id].append(item)
 
         file_found = True
         result = []
@@ -1766,7 +1787,9 @@ class FmpServer(object):
             file_found = False
             for user_id in group_by_user:
                 if len(group_by_user[user_id]) > 0:
-                    item = group_by_user[user_id].pop()
+                    # Grab the first item so it matches the order it
+                    # was placed in the array.
+                    item = group_by_user[user_id].pop(0)
                     file_found = True
                     result.append(item)
 
@@ -1782,8 +1805,9 @@ class FmpServer(object):
         # print("post_data:", post_data)
         result = {}
         user_ids = []
-        for user in post_data.get('user_file_info',[]):
-            user_ids.append(user.get('user_id'))
+        for user_id in post_data.get('user_ids',[]):
+            user_ids.append(user_id)
+
 
         print("post_data:",pformat(post_data))
 
@@ -1793,6 +1817,8 @@ class FmpServer(object):
                "serverTimestamp:%s" % (deviceTimestamp, serverTimestamp))
 
         with session_scope() as session:
+            ufi_user_ids = get_all_user_ids(session)
+
             file_id = post_data.get("id")
             dbInfo = session.query(File)\
                             .filter(File.id==file_id)\
@@ -1808,7 +1834,9 @@ class FmpServer(object):
             print("post_data_timestamp:%s\n"
                   "dbInfo_timestamp:   %s" % (post_data_timestamp, dbInfo_timestamp))
 
-            if post_data.get("played", False):
+            played = to_bool(post_data.get("played", False))
+
+            if played:
                 session.query(Preload)\
                                .filter(Preload.file_id==file_id)\
                                .delete()
@@ -1821,9 +1849,6 @@ class FmpServer(object):
                 print("proof:", exists)
 
             session.add(dbInfo)
-
-
-
 
             if post_data_timestamp >= dbInfo_timestamp:
                 for ns_ufi in post_data.get("user_file_info",[]):
@@ -1873,19 +1898,20 @@ class FmpServer(object):
                     session.commit()
 
                 # mark as played AFTER
-                mark_as_played_kwargs = {
-                    "user_ids": user_ids,
-                    "percent_played": to_int(post_data.get('percent_played', 0)),
-                    "now": to_int(post_data.get('now', 0)),
-                    "force": True
-                }
+                if post_data.get("played", False):
+                    mark_as_played_kwargs = {
+                        "user_ids": user_ids,
+                        "percent_played": to_int(post_data.get('percent_played', 0)),
+                        "now": to_int(post_data.get('now', 0)),
+                        "force": True
+                    }
 
-                try:
-                    dbInfo.mark_as_played(**mark_as_played_kwargs)
-                except Exception as e:
-                    print("dbInfo.mark_as_played Exception:", e)
-                session_add(session, dbInfo)
-                session.commit()
+                    try:
+                        dbInfo.mark_as_played(**mark_as_played_kwargs)
+                    except Exception as e:
+                        print("dbInfo.mark_as_played Exception:", e)
+                    session_add(session, dbInfo)
+                    session.commit()
 
             elif dbInfo_timestamp > post_data_timestamp:
                 print("dbInfo_timestamp > post_data_timestamp")
@@ -1898,7 +1924,7 @@ class FmpServer(object):
 
             session.add(dbInfo)
 
-            result = dbInfo.json(history=True, user_ids=user_ids,
+            result = dbInfo.json(history=True, user_ids=ufi_user_ids,
                                  get_image=False)
 
             print("AFTER dbInfo:", pformat(result))
@@ -2079,3 +2105,15 @@ def get_all_users():
         for u in users:
             results.append(u.json())
     return results
+
+def get_all_user_ids(session):
+    ufi_user_ids = []
+
+    users = session.query(User)\
+                   .order_by(User.admin.desc().nullslast(),
+                             User.name.nullslast())\
+                   .all()
+    for u in users:
+        ufi_user_ids.append(u.id)
+
+    return ufi_user_ids

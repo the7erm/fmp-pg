@@ -13,6 +13,7 @@ def to_bool(value):
         if not value or value in('f', '0', 'false', 'off', 'null',
                                  'undefined', ''):
             return False
+
     return bool(value)
 
 def to_int(value):
@@ -29,14 +30,19 @@ def to_int(value):
 
 def session_add(session, obj, commit=False, close=False):
     added = False
+    try_cnt = 0
     while not added:
         try:
             session.add(obj)
             added = True
+            if try_cnt:
+                print("Finally added obj")
         except InvalidRequestError as e:
+            added = False
             traceback.print_exc()
-            print("InvalidRequestError:", e)
+            print("session_add InvalidRequestError:", e)
             sleep(0.1)
+        try_cnt = try_cnt + 1
 
     if commit:
         session.commit()

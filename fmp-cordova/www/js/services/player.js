@@ -1,5 +1,6 @@
 fmpApp.factory('FmpPlayer', function(FmpPreload, FmpPlaylist,
                                $rootScope, FmpUtils, FmpLocalStorage){
+  console.log("FmpPlayer");
   var playerState = localStorage.playerState || Media.MEDIA_PAUSED,
       collection = {
         "duration": -1,

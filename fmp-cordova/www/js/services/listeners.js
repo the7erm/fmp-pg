@@ -2,7 +2,7 @@ fmpApp
 .factory('FmpListeners', function($http, $rootScope, FmpConfig,
                                   FmpLocalStorage, FmpSocket){
 
-    var logger = new Logger("FmpListeners", false);
+    var logger = new Logger("FmpListeners", true);
 
     var collection = {
             fetchLock: false,
@@ -106,19 +106,110 @@ fmpApp
         logger.log("-----------> setPrimaryUser:", collection.primary_user_id);
         localStorage.primary_user_id = collection.primary_user_id;
     };
+
+    methods.setPrimary = function(user_id) {
+        console.log("setPrimary:", user_id);
+        for (var i=0;i<collection.users.length;i++) {
+            var user = collection.users[i];
+            if (user.id == user_id) {
+                user.primary = true;
+                user.secondary = false;
+                user.listening = true; // The primary user ALWAYS is listening
+                collection.primary_user_id = user.id;
+                var idx = collection.secondary_user_ids.indexOf(user.id);
+                if (idx != -1) {
+                    collection.secondary_user_ids.splice(idx, 1);
+                }
+                if (collection.listener_user_ids.indexOf(user_id) == -1) {
+                    collection.listener_user_ids.push(user_id);
+                }
+            } else {
+                var wasPrimary = false;
+                if (user.primary) {
+                    // I did this check because I wanted to make sure
+                    // the value wasn't linked to user.primary.
+                    wasPrimary = true;
+                }
+                user.primary = false;
+                if (wasPrimary) {
+                    user.secondary = true;
+                    if (collection.secondary_user_ids.indexOf(user_id) == -1) {
+                        collection.secondary_user_ids.push(user_id);
+                    }
+                    if (collection.listener_user_ids.indexOf(user_id) == -1) {
+                        collection.listener_user_ids.push(user_id);
+                        user.listening = true;
+                    }
+                }
+            }
+        }
+        methods.save();
+    }
+
+    methods.toggle = function(type, user_id) {
+        console.log("type:", type, "user_id:", user_id, "forceValue:", forceValue);
+        if (["listening", "secondary"].indexOf(type) == -1) {
+            return;
+        }
+        for (var i=0;i<collection.users.length;i++) {
+            var user = collection.users[i];
+            if (user.id != user_id) {
+                continue;
+            }
+            var obj = collection.listener_user_ids;
+            if (type == "secondary") {
+                obj = collection.secondary_user_ids;
+            }
+            user[type] = !user[type];
+            var idx = obj.indexOf(user_id);
+            if (user[type] && idx == -1) {
+                obj.push(idx);
+            } else if (!user[type] && idx != -1) {
+                obj.splice(idx, 1);
+            }
+            if (type == "secondary" && !user["secondary"] &&
+                user.listening) {
+                // The user is not a secondary user yet is still listening.
+                methods.toggle("listening", user_id);
+                return;
+            }
+            methods.save();
+            break;
+        }
+    }
+
     methods.save = function() {
         collection.listener_user_ids = [];
         collection.secondary_user_ids = [];
+        var primaryMarked = false;
         for (var i=0;i<collection.users.length;i++) {
             var user = collection.users[i];
+            if (!user.secondary && !user.primary) {
+                // The user is not a primary or a secondary so they
+                // can never be marked listening.
+                user.listening = false;
+            }
+            if (user.primary) {
+                if (!primaryMarked) {
+                    primaryMarked = true;
+                    collection.primary_user_id = user.id;
+                    // Primary users are always listening, and they
+                    // are never a secondary user.
+                    user.listening = true;
+                    user.secondary = false;
+                } else {
+                    // Only allow 1 user to be a primary user
+                    // Mark them as the secondary user, and
+                    // set them as listening.
+                    user.secondary = true;
+                    user.listening = true;
+                }
+            }
             if (user.listening) {
                 collection.listener_user_ids.push(user.id);
             }
             if (user.secondary) {
                 collection.secondary_user_ids.push(user.id);
-            }
-            if (user.primary) {
-                collection.primary_user_id = user.id;
             }
         }
         logger.log("SAVE collection:", collection);
@@ -176,6 +267,6 @@ fmpApp
     $rootScope.$on("user-data", methods.onUserData);
     $rootScope.$on("socket-open", methods.syncUsers);
 
-
+    logger.log("All good");
     return methods;
 });

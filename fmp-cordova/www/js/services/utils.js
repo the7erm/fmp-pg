@@ -1,15 +1,16 @@
 fmpApp
 .factory('FmpUtils', function(FmpConfig){
-  var methods = {};
+  var methods = {},
+      logger = new Logger("FmpUtils", true);
   methods.listDir = function (path, successCb, errorCb){
     if (typeof successCb == 'undefined') {
       successCb = function(entries) {
-        console.log("FmpUtils.methods.listDir successCb:", entries);
+        logger.log("FmpUtils.methods.listDir successCb:", entries);
       };
     }
     if (typeof errorCb == 'undefined') {
       errorCb = function(err) {
-          console.log("FmpUtils.methods.listDir errorCb:", err);
+          logger.log("FmpUtils.methods.listDir errorCb:", err);
       };
     }
     /* listDir stolen from
@@ -96,7 +97,7 @@ fmpApp
     ufi.satellite_history[now.today]["timestamp"] = now.timestamp.toISOString();
     ufi.satellite_history[now.today]["timestamp_UTC"] = now.timestamp_UTC;
     for (var k in obj) {
-      console.log("K:",k, "v:", obj[k]);
+      logger.log("K:",k, "v:", obj[k]);
       ufi.satellite_history[now.today][k] = obj[k];
     }
   }
@@ -152,7 +153,7 @@ fmpApp
       var file = list[i];
       methods.addLocalData(file);
       if (!methods.validFile(file)) {
-        console.log("invalid extension:", file);
+        logger.log("invalid extension:", file);
         continue;
       }
       newList.push(file);
@@ -160,5 +161,6 @@ fmpApp
     return newList;
   };
 
+  logger.log("Initialized");
   return methods;
 });

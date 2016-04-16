@@ -6,5 +6,8 @@ connection:{{connection.type}}<br>
         </span>
     </button>
     <button class="btn btn-default glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button>
+    <button ng-if="FmpSyncCollection.FmpIpScanner.collection.url"
+            class="btn btn-default glyphicon glyphicon-search"
+            ng-click="openSearch()"></button>
 </span>
 <button class="btn btn-default" ng-click="organize()">organize</button><br>

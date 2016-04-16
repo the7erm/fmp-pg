@@ -1,5 +1,6 @@
 fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
                                        FmpSync, FmpPreload){
+  var logger = new Logger("FmpPlaylist", false);
   var collection = {
         files: [],
         lastSave: 0,
@@ -8,16 +9,19 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
         FmpSync: FmpSync,
         lastSyncTime: 0,
         organizeLock:false,
-        saveLock: false
+        saveLock: false,
+        loaded: false
       },
       methods = {
         collection: collection
       };
 
     methods.load = function() {
+      logger.log("load()");
       collection.files = [];
       if (typeof localStorage["playlist"] == "undefined" ||
           !localStorage["playlist"]) {
+        collection.loaded = true;
         return;
       }
       var files = JSON.parse(localStorage["playlist"]);
@@ -31,9 +35,10 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
         collection.files.push(file);
         if (file.playing == true) {
           file.play();
-          // file.pause();
         }
       }
+      logger.log("loaded");
+      collection.loaded = true;
     };
 
     methods.save = function() {
@@ -65,20 +70,64 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
         return;
       }
       var playingIdx = -1,
-          prevIdx = -1;
+          prevIdx = -1,
+          files = [],
+          listener_user_ids = FmpListeners.collection.listener_user_ids,
+          primary_user_id = FmpListeners.collection.primary_user_id,
+          user_ids = [];
+
+      // We're creating a new array because we don't want
+      // to push the primary_user_id onto listener_user_ids
+      $.each(FmpListeners.collection.listener_user_ids, function(i, user_id){
+          user_ids.push(user_id);
+      });
+      if (user_ids.indexOf(primary_user_id) == -1) {
+          user_ids.push(primary_user_id);
+      }
+
+      var atLeastOneWithoutError = false;
+
+      // Build a list of files that are showing.
       for (var i=0;i<collection.files.length;i++) {
         var file = collection.files[i];
+        if (typeof file.cued == "undefined" || !file.cued || file.playing) {
+          if (!file.err) {
+            atLeastOneWithoutError = true;
+          }
+          files.push(file);
+          continue;
+        }
+        if (user_ids.indexOf(file.cued.user_id) != -1) {
+          if (!file.err) {
+            atLeastOneWithoutError = true;
+          }
+          files.push(file);
+        }
+      }
+
+      if (files.length == 0) {
+        return;
+      }
+
+      if (!atLeastOneWithoutError) {
+        return;
+      }
+
+      for (var i=0;i<files.length;i++) {
+        // Get the playing index, then increment & decrement the score
+        // accordingly.
+        var file = files[i];
         if (file.playing) {
           playingIdx = i;
           prevIdx = i;
           if (incScore == -1) {
             file.spec.skipped = true;
-            file.deinc_score(FmpListeners.collection.listener_user_ids);
+            file.deinc_score(user_ids);
             file.save();
           }
           if (incScore == 1) {
             file.spec.skipped = false;
-            file.inc_score(FmpListeners.collection.listener_user_ids);
+            file.inc_score(user_ids);
             file.save();
           }
           break;
@@ -86,35 +135,38 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       }
       playingIdx = playingIdx + by;
       if (playingIdx < 0) {
-        playingIdx = collection.files.length - 1;
+        // The playing index is < 0 set it to the length of files.
+        playingIdx = files.length - 1;
       }
-      if (playingIdx > collection.files.length) {
+      if (playingIdx >= files.length) {
+        // the playing index is >= the files.length so we
+        // loop back to the beginning.
         playingIdx = 0;
       }
 
       if (prevIdx != playingIdx && prevIdx != -1 &&
-          typeof collection.files[prevIdx] != 'undefined') {
-            var file = collection.files[prevIdx];
+          typeof files[prevIdx] != 'undefined') {
+            // The previous index exists, so set the playing to false
+            var file = files[prevIdx];
             file.playing = false;
-            file.save();
       }
 
-      for (var i=0;i<collection.files.length;i++) {
+      for (var i=0;i<files.length;i++) {
         if (i == playingIdx) {
-          var file = collection.files[i];
-          file.play();
+          files[i].playing = true;
+          files[i].play();
           break;
         }
       }
     }
 
     methods.next = function() {
-      console.log("PLAYLIST NEXT");
+      logger.log("PLAYLIST NEXT");
       methods.incTrack(1, -1, []);
     };
 
     methods.prev = function() {
-      console.log("PLAYLIST PREV");
+      logger.log("PLAYLIST PREV");
       methods.incTrack(-1, 0, []);
     };
 
@@ -132,7 +184,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
 
       for (var i=0;i<FmpPreload.collection.files.length;i++) {
           var file = FmpPreload.collection.files[i];
-          console.log("file:", file);
+          logger.log("file:", file);
           files.push(file);
       }
       for (var i=0;i<collection.files.length;i++) {
@@ -143,11 +195,11 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       for (var i=0;i<files.length;i++) {
         var file = files[i];
         if (!file) {
-          console.log("FILE IS NULL!");
+          logger.log("FILE IS NULL!");
           continue;
         }
         if (!file.spec) {
-          console.log("!file.spec", file);
+          logger.log("!file.spec", file);
           continue;
         }
         if (file.spec.cued) {
@@ -162,7 +214,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
             groupedByUsers[user_id].push(file);
         } else {
             FmpPreload.collection.files.push(file);
-            console.log("fallback push:", file.id);
+            logger.log("fallback push:", file.id);
         }
       }
       var hasFiles = true;
@@ -180,16 +232,16 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
               playingFile = file;
             } else {
               playedFiles.push(file);
-              console.log("PLAYED:", file.id);
+              logger.log("PLAYED:", file.id);
             }
           } else {
             unplayedFiles.push(file);
           }
         }
       }
-      console.log("playedFiles:", playedFiles);
-      console.log("playingFile:", playingFile);
-      console.log("unplayedFiles:", unplayedFiles);
+      logger.log("playedFiles:", playedFiles);
+      logger.log("playingFile:", playingFile);
+      logger.log("unplayedFiles:", unplayedFiles);
       for (var i=0;i<playedFiles.length;i++) {
         newOrder.push(playedFiles[i]);
       }
@@ -203,8 +255,21 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       collection.organizeLock = false;
     };
 
+    methods.deleteFile = function(file) {
+        var idx = FmpUtils.indexOfFile(collection.files, file);
+        if (idx != -1) {
+            var _file = collection.files[idx];
+            collection.splice(idx,1);
+            _file.delete(methods.deleteCb);
+        }
+    }
+
+    methods.deleteCb = function(file) {
+
+    }
+
     methods.rate = function(ufi) {
-        console.log("rate:", ufi);
+        logger.log("rate:", ufi);
         for (var i=0;i<collection.files.length;i++) {
             var file = collection.files[i];
             if (file.file_id == ufi.file_id) {
@@ -215,7 +280,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     methods.score = function (ufi) {
-        console.log("score:", ufi);
+        logger.log("score:", ufi);
         for (var i=0;i<collection.files.length;i++) {
             var file = collection.files[i];
             if (file.file_id == ufi.file_id) {
@@ -226,11 +291,11 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     methods.remove = function(file) {
-      console.log("remove:", file);
+      logger.log("remove:", file);
     };
 
     window.player.completeCb = function(file) {
-      console.log("PLAYLIST COMPLETED CB:", file.basename);
+      logger.log("PLAYLIST COMPLETED CB:", file.basename);
       methods.incTrack(1, 1, []);
     };
     window.player.errorCb = function(file) {
@@ -239,10 +304,10 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
     };
 
     window.player.timeStatusCb = function(file) {
-      // console.log("window.player.timeStatusCb");
-      // console.log("file.duration:", file.duration, "file.position:", file.position);
+      // logger.log("window.player.timeStatusCb");
+      // logger.log("file.duration:", file.duration, "file.position:", file.position);
       if (file.duration <= 0 || file.position <= 0) {
-        // console.log("return;");
+        // logger.log("return;");
         return;
       }
       var percent_played = (file.position / file.duration) * 100;
@@ -250,7 +315,7 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       file.spec.position = file.position;
       file.mark_as_played(FmpListeners.collection.listener_user_ids, percent_played);
       file.spec.percent_played = percent_played;
-      // console.log("percent_played:", file.percent_played);
+      // logger.log("percent_played:", file.percent_played);
       collection.playingFile = file;
       $rootScope.$broadcast("time-status", file);
     }

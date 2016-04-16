@@ -9,27 +9,37 @@
     </tr>
     <tr ng-repeat="user in listenersCollection.users">
         <td>
-
-            <input type="radio"
-                   name="primary_user_id"
-                   ng-model="listenersCollection.primary_user_id"
-                   ng-click="listenersCollection.primary_user_id=user.id;save()"
-                   ng-checked="listenersCollection.primary_user_id==user.id">
+            <button class="btn btn-xs"
+                    ng-class="{
+                      'btn-success glyphicon glyphicon-check
+': user.id == listenersCollection.primary_user_id,
+                      'btn-default glyphicon glyphicon-unchecked': user.id != listenersCollection.primary_user_id
+                    }"
+                    ng-click="setPrimary(user.id)"
+            ></button>
         </td>
         <td>{{user.name}}</td>
         <td>
-            <input type="checkbox"
-                   name="secondary"
-                   ng-model="user.secondary"
-                   ng-if="listenersCollection.primary_user_id!=user.id"
-                   ng-click="save()">
+            <button class="btn btn-xs"
+                    ng-if="listenersCollection.primary_user_id!=user.id"
+                    ng-class="{
+                      'btn-success glyphicon glyphicon-check
+': listenersCollection.secondary_user_ids.indexOf(user.id) != -1,
+                      'btn-default glyphicon glyphicon-unchecked': listenersCollection.secondary_user_ids.indexOf(user.id) == -1,
+                    }"
+                    ng-click="toggle('secondary', user.id)"
+            ></button>
         </td>
         <td>
-            <input type="checkbox"
-                   name="listening"
-                   ng-model="user.listening"
-                   ng-if="user.secondary || listenersCollection.primary_user_id==user.id"
-                   ng-click="save()">
+            <button class="btn btn-xs"
+                    ng-if="listenersCollection.primary_user_id!=user.id"
+                    ng-class="{
+                      'btn-success glyphicon glyphicon-check
+': listenersCollection.listener_user_ids.indexOf(user.id) != -1,
+                      'btn-default glyphicon glyphicon-unchecked': listenersCollection.listener_user_ids.indexOf(user.id) == -1,
+                    }"
+                    ng-click="toggle('listening', user.id)"
+            ></button>
         </td>
     </tr>
 </table>

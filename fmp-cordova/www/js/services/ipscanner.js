@@ -1,5 +1,5 @@
 fmpApp.factory("FmpIpScanner", function($http, $rootScope){
-  var logger = new Logger("FmpIpScanner", false);
+  var logger = new Logger("FmpIpScanner", true);
   logger.log("Connection:", navigator.connection);
   var collection = {
         "knownHosts": [],
@@ -51,11 +51,13 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
       logger.log("skipping !",Connection.WIFI);
       return;
     }
-    collection.scanLock = true;
+    if (thread == 4) {
+      collection.scanLock = true;
+    }
     var host = collection.scanHosts.shift();
     // logger.log("scan thread:", thread, host);
     try {
-
+      logger.log("methods.scan:",host);
       $http({
           method: 'GET',
           url: host+"fmp_version",
@@ -93,17 +95,19 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
   };
 
   methods.startScan = function(FmpConfig) {
+    logger.log("startScan()");
     collection.found = false;
     methods.generateHosts();
     collection.scanStart = new Date();
-    for (var i=1;i<5;i++) {
+    for (var i=1;i<=5;i++) {
       try {
+        logger.log("started thread:",i);
         methods.scan(i, FmpConfig);
       } catch(e) {
         logger.log("methods.scan:",e);
       }
     }
   }
-
+  logger.log("FmpIpScanner: Initialized");
   return methods;
 });

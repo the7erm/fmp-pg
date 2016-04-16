@@ -7,10 +7,12 @@ Rating:<a class="glyphicon"
             'glyphicon-star-empty': (rating>0&&ufi.rating<rating)||ufi.rating==6
          }"
          ng-click="ufi.rating=rating;rate(ufi)"></a>
-    <span ng-if="ufi.rating==6" class="glyphicon glyphicon-question-sign"></span><br>
-Score: {{ufi.skip_score}} <a class="glyphicon glyphicon-thumbs-down" ng-click="ufi.skip_score=ufi.skip_score-1;score(ufi);" ng-if="ufi.skip_score>-15"></a> <a class="glyphicon glyphicon-thumbs-up" ng-click="ufi.skip_score=ufi.skip_score+1;score(ufi);" ng-if="ufi.skip_score<15"></a><br>
+<span ng-if="ufi.rating==6" class="glyphicon glyphicon-question-sign"></span><br>
+Score: {{ufi.skip_score}} <a class="glyphicon glyphicon-thumbs-down" ng-click="ufi.skip_score=ufi.skip_score-1;score(ufi);" ng-if="ufi.skip_score>-15"></a>
+<a class="glyphicon glyphicon-thumbs-up" ng-click="ufi.skip_score=ufi.skip_score+1;score(ufi);" ng-if="ufi.skip_score<15"></a><br>
 True Score: {{(((ufi.rating * 2 * 10) +(ufi.skip_score * 10)) / 2) | number:0}}
 
 <button class="btn btn-default btn-xs glyphicon glyphicon-transfer"
         ng-if="connection.type=='wifi'"
         ng-click="syncFile(item);"></button>
+

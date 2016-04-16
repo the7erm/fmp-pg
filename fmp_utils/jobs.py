@@ -83,7 +83,7 @@ class Jobs():
 
     def exe(self, job):
         cmd, args, kwargs = job
-        print("exe:", cmd, args, kwargs)
+        # print("exe:", cmd, args, kwargs)
         try:
             cmd(*args, **kwargs)
         except:

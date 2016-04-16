@@ -7,6 +7,8 @@ window.Logger = function(name, debug) {
     if (typeof debug == "undefined") {
         debug = false;
     }
+
+    debug = true;
     var thisLogger = this;
     thisLogger.name = name;
     thisLogger.debug = debug;
@@ -39,6 +41,7 @@ window.Logger = function(name, debug) {
           console.error.apply(console, args);
         }());
     };
+    thisLogger.log("initialized",name,"logger");
 };
 
 var listDir = function (path, successCb, errorCb){
@@ -182,14 +185,19 @@ var FmpFile = function (spec) {
         thisFile.dirty = false;
     };
 
-    thisFile.delete = function() {
-        delete localStorage["file-"+thisFile.id];
+    thisFile.delete = function(deleteCb) {
         logger.log("***** REMOVE FILE *****");
         window.resolveLocalFileSystemURL(
                 thisFile.filename,
                 function(fileEntry) {
                     fileEntry.remove(function(file){
                         logger.log("File removed!");
+                        thisFile.save();
+                        localStorage["deleted-"+thisFile.id] = localStorage["file-"+thisFile.id];
+                        delete localStorage["file-"+thisFile.id];
+                        if (typeof deleteCb != "undefined") {
+                            deleteCb(thisFile);
+                        }
                     },function(error){
                         logger.log("error deleting the file " + error.code);
 
@@ -825,7 +833,7 @@ var Player = function() {
     thisPlayer.dragging = false;
     thisPlayer.mediaState = null;
 
-    var logger = new Logger("Player", true);
+    var logger = new Logger("Player", false);
 
     thisPlayer.completeCb = function(file) {
         logger.log("completeCb*********************");
