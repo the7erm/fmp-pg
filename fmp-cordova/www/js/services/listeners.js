@@ -58,7 +58,7 @@ fmpApp
     methods.fetch = function() {
         logger.log("FETCHING LISTENERS");
         if (collection.fetchLock) {
-            // return;
+            return;
         }
         collection.fetchLock = true;
 
@@ -147,7 +147,7 @@ fmpApp
     }
 
     methods.toggle = function(type, user_id) {
-        console.log("type:", type, "user_id:", user_id, "forceValue:", forceValue);
+        console.log("type:", type, "user_id:", user_id);
         if (["listening", "secondary"].indexOf(type) == -1) {
             return;
         }

@@ -6,6 +6,7 @@ from time import time, sleep
 from datetime import date, datetime
 import cherrypy
 from cherrypy.lib.static import serve_file
+from cherrypy.process import wspbus, plugins
 import configparser
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
@@ -33,7 +34,7 @@ from models.album import Album
 from models.genre import Genre
 from models.user import get_users
 from models.user_file_history import UserFileHistory
-from sqlalchemy.sql import not_, text, and_, func
+from sqlalchemy.sql import not_, text, and_, or_, func
 from sqlalchemy.exc import InvalidRequestError
 import subprocess
 from pprint import pprint, pformat
@@ -56,6 +57,7 @@ MEDIA_STOPPED = 4
 
 fnCache = {}
 
+
 class Converter(object):
     def __init__(self):
         self.files = []
@@ -63,7 +65,8 @@ class Converter(object):
         self.die = False
 
     def append(self, src, tmp_dst, dst):
-        return
+        if self.die:
+            return
         found = False
         for f in self.files:
             _src, _tmp_dst, _dst = f
@@ -76,6 +79,8 @@ class Converter(object):
         self.start()
 
     def start(self):
+        if self.die:
+            return
         if self.converting:
             print("current conversion:",self.converting)
             return
@@ -84,12 +89,16 @@ class Converter(object):
         t.start()
 
     def do(self):
+        print("DO", "!"*100)
         if len(self.files) == 0:
             self.converting = False
             return
         while len(self.files) > 0:
+            if self.die:
+                return
             src, tmp_dst, dst = self.files.pop(0) # Grab the first set of files.
             if os.path.exists(dst):
+                print("EXISTS:", dst)
                 continue
 
             tmp_basename = os.path.basename(tmp_dst)
@@ -114,6 +123,8 @@ class Converter(object):
                 ]
                 try:
                     output = subprocess.check_output(ex)
+                    output = output.decode('utf-8')
+                    print("avprobe:", output)
                 except Exception as e:
                     print("Probe Error:", e)
                     continue
@@ -127,6 +138,7 @@ class Converter(object):
                         ]
                         try:
                             output = subprocess.check_output(ex)
+                            output = output.decode('utf-8')
                         except Exception as e:
                             print("Conversion Exception:", e)
                         if os.path.exists(tmp_dst):
@@ -158,6 +170,7 @@ class Converter(object):
                     ]
                     try:
                         output = subprocess.check_output(ex)
+                        output = output.decode('utf-8')
                     except Exception as e:
                         print("Conversion Exception:", e)
 
@@ -169,10 +182,11 @@ class Converter(object):
             ex = [
                 "avconv", "-y", "-i", src, tmp_dst
             ]
-
+            print("ex:", " ".join(ex))
             output = ""
             try:
                 output = subprocess.check_output(ex)
+                output = output.decode('utf-8')
             except Exception as e:
                 print("Conversion Exception:", e)
 
@@ -186,10 +200,27 @@ class Converter(object):
         self.converting = False
 
 
+class ConverterPlugin(cherrypy.process.plugins.SimplePlugin):
+    def __init__(self, bus):
+        plugins.SimplePlugin.__init__(self, bus)
+
+    def start(self):
+        self.bus.log('Start Called')
+
+    def stop(self):
+        self.bus.log('Stop Called')
+        converter.die = True
+        self.bus.log("CONVERTER THREAD:%s" % converter.thread)
+        pprint(dir(converter.thread))
+
+
+ConverterPlugin(cherrypy.engine).subscribe()
+
 converter = Converter()
 
 def convert(id=None, locations=[], to=".mp3", unique=True,  *args, **kwargs):
     if converter.converting and len(converter.files) > 10:
+        print("converter.converting and len(converter.files) > 10", len(converter.files) )
         return
     # convert
     # print("CONVERT: id:%s locations:%s, to:%s" % (id, pformat(locations), to))
@@ -229,9 +260,16 @@ def check_for_files_that_need_converting():
     print("- STARTTED -", "-"*100)
     while True:
         if converter.die:
-            break;
+            return
+        print("check_for_files_that_need_converting()")
         if converter.converting and len(converter.files) > 10:
-            sleep(60)
+            print("converter.converting and len(converter.files) > ", len(converter.files))
+            cnt = 60
+            while cnt > 0:
+                cnt = cnt - 1
+                sleep(1)
+                if converter.die:
+                    return
             continue
         awaiting_download = []
         with session_scope() as session:
@@ -246,23 +284,27 @@ def check_for_files_that_need_converting():
                            .all()
 
             for f in files:
+                if converter.die:
+                    return
                 user_id = 0
                 session_add(session, f)
-                filename = fnCache.get(f.id, f.filename)
-                session_add(session, f)
-                fnCache[f.id] = filename
-                # print("f.filename:",filename)
+                filename = f.filename
+
                 if filename.lower().endswith(".mp3"):
                     continue
+                # print("f.filename:",filename)
 
                 session_add(session, f)
                 _id = f.id
                 dst = convert_filename(_id)
+                awaiting_download.append(dst)
                 if os.path.exists(dst):
-                    awaiting_download.append(dst)
+                    # print("exists:", dst)
                     continue
+                # print("MISSING:", dst)
 
                 locations = []
+                session_add(session, f)
                 for l in f.locations:
                     session_add(session, l)
                     locations.append(l.json())
@@ -272,16 +314,25 @@ def check_for_files_that_need_converting():
                             to='.mp3',
                             unique=True)
 
+        threashold = (time() - (24 * 60 * 60))
         for root, dirs, files in os.walk(CONVERT_DIR):
             for name in files:
                 fn = os.path.join(root,name)
-                if fn not in awaiting_download:
-                    # print("__"*100)
-                    # print("remove:",fn)
+                mtime = os.path.getmtime(fn)
+                # print("mtime     :", mtime)
+                # print("threashold:", threashold)
+                if fn not in awaiting_download and mtime < threashold:
+                    print("__"*100)
+                    print("remove:",fn, mtime)
                     os.unlink(fn)
                     continue
                 # print("keep:", fn)
-        sleep(60)
+        cnt = 60
+        while cnt > 0:
+            cnt = cnt - 1
+            sleep(1)
+            if converter.die:
+                return
 
 class ChatWebSocketHandler(WebSocket):
     def received_message(self, message):
@@ -1690,8 +1741,32 @@ class FmpServer(object):
         user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
         user_ids = list(set(user_ids))
         user_ids = [int(x) for x in user_ids]
+        group_by_user_file_ids= {}
+        files = post_data.get("files", [])
+        already_added = []
+        already_added_sql = ""
+
+        for f in files:
+            cued = f.get("cued", {})
+            user_id = cued.get("user_id", 0)
+            if not group_by_user_file_ids.get(user_id):
+                group_by_user_file_ids[user_id] = []
+            file_id = f.get("id")
+            if file_id:
+                file_id = int(file_id)
+                already_added.append(file_id)
+
+            if file_id and file_id not in group_by_user_file_ids[user_id]:
+                group_by_user_file_ids[user_id].append(file_id)
+
+
+        if already_added:
+            already_added_sql = " AND p.file_id NOT IN (%s) " % (
+                ",".join(str(x) for x in already_added),
+            )
 
         print("PRIMARY USER ID:",primary_user_id)
+        # print("FILES:", files)
 
         sql = """SELECT f.*, l.basename
                  FROM files f,
@@ -1699,13 +1774,16 @@ class FmpServer(object):
                       locations l
                  WHERE user_id IN (%s) AND
                        f.id = p.file_id AND
-                       l.file_id = f.id
-                 ORDER BY p.from_search DESC, p.id ASC;""" % ",".join(
-                    str(x) for x in user_ids)
+                       l.file_id = f.id %s
+                 ORDER BY p.from_search DESC, p.id ASC""" % (
+                    ",".join(str(x) for x in user_ids),
+                    already_added_sql
 
-        group_by_user = {}
+                 )
+        print("sql:", sql)
+
         with session_scope() as session:
-            ufi_user_ids = get_all_user_ids(session)
+            ufi_user_ids = merge_admin_user_ids(session, user_ids)
 
             # Check the preload and make sure all the users have files
             # up to their minimums ready.
@@ -1728,8 +1806,8 @@ class FmpServer(object):
                            .from_statement(
                                 text(sql))\
                            .all()
-            already_added = []
 
+            group_by_user = {}
             for f in files:
                 session_add(session, f)
                 f_id = f.id
@@ -1767,12 +1845,16 @@ class FmpServer(object):
                     user_id = f.cued['user_id']
                 if not group_by_user.get(user_id):
                     group_by_user[user_id] = []
+                if not group_by_user_file_ids.get(user_id):
+                    group_by_user_file_ids[user_id] = []
                 if user_id != primary_user_id:
-                    if len(group_by_user[user_id]) >= secondaryPrefetchNum:
+                    if (len(group_by_user[user_id]) +
+                        len(group_by_user_file_ids[user_id])) >= secondaryPrefetchNum:
                         # skip because we've fetched enough.
                         continue
                 elif user_id == primary_user_id:
-                    if len(group_by_user[user_id]) >= prefetchNum:
+                    if (len(group_by_user[user_id]) +
+                        len(group_by_user_file_ids[user_id])) >= prefetchNum:
                         # skip because we've fetched enough.
                         continue
 
@@ -1799,13 +1881,77 @@ class FmpServer(object):
     @cherrypy.expose
     @cherrypy.tools.json_in()
     @cherrypy.tools.json_out()
+    def playedSince(self, *args, **kwargs):
+        # The concept for this section of code is to keep track of the
+        # timestamp so if a user on one device plays a file it will
+        # be removed on other devices.
+        # It limits the query to files only on the device so it will
+        # limit the result to only files the device cares about.
+        # If any of the files are in the preload it will not delete them.
+        post_data = cherrypy.request.json
+
+        listener_user_ids = post_data.get('listener_user_ids',[])
+        primary_user_id = int(post_data.get('primary_user_id'))
+        secondary_user_ids = post_data.get('secondary_user_ids', [])
+        file_ids = post_data.get("file_ids",[])
+
+        primary_user_id = int(primary_user_id)
+        listener_user_ids = listener_user_ids + [primary_user_id]
+        listener_user_ids = list(set(listener_user_ids))
+        user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
+        user_ids = list(set(user_ids))
+        user_ids = [int(x) for x in user_ids]
+        file_ids = [int(x) for x in file_ids]
+        str_user_ids = ",".join(str(x) for x in user_ids)
+        str_file_ids = ",".join(str(x) for x in file_ids)
+
+        removeTimestamp = to_int(post_data.get("removeTimestamp", 0))
+        removeThreshold = time() - (24 * 60 * 60 * 31) # 31 days
+        if removeTimestamp < removeThreshold:
+            removeTimestamp = removeThreshold
+
+        # The goal here is to get any recently played files that aren't
+        # in the preload to tell the system it's ok to delete them.
+        sql = """SELECT ufi.*
+                 FROM user_file_info ufi
+                 WHERE time_played >= %d AND
+                       ufi.user_id IN (%s) AND
+                       ufi.file_id IN (%s) AND
+                       ufi.file_id NOT IN(SELECT file_id
+                                          FROM preload
+                                          WHERE user_id IN (%s))
+                 ORDER BY ufi.time_played DESC""" % (
+                    removeTimestamp,
+                    str_user_ids,
+                    str_file_ids,
+                    str_user_ids
+                 );
+
+        print("QUERY:", sql)
+
+        result = []
+        with session_scope() as session:
+            ufis = session.query(UserFileInfo)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+            for ufi in ufis:
+                session_add(session, ufi)
+                result.append(ufi.json())
+
+        return {"STATUS": "OK",
+                "result": result}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
     def fileSync(self, *args, **kwargs):
         post_data = cherrypy.request.json
         # print("newSync:", args, kwargs)
         # print("post_data:", post_data)
         result = {}
         user_ids = []
-        for user_id in post_data.get('user_ids',[]):
+        for user_id in post_data.get('user_ids', []):
             user_ids.append(user_id)
 
 
@@ -1817,7 +1963,7 @@ class FmpServer(object):
                "serverTimestamp:%s" % (deviceTimestamp, serverTimestamp))
 
         with session_scope() as session:
-            ufi_user_ids = get_all_user_ids(session)
+            ufi_user_ids = merge_admin_user_ids(session, user_ids)
 
             file_id = post_data.get("id")
             dbInfo = session.query(File)\
@@ -1835,8 +1981,9 @@ class FmpServer(object):
                   "dbInfo_timestamp:   %s" % (post_data_timestamp, dbInfo_timestamp))
 
             played = to_bool(post_data.get("played", False))
+            deleted = to_bool(post_data.get("deleted", False))
 
-            if played:
+            if played or deleted:
                 session.query(Preload)\
                                .filter(Preload.file_id==file_id)\
                                .delete()
@@ -1930,8 +2077,15 @@ class FmpServer(object):
             print("AFTER dbInfo:", pformat(result))
 
 
-        return {"STATUS": "OK",
-                "result": result};
+        return_data = {
+            "STATUS": "OK",
+            "deleted": False,
+            "result": result
+        }
+        if deleted:
+            return_data['deleted'] = True
+
+        return return_data
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
@@ -2106,14 +2260,19 @@ def get_all_users():
             results.append(u.json())
     return results
 
-def get_all_user_ids(session):
+def merge_admin_user_ids(session, user_ids=[]):
+    user_ids = [int(x) for x in user_ids]
     ufi_user_ids = []
 
     users = session.query(User)\
+                   .filter(or_(User.admin==True,
+                               User.id.in_(user_ids)))\
                    .order_by(User.admin.desc().nullslast(),
                              User.name.nullslast())\
                    .all()
+
     for u in users:
-        ufi_user_ids.append(u.id)
+        if u.id not in ufi_user_ids:
+            ufi_user_ids.append(u.id)
 
     return ufi_user_ids

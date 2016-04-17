@@ -14,11 +14,14 @@ from threading import Thread
 fmp_utils.fmp_playlist.setproctitle = setproctitle
 from subprocess import Popen
 
+
+
+server.converter.thread = Thread(target=server.check_for_files_that_need_converting)
+server.converter.thread.start()
+
 server_thread = Thread(target=server.cherry_py_worker)
 server_thread.start()
 
-t = Thread(target=server.check_for_files_that_need_converting)
-t.start()
 
 if first_run:
     print("FIRST RUN", first_run)

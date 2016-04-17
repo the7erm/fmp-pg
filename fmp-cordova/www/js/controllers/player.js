@@ -1,4 +1,4 @@
-fmpApp.controller('PlayerController', function ($scope, FmpSync, PlayerData,
+fmpApp.controller('PlayerController', function ($scope, FmpSync,
                                                 FmpPlayer, $rootScope) {
     console.log("PlayerController");
     $scope.FmpPlayerCollection = FmpPlayer.collection;

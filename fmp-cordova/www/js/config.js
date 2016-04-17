@@ -7,11 +7,13 @@ fmpApp.config(['$routeProvider', '$locationProvider', function($routeProvider, $
     })
     .when('/player', {
         templateUrl: 'partials/player.html',
-        controller: 'PlaylistCtrl'
+        controller: 'PlaylistCtrl',
+        reloadOnSearch: false
     })
     .when("/listeners", {
         templateUrl: 'partials/listeners.html',
-        controller: 'ListenersController'
+        controller: 'ListenersController',
+        reloadOnSearch: false
     })
     .otherwise({
         redirectTo: '/player'

@@ -20,12 +20,12 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
             syncQue: [],
             syncLock: false,
             syncFileLock: false,
-            syncPreloadLock: false
+            syncPreloadLock: false,
+            removeFilesLock: false
         },
         methods = {
             collection:collection
         };
-
     /*
         main.js will populate
         FmpSync.collection.FmpPlaylist = FmpPlaylist;
@@ -221,7 +221,7 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
 
     methods.getPlaylistFiles = function() {
         var playlistFiles = [];
-        if (collection.FmpPreload.collection.files) {
+        if (collection.FmpPlaylist.collection.files) {
             for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
                 playlistFiles.push(collection.FmpPlaylist.collection.files[i].spec);
             }
@@ -232,23 +232,103 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
     methods.removeFiles = function() {
         // logger.log("DISABLED removeFiles()", collection.filesToRemove.length);
         // collection.filesToRemove = [];
-        if (collection.filesToRemove.length == 0) {
+
+        if (!collection.FmpPlaylist.collection.loaded) {
+            setTimeout(methods.removeFiles, 1000);
             return;
         }
-        while (collection.filesToRemove.length > 0) {
-            var removeId = collection.filesToRemove.pop();
-            for(var idx=collection.FmpPlaylist.collection.files.length - 1;
-                idx > -1;
-                idx--) {
-                    var plfile = collection.FmpPlaylist.collection.files[idx];
-                    if (plfile.spec.id == removeId && !plfile.spec.playing) {
-                        logger.log("******** DELETING ***",removeId);
-                        collection.FmpPlaylist.collection.files.splice(idx, 1);
-                        plfile.delete();
-                    }
-            }
-
+        if (collection.removeFilesLock) {
+            return;
         }
+        collection.removeFilesLock = true;
+        collection.removingFiles = false;
+
+        if (typeof localStorage.removeTimestamp != "undefined") {
+            try {
+                removeTimestamp = parseFloat(localStorage.removeTimestamp);
+            } catch (e) {
+                removeTimestamp = 0;
+            }
+        }
+
+        if (collection.filesToRemove.length > 0) {
+            while (collection.filesToRemove.length > 0) {
+                var removeId = collection.filesToRemove.pop();
+                for(var idx=collection.FmpPlaylist.collection.files.length - 1;
+                    idx > -1;
+                    idx--) {
+                        var plfile = collection.FmpPlaylist.collection.files[idx];
+                        if (plfile.spec.id == removeId && !plfile.spec.playing) {
+                            collection.FmpPlaylist.deleteFile(plfile);
+                        }
+                }
+            }
+        }
+
+        var removeTimestamp = 0,
+            file_ids = [],
+            startTimestamp = Date.now() / 1000;
+
+        for (var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
+            var file = collection.FmpPlaylist.collection.files[i];
+            if (!file.playing) {
+                file_ids.push(file.id);
+            }
+        }
+
+        if (file_ids.length == 0) {
+            collection.removeFilesLock = false;
+            return;
+        }
+
+        var post_data = {
+            "primary_user_id": collection.FmpListeners.collection.primary_user_id,
+            "listener_user_ids": collection.FmpListeners.collection.listener_user_ids,
+            "secondary_user_ids": collection.FmpListeners.collection.secondary_user_ids,
+            "removeTimestamp": removeTimestamp,
+            "deviceTimestamp": Date.now() / 1000,
+            "file_ids": file_ids
+        };
+        $http({
+          method: 'POST',
+          url: FmpIpScanner.collection.url+"playedSince",
+          data: JSON.stringify(post_data),
+          headers: {
+            'Content-Type': "application/json"
+          }
+        }).then(function successCallback(response) {
+            if (response.data.STATUS != "OK") {
+                logger.log("removeFiles response.data ERROR:", response.data);
+                collection.syncPreloadLock = false;
+                return;
+            }
+            logger.log("removeFiles response.data.result:", response.data.result);
+            while (response.data.result.length > 0) {
+                var ufi = response.data.result.shift();
+                for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
+                    var file = collection.FmpPlaylist.collection.files[i];
+                    if (file.id == ufi.file_id) {
+                        var deleteCb = function(file){
+                            // We're removing it from storage so it won't
+                            // be synced later.
+                            if(typeof localStorage["deleted-"+file.id] != "undefined") {
+                                delete localStorage["deleted-"+file.id];
+                            }
+                            logger.log("deleted played file:", file.id);
+                        }
+                        if (typeof file.cued == "undfined" || !file.cued) {
+                            collection.FmpPlaylist.deleteFile(file, deleteCb);
+                        } else if (file.cued.user_id == ufi.user_id) {
+                            collection.FmpPlaylist.deleteFile(file, deleteCb);
+                        }
+                    }
+                }
+            }
+            localStorage.removeTimestamp = startTimestamp;
+            collection.removeFilesLock = false;
+        }, function(){
+            collection.removeFilesLock = false;
+        });
     }
 
     methods.syncPreload = function() {
@@ -281,9 +361,59 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                 "secondary_user_ids": collection.FmpListeners.collection.secondary_user_ids,
                 "prefetchNum": collection.FmpListeners.collection.prefetchNum,
                 "secondaryPrefetchNum": collection.FmpListeners.collection.secondaryPrefetchNum
-            };
+            },
+            grouped_by_user = {};
 
         logger.log("POST_DATA:", post_data);
+
+        for (var i=0;i<files.length;i++) {
+            var file = files[i],
+                user_id = 0;
+            if (typeof file.cued != "undefined" && file.cued) {
+                user_id = file.cued.user_id;
+            }
+            if (typeof grouped_by_user[user_id] == "undefined") {
+                grouped_by_user[user_id] = [];
+            }
+            grouped_by_user[user_id].push(file.id);
+        }
+        var needFiles = false,
+            tripped = false;
+        if (angular.equals(grouped_by_user, {})) {
+            needFiles = true;
+        } else {
+            for(var user_id in grouped_by_user) {
+                var groupLength = grouped_by_user[user_id].length;
+                logger.log("user_id:", user_id, "groupLength:", groupLength);
+                if (user_id == 0) {
+                    continue;
+                }
+                if (collection.FmpListeners.collection.secondary_user_ids.indexOf(user_id) != -1 &&
+                    groupLength <= 10) {
+                    logger.log("need files");
+                    needFiles = true;
+                    tripped = true;
+                    break;
+                }
+                if (collection.FmpListeners.collection.primary_user_id == user_id &&
+                    groupLength <= 50) {
+                    logger.log("need files");
+                    needFiles = true;
+                    tripped = true;
+                    break;
+                }
+            }
+        }
+
+        if (!tripped) {
+            needFiles = true;
+        }
+
+        if (!needFiles) {
+            logger.log("Plenty of files for all users. Not needed");
+            collection.syncPreloadLock = false;
+            return;
+        }
 
         $http({
           method: 'POST',
@@ -315,6 +445,7 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                 logger.log("preload fileData:", fileData);
                 logger.log("primary_user_id:", primary_user_id);
                 logger.log("listener_user_ids:", listener_user_ids);
+                logger.log("secondary_user_ids:", secondary_user_ids);
                 if (fileData.cued) {
                     if (idx != -1 &&
                         !angular.equals(collection.FmpPlaylist.collection.files[idx].spec.cued,
@@ -328,6 +459,9 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                     }
                     if (grouped_by_user[user_id].length >= 50) {
                         logger.log("The user has plenty of files ... skipping");
+                        continue;
+                    }
+                    if (grouped_by_user[user_id].indexOf(fileData.id) != -1) {
                         continue;
                     }
                     grouped_by_user[user_id].push(fileData.id);
@@ -345,12 +479,6 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                         }
                         continue;
                     }
-                    if (primary_user_id != fileData.cued.user_id &&
-                        listener_user_ids.indexOf(fileData.cued.user_id) == -1) {
-                        console.log("user is not listening:", fileData.cued.user_id);
-                        continue;
-                    }
-
                 }
                 if (idx == -1) {
                     var file = new FmpFile(fileData);
@@ -446,6 +574,12 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
 
         // delete file['image'];
         logger.log("syncFile:", fileData);
+        if (typeof localStorage["deleted-"+fileData.id] != "undefined") {
+            fileData.deleted = true;
+        }
+        if (typeof fileData.deleted == "undefined") {
+            fileData.deleted = false;
+        }
         fileData.deviceTimestamp = Date.now() / 1000;
         $http({
           method: 'POST',
@@ -460,21 +594,24 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
             logger.log("response:", response);
             if (response.data.STATUS == "OK") {
                 var result = response.data.result;
-                if (typeof localStorage["deleted-"+result.id] != "undefined") {
-                    delete localStorage["deleted-"+result.id];
-                    if (typeof localStorage["file-"+result.id] != "undefined") {
-                        delete localStorage["file-"+result.id];
-                    }
-                    for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
-                        var file = collection.FmpPlaylist.collection.files[i];
-                        if (file.id != result.id || file.id != fileData.id) {
-                            continue;
+                if (typeof localStorage["deleted-"+result.id] != "undefined" ||
+                    fileData.deleted) {
+                        if (typeof localStorage["deleted-"+result.id] != "undefined") {
+                            delete localStorage["deleted-"+result.id];
                         }
-                        collection.FmpPlaylist.collection.files.splice(i, 1);
-                    }
-                    collection.syncFileLock = false;
-                    methods.syncNext();
-                    return;
+                        if (typeof localStorage["file-"+result.id] != "undefined") {
+                            delete localStorage["file-"+result.id];
+                        }
+                        for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
+                            var file = collection.FmpPlaylist.collection.files[i];
+                            if (file.id != result.id || file.id != fileData.id) {
+                                continue;
+                            }
+                            collection.FmpPlaylist.collection.files.splice(i, 1);
+                        }
+                        collection.syncFileLock = false;
+                        methods.syncNext();
+                        return;
                 }
                 for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
                     var file = collection.FmpPlaylist.collection.files[i];
@@ -550,6 +687,17 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
         collection.syncLock = true;
         methods.removeDuplicates();
         collection.filesToRemove = [];
+        var deletedRx = new RegExp("^deleted\-[\d]+");
+        $.each(localStorage, function(key, value){
+            if (deletedRx.test(key)) {
+                try {
+                    var obj = JSON.parse(value);
+                    methods.syncFile(obj);
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+        });
         var files = methods.getPlaylistFiles();
         if (files.length == 0) {
             collection.syncLock = false;
@@ -564,17 +712,7 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
             file.removeIfPlayed = removeIfPlayed;
             methods.syncFile(file);
         });
-        var deletedRx = new RegExp("^deleted\-[\d]+");
-        $.each(localStorage, function(key, value){
-            if (deletedRx.test(key)) {
-                try {
-                    var obj = JSON.parse(value);
-                    methods.syncFile(obj);
-                } catch(e) {
-                    continue;
-                }
-            }
-        });
+
         collection.syncLock = false;
     };
 

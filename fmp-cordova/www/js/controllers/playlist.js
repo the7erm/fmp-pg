@@ -1,6 +1,8 @@
 fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
-                                            FmpListeners, FmpUtils, $rootScope) {
-    $scope.FmpPlaylistCollection = FmpPlaylist.collection;
+                                            FmpListeners, FmpUtils, $rootScope,
+                                            $timeout) {
+    var logger = new Logger("PlaylistCtrl", false);
+
     $scope.FmpSyncCollection = FmpSync.collection;
     $scope.syncCollections = FmpSync.newSync;
     $scope.listenersCollection = FmpListeners.collection;
@@ -24,7 +26,8 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
         if (!res) {
             return;
         }
-        FmpPlaylist.deleteFile(file);
+        console.log("deleting ... ");
+        FmpPlaylist.deleteFile(file.spec);
     };
 
     $scope.syncFile = function(file) {
@@ -33,5 +36,10 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
         console.log("/removeIfPlayed");
         FmpSync.syncFile(file.spec);
     }
-
+    $timeout(function(){
+        $scope.rendering = true;
+        $scope.FmpPlaylistCollection = FmpPlaylist.collection;
+        $scope.rendering = false;
+    }, 500);
+    logger.log("initialized");
 });

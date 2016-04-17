@@ -27,7 +27,7 @@
 </div>
 <div class="clearfix"></div>
 {{item.spec.cued.reason}}
-<div ng-if="item.playing&&item.duration>-1&&item.position>-1&&item.remaining>-1">
+<div ng-if="item.playing&&item.duration>=0&&item.position>=0&&item.remaining>=0">
     -{{item.remaining|formatTimer}} {{item.position|formatTimer}}/{{item.duration|formatTimer}}
 </div>
 <div class="clearfix"></div>

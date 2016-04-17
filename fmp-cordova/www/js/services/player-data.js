@@ -1,4 +1,5 @@
 fmpApp.factory('PlayerData', function(){
+    var logger = new Logger("PlayerData", false);
     var collection = {
             play_pause: 'Pause',
             mode: "satellite",
@@ -7,5 +8,6 @@ fmpApp.factory('PlayerData', function(){
         methods = {
             collection:collection
         }
+    logger.log("initialized");
     return methods;
 });

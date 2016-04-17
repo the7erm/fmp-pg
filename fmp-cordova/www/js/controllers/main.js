@@ -1,6 +1,7 @@
 fmpApp.controller("MainController", function($scope, $location, FmpListeners,
                                              FmpIpScanner, FmpSocket, FmpSync,
-                                             FmpPlaylist, FmpPreload){
+                                             FmpPlaylist, FmpPlayer, FmpPreload){
+    var logger = new Logger("MainController", false);
     /*
     $scope.swipeLeft = function() {
         console.log("swipeLeft main");
@@ -11,12 +12,12 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
         window.location = "#/playlist";
     };
     */
-    console.log("main.js 1");
     FmpSync.collection.FmpPlaylist = FmpPlaylist;
+    // FmpSync.collection.FmpPlayer = FmpPlayer;
     FmpSync.collection.FmpListeners = FmpListeners;
     FmpSync.collection.FmpSocket = FmpSocket;
     FmpSync.collection.FmpIpScanner = FmpIpScanner;
-    FmpSync.collection.FmpPreload = FmpPreload;
+    // FmpSync.collection.FmpPreload = FmpPreload;
     FmpListeners.collection.FmpSync = FmpSync;
 
     $scope.newSync = FmpSync.newSync;
@@ -37,5 +38,5 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
     }
 
     FmpIpScanner.startScan();
-    console.log("mainJS ok");
+    logger.log("initialized");
 });

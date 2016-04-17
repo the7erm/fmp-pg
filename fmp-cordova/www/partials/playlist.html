@@ -1,6 +1,10 @@
-<h3>Playlist</h3>
+<span class='pull-right'><small>{{connection.type}}</small></span>
+<h4>Playlist</h4>
 <span ng-include src="'partials/top-buttons.html'"></span>
-<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing || typeof item.cued == 'undefined' || !item.cued || listenersCollection.listener_user_ids.indexOf(cued.user_id) != -1 || listenersCollection.primary_user_id==cued.user_id">
+<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing ||
+           !item.cued ||
+           listenersCollection.listener_user_ids.indexOf(item.cued.user_id) != -1 ||
+           listenersCollection.primary_user_id==item.cued.user_id">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
          ng-include src="'partials/item.html'"></div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"

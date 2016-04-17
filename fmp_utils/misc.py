@@ -32,11 +32,13 @@ def session_add(session, obj, commit=False, close=False):
     added = False
     try_cnt = 0
     while not added:
+        if try_cnt > 0:
+            print("try_cnt:",try_cnt)
         try:
             session.add(obj)
             added = True
             if try_cnt:
-                print("Finally added obj")
+                print("Finally added obj", "-GOOD-")
         except InvalidRequestError as e:
             added = False
             traceback.print_exc()

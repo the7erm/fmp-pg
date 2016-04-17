@@ -1,10 +1,7 @@
-<h3>Player</h3>
-<!-- ng-if="FmpSyncCollection.syncQue.length>0" -->
-
+<span class='pull-right'><small>{{connection.type}}</small></span>
+<h4>Player</h4>
 <span ng-include src="'partials/top-buttons.html'"></span>
-
-<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" >
-
+<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
          ng-include src="'partials/item.html'"></div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"

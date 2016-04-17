@@ -8,7 +8,6 @@ window.Logger = function(name, debug) {
         debug = false;
     }
 
-    debug = true;
     var thisLogger = this;
     thisLogger.name = name;
     thisLogger.debug = debug;
@@ -186,12 +185,14 @@ var FmpFile = function (spec) {
     };
 
     thisFile.delete = function(deleteCb) {
+        logger.debug = true;
         logger.log("***** REMOVE FILE *****");
         window.resolveLocalFileSystemURL(
                 thisFile.filename,
                 function(fileEntry) {
                     fileEntry.remove(function(file){
                         logger.log("File removed!");
+                        thisFile.spec.deleted = true;
                         thisFile.save();
                         localStorage["deleted-"+thisFile.id] = localStorage["file-"+thisFile.id];
                         delete localStorage["file-"+thisFile.id];
