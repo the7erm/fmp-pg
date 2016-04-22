@@ -1,4 +1,65 @@
 
+window.objHandler = {
+    dirty: false,
+    ignore: [],
+    get: function(target, name) {
+        if (name != "dirty" && name != "ignore") {
+            return name in target ? target[name] : undefined;
+        }
+        if (name == "ignore") {
+            return this.ignore;
+        }
+        if (name == "dirty") {
+            // console.log("get dirty:", target);
+            if (this.dirty) {
+                return true;
+            }
+            if (typeof target == "object") {
+                if (target.dirty) {
+                    return true;
+                }
+                for (k in target) {
+                  if (typeof target[k] == "object" && target[k].dirty) {
+                      return true;
+                  }
+                }
+            }
+            return this.dirty;
+        }
+        return undefined;
+    },
+    set: function(target, name, value) {
+        if (name == "dirty") {
+            this.dirty = value;
+            if (typeof target == "object") {
+                for (k in target) {
+                    if (typeof target[k] == "object") {
+                        target[k].dirty = value;
+                    }
+                }
+            }
+            return;
+        }
+        if (name == "ignore") {
+            this.ignore = value;
+            return;
+        }
+        if (angular.equals(target[name], value)) {
+            return;
+        }
+        if (this.ignore.indexOf(name) == -1) {
+            this.dirty = true;
+        }
+        var _type = typeof value;
+        if (_type == "object") {
+            // console.log("making proxy:", value);
+            value = new Proxy(value, window.objHandler);
+            value.dirty = true;
+        }
+        target[name] = value;
+    }
+};
+
 window.transactionId = function() {
     return Math.random().toString(36).replace(/[^a-z0-9]+/g, '')+"-"+(Date.now() / 1000);
 }
@@ -158,6 +219,9 @@ var FmpFile = function (spec) {
             thisFile.dirty = true;
             thisFile.save();
         }
+        if (typeof thisFile.spec.voted_to_skip == "undefined") {
+            thisFile.spec.voted_to_skip = [];
+        }
     };
     thisFile.save = function() {
         if (!thisFile.file_id) {
@@ -177,6 +241,16 @@ var FmpFile = function (spec) {
             // var img = thisFile.spec.image;
             delete thisFile.image;
         }
+        if (typeof thisFile.spec.voted_to_skip == "undefined") {
+            thisFile.spec.voted_to_skip = [];
+        }
+        $.each(thisFile.spec.user_file_info, function(idx, ufi){
+            if (thisFile.spec.voted_to_skip.indexOf(ufi.user_id) != -1) {
+                ufi.voted_to_skip = true;
+            } else {
+                ufi.voted_to_skip = false;
+            }
+        });
         // thisFile.spec["needsSync"] = true;
         // logger.log("saved dirty:", thisFile.basename);
         thisFile.spec.saved = thisFile.timestamp;
@@ -186,6 +260,9 @@ var FmpFile = function (spec) {
 
     thisFile.delete = function(deleteCb) {
         logger.debug = true;
+        if (thisFile.spec.keep) {
+            return;
+        }
         logger.log("***** REMOVE FILE *****");
         window.resolveLocalFileSystemURL(
                 thisFile.filename,
@@ -219,6 +296,9 @@ var FmpFile = function (spec) {
         }
     } else {
         thisFile.spec = spec;
+        if (typeof thisFile.spec.voted_to_skip == "undefined") {
+            thisFile.spec.voted_to_skip = [];
+        }
     }
 
     if (typeof thisFile.spec.image != "undefined") {
@@ -354,6 +434,7 @@ var FmpFile = function (spec) {
         }
         return thisFile.dirname+thisFile.file_id+"."+thisFile.ext;
     };
+
     /*
         thisFile.playing = false;
         thisFile.played = false;
@@ -384,6 +465,13 @@ var FmpFile = function (spec) {
         if (save) {
             thisFile.save();
         }
+    };
+
+    thisFile.get_keep = function() {
+        return thisFile.spec.keep;
+    };
+    thisFile.set_keep = function(value) {
+        thisFile.set_spec_value("keep", thisFile.toBool(value));
     };
     thisFile.get_playing = function() {
         return thisFile.spec.playing;
@@ -418,9 +506,26 @@ var FmpFile = function (spec) {
     thisFile.get_playingState = function() {
         return thisFile.spec.playingState;
     };
+
     thisFile.set_playingState = function(value) {
         thisFile.set_spec_value("playingState", value);
     };
+
+    thisFile.get_voted_to_skip = function() {
+        return thisFile.spec.voted_to_skip;
+    }
+
+    thisFile.set_voted_to_skip = function(value) {
+        thisFile.set_spec_value("voted_to_skip", value);
+        $.each(thisFile.spec.user_file_info, function(idx, ufi){
+            if (value.indexOf(ufi.user_id) != -1) {
+                ufi.voted_to_skip = true;
+            } else {
+                ufi.voted_to_skip = false;
+            }
+        });
+    }
+
     thisFile.setUserValue = function(name, user_id, value, forceSave) {
         user_id = parseInt(user_id);
         forceSave = thisFile.toBool(forceSave);
@@ -486,13 +591,14 @@ var FmpFile = function (spec) {
     };
 
     thisFile.multiSetSkipScore = function(user_ids, by, voted_to_skip) {
+        console.log("multiSetSkipScore:", user_ids, by, voted_to_skip);
         var file_id = parseInt(thisFile.spec.id),
             timestamp = thisFile.get_timestamp();
         for (var i=0;i<thisFile.spec.user_file_info.length;i++) {
             var ufi = thisFile.spec.user_file_info[i];
             if(user_ids.indexOf(ufi.user_id) != -1 && ufi.file_id == file_id) {
                 if (typeof voted_to_skip != "undefined") {
-                    voted_to_skip = voted_to_skip;
+                    ufi.voted_to_skip = voted_to_skip;
                 }
                 ufi.skip_score = parseInt(ufi.skip_score) + parseInt(by);
                 ufi.timestamp = timestamp;
@@ -507,7 +613,7 @@ var FmpFile = function (spec) {
 
         user_id = parseInt(user_id);
         if (typeof voted_to_skip == "string" &&
-            ["0", "off", "false"].indexOf(voted_to_skip.toLowerCase()) != -1) {
+            ["0", "off", "false", "f"].indexOf(voted_to_skip.toLowerCase()) != -1) {
             voted_to_skip = false;
         }
         if (voted_to_skip) {
@@ -515,17 +621,30 @@ var FmpFile = function (spec) {
         } else {
             voted_to_skip = false;
         }
-
+        if (typeof thisFile.spec.voted_to_skip == "undefined") {
+            thisFile.spec.voted_to_skip = [];
+        }
+        console.log("vote_to_skip() user_id:", user_id, "voted_to_skip:", voted_to_skip);
         for (var i=0;i<thisFile.spec.user_file_info.length;i++) {
             var ufi = thisFile.spec.user_file_info[i];
-            if (ufi.user_id == user_id && ufi.file_id == file_id &&
-                ufi.voted_to_skip != voted_to_skip) {
-                ufi.voted_to_skip = voted_to_skip;
-                ufi.timestamp = timestamp;
-                thisFile.dirty = true;
-                break;
+            if (ufi.user_id != user_id) {
+                continue;
             }
+            ufi.voted_to_skip = voted_to_skip;
+            ufi.timestamp = timestamp;
+            thisFile.dirty = true;
+
+            var idx = thisFile.spec.voted_to_skip.indexOf(ufi.user_id);
+            if (ufi.voted_to_skip && idx == -1) {
+                thisFile.spec.voted_to_skip.push(ufi.user_id);
+            }
+
+            if (!ufi.voted_to_skip && idx != -1) {
+                thisFile.spec.voted_to_skip.splice(idx, 1);
+            }
+            break;
         }
+        thisFile.save();
     };
     thisFile.inc_score = function(user_ids) {
         thisFile.multiSetSkipScore(user_ids, 1, false);
@@ -572,6 +691,26 @@ var FmpFile = function (spec) {
         thisFile.dirty = true;
         // logger.log("/mark_as_played");
     };
+    thisFile.set_skipped_by_listeners = function(listener_user_ids) {
+        console.log("thisFile.skipped_by_listeners called");
+        var voted_to_skip_user_ids = [],
+            didnt_vote_to_skip_user_ids = [];
+        for (var i=0;i<thisFile.spec.user_file_info.length;i++) {
+            var ufi = thisFile.spec.user_file_info[i];
+            if (listener_user_ids.indexOf(ufi.user_id) == -1) {
+                ufi.voted_to_skip = false;
+                // This person didn't listen to the song.
+                continue;
+            }
+            if (ufi.voted_to_skip) {
+                voted_to_skip_user_ids.push(ufi.user_id);
+            } else {
+                didnt_vote_to_skip_user_ids.push(ufi.user_id);
+            }
+        };
+        thisFile.multiSetSkipScore(voted_to_skip_user_ids, -1, true);
+        thisFile.multiSetSkipScore(didnt_vote_to_skip_user_ids, 0, false);
+    };
     thisFile.completed = function(listener_user_ids) {
         var voted_to_skip_user_ids = [],
             didnt_vote_to_skip_user_ids = [];
@@ -590,7 +729,6 @@ var FmpFile = function (spec) {
 
         thisFile.multiSetSkipScore(voted_to_skip_user_ids, -2, true);
         thisFile.multiSetSkipScore(didnt_vote_to_skip_user_ids, 1, false);
-
     };
 
     thisFile.error_playing = function() {
@@ -732,7 +870,7 @@ var FmpFile = function (spec) {
     };
 
     var getterSetterKeys = ["playing", "playing", "playingState", "duration",
-                            "remaining", "position"];
+                            "remaining", "position", "keep"];
     for (var i=0;i<getterSetterKeys.length;i++) {
         var key = getterSetterKeys[i];
         Object.defineProperty(thisFile, key, {
@@ -876,6 +1014,14 @@ var Player = function() {
         localStorage['player-playing-id'] = thisPlayer.file.id;
     };
     thisPlayer.prepare = function(file) {
+        if (typeof file.spec.user_file_info != "undefined") {
+            $.each(file.spec.user_file_info, function(idx, ufi){
+                ufi.voted_to_skip = false;
+            });
+            file.spec.voted_to_skip = [];
+            file.dirty = true;
+            file.save();
+        }
         if (thisPlayer.media) {
             logger.log("SETTING RELEASING 2");
             thisPlayer.state = "RELEASING";
@@ -895,6 +1041,7 @@ var Player = function() {
         thisPlayer.file = file;
         thisPlayer.file.playing = true;
         thisPlayer.file.played = true;
+        thisPlayer.file.skipped = false;
         thisPlayer.file.err = "";
 
         thisPlayer.media = new Media(thisPlayer.file.filename,
@@ -1158,3 +1305,9 @@ var Player = function() {
 window.downloader = new Downloader();
 window.player = new Player();
 
+window.onunload = function() {
+    MusicControls.destroy(function(){}, function(){});
+}
+window.onbeforeunload = function() {
+    MusicControls.destroy(function(){}, function(){});
+}

@@ -14,10 +14,12 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
     hasError: false
   };
 
-  var logger = new Logger("FmpSocket", false);
+  var logger = new Logger("FmpSocket", true);
   var methods = {
     collection: collection,
     send: function(obj) {
+      logger.log("deprecated send()");
+      return;
       if (angular.equals(obj,{})) {
         console.error("empty sync object:", obj);
         return;
@@ -36,6 +38,8 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
       }
     },
     onMessage: function(message) {
+      logger.log("deprecated onMessage()");
+      return;
       collection.connected = true;
       collection.connectionLock = false;
       collection.hasError = false;
@@ -78,6 +82,8 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
       }
     },
     onError: function(arg1, arg2) {
+      logger.log("deprecated onError()");
+      return;
       collection.connected = false;
       collection.connectionLock = false;
       collection.hasError = true;
@@ -87,6 +93,8 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
       setTimeout(methods.connect, 10000);
     },
     onOpen: function() {
+      logger.log("deprecated onOpen()");
+      return;
       collection.connected = true;
       collection.connectionLock = false;
       collection.hasError = false;
@@ -94,6 +102,8 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
       $rootScope.$broadcast("socket-open");
     },
     onClose: function() {
+      logger.log("deprecated onClose()");
+      return;
       collection.connected = false;
       collection.connectionLock = false;
       logger.log("socket onClose:", arguments);
@@ -105,6 +115,8 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
   };
 
   methods.connect = function() {
+    logger.log("deprecated connect()");
+    return;
     if (collection.connectionLock || collection.connected) {
       // Don't run if we are already connected or in the process of
       // connecting.
@@ -140,7 +152,7 @@ fmpApp.factory('FmpSocket', function($websocket, FmpIpScanner, $rootScope,
     collection.dataStream.onClose(methods.onClose);
   };
 
-  $rootScope.$on("server-found", methods.connect);
-  logger.log("initialized");
+  // $rootScope.$on("server-found", methods.connect);
+  logger.log("initialized - deprecated");
   return methods;
 });

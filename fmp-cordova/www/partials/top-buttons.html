@@ -1,17 +1,30 @@
-<span ng-if="!FmpSyncCollection.syncPreloadLock">
+<span ng-if="!FmpSyncCollection.syncPreloadLock&&!FmpSyncCollection.removeFilesLock">
     <span ng-if="connection.type=='wifi'">
-        <button class="btn btn-default btn-sm glyphicon glyphicon-transfer" ng-click="syncCollections()">
+        <button class="btn btn-default btn-sm glyphicon glyphicon-transfer" ng-click="syncCollections(true)">
             <span ng-if="FmpSyncCollection.syncQue.length>0" style="position: relative; padding-left: 5px;">
                 <small>{{FmpSyncCollection.syncTotal}}:{{FmpSyncCollection.syncQue.length}}</small>
             </span>
         </button>
-        <button class="btn btn-default btn-sm glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button>
+        <!--
+        <button class="btn btn-default btn-sm glyphicon glyphicon-compressed" ng-click="syncCollections(true)"></button> -->
         <button ng-if="FmpSyncCollection.FmpIpScanner.collection.url"
                 class="btn btn-default btn-sm glyphicon glyphicon-search"
                 ng-click="openSearch()"></button>
     </span>
-    <button ng-if="!FmpSyncCollection.syncQue||FmpSyncCollection.syncQue.length<=0" class="btn btn-default btn-sm" ng-click="organize()">organize</button><br>
+    <button ng-click="scrollToPlaying()" class="btn btn-default btn-sm glyphicon glyphicon-play-circle" ng-if="path=='/playlist'"></button>
+    <span class="dropdown" ng-if="!FmpSyncCollection.syncQue||FmpSyncCollection.syncQue.length<=0">
+      <button class="btn btn-default dropdown-toggle btn-sm glyphicon glyphicon-sort-by-attributes" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+        <span class="caret"></span>
+      </button>
+      <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+        <li ng-if="!FmpSyncCollection.syncQue||FmpSyncCollection.syncQue.length<=0" ><a  ng-click="organize(this)" href="#/playlist">Played first</a></li>
+        <li><a href="#/playlist" ng-click="organize_random(this)">Random</a></li>
+      </ul>
+    </span><br>
 </span>
 <span ng-if="FmpSyncCollection.syncPreloadLock">
 <img src="img/loading.svg"><small>Getting new files ...</small><br>
+</span>
+<span ng-if="FmpSyncCollection.removeFilesLock&&!FmpSyncCollection.syncPreloadLock">
+<img src="img/loading.svg"><small>Removing played files ...</small><br>
 </span>

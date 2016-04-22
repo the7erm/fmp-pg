@@ -1,13 +1,14 @@
 fmpApp
 .factory('FmpListeners', function($http, $rootScope, FmpConfig,
-                                  FmpLocalStorage, FmpSocket){
+                                  FmpLocalStorage, FmpSocket, FmpIpScanner){
 
     var logger = new Logger("FmpListeners", true);
 
-    var collection = {
+    var collectionObj = {
             fetchLock: false,
             listener_user_ids: [],
             users: [],
+            session_user_ids: [],
             primary_user_id: 0, // user_id
             secondary_user_ids: [],
             prefetchNum: 50,
@@ -26,14 +27,17 @@ fmpApp
                 ],
                 "objects" : [
                     "users",
+                    "session_user_ids",
                     "listener_user_ids",
                     "secondary_user_ids"
                 ],
                 "strings": [],
                 "floats": []
             },
-            "ip_addresses": []
+            "ip_addresses": [],
+            "_ignore": ["dirty", "storeFields", "loaded", "fetchLock"]
         },
+        collection = new Proxy(collectionObj, objHandler),
         methods = {
             "collection": collection
         };
@@ -42,6 +46,7 @@ fmpApp
         logger.log("LOAD LISTENERS <<<<<<<<<<<<<<<<<<<");
         FmpLocalStorage.load(collection);
         collection.loaded = true;
+        collection.dirty = false;
         logger.log(">>>> LISTENERS LOADED", collection);
     }
 
@@ -56,6 +61,14 @@ fmpApp
     }
 
     methods.fetch = function() {
+        if (navigator.connection.type != Connection.WIFI) {
+          logger.log("skipping !",Connection.WIFI);
+          return;
+        }
+        if (!FmpIpScanner.collection.url) {
+            setTimeout(methods.fetch, 1000);
+            return;
+        }
         logger.log("FETCHING LISTENERS");
         if (collection.fetchLock) {
             return;
@@ -64,36 +77,42 @@ fmpApp
 
         $http({
             method: 'GET',
-            url: FmpConfig.url+"ip_addresses"
+            url: FmpIpScanner.collection.url+"ip_addresses"
         }).then(function(response) {
             collection.ip_addresses = response.ip_addresses;
+            methods.save();
         });
 
         $http({
             method: 'GET',
-            url: FmpConfig.url+"listeners"
+            url: FmpIpScanner.collection.url+"listeners"
         }).then(function(response) {
-            logger.log("FETCHED:", response);
-            collection.users = response.data;
-            if (collection.listener_user_ids.length == 0) {
-                var listener_user_ids = [];
-                for (var i=0;i<collection.users.length;i++) {
-                    var user = collection.users[i];
-                    user.listening = false;
-                }
-                collection.listener_user_ids = listener_user_ids;
+            logger.log(FmpIpScanner.collection.url+"listeners", "FETCHED:", response);
+            if (!collection.users) {
+                collection.users = [];
             }
-            for (var i=0;i<collection.users.length;i++) {
-                var user = collection.users[i];
-                if (collection.secondary_user_ids.indexOf(user.id) != -1) {
-                    user.secondary = true;
-                } else {
-                    user.secondary = false;
+            var responseUsers = response.data;
+            if (!responseUsers) {
+                responseUsers = [];
+            }
+            for(var i=0;i<responseUsers.length;i++) {
+                var found = false,
+                    rUser = responseUsers[i];
+                for (var i2=0;i2<collection.users.length;i2++) {
+                    var cUser = collection.users[i2];
+                    if (rUser.id == cUser.id) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    collection.users.push(rUser);
+                    dirty = true;
                 }
             }
+            methods.save();
             $rootScope.$broadcast("listeners-loaded");
             collection.fetchLock = false;
-            methods.save();
         }, function errorCallback(response) {
             // called asynchronously if an error occurs
             // or server returns response with an error status.
@@ -151,36 +170,26 @@ fmpApp
         if (["listening", "secondary"].indexOf(type) == -1) {
             return;
         }
+        console.log("toggle collection.users:", collection.users);
         for (var i=0;i<collection.users.length;i++) {
             var user = collection.users[i];
             if (user.id != user_id) {
                 continue;
             }
-            var obj = collection.listener_user_ids;
-            if (type == "secondary") {
-                obj = collection.secondary_user_ids;
-            }
             user[type] = !user[type];
-            var idx = obj.indexOf(user_id);
-            if (user[type] && idx == -1) {
-                obj.push(idx);
-            } else if (!user[type] && idx != -1) {
-                obj.splice(idx, 1);
-            }
-            if (type == "secondary" && !user["secondary"] &&
-                user.listening) {
-                // The user is not a secondary user yet is still listening.
-                methods.toggle("listening", user_id);
-                return;
-            }
-            methods.save();
+            collection.dirty = true;
             break;
         }
+        methods.save();
     }
 
     methods.save = function() {
-        collection.listener_user_ids = [];
-        collection.secondary_user_ids = [];
+        if (!collection.dirty) {
+            return;
+        }
+        session_user_ids = [];
+        listener_user_ids = [];
+        secondary_user_ids = [];
         var primaryMarked = false;
         for (var i=0;i<collection.users.length;i++) {
             var user = collection.users[i];
@@ -206,14 +215,22 @@ fmpApp
                 }
             }
             if (user.listening) {
-                collection.listener_user_ids.push(user.id);
+                listener_user_ids.push(user.id);
             }
             if (user.secondary) {
-                collection.secondary_user_ids.push(user.id);
+                secondary_user_ids.push(user.id);
+            }
+            if(user.secondary || user.primary) {
+                session_user_ids.push(user.id);
             }
         }
+        collection.session_user_ids = session_user_ids;
+        collection.listener_user_ids = listener_user_ids;
+        collection.secondary_user_ids = secondary_user_ids;
+
         logger.log("SAVE collection:", collection);
         FmpLocalStorage.save(collection);
+        collection.dirty = false;
         logger.log("localStorage:", localStorage);
     };
     methods.updateSecondaryUserIds = function(scope, user_id) {
@@ -259,14 +276,12 @@ fmpApp
                 dirty = true;
             }
         }
-        if (dirty) {
-            methods.save();
-        }
+        methods.save();
     };
 
-    $rootScope.$on("user-data", methods.onUserData);
-    $rootScope.$on("socket-open", methods.syncUsers);
+    // $rootScope.$on("user-data", methods.onUserData);
+    // $rootScope.$on("socket-open", methods.syncUsers);
+    $rootScope.$on("server-found", methods.fetch);
 
-    logger.log("All good");
     return methods;
 });

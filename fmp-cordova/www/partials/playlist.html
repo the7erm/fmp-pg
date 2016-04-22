@@ -6,7 +6,7 @@
            listenersCollection.listener_user_ids.indexOf(item.cued.user_id) != -1 ||
            listenersCollection.primary_user_id==item.cued.user_id">
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
-         ng-include src="'partials/item.html'"></div>
+         ng-include src="'partials/item.html'" id="file-{{item.id}}"></div>
     <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"
          ng-repeat="(key, ufi) in item.spec.user_file_info track by ufi.id"
          ng-if="listenersCollection.listener_user_ids.indexOf(ufi.user.id) != -1 || ufi.user.id == listenersCollection.primary_user_id"

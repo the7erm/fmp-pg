@@ -261,7 +261,7 @@ def check_for_files_that_need_converting():
     while True:
         if converter.die:
             return
-        print("check_for_files_that_need_converting()")
+        # print("check_for_files_that_need_converting()")
         if converter.converting and len(converter.files) > 10:
             print("converter.converting and len(converter.files) > ", len(converter.files))
             cnt = 60
