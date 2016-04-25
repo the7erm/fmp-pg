@@ -1,7 +1,14 @@
 <span class='pull-right'><small>{{connection.type}}</small></span>
 <h4>Playlist</h4>
 <span ng-include src="'partials/top-buttons.html'"></span>
-<div class="row" ng-repeat="item in FmpPlaylistCollection.files track by item.id" ng-if="item.playing ||
+<div class="input-group input-group-sm">
+  <div class="input-group-btn">
+    <button type="button" class="glyphicon glyphicon-search btn btn-default btn-sm" ></button>
+  </div>
+  <input type="text" class="form-control" placeholder="search" aria-describedby="sizing-addon1" ng-model="search">
+</div>
+
+<div class="row" ng-repeat="item in FmpPlaylistCollection.files | filterPlaylist:search track by item.id" ng-if="item.playing ||
            !item.cued ||
            listenersCollection.listener_user_ids.indexOf(item.cued.user_id) != -1 ||
            listenersCollection.primary_user_id==item.cued.user_id">

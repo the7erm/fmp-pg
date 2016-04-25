@@ -1,0 +1,36 @@
+<h4>Remote</h4>
+Bluetooth:{{adapterInfo.enabled}}<br>
+discoveryLock:{{discoveryLock}}<br>
+<button class="btn btn-default btn-sm" ng-click="startDiscovery()">startDiscovery</button>
+<button class="btn btn-default btn-sm" ng-click="requestDiscoverable()">requestDiscoverable</button>
+<button class="btn btn-default btn-sm" ng-click="sendTest()">sendTest</button>
+<pre>{{adapterInfo|json}}</pre>
+devices:
+<table>
+    <tr ng-repeat="(address, device) in devices">
+        <td>
+            <button class="btn btn-default btn-sm" ng-click="connectToPeer(device)">{{address}}</button>
+        </td>
+        <td>
+            {{address}}:<pre>{{device|json}}</pre>
+        </td>
+    </tr>
+</table>
+
+socketId:<pre>{{socketId|json}}</pre>
+
+receiveInfo: <pre>{{receiveInfo|json}}</pre>
+
+serverSocketId: <pre>{{serverSocketId}}</pre>
+
+decodedRecieveData: <pre>{{decodedRecieveData|json}}</pre>
+
+acceptInfo: <pre>{{acceptInfo|json}}</pre>
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>

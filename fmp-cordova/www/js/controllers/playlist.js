@@ -1,3 +1,4 @@
+
 fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
                                             FmpListeners, FmpUtils, $rootScope,
                                             $timeout, $location) {

@@ -15,6 +15,11 @@ fmpApp.config(['$routeProvider', '$locationProvider', function($routeProvider, $
         controller: 'ListenersController',
         reloadOnSearch: false
     })
+    .when("/remote",{
+        templateUrl: "partials/remote.html",
+        controller: "RemoteController",
+        reloadOnSearch: false
+    })
     .otherwise({
         redirectTo: '/player'
     });

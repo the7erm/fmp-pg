@@ -75,3 +75,4 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
     FmpIpScanner.startScan();
     logger.log("initialized");
 });
+
