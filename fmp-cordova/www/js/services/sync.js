@@ -392,14 +392,14 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                     continue;
                 }
                 if (collection.FmpListeners.collection.secondary_user_ids.indexOf(user_id) != -1 &&
-                    groupLength <= 10) {
+                    groupLength <= 20) {
                     logger.log("need files");
                     needFiles = true;
                     tripped = true;
                     break;
                 }
                 if (collection.FmpListeners.collection.primary_user_id == user_id &&
-                    groupLength <= 50) {
+                    groupLength <= 100) {
                     logger.log("need files");
                     needFiles = true;
                     tripped = true;

@@ -16,12 +16,14 @@ var fmpApp = angular.module('fmpApp', [
       var methods = {};
 
       methods.calculateTrueScore = function(data) {
+        /*
         if (data.true_score <= -20) {
           data.skip_score = parseInt(data.skip_score) + 1;
-        }
+        } */
+        /*
         if (data.true_score >= 125) {
           data.skip_score = parseInt(data.skip_score) - 1;
-        }
+        } */
         data.true_score = ((data.rating * 2 * 10) +
                             data.skip_score * 10) / 2.0;
       }

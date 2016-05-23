@@ -11,8 +11,8 @@ fmpApp
             session_user_ids: [],
             primary_user_id: 0, // user_id
             secondary_user_ids: [],
-            prefetchNum: 50,
-            secondaryPrefetchNum: 10,
+            prefetchNum: 100,
+            secondaryPrefetchNum: 20,
             prefetchSize: -1,
             secondaryPrefetchSize: -1,
             prefetchSizeLimit: 0,
@@ -36,11 +36,16 @@ fmpApp
             },
             "ip_addresses": [],
             "_ignore": ["dirty", "storeFields", "loaded", "fetchLock"]
-        },
-        collection = new Proxy(collectionObj, objHandler),
-        methods = {
-            "collection": collection
         };
+
+    if (typeof Proxy != "undefined") {
+        var collection = new Proxy(collectionObj, objHandler);
+    } else {
+        var collection = collectionObj;
+    }
+    var methods = {
+        "collection": collection
+    };
 
     methods.load = function() {
         logger.log("LOAD LISTENERS <<<<<<<<<<<<<<<<<<<");
@@ -183,7 +188,10 @@ fmpApp
         methods.save();
     }
 
-    methods.save = function() {
+    methods.save = function(force) {
+        if (typeof Proxy == "undefined") {
+            collection.dirty = true;
+        }
         if (!collection.dirty) {
             return;
         }

@@ -108,7 +108,7 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
 
         <div class="col-xs-4 col-sm-2 col-md-2 col-lg-2" ng-controller="RatingCtrl" style="cursor:pointer;">
             <a class="glyphicon glyphicon-thumbs-up" ng-click="upScore(data)"></a>
-            <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)"></a>
+            <a class="glyphicon glyphicon-thumbs-down" ng-click="downScore(data)" ng-if="data.true_score>=0"></a>
              {{data.true_score}}
         </div>
         <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12"><hr/></div>

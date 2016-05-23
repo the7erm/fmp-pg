@@ -1,7 +1,7 @@
 fmpApp.controller("MainController", function($scope, $location, FmpListeners,
                                              FmpIpScanner, FmpSocket, FmpSync,
                                              FmpPlaylist, FmpPlayer, FmpPreload,
-                                             $timeout){
+                                             $timeout, FmpRemote){
     var logger = new Logger("MainController", false);
 
     /*
@@ -14,6 +14,7 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
 
         window.location = "#/player";
     }; */
+
     FmpSync.collection.FmpPlaylist = FmpPlaylist;
     // FmpSync.collection.FmpPlayer = FmpPlayer;
     FmpSync.collection.FmpListeners = FmpListeners;

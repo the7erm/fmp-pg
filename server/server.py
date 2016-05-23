@@ -529,8 +529,8 @@ class ChatWebSocketHandler(WebSocket):
         primary_user_id = payload.get("primary_user_id", 0)
         listener_user_ids = payload.get("listener_user_ids", [])
         secondary_user_ids = payload.get("secondary_user_ids", [])
-        prefetchNum = payload.get("prefetchNum", 50)
-        secondaryPrefetchNum = payload.get("secondaryPrefetchNum", 10)
+        prefetchNum = payload.get("prefetchNum", 100)
+        secondaryPrefetchNum = payload.get("secondaryPrefetchNum", 20)
         needs_synced_files = payload.get("needs_synced_files", [])
         user_ids = listener_user_ids + secondary_user_ids + [primary_user_id]
         user_ids = list(set(user_ids))
@@ -737,8 +737,11 @@ class ChatWebSocketHandler(WebSocket):
                         ufi.rating = value
 
                 if attr == 'skip_score':
+                    """
                     if value >= -15 and value <= 15:
                         ufi.skip_score = value
+                    """
+                    ufi.skip_score = value
 
                 if attr == 'voted_to_skip':
                     value = to_bool(value)
@@ -1733,8 +1736,8 @@ class FmpServer(object):
         primary_user_id = int(post_data.get('primary_user_id'))
         secondary_user_ids = post_data.get('secondary_user_ids', [])
 
-        prefetchNum = 50
-        secondaryPrefetchNum = 10
+        prefetchNum = 100
+        secondaryPrefetchNum = 20
         primary_user_id = int(primary_user_id)
         listener_user_ids = listener_user_ids + [primary_user_id]
         listener_user_ids = list(set(listener_user_ids))
@@ -2184,6 +2187,61 @@ class FmpServer(object):
         print("playlist.last_action", playlist.last_action)
         print("satellite_last_action", satellite_last_action)
         return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def artist_letters(self):
+        result = []
+        with session_scope() as session:
+            """
+            # recommended
+            cmd = 'select * from Employees where EmployeeGroup == :group'
+            employeeGroup = 'Staff'
+            employees = connection.execute(text(cmd), group = employeeGroup)"""
+
+            sql = """SELECT DISTINCT(LOWER(SUBSTRING(name,1,1))) AS letter
+                     FROM artists
+                     ORDER BY letter"""
+
+            letters = session.execute(text(sql))
+            for l in letters:
+                result.append(l[0])
+
+        return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def artists(self, *args, **kwargs):
+        result = []
+        letter = kwargs.get("l")
+        print("letter:", letter)
+        if not letter:
+            return result
+        """
+        files = session.query(File)\
+                           .from_statement(
+                                text(search_query))\
+                           .params(**query_args)\
+                           .all()"""
+
+        with session_scope() as session:
+            spec = {
+                "letter": "%s%%" % letter
+            }
+            sql = """SELECT *
+                     FROM artists
+                     WHERE name ILIKE :letter
+                     ORDER BY name"""
+            artists = session.query(Artist)\
+                             .from_statement(
+                                  text(sql)
+                              )\
+                             .params(**spec)\
+                             .all()
+            for a in artists:
+                result.append(a.name)
+        return result
+
 
 def cherry_py_worker():
     doc_path = os.path.join(sys.path[0])

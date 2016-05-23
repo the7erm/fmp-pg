@@ -22,6 +22,7 @@
         <script type="text/javascript">
             window.name = "NG_DEFER_BOOTSTRAP!";
         </script>
+
         <!--
         Customize this policy to fit your own app's needs. For more guidance, see:
             https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
@@ -46,8 +47,12 @@
 
 
         <title>FMP</title>
+        <script type="text/javascript" src="bower_components/jquery/dist/jquery.min.js"></script>
+        <!-- Include all compiled plugins (below), or include individual files as needed -->
+        <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+        <script type="text/javascript" src="bower_components/angular/angular.js"></script>
     </head>
-    <body ng-app="fmpApp">
+    <body ng-app="fmpApp" ng-cloak>
         <nav class="navbar navbar-fixed-top navbar-default" role="navigation" bs-navbar>
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
@@ -120,17 +125,15 @@
                 </div>
             </form>
         </nav>
-        <script type="text/javascript" src="bower_components/jquery/dist/jquery.min.js"></script>
-        <!-- Include all compiled plugins (below), or include individual files as needed -->
-        <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
-        <script type="text/javascript" src="bower_components/angular/angular.js"></script>
+
         <script type="text/javascript" src="bower_components/angular-bootstrap/ui-bootstrap.min.js"></script>
         <script type="text/javascript" src="bower_components/angularjs-slider/dist/rzslider.min.js"></script>
         <script type="text/javascript" src="bower_components/angular-route/angular-route.min.js"></script>
         <script type="text/javascript" src="bower_components/angular-touch/angular-touch.js"></script>
         <script type="text/javascript" src="bower_components/angular-websocket/angular-websocket.js"></script>
         <script type="text/javascript" src="bower_components/crypto-js/crypto-js.js"></script>
-        <script type="text/javascript" src="js/jsmediatags.min.js"></script>
+        <script type="text/javascript" src="js/lib/jsmediatags.min.js"></script>
+
         <script type="text/javascript" src="js/file.js"></script>
 
         <script type="text/javascript" src="js/fmp.js"></script>
@@ -154,6 +157,7 @@
         <script type="text/javascript" src="js/services/socket.js"></script>
         <script type="text/javascript" src="js/services/storage.js"></script>
         <script type="text/javascript" src="js/services/sync.js"></script>
+        <script type="text/javascript" src="js/services/remote.js"></script>
         <script type="text/javascript" src="js/services/utils.js"></script>
 
         <script type="text/javascript" src="cordova.js"></script>

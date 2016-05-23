@@ -159,7 +159,7 @@ var proxyReader = function(name, value) {
 };
 
 var proxyLogger = new Logger("proxyLogger", true);
-
+/*
 var localStorageProxy = new Proxy({}, {
     get: function(target, name) {
         if (!(name in target)) {
@@ -172,6 +172,7 @@ var localStorageProxy = new Proxy({}, {
         proxyWriter(name, value);
     }
 });
+*/
 
 var initalizeLocalStorageProxy = function(entries) {
     var patt = new RegExp("$.storage");
@@ -1243,6 +1244,9 @@ var Player = function() {
                        thisPlayer.mediaState == Media.MEDIA_PAUSED) {
                         localStorage['player-state'] = "paused";
                     }
+                    if (position != -1) {
+                        thisPlayer.timeStatusCb(thisPlayer.file);
+                    }
                     return;
                 }
                 if (!thisPlayer.resume) {
@@ -1268,7 +1272,6 @@ var Player = function() {
 
                 thisPlayer.timeStatusCb(thisPlayer.file);
                 if (thisPlayer.file.dirty) {
-
                     thisPlayer.file.save();
                 }
             },

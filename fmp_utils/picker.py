@@ -18,12 +18,39 @@ import math
 
 true_score_pool = defaultdict(list)
 
-def build_truescore_list():
+def build_truescore_list(user_id):
     scores = []
+
+    with session_scope() as session:
+        true_scores = session.query(UserFileInfo.true_score)\
+                             .filter(and_(
+                                    UserFileInfo.user_id==user_id,
+                                    UserFileInfo.true_score >= 0
+                                  ))\
+                             .distinct()\
+                             .all()
+
+        minimum = 0
+        for true_score in true_scores:
+            true_score = true_score[0]
+            print("true_score:", true_score)
+            tmp = math.ceil(true_score * 0.1)
+            if tmp <= 0:
+                tmp = 1
+            for i in range(0, tmp):
+                true_score = int(true_score)
+                if true_score % 10 == 0:
+                    scores.append(true_score)
+
+        if scores:
+            scores.sort()
+            print("SCORES:", scores)
+            shuffle(scores)
+            return scores
+
     for i in range(0, 11):
         for score in range(0, i+1):
             scores.append(i*10)
-
     shuffle(scores)
     return scores
 
@@ -336,7 +363,9 @@ def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
 def populate_preload_for_user(user, threashold=1):
     with session_scope() as session:
         session_add(session, user)
-        true_score_pool[user.id] = build_truescore_list()
+        user_id = user.id
+        true_score_pool[user_id] = build_truescore_list(user_id)
+        session_add(session, user)
         cnt = 0
         if threashold <= 0:
             threashold = 1
