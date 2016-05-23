@@ -982,6 +982,7 @@ class FmpServer(object):
         with session_scope() as session:
             results = []
             limit = hard_limit
+            # Get all the artists that match the word + 3 characters
             artists = session.query(Artist)\
                              .filter(and_(
                                 Artist.name.ilike("%s%%" % word),
@@ -1043,6 +1044,26 @@ class FmpServer(object):
                 results += [a.name for a in albums]
                 results = list(set(results))
 
+            if len(results) < hard_limit:
+                limit = hard_limit - len(results)
+                locations = session.query(Location)\
+                                   .filter(Location.basename.ilike("%s%%" % word))\
+                                   .order_by(Location.basename)\
+                                   .limit(limit)
+                for l in locations:
+                    basename = l.basename
+                    if "_" in basename:
+                        parts = basename.split("_")
+                        basename = parts[0]
+                    if " " in basename:
+                        parts = basename.split(" ")
+                        basename = parts[0]
+                    results.append(basename)
+                    results.append(l.basename)
+
+                results = list(set(results))
+
+            results.sort()
             return json_dumps(results)
 
 
