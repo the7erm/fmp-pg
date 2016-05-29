@@ -144,8 +144,8 @@ def populate_pick_from(user_id=None, truncate=False):
                                          SELECT id
                                          FROM files
                                          WHERE time_played IS NOT NULL
-                                         ORDER BY time_played DESC
-                                         LIMIT 100
+                                         ORDER BY time_played DESC NULLS LAST
+                                         LIMIT 200
                                     )"""))
 
             # remove the last 50 artists
@@ -160,7 +160,7 @@ def populate_pick_from(user_id=None, truncate=False):
                                                    SELECT id
                                                    FROM files
                                                    WHERE time_played IS NOT NULL
-                                                   ORDER BY time_played DESC
+                                                   ORDER BY time_played DESC NULLS LAST
                                                    LIMIT 50
                                              )
                                         )
@@ -180,14 +180,14 @@ def populate_pick_from(user_id=None, truncate=False):
 
         if user_id is not None:
             # Remove files rated 0
-            session.execute(text("""DELETE FROM pick_from
-                                    WHERE file_id IN (
-                                         SELECT file_id
-                                         FROM user_file_info
-                                         WHERE rating = 0 AND
-                                               user_id = :user_id
-                                    )"""),
-                            {"user_id": user_id})
+            #session.execute(text("""DELETE FROM pick_from
+            #                        WHERE file_id IN (
+            #                             SELECT file_id
+            #                             FROM user_file_info
+            #                             WHERE rating = 0 AND
+            #                                   user_id = :user_id
+            #                        )"""),
+            #                {"user_id": user_id})
 
             # Remove files that are already in the preload for that user.
             session.execute(text("""DELETE FROM pick_from
@@ -206,7 +206,7 @@ def populate_pick_from(user_id=None, truncate=False):
                                          FROM user_file_info
                                          WHERE time_played IS NOT NULL AND
                                                user_id = :user_id
-                                         ORDER BY time_played DESC
+                                         ORDER BY time_played DESC NULLS LAST
                                          LIMIT 100
                                     )"""),
                             {"user_id": user_id})
@@ -266,7 +266,8 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
                  WHERE ufi.file_id = f.id AND
                        ufi.user_id = :user_id AND
                        ufi.true_score >= :true_score AND
-                       pf.file_id = f.id
+                       pf.file_id = f.id AND
+                       ufi.rating > 0
                  ORDER BY f.time_played NULLS FIRST, random()
                  LIMIT 1"""
 
