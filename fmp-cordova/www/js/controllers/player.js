@@ -7,9 +7,13 @@ fmpApp.controller('PlayerController', function ($scope, FmpSync,
     $scope.syncFile = FmpSync.syncFile;
     $scope.FmpSyncCollection = FmpSync.collection;
     $scope.player = window.player;
+    $scope.item = window.player.file;
+
     $rootScope.$on("time-status", function(scope, file){
+        console.log("$rootScope.$on time-status");
         $scope.$apply();
     });
+
     $scope.FmpListenersCollection = FmpListeners.collection;
     $scope.downloader = window.downloader;
     $scope.toggleVoteToSkip = function(user){
