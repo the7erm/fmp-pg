@@ -50,9 +50,6 @@ fmpApp.controller('PlaylistCtrl', function ($scope, FmpPlaylist, FmpSync,
 
     $scope.moreInView = function(direction) {
         $scope.more(direction);
-        var tmp = function() {
-            $scope.more(direction);
-        };
     }
 
     for (var i=0;i<files.length;i++) {
