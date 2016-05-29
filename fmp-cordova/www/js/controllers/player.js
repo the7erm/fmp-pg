@@ -10,8 +10,10 @@ fmpApp.controller('PlayerController', function ($scope, FmpSync,
     $scope.item = window.player.file;
 
     $rootScope.$on("time-status", function(scope, file){
-        console.log("$rootScope.$on time-status");
-        $scope.$apply();
+        // console.log("$rootScope.$on time-status");
+        if (!$scope.$$phase) {
+            $scope.$apply();
+        }
     });
 
     $scope.FmpListenersCollection = FmpListeners.collection;

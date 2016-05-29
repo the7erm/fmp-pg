@@ -2,7 +2,8 @@ var fmpApp = angular.module('fmpApp', [
     'ngRoute',
     'ngTouch',
     'ngWebSocket',
-    'rzModule'
+    'rzModule',
+    'angular-inview'
 ]).filter('filterPlaylist', function() {
     return function(input, search) {
       if (!input) return input;
