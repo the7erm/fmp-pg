@@ -223,6 +223,7 @@ var FmpFile = function (spec) {
         if (typeof thisFile.spec.voted_to_skip == "undefined") {
             thisFile.spec.voted_to_skip = [];
         }
+
     };
     thisFile.save = function() {
         if (!thisFile.file_id) {

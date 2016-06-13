@@ -46,6 +46,49 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
         }
     }
 
+    $scope.scrollToElement = function(id, timeout, cnt, last_pos) {
+        if (typeof cnt == 'undefined') {
+            cnt = 0;
+        }
+        if (typeof timeout == 'undefined') {
+            timeout = 500;
+        }
+        $el = $(id);
+        console.log("scrollToElement:", cnt, id);
+        cnt = cnt + 1;
+        if (!$el || $el.length == 0) {
+            if (cnt > 10) {
+                console.log("id never found:", cnt, "id:", id);
+                return;
+            }
+            console.log("missing $el cnt:", cnt);
+            var tmp = function() {
+                $scope.scrollToElement(id, timeout, cnt);
+            }
+            $timeout(tmp, timeout);
+            return;
+        }
+        if (cnt > 10) {
+            console.log("Done scrolling", cnt, "id:", id);
+            return;
+        }
+        console.log("el:",$el);
+        var pos = $el.offset().top-100;
+        if (pos == last_pos) {
+            return;
+        }
+        $("html, body").animate({
+            scrollTop: pos
+        }, "slow");
+        if (cnt < 5) {
+            timeout = 1000;
+        }
+        var tmp = function() {
+            $scope.scrollToElement(id, timeout, cnt, pos);
+        }
+        $timeout(tmp, timeout);
+    }
+
     $scope.scrollToPlaying = function() {
         console.log("scrollToPlaying()");
         if (!window.player || !window.player.file || !window.player.file.id) {
@@ -61,16 +104,7 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
             $timeout($scope.scrollToPlaying, 1000);
             return;
         }
-        $el = $("#file-"+window.player.file.id);
-        if (!$el || $el.length == 0) {
-            console.log("missing $el");
-            $timeout($scope.scrollToPlaying, 1000);
-            return;
-        }
-        console.log("el:",$el);
-        $("html, body").animate({
-            scrollTop: $el.offset().top-100
-        }, "slow");
+        $scope.scrollToElement("#file-"+window.player.file.id);
     }
 
     FmpIpScanner.startScan();

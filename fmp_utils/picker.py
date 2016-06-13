@@ -129,24 +129,33 @@ def populate_pick_from(user_id=None, truncate=False):
     with session_scope() as session:
         if user_id is None:
             truncate = True
-
+        spec = {
+            "user_id": user_id
+        }
         if truncate:
-            session.execute(text("TRUNCATE pick_from"))
-            session.execute(text("""INSERT INTO pick_from (file_id)
-                                    SELECT id
-                                    FROM files"""))
+            session.execute(text("""DELETE FROM pick_from
+                                    WHERE user_id = :user_id""",
+                                    ),
+                            spec)
+            session.execute(text("""INSERT INTO pick_from (file_id, user_id)
+                                    SELECT id, :user_id
+                                    FROM files"""),
+                            spec)
             session.commit()
 
             # Remove the last 100 songs that have been played
             # note, some files don't have an artist.
             session.execute(text("""DELETE FROM pick_from
                                     WHERE file_id IN (
-                                         SELECT id
-                                         FROM files
-                                         WHERE time_played IS NOT NULL
+                                         SELECT file_id
+                                         FROM user_file_info ufi
+                                         WHERE time_played IS NOT NULL AND
+                                               user_id = :user_id
                                          ORDER BY time_played DESC NULLS LAST
                                          LIMIT 200
-                                    )"""))
+                                    ) AND
+                                    user_id = :user_id"""),
+                            spec)
 
             # remove the last 50 artists
             session.execute(text("""DELETE FROM pick_from
@@ -157,14 +166,16 @@ def populate_pick_from(user_id=None, truncate=False):
                                              SELECT artist_id
                                              FROM artist_association
                                              WHERE file_id IN (
-                                                   SELECT id
-                                                   FROM files
-                                                   WHERE time_played IS NOT NULL
+                                                   SELECT file_id
+                                                   FROM user_file_info ufi
+                                                   WHERE time_played IS NOT NULL AND
+                                                         user_id = :user_id
                                                    ORDER BY time_played DESC NULLS LAST
                                                    LIMIT 50
                                              )
                                         )
-                                   )"""))
+                                   )"""),
+                            spec)
 
             # remove disabled genres
             session.execute(text("""DELETE FROM pick_from
@@ -176,7 +187,8 @@ def populate_pick_from(user_id=None, truncate=False):
                                                FROM genres
                                                WHERE enabled = false
                                          )
-                                    )"""))
+                                    ) AND user_id = :user_id"""),
+                            spec)
 
         if user_id is not None:
             # Remove files rated 0
@@ -196,7 +208,7 @@ def populate_pick_from(user_id=None, truncate=False):
                                          FROM preload
                                          WHERE user_id = :user_id
                                     )"""),
-                           {"user_id": user_id})
+                           spec)
 
             # Remove the last 100 songs that have been played for the user
             # note, some files don't have an artist.
@@ -209,7 +221,7 @@ def populate_pick_from(user_id=None, truncate=False):
                                          ORDER BY time_played DESC NULLS LAST
                                          LIMIT 100
                                     )"""),
-                            {"user_id": user_id})
+                            spec)
 
             # remove the last 50 artists heard by that user
             session.execute(text("""DELETE FROM pick_from
@@ -229,7 +241,7 @@ def populate_pick_from(user_id=None, truncate=False):
                                              )
                                         )
                                    )"""),
-                            {"user_id": user_id})
+                            spec)
 
         session.commit()
 
@@ -237,29 +249,33 @@ def insert_random_unplayed_for_user_from_pick_from(user):
     result = None
     with session_scope() as session:
         session_add(session, user)
+        user_id = user.id
         result = session.query(File).from_statement(
             text("""SELECT f.*
                     FROM pick_from pf, files f
                     LEFT JOIN user_file_info usi ON user_id = :user_id AND
                                                     usi.file_id = f.id
                     WHERE usi.file_id IS NULL AND
-                          pf.file_id = f.id
+                          pf.file_id = f.id AND
+                          pf.user_id = :user_id
                     ORDER BY random()
                     LIMIT 1"""))\
-            .params(user_id=user.id)\
+            .params(user_id=user_id)\
             .first()
-
-        remove_file_from_pick_from(result, session)
+        session_add(session, user)
+        remove_file_from_pick_from(result, session, user_id=user_id)
         if result:
             session_add(session, user)
             insert_into_preload(
-                    user.id, result.id, "random unplayed for %s" % user.name)
+                    user_id, result.id, "random unplayed for %s" % user.name)
     return result
 
 def insert_random_for_user_true_score_from_pick_from(user, true_score):
     with session_scope() as session:
         session_add(session, user)
-        sql = """SELECT f.*
+        user_id = user.id
+        user_name = user.name
+        sql = """SELECT f.*, ufi.time_played
                  FROM files f,
                       user_file_info ufi,
                       pick_from pf
@@ -267,43 +283,69 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
                        ufi.user_id = :user_id AND
                        ufi.true_score >= :true_score AND
                        pf.file_id = f.id AND
-                       ufi.rating > 0
-                 ORDER BY f.time_played NULLS FIRST, random()
+                       ufi.rating > 0 AND
+                       pf.user_id = ufi.user_id
+                 ORDER BY ufi.time_played NULLS FIRST,
+                          f.time_played NULLS FIRST,
+                          random()
                  LIMIT 1"""
 
         result = session.query(File)\
                         .from_statement(text(sql))\
-                        .params(user_id=user.id, true_score=true_score)\
+                        .params(user_id=user_id, true_score=true_score)\
                         .first()
 
         if not result:
             return insert_random_unplayed_for_user_from_pick_from(user)
         session_add(session, user)
         insert_into_preload(
-            user.id, result.id, "%s true_score >= %s" % (user.name, true_score))
-        remove_file_from_pick_from(result, session)
+            user_id, result.id, "%s true_score >= %s" % (user_name, true_score))
+        remove_file_from_pick_from(result, session, user_id=user_id)
 
     return result
 
-def remove_file_from_pick_from(result, session):
+def remove_file_from_pick_from(result, session, user_id=None):
     if not result:
         return
     session_add(session, result)
-    session.execute(text("""DELETE FROM pick_from
-                            WHERE file_id = :file_id"""),
-                    {'file_id': result.id })
+    if not user_id:
+        session.execute(text("""DELETE FROM pick_from
+                                WHERE file_id = :file_id"""),
+                        {'file_id': result.id })
 
-    session.execute(text("""DELETE FROM pick_from
-                            WHERE file_id IN (
-                                 SELECT file_id
-                                 FROM artist_association
-                                 WHERE artist_id IN (
-                                     SELECT artist_id
+        session.execute(text("""DELETE FROM pick_from
+                                WHERE file_id IN (
+                                     SELECT file_id
                                      FROM artist_association
-                                     WHERE file_id = :file_id
-                                )
-                           )"""),
-                   {'file_id': result.id})
+                                     WHERE artist_id IN (
+                                         SELECT artist_id
+                                         FROM artist_association
+                                         WHERE file_id = :file_id
+                                    )
+                               )"""),
+                       {'file_id': result.id})
+    else:
+        spec = {
+            'file_id': result.id,
+            'user_id': user_id
+        }
+        session.execute(text("""DELETE FROM pick_from
+                                WHERE file_id = :file_id AND
+                                      user_id = :user_id"""),
+                        spec)
+
+        session.execute(text("""DELETE FROM pick_from
+                                WHERE file_id IN (
+                                     SELECT file_id
+                                     FROM artist_association
+                                     WHERE artist_id IN (
+                                         SELECT artist_id
+                                         FROM artist_association
+                                         WHERE file_id = :file_id
+                                    )
+                               ) AND
+                               user_id = :user_id"""),
+                       spec)
     session.commit()
 
 def insert_into_preload(user_id, file_id, reason="", from_search=False):
@@ -319,7 +361,7 @@ def insert_into_preload(user_id, file_id, reason="", from_search=False):
 def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
                      secondary_prefetch_num=None):
     with session_scope() as session:
-        populate_pick_from(truncate=True)
+        # populate_pick_from(truncate=True)
         if not users:
             # User list defined, use users who are marked `listening`
             users = session.query(User).filter(User.listening == True).all()
@@ -333,7 +375,7 @@ def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
             session_add(session, user)
             # Prepare a list that is safe for all our users.
             user_id = user.id
-            populate_pick_from(user_id=user_id, truncate=False)
+            populate_pick_from(user_id=user_id, truncate=True)
 
         threashold = math.floor(len(users) / 5)
         if threashold <= 0:

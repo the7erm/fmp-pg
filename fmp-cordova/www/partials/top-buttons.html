@@ -17,8 +17,9 @@
         <span class="caret"></span>
       </button>
       <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-        <li ng-if="!FmpSyncCollection.syncQue||FmpSyncCollection.syncQue.length<=0" ><a  ng-click="organize(this)" href="#/playlist">Played first</a></li>
-        <li><a href="#/playlist" ng-click="organize_random(this)">Random</a></li>
+        <li ng-if="!FmpSyncCollection.syncQue||FmpSyncCollection.syncQue.length<=0" ><a  ng-click="organize()" href="#/playlist">Played first</a></li>
+        <li><a href="#/playlist" ng-click="organize_random()">Random</a></li>
+        <li><a href="#/playlist" ng-click="organize_by_plid()">Cued Order</a></li>
       </ul>
     </span><br>
 </span>

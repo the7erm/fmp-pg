@@ -730,7 +730,10 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
         if (!methods.aquireSyncLock(removeIfPlayed)) {
             return;
         }
-        methods.removeFiles();
+        if (!collection.FmpPlaylist.files) {
+            removeIfPlayed = true;
+        }
+        // methods.removeFiles();
         methods.removeDuplicates();
         collection.filesToRemove = [];
         var deletedRx = new RegExp("^deleted\-[\d]+");

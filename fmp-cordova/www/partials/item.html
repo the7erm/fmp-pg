@@ -1,9 +1,19 @@
-<a ng-if="!item.playing" style="text-decoration: none;" class="glyphicon glyphicon-remove pull-right" ng-click="trash(item)"></a>
-<br ng-if="item.playing" clear="all">
-<a class="glyphicon pull-right" style="color:red; text-decoration: none;"
-   ng-class="{'glyphicon-heart-empty':!item.keep,
-              'glyphicon-heart':item.keep}"
-   ng-click="item.keep=!item.keep"></a>
+<div>
+    <a ng-if="!item.playing" style="text-decoration: none;" class="glyphicon glyphicon-remove pull-right" ng-click="trash(item)"></a>
+    <br ng-if="item.playing" clear="all">
+    <a class="glyphicon pull-right" style="color:red; text-decoration: none;"
+       ng-class="{'glyphicon-heart-empty':!item.keep,
+                  'glyphicon-heart':item.keep}"
+       ng-click="item.keep=!item.keep"></a>
+    <button class="btn btn-default btn-xs glyphicon glyphicon-transfer"
+        ng-if="connection.type=='wifi'"
+        ng-click="quickSync();"></button>
+    <span ng-if="path=='/playlist'">
+        <button ng-click="scrollToPlaying()" class="btn btn-default btn-xs glyphicon glyphicon-play-circle" ng-if="!item.playing"></button>
+        <button ng-click="scrollToUnrated()" class="btn btn-default btn-xs glyphicon glyphicon-question-sign" ng-if="hasUnratedFiles"></button>
+    </span>
+    <br>
+</div>
 
 <div class="item-img pull-left" ng-if="item.image" style="background:url({{item.image}}) no-repeat fixed center; background-size: cover;background-color:rgba(0, 0, 0, 0.7);">
     <button class="btn btn-xs btn-default glyphicon glyphicon-play"

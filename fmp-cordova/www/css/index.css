@@ -44,6 +44,15 @@
 }
 
 .glyphicon-question-sign, .glyphicon-question-sign:hover {
+    vertical-align: middle;
+    text-decoration: none;
+    color:yellow;
+    -webkit-text-fill-color: yellow; /* Will override color (regardless of order) */
+    -webkit-text-stroke-width: 1px;
+    -webkit-text-stroke-color: black;
+}
+
+.glyphicon-question-sign-rating, .glyphicon-question-sign-rating:hover {
     font-size:1.3em;
     padding:5px;
     vertical-align: middle;

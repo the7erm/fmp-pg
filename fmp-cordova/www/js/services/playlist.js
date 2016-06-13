@@ -166,80 +166,252 @@ fmpApp.factory('FmpPlaylist', function($rootScope, FmpUtils, FmpListeners,
       return Math.floor(Math.random() * (max - min)) + min;
     }
 
-    methods.organize_random = function(el, played_first) {
+    var getKeyValue = function(obj, key, defaultValue) {
+      if (key.indexOf(".") != -1) {
+          var parts = key.split("."),
+              _key = parts.shift(),
+              child_key = parts.join(".");
+          if (typeof obj[_key] == "undefined") {
+            return defaultValue;
+          }
+          return getKeyValue(obj[_key], child_key, defaultValue);
+      }
+      if (typeof obj[key] == "undefined") {
+        return defaultValue;
+      }
+      return obj[key];
+    };
+
+
+    var collapsGroup = function(groupedList, groupSortDirection,
+                                valueSortDirection, groupStyle) {
+      var files = [],
+          foundFile = true;
+
+      $.each(groupedList, function(key, values) {
+        // console.log("valueSortDirection: ", valueSortDirection, "values before sort:", values);
+        if (valueSortDirection == 0) {
+          // stolen from http://stackoverflow.com/a/18650169/2444609
+          // This is a simple random and I love it.
+          values.sort(function() {
+            return .5 - Math.random();
+          });
+        } else {
+          values.sort();
+        }
+        if (valueSortDirection == -1) {
+          values.reverse();
+        }
+        // console.log("valueSortDirection: ", valueSortDirection, "values after sort:", values);
+      });
+
+      var keys = Object.keys(groupedList);
+      // console.log("groupSortDirection: ", groupSortDirection, "keys before sort:", keys);
+      if (groupSortDirection == 0) {
+        // stolen from http://stackoverflow.com/a/18650169/2444609
+        // This is a simple random and I love it.
+        keys.sort(function() {
+          return .5 - Math.random();
+        });
+      } else {
+        keys.sort();
+      }
+      if (groupSortDirection == -1) {
+        keys.reverse();
+      }
+
+      // console.log("groupSortDirection: ", groupSortDirection, "keys after sort:", keys);
+      // console.log("groupedList:",groupedList);
+
+
+      if (groupStyle == "stagger") {
+        var foundFile = true;
+        while(foundFile) {
+          foundFile = false;
+          $.each(keys, function(i, key){
+            var values = groupedList[key];
+            if (!values || values.length == 0) {
+              return;
+            }
+            var file = values.shift();
+            if (!file){
+              return;
+            }
+            foundFile = true;
+            files.push(file);
+          });
+        }
+      } else {
+        $.each(keys, function(i, key){
+          var values = groupedList[key];
+          if (!values || values.length == 0) {
+            return;
+          }
+          while (values && values.length > 0) {
+            var file = values.shift();
+            if (!file){
+              continue;
+            }
+            files.push(file);
+          }
+        });
+      }
+
+
+      return files;
+    };
+
+    var groupByKey = function(file_list, groupKeyRule, defaultValue,
+                              returnGrouped) {
+      var groupedList = {},
+          alreadyAdded = [],
+          trackBy = "",
+          groupSortDirection = 1,
+          valueSortDirection = 1,
+          groupStyle = 0;
+
+      if (typeof returnGrouped == "undefined") {
+          returnGrouped = false;
+      }
+
+      if (groupKeyRule.indexOf(",") != -1) {
+        var groups = groupKeyRule.split(","),
+            groupRule = groups.shift(),
+            groupedList = groupByKey(file_list, groupRule, defaultValue, true),
+            remaingRules = groups.join(","),
+            files_list = [],
+            foundFile = true;
+        // console.log("groupRule:", groupRule, "groupedList:", groupedList);
+        $.each(groupedList['list'], function(key, values) {
+          groupedList['list'][key] = groupByKey(values, remaingRules, defaultValue, false);
+        });
+
+        return collapsGroup(groupedList['list'],
+                            groupedList['groupSortDirection'],
+                            groupedList['valueSortDirection'],
+                            groupedList['groupStyle']);
+      }
+
+      // Group by key has the format of:
+      // <key to group by>|<key to track by>|<groupSortDirection>
+      // groupSortDirection: 1 ascending, -1 descending, 0 random
+      // valueSortDirection: 1 ascending, -1 descending, 0 random
+      var cmds = groupKeyRule.split("|"),
+          groupKey = "";
+
+      if (cmds.length >= 1) {
+        groupKey = cmds[0];
+      }
+      if (cmds.length >= 2) {
+        trackBy = cmds[1];
+      }
+      if (cmds.length >= 3) {
+        groupSortDirection =  parseInt(cmds[2]);
+      }
+      if (cmds.length >= 4) {
+        valueSortDirection = parseInt(cmds[3]);
+      }
+      if (cmds.length >= 5) {
+        groupStyle = cmds[4];
+      }
+
+      if ([0, 1, -1].indexOf(valueSortDirection) == -1) {
+          valueSortDirection = 1;
+      }
+
+      if ([0, 1, -1].indexOf(groupSortDirection) == -1) {
+          groupSortDirection = 1;
+      }
+
+      if (typeof defaultValue == "undefined") {
+        defualt = "undefined";
+      }
+      $.each(file_list, function(i, file){
+          var keyValue = getKeyValue(file, groupKey, defaultValue);
+          if (typeof groupedList[keyValue] == "undefined") {
+            groupedList[keyValue] = [];
+          }
+          if (trackBy) {
+            var trackValue = getKeyValue(file, trackBy, "-failed-");
+            if (alreadyAdded.indexOf(trackValue) != -1) {
+              return;
+            }
+            alreadyAdded.push(trackValue);
+          }
+          groupedList[keyValue].push(file);
+      });
+      if (returnGrouped) {
+          return {
+            "list": groupedList,
+            "valueSortDirection": valueSortDirection,
+            "groupSortDirection": groupSortDirection,
+            "groupStyle": groupStyle
+          };
+      }
+      return collapsGroup(groupedList, groupSortDirection, valueSortDirection,
+                          groupStyle);
+    };
+
+    methods.organize_random = function(sortRule) {
       if (collection.organizeLock) {
         return;
       }
       collection.organizeLock = true;
-      if (typeof played_first == "undefined") {
-        played_first = false;
+      if (typeof sortRule == "undefined" || !sortRule) {
+        // Randomly sort by user id and stagger.
+        sortRule = [
+          "playing|id|-1|1", // playing first,
+          "spec.cued.user_id|id|0|0|stagger"
+        ];
       }
-      var files = [],
-          groupedByUsers = [],
-          preload = [],
-          alreadyLoaded = []
-          walkList = function(idx, file){
-            if (alreadyLoaded.indexOf(file.id) != -1) {
-              return;
-            }
-            alreadyLoaded.push(file.id);
-            var user_id = 0;
-            if ("cued" in file && file.cued) {
-              user_id = file.cued.user_id;
-            }
-            if (!(user_id in groupedByUsers)) {
-              groupedByUsers[user_id] = [];
-            }
-            if (!user_id || FmpListeners.collection.listener_user_ids.indexOf(user_id) != -1) {
-                groupedByUsers[user_id].push(file);
-            } else {
-                // preload.push(file);
-                // logger.log("fallback push:", file.id);
-                groupedByUsers[user_id].push(file);
-            }
-          };
-
-      $.each(collection.files, walkList);
-      $.each(FmpPreload.collection.files, walkList);
-
-      FmpPreload.collection.files = preload;
-      FmpPreload.save();
-
-      var fileFound = true;
-      while (fileFound) {
-        fileFound = false;
-        $.each(groupedByUsers, function(user_id, user_files) {
-          console.log("user_id:", user_id)
-          if (!user_files || user_files.length == 0) {
-            return;
-          }
-
-          fileFound = true;
-          var file = false;
-
-          if (!played_first) {
-            var idx = methods.getRandomInt(0, user_files.length-1),
-                file = user_files.splice(idx, 1);
-            file = file[0];
-          } else {
-            file = user_files.pop();
-          }
-
-          if (!file) {
-            return;
-          }
-
-          console.log("file:", file.id);
-          files.push(file);
-        });
+      if (sortRule instanceof Array) {
+        sortRule = sortRule.join(",");
       }
-      console.log("files:", files);
-      collection.files = files;
+      var files = collection.files.concat(FmpPreload.collection.files);
+      collection.files = groupByKey(files, sortRule);
+      var lowest = collection.files.length,
+          highest = 0;
+      for (var i=0;i<collection.files.length;i++) {
+          var file = collection.files[i];
+          if (file.showing) {
+            if (i < lowest) {
+              lowest = i;
+            }
+            if (i > highest) {
+              highest = i;
+            }
+          }
+      }
+      for (var i=0;i<collection.files.length;i++) {
+          if (i >= lowest && i <= highest) {
+            collection.files[i].showing = true;
+          }
+      }
       collection.organizeLock = false;
     };
 
-    methods.organize = function(el) {
-      methods.organize_random(el, true);
+    methods.organize = function() {
+      // Put played files first, then playing last out those, and stagger by user_id
+      var rules = [
+          "spec.played|id|-1|1",
+          "playing|id|1|1",
+          "spec.cued.user_id|id|1|1|stagger"
+      ];
+      methods.organize_random(rules);
+    };
+
+    methods.organize_by_plid = function() {
+      // Put played first then files that were cued from search,
+      // after that
+      var rules = [
+        "spec.played|id|-1|1", // played files first,
+        "playing|id|1|1", // playing last,
+        "spec.cued.user_id|id|1|1|stagger", // stagger by the user
+        "spec.cued.from_search|id|-1|1", // cued from search next with `true`
+                                         // values first
+        "spec.cued.id"  // Last but not least order by the preload.id
+      ];
+      methods.organize_random(rules);
     };
 
     methods.deleteFile = function(file, deleteCb) {
