@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 
-from setproctitle import setproctitle
-setproctitle("fmp.py")
-
 import sys
 import fmp_utils
+
+from setproctitle import setproctitle
 from fmp_utils.player import Player, Gtk
 from fmp_utils.fmp_playlist import FmpPlaylist
 from fmp_utils import picker
 from fmp_utils.first_run import first_run
 from server import server
 from threading import Thread
-fmp_utils.fmp_playlist.setproctitle = setproctitle
 from subprocess import Popen
 
 
+setproctitle("fmp.py")
+fmp_utils.fmp_playlist.setproctitle = setproctitle
 
-server.converter.thread = Thread(target=server.check_for_files_that_need_converting)
+server.converter.thread = Thread(
+    target=server.check_for_files_that_need_converting)
 server.converter.thread.start()
 
 server_thread = Thread(target=server.cherry_py_worker)
 server_thread.start()
-
 
 if first_run:
     print("FIRST RUN", first_run)
@@ -32,7 +32,11 @@ else:
     create_all(Base)
 
 playlist = FmpPlaylist(server=server, first_run=first_run)
-from models.folder import folder_scanner
+
+if True:
+    # pep8 ... it's weird sometimes
+    from models.folder import folder_scanner
+
 folder_scanner.scan()
 
 Gtk.main()
