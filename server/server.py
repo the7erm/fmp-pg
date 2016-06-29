@@ -928,18 +928,25 @@ class FmpServer(object):
     @cherrypy.expose
     def next(self):
         playlist.next()
-        return "Next"
+        return "NEXT"
 
     @cherrypy.expose
     def prev(self):
         playlist.prev()
-        return "Prev"
+        return "PREV"
 
     @cherrypy.expose
     def pause(self):
         playlist.pause()
         # broadcast({"state-changed": playlist.player.state_string })
-        return "pause"
+        if playlist.player.state_string == "PLAYING":
+            return "PLAYING"
+        return "PAUSED"
+
+    @cherrypy.expose
+    def status(self):
+        return "%s %s" % (playlist.player.state_string,
+                          os.path.basename(playlist.player.filename))
 
     @cherrypy.expose
     def vote_to_skip(self, *args, **kwargs):
