@@ -161,12 +161,6 @@ Mode: <select name="singleSelect" id="singleSelect" ng-model="PlayerData.collect
         <li>preload:{{data.basename}}</li>
     </div>
 </div>
-
-<ul ng-if="PlayerData.collection.iam==1">
-  <li ng-repeat="(key, data) in PlayerData.collection track by key">
-    {{key}}: <span ng-if="key!='player'&&key!='playingData'">{{ data | json }}</span><pre ng-if="key=='playingData'">{{ data | json }}</pre>
-  </li>
-</ul>
 <br>
 <br>
 <br>

@@ -904,7 +904,7 @@ class FmpServer(object):
                        .first()
             session.add(f)
             mark_as_played_kwargs = {
-                "user_ids": [kwargs.get('user_id')],
+                "user_id": [kwargs.get('user_id')],
                 "percent_played": kwargs.get("percent_played", 0),
                 "now": int(kwargs.get("now", time()))
             }
@@ -1193,6 +1193,7 @@ class FmpServer(object):
     def preload(self, *args, **kwargs):
         params = cherrypy.request.params
         user_ids = self.get_user_ids(user_ids=kwargs.get('user_ids', []))
+        limit = int(kwargs.get("limit", 0))
         user_sql = """SELECT user_id AS id
                       FROM preload
                       WHERE user_id IN(%s)
@@ -1241,7 +1242,29 @@ class FmpServer(object):
                                 text(sql))\
                            .all()
             for f in files:
+                if limit and len(results) >= limit:
+                    break
                 results.append(f.json(user_ids=user_ids))
+
+        _results = []
+        group_by_user = {}
+        for r in results:
+            cued = r.get("cued", {})
+            user_id = cued.get("user_id", 0)
+            if user_id not in group_by_user:
+                group_by_user[user_id] = []
+            group_by_user[user_id].append(r)
+
+        has_files = True
+        while has_files:
+            has_files = False
+            for user_id, group in group_by_user.items():
+                if not group:
+                    continue
+                file = group.pop(0)
+                has_files = True
+                _results.append(file)
+        results = _results
 
         if not kwargs.get("raw"):
             return json_dumps(results)
@@ -1689,6 +1712,32 @@ class FmpServer(object):
         return json_dumps(results)
 
     @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def user_history(self, *args, **kwargs):
+        post_data = cherrypy.request.json
+        user_ids = [str(int(x)) for x in post_data.get('user_ids', [])]
+
+        results = []
+        with session_scope() as session:
+            sql = """SELECT f.*
+                     FROM files f, user_file_history ufh
+                     WHERE f.id = ufh.file_id AND
+                           ufh.user_id IN (%s)
+                     ORDER BY ufh.time_played DESC NULLS LAST
+                     LIMIT 1""" % (",".join(user_ids))
+            files = session.query(File)\
+                           .from_statement(
+                                text(sql))\
+                           .all()
+            for f in files:
+                session_add(session, f)
+                item = f.json(user_ids=user_ids, get_image=False)
+                results.append(item)
+
+        return results
+
+    @cherrypy.expose
     def download(self, file_id, convert=False, extract_audio=False):
         location = None
         with session_scope() as session:
@@ -1772,8 +1821,8 @@ class FmpServer(object):
         primary_user_id = int(post_data.get('primary_user_id'))
         secondary_user_ids = post_data.get('secondary_user_ids', [])
 
-        prefetchNum = 100
-        secondaryPrefetchNum = 20
+        prefetchNum = int(post_data.get('prefetchNum', 100))
+        secondaryPrefetchNum = int(post_data.get('secondaryPrefetchNum', 20))
         primary_user_id = int(primary_user_id)
         listener_user_ids = listener_user_ids + [primary_user_id]
         listener_user_ids = list(set(listener_user_ids))

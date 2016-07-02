@@ -4,8 +4,8 @@ import sys
 import fmp_utils
 
 from setproctitle import setproctitle
-from fmp_utils.player import Player, Gtk
-from fmp_utils.fmp_playlist import FmpPlaylist
+from fmp_utils.player import Player, Gtk, wait
+from fmp_utils.fmp_playlist import FmpPlaylist, wnck_tracker
 from fmp_utils import picker
 from fmp_utils.first_run import first_run
 from server import server
@@ -38,5 +38,13 @@ if True:
     from models.folder import folder_scanner
 
 folder_scanner.scan()
+
+wait()
+if Gtk.events_pending():
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+print ("*"*100)
+wnck_tracker.restore_window()
+wnck_tracker.check_window()
 
 Gtk.main()

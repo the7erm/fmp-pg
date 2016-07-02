@@ -134,7 +134,9 @@ var fmpApp = angular.module('fmpApp', [
       return methods;
   }])
   .factory('SatellitePlayer', ['$http', '$cookies', '$filter', 'ngAudio',
-    '$interval','UserUtils', 'notify', '$timeout', function($http, $cookies, $filter, ngAudio, $interval, UserUtils, notify, $timeout){
+           '$interval','UserUtils', 'notify', '$timeout', function(
+            $http, $cookies, $filter, ngAudio, $interval, UserUtils,
+            notify, $timeout) {
         var iam = $cookies.get('iam');
         if (!iam) {
           iam = -1;
@@ -215,25 +217,29 @@ var fmpApp = angular.module('fmpApp', [
         }
 
         methods.initPlaylist = function() {
-           console.log("initPlaylist")
+           console.log("initPlaylist");
            $http({
-              "url": "/history",
-              "params": {"uid": collection.uids.join(",") }
+              "method": 'POST',
+              "url": "/user_history",
+              "data": JSON.stringify({ "user_ids": collection.uids }),
+              "headers": {
+                'Content-Type': "application/json"
+              }
             }).then(function successCallback(response) {
               console.log("success", response.data);
               collection.playlist = response.data;
               collection.idx = collection.playlist.length - 1;
               console.log("collection.idx:", collection.idx);
+              var file_info = collection.playlist[collection.idx];
+              console.log("file info:", file_info);
               var user_file_info = collection.playlist[collection.idx]['user_file_info'];
               console.log("user_file_info:", user_file_info)
-              collection.resumePosition = user_file_info['listeners'][0]['percent_played'] * 0.01;
-
+              collection.resumePosition = user_file_info['percent_played'] * 0.01;
               console.log("collection.resumePosition:", collection.resumePosition)
               $timeout(methods.resume, 1);
               methods.setIndex();
               collection.sound.play();
             }, function errorCallback(response) {
-
             });
         }
 
@@ -242,29 +248,34 @@ var fmpApp = angular.module('fmpApp', [
                 return;
             }
             collection.initPreloadLocked = true;
-            for (var i=0;i<collection.uids.length;i++) {
-              var uid = collection.uids[i];
-              $http({
-                "url": "/preload",
-                "params": {"uid": uid }
-              }).then(function successCallback(response) {
-                var uid = response.data.uids[0];
-                for (var i=0;i<response.data.results.length;i++) {
-                  collection.preload.push(response.data.results[i]);
-                }
-                collection.initPreloadLocked = false;
-              }, function errorCallback(response) {
-                collection.initPreloadLocked = false;
-              });
-            }
-            $http({
-              "url": "/preload",
-              "params": {"uid": collection.uids.join(","), "limit":10 }
-            }).then(function successCallback(response) {
-              // Tell the server to convert the next files to .mp3 if needed.
-            }, function errorCallback(response) {
+            /*
+            listener_user_ids = post_data.get('listener_user_ids', [])
+            primary_user_id = int(post_data.get('primary_user_id'))
+            secondary_user_ids = post_data.get('secondary_user_ids', [])*/
 
+            $http({
+              "method": "POST",
+              "url": "/preloadSync",
+              "data": {
+                  "listener_user_ids": collection.uids,
+                  "primary_user_id": collection.uids[0],
+                  "secondary_user_ids": collection.uids,
+                  "files": [],
+                  "prefetchNum": 10,
+                  "secondaryPrefetchNum": 10
+              },
+              "headers": {
+                  "Content-Type": "application/json"
+              }
+            }).then(function successCallback(response) {
+              for (var i=0;i<response.data.preload.length;i++) {
+                collection.preload.push(response.data.preload[i]);
+              }
+              collection.initPreloadLocked = false;
+            }, function errorCallback(response) {
+              collection.initPreloadLocked = false;
             });
+
         }
 
         // collection.sound.play();
@@ -302,9 +313,6 @@ var fmpApp = angular.module('fmpApp', [
                 }
             });
         };
-
-
-
         methods.markAsPlayed = function(force) {
           if (collection.mode == 'remote') {
             // console.log("markAsPlayed - remote");
@@ -324,9 +332,8 @@ var fmpApp = angular.module('fmpApp', [
           }
           console.log("markAsPlayed - 4");
           var params = {
-              "fid": collection.playlist[collection.idx].fid,
-              "eid": collection.playlist[collection.idx].eid,
-              "uid": collection.uids.join(","),
+              "file_id": collection.playlist[collection.idx].id,
+              "user_id": collection.uids.join(","),
               "percent": (collection.sound.progress || 0) * 100
           };
           $http({
@@ -351,6 +358,9 @@ var fmpApp = angular.module('fmpApp', [
             return;
           }
           if (typeof collection.sound == 'undefined') {
+            return;
+          }
+          if (!collection.sound) {
             return;
           }
           if (typeof collection.sound.audio == 'undefined') {
@@ -424,10 +434,11 @@ var fmpApp = angular.module('fmpApp', [
             console.log("stopping")
             collection.sound.stop();
           }
-
-          console.log("loading audio:", '/download/?fid='+collection.playlist[collection.idx].fid);
-
-          collection.sound = ngAudio.load('/download/?fid='+collection.playlist[collection.idx].fid);
+          console.log("loading audio:", '/download/?file_id='+collection.playlist[collection.idx].id);
+          if (!collection.playlist[collection.idx] || ! collection.playlist[collection.idx].id) {
+            return;
+          }
+          collection.sound = ngAudio.load('/download/?file_id='+collection.playlist[collection.idx].id);
           collection.sound.performance = 100;
           var obj = collection.playlist[collection.idx];
           console.log("setIndex obj:", obj);
@@ -495,7 +506,6 @@ var fmpApp = angular.module('fmpApp', [
         if (mode) {
             collection.mode = mode;
             SatellitePlayer.collection.mode = mode;
-
         }
 
         var methods = {
@@ -561,7 +571,7 @@ var fmpApp = angular.module('fmpApp', [
         };
 
         methods.setMode = function(mode) {
-          mode = 'remote';
+          // mode = 'remote';
           console.log("setMode:", mode);
           var expires = new Date();
           expires.setFullYear(parseInt(expires.getFullYear()) + 1);

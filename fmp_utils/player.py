@@ -21,7 +21,7 @@
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
-                          GLib, Gio, GdkPixbuf
+                          GLib, Gio, GdkPixbuf, Wnck
 GObject.threads_init()
 Gst.init(None)
 import sys

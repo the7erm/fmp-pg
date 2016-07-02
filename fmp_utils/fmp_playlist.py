@@ -1,5 +1,6 @@
 
-from fmp_utils.player import Player, Playlist, TrayIcon, Gdk, ActionTracker
+from fmp_utils.player import Player, Playlist, TrayIcon, Gdk, ActionTracker, \
+                             Wnck, Gtk
 from fmp_utils import picker
 from fmp_utils.jobs import jobs
 
@@ -9,12 +10,187 @@ from fmp_utils.misc import session_add
 from fmp_utils.constants import CONFIG_DIR
 import os
 import sys
+import json
 from subprocess import check_output
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject
 
 GObject.threads_init()
+
+
+class WnckTracker:
+    def __init__(self):
+        Gtk.main_iteration()
+        self.wnck_file = os.path.join(CONFIG_DIR, "wnck.json")
+        self.geometry = None
+        self.window = None
+        self.timeout = None
+        self.locked = False
+
+    def check_window(self):
+        print ("+"*1000)
+        Gtk.main_iteration()
+        self.screen = Wnck.Screen.get_default()
+        self.screen.force_update()
+        self.windows = self.screen.get_windows()
+        self.workspaces = self.screen.get_workspaces()
+
+        for w in self.windows:
+            name = w.get_class_instance_name()
+            print ("name:",name)
+            if "fmp.py" not in name:
+                continue
+            self.window = w
+            self.window.connect("geometry-changed", self.on_geometry_changed)
+            self.window.connect("state-changed", self.on_state_change)
+            self.window.connect("workspace-changed", self.on_state_change)
+
+    def on_geometry_changed(self, *args, **kwargs):
+        # print("on_geometry_changed:", args, kwargs)
+        if self.timeout:
+            GObject.source_remove(self.timeout)
+            self.timeout = False
+        self.timeout = GObject.timeout_add_seconds(1, self.write_once)
+
+    def on_state_change(self, *args, **kwargs):
+        # print ("on_state_change")
+        if self.timeout:
+            GObject.source_remove(self.timeout)
+            self.timeout = False
+        self.timeout = GObject.timeout_add_seconds(1, self.write_once)
+
+    def write_once(self):
+        GObject.source_remove(self.timeout)
+        self.timeout = False
+        print("+"*100)
+        print("write_once")
+        self.write_wnck_file()
+        return True
+
+    def write_wnck_file(self, *args, **kwargs):
+        print ("write_wnck_file")
+        if self.locked:
+            self.timeout = GObject.timeout_add_seconds(1, self.write_once)
+            return
+        self.locked = True
+        if self.window is None:
+            self.check_window()
+        if self.window is None:
+            self.locked = False
+            return False
+
+        self.workspace = self.window.get_workspace()
+        spec = {
+            "client_window_geometry": self.window.get_client_window_geometry(),
+            "geometry": self.window.get_geometry(),
+            "is_above": self.window.is_above(),
+            "is_below": self.window.is_below(),
+            "is_fullscreen": self.window.is_fullscreen(),
+            "is_in_viewport": self.window.is_in_viewport(self.workspace),
+            "is_maximized": self.window.is_maximized(),
+            "is_maximized_horizontally": self.window.is_maximized_horizontally(),
+            "is_maximized_vertically": self.window.is_maximized_vertically(),
+            "is_minimized": self.window.is_minimized(),
+            "is_pinned": self.window.is_pinned(),
+            "is_shaded": self.window.is_shaded(),
+            "is_skip_pager": self.window.is_skip_pager(),
+            "is_skip_tasklist": self.window.is_skip_tasklist(),
+            "is_sticky": self.window.is_sticky(),
+            "is_visible_on_workspace": self.window.is_visible_on_workspace(self.workspace),
+            "sort_order": self.window.get_sort_order(),
+            "workspace": {
+                "number": self.workspace.get_number(),
+                "name": self.workspace.get_name()
+            },
+        }
+        pprint(spec)
+        with open(self.wnck_file, 'w') as fp:
+            fp.write(json.dumps(spec, sort_keys=True,
+                     indent=4, separators=(',', ': ')))
+        self.locked = False
+        return False
+
+    def restore_window(self):
+        if not os.path.exists(self.wnck_file):
+            return
+        self.locked = True
+        try:
+            with open(self.wnck_file, "r") as fp:
+
+                data = json.loads(fp.read())
+                self.check_window()
+                print ("RESTORE:", data)
+                pprint(dir(Wnck.WindowMoveResizeMask))
+
+                self.window.set_geometry(Wnck.WindowGravity.STATIC,
+                                         Wnck.WindowMoveResizeMask.X |
+                                         Wnck.WindowMoveResizeMask.Y |
+                                         Wnck.WindowMoveResizeMask.WIDTH |
+                                         Wnck.WindowMoveResizeMask.HEIGHT,
+                                         *data["geometry"])
+
+                if data.get("is_above", False):
+                    self.window.make_above()
+
+                if data.get("is_below", False):
+                    self.window.make_below()
+
+                self.window.set_fullscreen(data.get("is_fullscreen", False))
+
+                if data.get("is_maximized", False):
+                    self.window.maximize()
+
+                if data.get("is_maximized_horizontally", False):
+                    self.window.maximize_horizontally()
+
+                if data.get("is_maximized_vertically", False):
+                    self.window.maximize_vertically()
+
+                if data.get("is_minimized", False):
+                    self.window.minimize()
+
+                if data.get("is_pinned", False):
+                    self.window.pin()
+
+                if data.get("is_shaded", False):
+                    self.window.shade()
+
+                if data.get("is_sticky", False):
+                    self.window.stick()
+
+                """
+                 'is_above': False,
+                 'is_below': False,
+                 'is_fullscreen': False,
+                 'is_in_viewport': True,
+                 'is_maximized': False,
+                 'is_maximized_horizontally': False,
+                 'is_maximized_vertically': False,
+                 'is_minimized': True,
+                 'is_pinned': False,
+                 'is_shaded': False,
+                 'is_skip_pager': False,
+                 'is_skip_tasklist': False,
+                 'is_sticky': False,
+                 'is_visible_on_workspace': False,
+                 'sort_order': 13,
+                """
+
+                workspace = data.get("workspace", {})
+                workspace_number = int(workspace.get("number", 0))
+                workspace_name = workspace.get("name", "")
+                for workspace in self.workspaces:
+                    if workspace.get_number() == workspace_number:
+                        self.window.move_to_workspace(workspace)
+                        break
+        except:
+            print ("WRITE ERROR")
+        self.locked = False
+
+wnck_tracker = WnckTracker()
+
+
 class HostnameTracker:
     def __init__(self):
         self.ip_address_file = os.path.join(sys.path[0], "ip_addresses.py")
@@ -39,9 +215,11 @@ class HostnameTracker:
             return ""
 
         ips = ip_data.split(" ")
+        ips.sort()
         return "IP_ADDRESSES = %s\n" % ips
 
     def write_ip_address_file(self, ip_data):
+        wnck_tracker.write_wnck_file()
         with open(self.ip_address_file, 'w') as fp:
             fp.write(ip_data)
 
