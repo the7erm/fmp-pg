@@ -14,6 +14,7 @@ from sqlalchemy import Column, Integer, String, BigInteger,\
                        Float, Boolean
 
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import not_, and_, text
 from fmp_utils.db_session import Session, session_scope
 
 
@@ -122,7 +123,7 @@ class File(Base):
             percent_played = kwargs.get('percent_played', 0)
             if self.percent_played and not kwargs.get("force", False) and\
                int(self.percent_played) == int(percent_played):
-                print("not marking as played")
+                print("not marking as played", int(self.percent_played) == int(percent_played))
                 return
             self.time_played = int(kwargs.get('now', time()))
             self.percent_played = percent_played
@@ -153,15 +154,24 @@ class File(Base):
 
     def create_ufi(self, user_id, **kwargs):
         with session_scope() as session:
-
+            print ("CREATE UFI")
             if 'user' not in kwargs or not kwargs.get('user'):
-                kwargs['user'] = session.query(User).filter(id=user_id).first()
+                kwargs['user'] = session.query(User).filter(User.id==user_id).first()
 
             user = kwargs.get('user')
             if not user:
                 return None
             session_add(session, self)
             session_add(session, user)
+            # double check to make sure the entry doesn't exist.
+            ufi = session.query(UserFileInfo)\
+                         .filter(and_(
+                            UserFileInfo.user_id==user_id,
+                            UserFileInfo.file_id==self.id
+                         )).first()
+            if ufi:
+                ufi.reason = self.reason
+                return ufi
             ufi = UserFileInfo()
             ufi.file_id = self.id
             ufi.user_id = user.id
@@ -181,16 +191,24 @@ class File(Base):
         self.iterate_ufi('deinc_score', user_id, *args, **kwargs)
 
     def iterate_ufi(self, cmd, user_id, *args, **kwargs):
+        user_id = int(user_id)
         with session_scope() as session:
             session_add(session, self)
             for ufi in self.user_file_info:
+                print ("UFI:", ufi)
                 session_add(session, self)
                 session_add(session, ufi)
-                if ufi.user.id == user_id:
+                if int(ufi.user_id) == int(user_id):
+                    print("*"*100)
+                    print("ufi.user.id:%s == user_id:%s" % (ufi.user.id,
+                                                            user_id))
                     ufi.reason = self.reason
                     exec_cmd = getattr(ufi, cmd)
                     exec_cmd(*args, **kwargs)
                     return
+                else:
+                    print("ufi.user.id:%s != user_id:%s" % (ufi.user.id,
+                                                            user_id))
 
         ufi = self.create_ufi(user_id, **kwargs)
         if ufi:

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html ng-app="fmpApp">
+  <head>
+    <meta charset="UTF-8">
+    <title>FMP - Satellite</title>
+    <link rel="stylesheet"
+          href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
+    <link rel="stylesheet"
+          href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
+
+    <script src="/static/js/jquery-2.0.3.min.js"></script>
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script type="text/javascript"
+            src="static/js/bootstrap-3.3.5-dist/js/bootstrap.min.js"></script>
+
+    <script type="text/javascript"
+            src="/static/js/angular.js"></script>
+    <script type="text/javascript"
+            src="/static/js/fmpSatApp.js"></script>
+    <style>
+      img.star{
+          width:30px; /* you can use % */
+          height: auto;
+      }
+      a.star:hover {
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 2em;
+      }
+      a.star {
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 2em;
+      }
+    </style>
+  </head>
+  <body>
+    <div ng-controller="PlayerController">
+        <h1>Who listening?</h1>
+        Server:<a href="{{FmpIpScanner.collection.url}}" target="_BLANK">{{FmpIpScanner.collection.url}}</a><br>
+        <div id="player" style="width:100%;"></div>
+        <button ng-repeat="user in ListenersService.collection.users"
+                class="btn btn-sm btn-default"
+                ng-click="ListenersService.setListening(user.id, !user.listening)"
+                ng-class="{'btn-primary': user.listening}">{{user.name}}</button>
+        <br clear="all">
+        <button class="btn btn-default glyphicon glyphicon-fast-backward"
+                ng-click="prev()"></button>
+        <button class="btn btn-default glyphicon glyphicon-pause"
+                ng-click="pause()"
+                ng-if="!PlayerService.collection.sound.paused"></button>
+        <button class="btn btn-default glyphicon glyphicon-play"
+                ng-click="play()"
+                ng-if="PlayerService.collection.sound.paused"></button>
+        <button class="btn btn-default glyphicon glyphicon-fast-forward"
+                ng-click="next()"></button>
+        <li ng-repeat="item in PlaylistService.collection.history">
+          <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;">{{item.locations[0].basename}}</a>
+          <br clear="all">
+          <div ng-repeat="ufi in item.user_file_info">
+            {{ufi.user.name}} {{ufi.rating}}
+            <a ng-click="rate(item.id, ufi.user.id, 0)" class="star">
+              <img src="/static/images/no.star.grey.png" ng-if="ufi.rating>0"
+                   class="star">
+              <img src="/static/images/no.star.png" ng-if="ufi.rating==0" class="star">
+            </a>
+            <a ng-click="rate(item.id, ufi.user.id, 1)"  class="star">
+              <img src="/static/images/star.hover.png" ng-if="ufi.rating>=1"
+                   class="star">
+              <img src="/static/images/star.grey.png" ng-if="ufi.rating<1"
+                   class="star">
+            </a>
+            <a ng-click="rate(item.id, ufi.user.id, 2)" class="star">
+              <img src="/static/images/star.hover.png" ng-if="ufi.rating>=2"
+                   class="star">
+              <img src="/static/images/star.grey.png" ng-if="ufi.rating<2"
+                   class="star">
+            </a>
+            <a ng-click="rate(item.id, ufi.user.id, 3)" class="star">
+              <img src="/static/images/star.hover.png" ng-if="ufi.rating>=3"
+                   class="star">
+              <img src="/static/images/star.grey.png" ng-if="ufi.rating<3"
+                   class="star">
+            </a>
+            <a ng-click="rate(item.id, ufi.user.id, 4)" class="star">
+              <img src="/static/images/star.hover.png" ng-if="ufi.rating>=4"
+                   class="star">
+              <img src="/static/images/star.grey.png" ng-if="ufi.rating<4"
+                   class="star">
+            </a>
+            <a ng-click="rate(item.id, ufi.user.id, 5)" class="star">
+              <img src="/static/images/star.hover.png" ng-if="ufi.rating>=5"
+                   class="star">
+              <img src="/static/images/star.grey.png" ng-if="ufi.rating<5"
+                   class="star">
+            </a>
+            <img src="/static/images/question.mark.svg" ng-if="ufi.rating==6"
+                 class="star">
+            <a ng-click="thumb(item.id, ufi.user.id, -1)" class="glyphicon glyphicon-thumbs-down star"></a>
+            <a ng-click="thumb(item.id, ufi.user.id, 1)" class="glyphicon glyphicon-thumbs-up star"></a> {{ufi.true_score}}
+          </div>
+        </li>
+        <h1>Coming up</h1>
+        <li ng-repeat="item in Preload.collection.preload">
+          <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;">{{item.locations[0].basename}}</a>
+        </li>
+        currentTime: {{PlayerService.collection.currentTime}}
+        {{PlayerService.collection.sound.duration}}
+    </div>
+  </body>
+</html>

@@ -125,6 +125,93 @@ def get_recently_played(limit=1):
         files.reverse()
     return files
 
+
+def remove_duplicate_entries(user_id):
+    print("remove_duplicate_entries user_id:", user_id)
+    with session_scope() as session:
+        sql = """SELECT file_id, count(*)
+                 FROM user_file_info
+                 WHERE user_id = :user_id
+                 GROUP BY file_id HAVING count(*) > 1"""
+
+        print ("SQL:", sql)
+        spec = {
+            "user_id": user_id
+        }
+        print ("spec:", spec)
+        result = session.execute(text(sql), spec)
+
+        for d in result:
+            print("DUP:", d)
+            file_id = d.file_id
+            entries = session.query(UserFileInfo)\
+                .filter(and_(
+                    UserFileInfo.file_id==file_id,
+                    UserFileInfo.user_id==user_id
+                )).all()
+            use_entry = None
+            for e in entries:
+                if use_entry is None:
+                    use_entry = e
+                    continue
+
+                if e.rating != 6 and use_entry.rating == 6:
+                    use_entry = e
+                    continue
+
+                if not e.time_played and use_entry.time_played:
+                    use_entry = e
+                    continue
+
+                if e.time_played and use_entry.time_played and \
+                   e.time_played > use_entry.time_played:
+                    use_entry = e
+                    continue
+
+
+            if use_entry is None:
+                continue
+
+            print("USE:", use_entry)
+            print("rating:", use_entry.rating)
+            print("true_score:", use_entry.true_score)
+            print("skip_score:", use_entry.skip_score)
+
+            spec['id'] = use_entry.id
+            spec['user_id'] = use_entry.user_id
+            spec['file_id'] = use_entry.file_id
+            spec['user_file_id'] = use_entry.id
+            print(spec)
+            sql = """UPDATE user_file_history
+                     SET user_file_id = :user_file_id
+                     WHERE user_id = :user_id AND
+                           file_id = :file_id"""
+
+            session.execute(text(sql), spec)
+            session.commit()
+
+            print (sql)
+
+            sql = """DELETE FROM user_file_history
+                     WHERE user_id = :user_id AND
+                           file_id = :file_id AND
+                           user_file_id != :user_file_id"""
+
+            session.execute(text(sql), spec)
+            session.commit()
+
+            print (sql)
+
+            sql = """DELETE FROM user_file_info
+                     WHERE file_id = :file_id AND
+                           user_id = :user_id AND
+                           id != :id"""
+
+            session.execute(text(sql), spec)
+            session.commit()
+
+            print (sql)
+
 def populate_pick_from(user_id=None, truncate=False):
     with session_scope() as session:
         if user_id is None:
@@ -132,6 +219,7 @@ def populate_pick_from(user_id=None, truncate=False):
         spec = {
             "user_id": user_id
         }
+        remove_duplicate_entries(user_id)
         if truncate:
             session.execute(text("""DELETE FROM pick_from
                                     WHERE user_id = :user_id""",

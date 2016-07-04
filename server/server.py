@@ -800,6 +800,17 @@ class FmpServer(object):
             data = fp.read()
         return data % template_data
 
+
+    @cherrypy.expose
+    def satellite(self):
+        static_path = sys.path[0]
+        index_path = os.path.join(static_path, "server", "templates",
+                                  "satellite.html")
+        data = "Error"
+        with open(index_path, 'r') as fp:
+            data = fp.read()
+        return data
+
     @cherrypy.expose
     def set_listening(self, user_id, listening, *args, **kwargs):
         with session_scope() as session:
@@ -898,14 +909,21 @@ class FmpServer(object):
 
     @cherrypy.expose
     def mark_as_played(self, *args, **kwargs):
+        print("kwargs:", kwargs)
         with session_scope() as session:
             f = session.query(File)\
                        .filter(File.id == kwargs.get('file_id'))\
                        .first()
             session.add(f)
+            user_id = kwargs.get("user_ids")
+            user_ids = [user_id]
+            if "," in user_id:
+                user_ids = user_id.split(",")
+
+            user_ids = [str(int(x)) for x in user_ids]
             mark_as_played_kwargs = {
-                "user_id": [kwargs.get('user_id')],
-                "percent_played": kwargs.get("percent_played", 0),
+                "user_ids": user_ids,
+                "percent_played": int(float(kwargs.get("percent_played", 0))),
                 "now": int(kwargs.get("now", time()))
             }
             f.mark_as_played(**mark_as_played_kwargs)
@@ -923,7 +941,7 @@ class FmpServer(object):
                 if p.id != kwargs.get("file_id"):
                     preload.append(p)
             playlist.preload = preload
-            return response
+            return json.dumps(response)
 
     @cherrypy.expose
     def next(self):
@@ -1717,7 +1735,9 @@ class FmpServer(object):
     def user_history(self, *args, **kwargs):
         post_data = cherrypy.request.json
         user_ids = [str(int(x)) for x in post_data.get('user_ids', [])]
-
+        limit = int(post_data.get("limit", 1))
+        if not limit:
+            limit = 1
         results = []
         with session_scope() as session:
             sql = """SELECT f.*
@@ -1725,7 +1745,7 @@ class FmpServer(object):
                      WHERE f.id = ufh.file_id AND
                            ufh.user_id IN (%s)
                      ORDER BY ufh.time_played DESC NULLS LAST
-                     LIMIT 1""" % (",".join(user_ids))
+                     LIMIT %s""" % (",".join(user_ids), limit)
             files = session.query(File)\
                            .from_statement(
                                 text(sql))\
@@ -1733,6 +1753,9 @@ class FmpServer(object):
             for f in files:
                 session_add(session, f)
                 item = f.json(user_ids=user_ids, get_image=False)
+                item['user_ids'] = user_ids
+                print("ITEM:")
+                pprint(item)
                 results.append(item)
 
         return results
@@ -1823,6 +1846,7 @@ class FmpServer(object):
 
         prefetchNum = int(post_data.get('prefetchNum', 100))
         secondaryPrefetchNum = int(post_data.get('secondaryPrefetchNum', 20))
+        include_admins = post_data.get("include_admins", True)
         primary_user_id = int(primary_user_id)
         listener_user_ids = listener_user_ids + [primary_user_id]
         listener_user_ids = list(set(listener_user_ids))
@@ -1870,7 +1894,9 @@ class FmpServer(object):
         print("sql:", sql)
 
         with session_scope() as session:
-            ufi_user_ids = merge_admin_user_ids(session, user_ids)
+            ufi_user_ids = user_ids
+            if include_admins:
+                ufi_user_ids = merge_admin_user_ids(session, user_ids)
 
             # Check the preload and make sure all the users have files
             # up to their minimums ready.
