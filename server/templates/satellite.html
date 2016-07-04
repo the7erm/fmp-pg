@@ -33,29 +33,33 @@
         cursor: pointer;
         font-size: 2em;
       }
+      .playing {
+        background: #EEE;
+        border:1px dotted;
+      }
+      body {
+        font-size:1.8em;
+      }
+      .item {
+        padding: 10px;
+      }
+      .btn-bottom {
+        width:33%;
+      }
     </style>
   </head>
   <body>
     <div ng-controller="PlayerController">
-        <h1>Who listening?</h1>
+
         Server:<a href="{{FmpIpScanner.collection.url}}" target="_BLANK">{{FmpIpScanner.collection.url}}</a><br>
-        <div id="player" style="width:100%;"></div>
+        <h1>Who listening?</h1>
         <button ng-repeat="user in ListenersService.collection.users"
                 class="btn btn-sm btn-default"
                 ng-click="ListenersService.setListening(user.id, !user.listening)"
                 ng-class="{'btn-primary': user.listening}">{{user.name}}</button>
         <br clear="all">
-        <button class="btn btn-default glyphicon glyphicon-fast-backward"
-                ng-click="prev()"></button>
-        <button class="btn btn-default glyphicon glyphicon-pause"
-                ng-click="pause()"
-                ng-if="!PlayerService.collection.sound.paused"></button>
-        <button class="btn btn-default glyphicon glyphicon-play"
-                ng-click="play()"
-                ng-if="PlayerService.collection.sound.paused"></button>
-        <button class="btn btn-default glyphicon glyphicon-fast-forward"
-                ng-click="next()"></button>
-        <li ng-repeat="item in PlaylistService.collection.history">
+        <div ng-repeat="item in PlaylistService.collection.history"
+             ng-class="{'playing': PlayerService.collection.playingId == item.id}" class="item">
           <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;">{{item.locations[0].basename}}</a>
           <br clear="all">
           <div ng-repeat="ufi in item.user_file_info">
@@ -100,13 +104,30 @@
             <a ng-click="thumb(item.id, ufi.user.id, -1)" class="glyphicon glyphicon-thumbs-down star"></a>
             <a ng-click="thumb(item.id, ufi.user.id, 1)" class="glyphicon glyphicon-thumbs-up star"></a> {{ufi.true_score}}
           </div>
-        </li>
+          <hr>
+        </div>
         <h1>Coming up</h1>
-        <li ng-repeat="item in Preload.collection.preload">
+        <div ng-repeat="item in Preload.collection.preload" class="item">
           <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;">{{item.locations[0].basename}}</a>
-        </li>
+        </div>
         currentTime: {{PlayerService.collection.currentTime}}
         {{PlayerService.collection.sound.duration}}
+        <nav class="navbar navbar-default navbar-fixed-bottom">
+          <div class="container" style="width:100%">
+            <div id="player" style="width:100%;"></div>
+            <button class="btn btn-default glyphicon glyphicon-fast-backward btn-bottom"
+                ng-click="prev()"></button>
+            <button class="btn btn-default glyphicon glyphicon-pause btn-bottom"
+                    ng-click="pause()"
+                    ng-if="!PlayerService.collection.sound.paused"></button>
+            <button class="btn btn-default glyphicon glyphicon-play btn-bottom"
+                    ng-click="play()"
+                    ng-if="PlayerService.collection.sound.paused"></button>
+            <button class="btn btn-default glyphicon glyphicon-fast-forward btn-bottom"
+                    ng-click="next()"></button>
+
+          </div>
+        </nav>
     </div>
   </body>
 </html>

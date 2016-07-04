@@ -228,6 +228,9 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
 
     methods.markAsPlayed = function(id, percent_played){
         // console.log("markAsPlayed", id, percent_played);
+        if (isNaN(percent_played)) {
+            return;
+        }
         var int_percent_played = parseInt(percent_played);
         if (collection.playingId == id && collection.int_percent_played == int_percent_played) {
             return;
@@ -246,7 +249,7 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
           "url": FmpIpScanner.collection.url+"mark_as_played",
           "params": params
         }).then(function(response) {
-            console.log("response.data:", response);
+            // console.log("response.data:", response);
         });
     };
 
@@ -273,7 +276,9 @@ fmpApp.factory("PlayerService", function(PlaylistService,
     collection.sound.setAttribute("preload", "auto");
     collection.sound.controls = true;
     collection.sound.style="width:100%";
-
+    collection.sound.onerror = function() {
+         alert("Error! Something went wrong");
+    };
     collection.sound.onended = function(){
         console.log("onended");
         var idx = methods.getPlayingIndex();
@@ -299,8 +304,10 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             currentTime = localStorage['currentTime'];
         methods.setPlayingData(PlaylistService.collection.history[0].id);
         methods.play();
-        if (collection.playingId == playingId) {
+        if (collection.playingId == playingId && !isNaN(currentTime)) {
+            console.log("setPlayingData:",PlaylistService.collection.history[0].id)
             collection.sound.currentTime = currentTime;
+            console.log("SEEK")
         }
     };
 
