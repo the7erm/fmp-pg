@@ -593,7 +593,9 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             collection.results[query] = [];
         }
         if (typeof collection.expireTimes[query] != "undefined" &&
-            collection.expireTimes[query] < Date.now()) {
+            collection.expireTimes[query] > Date.now()) {
+            console.log("cached:", query);
+            methods.prefetch();
             return;
         }
         $http({
@@ -604,8 +606,39 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             collection.totals[collection.searchTerm] = response.data.total;
             // expire in a few minutes
             collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
+            methods.prefetch();
         });
     };
+    methods.prefetch = function(multiplier) {
+        if (typeof multiplier == "undefined") {
+            multiplier = 1;
+        }
+        if (multiplier >= 5) {
+            return;
+        }
+        if (collection.start + (collection.limit * multiplier) < collection.totals[collection.searchTerm]) {
+            var _start = collection.start;
+            collection.start = collection.start + (collection.limit * multiplier);
+            var query = methods.query();
+            collection.start = _start;
+            if (typeof collection.expireTimes[query] != "undefined" &&
+                collection.expireTimes[query] > Date.now()) {
+                methods.prefetch(multiplier+1);
+                return;
+            }
+            console.log("prefetch:", query);
+            $http({
+              "method": 'GET',
+              "url": query
+            }).then(function(response) {
+                collection.results[query] = response.data.results;
+                collection.totals[collection.searchTerm] = response.data.total;
+                // expire in a few minutes
+                collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
+                methods.prefetch(multiplier+1);
+            });
+        }
+    }
     methods.updateLists = function(item) {
         var now = Date.now();
         $.each(collection.results, function(query, results){
