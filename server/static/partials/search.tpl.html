@@ -1,0 +1,39 @@
+<div class="modal" tabindex="-1" role="dialog" aria-hidden="false">
+  <div class="modal-dialog"
+  style="height:90%;">
+    <div class="modal-content">
+      <div class="modal-header" ng-show="title">
+        <button type="button" class="close" aria-label="Close" ng-click="$hide()"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Search<span ng-if="SearchService.collection.searchTerm"> - {{SearchService.collection.searchTerm}}</span></h4>
+      </div>
+      <div class="modal-body" style="overflow:auto;">
+        <div class="input-group">
+          <input type="text" class="form-control" placeholder="Search for..."
+                 ng-model="SearchService.collection.searchTerm"
+                 ng-keyup="SearchService.timeoutSearch()">
+          <span class="input-group-btn">
+            <button class="btn btn-default glyphicon glyphicon-search"
+                    type="button"
+                    ng-click="search()"
+            ></button>
+          </span>
+        </div>
+        <button class="btn-primary btn glyphicon glyphicon-triangle-left"
+                ng-click="SearchService.collection.start=SearchService.collection.start-SearchService.collection.limit; search();"></button>
+        <button class="btn-primary btn glyphicon glyphicon-triangle-right"
+                ng-click="SearchService.collection.start=SearchService.collection.start+SearchService.collection.limit; search();"></button><br>
+        <div ng-repeat="item in SearchService.collection.results[SearchService.collection.searchQuery] track by item.id"
+             ng-class="{'playing': PlayerService.collection.playingId == item.id}" class="item">
+             <span ng-include src="'/static/partials/item.tpl.html'"></span>
+        </div>
+        <button class="btn-primary btn glyphicon glyphicon-triangle-left"
+                ng-click="SearchService.collection.start=SearchService.collection.start-SearchService.collection.limit; search();"></button>
+        <button class="btn-primary btn glyphicon glyphicon-triangle-right"
+                ng-click="SearchService.collection.start=SearchService.collection.start+SearchService.collection.limit; search();"></button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
