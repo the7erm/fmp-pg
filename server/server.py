@@ -1860,6 +1860,8 @@ class FmpServer(object):
 
         for f in files:
             cued = f.get("cued", {})
+            if not cued:
+                cued = {}
             user_id = cued.get("user_id", 0)
             if not group_by_user_file_ids.get(user_id):
                 group_by_user_file_ids[user_id] = []

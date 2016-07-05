@@ -1,4 +1,4 @@
-var fmpApp = angular.module('fmpApp',[]);
+var fmpApp = angular.module('fmpApp', ['mgcrea.ngStrap']);
 window.Logger = function(name, debug) {
     if (typeof debug == "undefined") {
         debug = false;
@@ -123,12 +123,38 @@ fmpApp.factory("Utils", function(){
             if (!list || !item) {
                 return false;
             }
+            return methods.idInList(list, item.id);
+        },
+        idInList: function(list, id){
+            if (!list || !id) {
+                return false;
+            }
+            var result = false;
             for (var i=0;i<list.length;i++) {
-                if (item.id == list[i].id) {
-                    return true;
+                if (id == list[i].id) {
+                    result = true;
+                    break;
                 }
             }
-            return false;
+            return result;
+        },
+        getIdIndex: function(list, id, last) {
+            var idx = -1;
+            if (!list || !id || list.length == 0) {
+                return idx;
+            }
+            if (typeof last == "undefined") {
+                last = true;
+            }
+            for(var i=0;i<list.length;i++) {
+                if (list[i].id == id) {
+                    idx = i;
+                    if (!last) {
+                        break;
+                    }
+                }
+            }
+            return idx;
         }
     };
     return methods;
@@ -143,16 +169,33 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
             "collection": collection
         };
     methods.getPreload = function() {
-        if (collection.preload && collection.preload.length > 0) {
-            return;
+        var files = [],
+            history = methods.PlaylistService.collection.history,
+            preload = collection.preload;
+        if (preload && preload.length > 0) {
+            $.each(preload, function(idx, item){
+                if (Utils.inList(history, item)) {
+                    collection.preload.splice(idx, 1);
+                }
+            });
+            if (collection.preload && collection.preload.length > 10) {
+                return;
+            }
+        }
+        if(history && history.length > 0) {
+            files = files.concat(history);
+        }
+        if (preload && preload.length > 0) {
+            files = files.concat(preload);
         }
         var postData = {
             user_ids: ListenersService.collection.listener_user_ids,
             primary_user_id: ListenersService.collection.listener_user_ids[0],
             secondary_user_ids: ListenersService.collection.listener_user_ids,
-            prefetchNum: 1,
-            secondaryPrefetchNum: 1,
-            include_admins: false
+            prefetchNum: 10,
+            secondaryPrefetchNum: 10,
+            include_admins: false,
+            files: files
         };
         $http({
           "method": 'POST',
@@ -162,14 +205,24 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
           },
           "data": postData
         }).then(function(response) {
-            if (methods.PlaylistService) {
-                var history = methods.PlaylistService.collection.history;
-                if (Utils.inList(history, response.data.preload.id)) {
-                    setTimeout(methods.getPreload, 5000);
-                    return;
+            var preload = response.data.preload;
+            for (var i=0;i<preload.length;i++) {
+                var item = preload[i],
+                    found = false;
+                if (methods.PlaylistService) {
+                    found = Utils.inList(
+                        methods.PlaylistService.collection.history, item);
                 }
+                if (!found) {
+                    found = Utils.inList(
+                        methods.PlaylistService.collection.history, item);
+                }
+                if (found) {
+                    continue;
+                }
+                collection.preload.push(item);
             }
-            collection.preload = response.data.preload;
+            // collection.preload = collection.preload.concat(response.data.preload);
             console.log("collection.preload:", collection.preload);
         });
     };
@@ -220,7 +273,7 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
             var item = Preload.collection.preload[i];
             if (item.id == id) {
                 collection.history.push(item);
-                Preload.collection.preload.splice(i);
+                Preload.collection.preload.splice(i, 1);
                 Preload.getPreload();
             }
         }
@@ -263,7 +316,8 @@ fmpApp.factory("PlayerService", function(PlaylistService,
                                          $rootScope,
                                          $interval,
                                          Preload,
-                                         $http){
+                                         $http,
+                                         Utils){
     var collection = {
             "sound": document.createElement("audio"),
             "initialized": false,
@@ -301,13 +355,24 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         }
         collection.initialized = true;
         var playingId = localStorage['playingId'],
-            currentTime = localStorage['currentTime'];
-        methods.setPlayingData(PlaylistService.collection.history[0].id);
+            currentTime = localStorage['currentTime'],
+            paused = localStorage['paused'],
+            history = PlaylistService.collection.history,
+            idx = 0;
+        if (playingId && !isNaN(playingId) &&
+            Utils.idInList(history, playingId)) {
+                var idx = Utils.getIdIndex(history, playingId);
+                if (idx == -1) {
+                    idx = 0;
+                }
+        }
+        methods.setPlayingData(history[idx].id);
         methods.play();
         if (collection.playingId == playingId && !isNaN(currentTime)) {
-            console.log("setPlayingData:",PlaylistService.collection.history[0].id)
             collection.sound.currentTime = currentTime;
-            console.log("SEEK")
+        }
+        if (paused && paused != "0") {
+            methods.pause();
         }
     };
 
@@ -336,18 +401,15 @@ fmpApp.factory("PlayerService", function(PlaylistService,
     methods.pause = function() {
         collection.sound.pause();
     };
-    methods.getPlayingIndex = function() {
-        var idx = -1;
-        console.log("getPlayingIndex()")
-        for(var i=0;i<PlaylistService.collection.history.length;i++) {
-            var item = PlaylistService.collection.history[i];
-            if (item.id == collection.playingId) {
-                idx = i;
-            }
-        }
-        console.log("getPlayingIndex()", idx);
-        return idx;
+
+    methods.getIdIndex = function(id) {
+        return Utils.getIdIndex(PlaylistService.collection.history, id);
     };
+
+    methods.getPlayingIndex = function() {
+        return methods.getIdIndex(collection.playingId);
+    };
+
     methods.next = function() {
         var idx = methods.getPlayingIndex();
         if (idx == -1) {
@@ -407,7 +469,10 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             localStorage['playingId'] = collection.playingId;
             localStorage['percent_played'] = percent_played;
             localStorage['currentTime'] = collection.currentTime;
+            localStorage['paused'] = 0;
             PlaylistService.markAsPlayed(collection.playingId, percent_played);
+        } else {
+            localStorage['paused'] = 1;
         }
     };
     methods.rate = function(fileId, userId, rating) {
@@ -472,6 +537,74 @@ fmpApp.factory("PlayerService", function(PlaylistService,
     $rootScope.$on("playlist-loaded", methods.initPlayer);
     return methods;
 });
+fmpApp.factory("SearchService", function(ListenersService, $http,
+                                         FmpIpScanner,
+                                         $timeout){
+    var collection = {
+            results: {},
+            searchTerm: "",
+            expireTimes: {},
+            start:0,
+            limit:5,
+            totals: {},
+            promise: false
+        },
+        methods = {
+            collection: collection
+        };
+
+    methods.query = function() {
+        var start = collection.start,
+            limit = collection.limit;
+        if (typeof collection.totals[collection.searchTerm] == "undefined") {
+            start = 0;
+            limit = 5;
+            collection.start = 0;
+            collection.limit = 5;
+        } else if (start > collection.totals[collection.searchTerm]) {
+            start = collection.totals[collection.searchTerm] - limit;
+        }
+        if (start < 0) {
+            start = 0;
+            collection.start = 0;
+        }
+        var uri = (
+            "/search/?q="+encodeURIComponent(collection.searchTerm)+
+            "&s="+start+
+            "&l="+limit+
+            "&user_ids="+ListenersService.collection.listener_user_ids.join(","));
+        return uri;
+    }
+
+    methods.search = function() {
+        var query = methods.query();
+        collection.promise = false;
+        collection.searchQuery = query;
+        if (typeof collection.results[query] == "undefined") {
+            collection.results[query] = [];
+        }
+        if (typeof collection.expireTimes[query] != "undefined" &&
+            collection.expireTimes[query] < Date.now()) {
+            return;
+        }
+        $http({
+          "method": 'GET',
+          "url": query
+        }).then(function(response) {
+            collection.results[query] = response.data.results;
+            collection.totals[collection.searchTerm] = response.data.total;
+            // expire in a few minutes
+            collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
+        });
+    };
+    methods.timeoutSearch = function() {
+        if (collection.promise) {
+            $timeout.cancel(collection.promise);
+        }
+        collection.promise = $timeout(methods.search, 500, true);
+    }
+    return methods;
+});
 
 fmpApp.controller("PlayerController", function($scope,
                                                ListenersService,
@@ -479,7 +612,10 @@ fmpApp.controller("PlayerController", function($scope,
                                                PlaylistService,
                                                PlayerService,
                                                Preload,
-                                               $http){
+                                               $http,
+                                               $modal,
+                                               SearchService,
+                                               Utils){
     $scope.works = "WORKS";
     $scope.ListenersService = ListenersService;
     $scope.FmpIpScanner = FmpIpScanner;
@@ -492,7 +628,73 @@ fmpApp.controller("PlayerController", function($scope,
     $scope.PlaylistService = PlaylistService;
     $scope.rate = PlayerService.rate;
     $scope.thumb = PlayerService.thumb;
+    $scope.searchTerm = SearchService.collection.searchTerm;
+    $scope.SearchService = SearchService;
+    $scope.search = SearchService.search;
+    $scope.Utils = Utils;
+    $scope.addToPlaylist = function(item){
+        if (Utils.inList(PlaylistService.collection.history, item)) {
+            return;
+        }
+        if (Utils.inList(Preload.collection.preload, item)) {
+            PlaylistService.moveToHistory(item.id);
+            return;
+        }
+        PlaylistService.collection.history.push(item);
+        /*
+        _id = kwargs.get('id')
+        user_id = kwargs.get('uid')
+        if not user_id:
+            user_id = kwargs.get("user_id")
+        cued = to_bool(kwargs.get('cued'))
+        */
+        $http({
+          "method": 'GET',
+          "url": "/cue",
+          "params": {
+            "id": item.id,
+            "uid": ListenersService.collection.listener_user_ids[0],
+            "cued": 1
+          }
+        });
+    };
+    $scope.removeFromPlaylist = function(item) {
+        if (!Utils.inList(PlaylistService.collection.history, item) &&
+            !Utils.inList(Preload.collection.preload, item)) {
+            return;
+        }
+        var idx = Utils.getIdIndex(PlaylistService.collection.history, item.id);
+        if (idx != -1) {
+            PlaylistService.collection.history.splice(idx, 1);
+        }
+        var idx = Utils.getIdIndex(Preload.collection.preload, item.id);
+        if (idx != -1) {
+            Preload.collection.preload.splice(idx, 1);
+        }
+        $http({
+          "method": 'GET',
+          "url": "/cue",
+          "params": {
+            "id": item.id,
+            "uid": ListenersService.collection.listener_user_ids[0],
+            "cued": 0
+          }
+        });
+    };
 
     FmpIpScanner.startScan();
+    var d = new Date();
+    var myOtherModal = $modal({
+        scope: $scope,
+        template: '/static/partials/search.tpl.html?_='+Date.now()+".tpl.html",
+        show: false,
+        title:"Search",
+        backdrop: false
+    });
+    // Show when some event occurs (use $promise property to ensure the template has been loaded)
+    $scope.showModal = function() {
+        SearchService.search();
+        myOtherModal.$promise.then(myOtherModal.show);
+    };
 
 });
