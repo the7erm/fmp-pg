@@ -399,6 +399,12 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         PlaylistService.moveToHistory(id);
         collection.sound.play();
     };
+    methods.playItem = function(item) {
+        methods.playId(item.id);
+        if (!Utils.inList(PlaylistService.collection.history, item)) {
+            PlaylistService.collection.history.push(item);
+        }
+    };
     methods.pause = function() {
         collection.sound.pause();
     };
