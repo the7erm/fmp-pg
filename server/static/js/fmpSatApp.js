@@ -345,7 +345,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         for (var i=0;i<file.user_file_info.length;i++) {
             var ufi = file.user_file_info[i];
             console.log("inc score", ufi)
-            methods.thumb(file.id, ufi.user.id, +1);
+            methods.thumb(file, ufi.user.id, +1);
         }
         methods.setIndex(idx+1);
     }
@@ -427,7 +427,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         for (var i=0;i<file.user_file_info.length;i++) {
             var ufi = file.user_file_info[i];
             console.log("de inc score", ufi)
-            methods.thumb(file.id, ufi.user.id, -1);
+            methods.thumb(file, ufi.user.id, -1);
         }
         methods.setIndex(idx+1);
     };
