@@ -1,4 +1,10 @@
-var fmpApp = angular.module('fmpApp', ['mgcrea.ngStrap']);
+var fmpApp = angular.module('fmpApp', ['mgcrea.ngStrap',
+                                       'angularUtils.directives.dirPagination']);
+
+fmpApp.config(function(paginationTemplateProvider) {
+    paginationTemplateProvider.setPath('/static/js/bower_components/angularUtils-pagination/dirPagination.tpl.html');
+});
+
 window.Logger = function(name, debug) {
     if (typeof debug == "undefined") {
         debug = false;
@@ -382,7 +388,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             return;
         }
         collection.sound.src = (
-            FmpIpScanner.collection.url+"download?file_id="+id);
+            FmpIpScanner.collection.url+"download?file_id="+id+"&convert_to=.mp3");
         collection.playingId = id;
     }
 
@@ -561,7 +567,10 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             limit:5,
             totals: {},
             promise: false,
-            mostResentQuery: ""
+            mostResentQuery: "",
+            currentPage: 1,
+            currentTotal: 0,
+            locks: {}
         },
         methods = {
             collection: collection
@@ -591,6 +600,21 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
         return uri;
     }
 
+    methods.isLocked = function(query) {
+        if(typeof collection.locks[query] == 'undefined') {
+            return false;
+        }
+        return collection.locks[query];
+    };
+
+    methods.lock = function(query) {
+        collection.locks[query] = true;
+    };
+
+    methods.unlock = function(query) {
+        collection.locks[query] = false;
+    }
+
     methods.search = function() {
         var query = methods.query();
         collection.promise = false;
@@ -604,6 +628,11 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             methods.prefetch();
             return;
         }
+        if (methods.isLocked(query)) {
+            methods.prefetch();
+            return;
+        }
+        methods.lock(query);
         $http({
           "method": 'GET',
           "url": query
@@ -612,26 +641,65 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             collection.totals[collection.searchTerm] = response.data.total;
             // expire in a few minutes
             collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
+            collection.currentPage = (collection.start / collection.limit) + 1;
+            methods.unlock(query);
             methods.prefetch();
+        }, function(){
+            methods.unlock(query);
         });
+    };
+    methods.pageChanged = function(newPageNumber) {
+        collection.currentPage = parseInt(newPageNumber);
+        collection.start = (collection.limit * (newPageNumber - 1));
+        methods.search();
     };
     methods.prefetch = function(multiplier) {
         if (typeof multiplier == "undefined") {
             multiplier = 1;
         }
-        if (multiplier >= 5) {
+        if (multiplier > 7) {
             return;
         }
-        if (collection.start + (collection.limit * multiplier) < collection.totals[collection.searchTerm]) {
-            var _start = collection.start;
-            collection.start = collection.start + (collection.limit * multiplier);
+
+        var start = collection.start,
+            limit = collection.limit,
+            _multi = multiplier - 3,
+            subtract = _multi * limit,
+            thisStart = start + subtract;
+
+        if (collection.start <= (limit * 3)) {
+            thisStart = collection.start + (collection.limit * multiplier);
+        }
+        if (collection.start >= (collection.totals[collection.searchTerm] - (
+            collection.limit * 7))) {
+            start = collection.start,
+            limit = collection.limit,
+            _multi = multiplier - 7,
+            subtract = _multi * limit,
+            thisStart = start + subtract;
+        }
+        console.log("prefetch collection.start:", collection.start,
+                    "thisStart:", thisStart, "multiplier:", multiplier);
+        if (thisStart < 0) {
+            methods.prefetch(multiplier+1);
+            return;
+        }
+
+        if (thisStart < collection.totals[collection.searchTerm]) {
+            var collectionStart = collection.start;
+            collection.start = thisStart;
             var query = methods.query();
-            collection.start = _start;
+            collection.start = collectionStart;
             if (typeof collection.expireTimes[query] != "undefined" &&
                 collection.expireTimes[query] > Date.now()) {
                 methods.prefetch(multiplier+1);
                 return;
             }
+            if (methods.isLocked(query)) {
+                methods.prefetch(multiplier+1);
+                return;
+            }
+            methods.lock(query);
             console.log("prefetch:", query);
             $http({
               "method": 'GET',
@@ -639,9 +707,13 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             }).then(function(response) {
                 collection.results[query] = response.data.results;
                 collection.totals[collection.searchTerm] = response.data.total;
+
                 // expire in a few minutes
                 collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
+                methods.unlock(query);
                 methods.prefetch(multiplier+1);
+            }, function(){
+                methods.unlock(query);
             });
         }
     }

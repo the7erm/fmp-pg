@@ -16,6 +16,7 @@
     <!-- Latest compiled and minified JavaScript -->
     <script src="/static/js/bower_components/angular-strap/dist/angular-strap.min.js"></script>
     <script src="/static/js/bower_components/angular-strap/dist/angular-strap.tpl.min.js"></script>
+    <script src="/static/js/bower_components/angularUtils-pagination/dirPagination.js"></script>
 
 
     <script type="text/javascript"
@@ -26,26 +27,57 @@
           width:30px; /* you can use % */
           height: auto;
       }
+
+      .glyphicon-remove {
+        color: red;
+      }
+
+      .glyphicon-remove:hover {
+        color: green;
+      }
+
+      .glyphicon-plus {
+        color:green;
+      }
+
+      .glyphicon-plus:hover {
+        color:green;
+      }
+
+      a.glyphicon {
+        cursor: pointer;
+      }
+
+      a.glyphicon:hover {
+        cursor: pointer;
+        text-decoration: none;
+      }
+
       a.star:hover {
         text-decoration: none;
         cursor: pointer;
         font-size: 2em;
       }
+
       a.star {
         text-decoration: none;
         cursor: pointer;
         font-size: 2em;
       }
+
       .playing {
         background: #EEE;
         border:1px dotted;
       }
+
       body {
         font-size:1.8em;
       }
+
       .item {
         padding: 10px;
       }
+
       .btn-bottom {
         width:33%;
       }
@@ -56,6 +88,7 @@
         font-weight: bold;
         padding:0px;
       }
+
     </style>
   </head>
   <body>
@@ -72,11 +105,11 @@
         <br clear="all">
         <div ng-repeat="item in PlaylistService.collection.history track by item.id"
              ng-class="{'playing': PlayerService.collection.playingId == item.id}" class="item">
-          <span ng-include src="'/static/partials/item.tpl.html'"></span>
+          <span ng-include src="'/static/partials/item.tpl.html?_='+Date.now()"></span>
         </div>
         <h1>Coming up</h1>
         <div ng-repeat="item in Preload.collection.preload track by item.id" class="item">
-          <span ng-include src="'/static/partials/item.tpl.html'"></span>
+          <span ng-include src="'/static/partials/item.tpl.html?_='+Date.now()"></span>
         </div>
         currentTime: {{PlayerService.collection.currentTime}}
         {{PlayerService.collection.sound.duration}}

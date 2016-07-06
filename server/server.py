@@ -7,6 +7,8 @@ import cherrypy
 import configparser
 import threading
 import subprocess
+import mimetypes
+mimetypes.init()
 from time import time, sleep
 from datetime import date, datetime
 from cherrypy.lib.static import serve_file
@@ -287,10 +289,32 @@ def check_for_files_that_need_converting():
                           preload p
                      WHERE f.id = p.file_id
                      ORDER BY p.from_search DESC, p.id ASC"""
-            files = session.query(File)\
+            _files = session.query(File)\
                            .from_statement(
                                 text(sql))\
                            .all()
+            files = [f for f in _files]
+
+            users = session.query(User).all()
+            for user in users:
+                # print ("USER:", user.name)
+                sql = """SELECT f.*
+                         FROM files f
+                         WHERE f.id IN (
+                            SELECT file_id
+                            FROM user_file_info ufi
+                            WHERE ufi.user_id = %s AND
+                                  ufi.time_played IS NOT NULL
+                            ORDER BY ufi.time_played DESC NULLS LAST
+                            LIMIT 100
+                         )
+                         ORDER BY f.time_played DESC NULLS LAST""" % (user.id,)
+                _files = session.query(File)\
+                               .from_statement(
+                                    text(sql)
+                                )\
+                           .all()
+                files = files + [f for f in _files]
 
             for f in files:
                 if converter.die:
@@ -1761,14 +1785,17 @@ class FmpServer(object):
         return results
 
     @cherrypy.expose
-    def download(self, file_id, convert=False, extract_audio=False):
+    def download(self, file_id, convert_to=".mp3", **kwargs):
         location = None
         with session_scope() as session:
             dst = convert_filename(file_id)
-
+            print ("cherrypy.request.headers[Accept]:",
+                   cherrypy.request.headers.get("Accept"))
             if os.path.exists(dst):
+                mimetype = mimetypes.guess_type(dst)
+                print("mimetype 1:", mimetype)
                 return serve_file(dst,
-                                  "application/x-download",
+                                  mimetype[0],
                                   "attachment")
 
             locations = session.query(Location)\
@@ -1778,13 +1805,54 @@ class FmpServer(object):
                 raise cherrypy.NotFound()
 
             for loc in locations:
-                session.add(loc)
+                session_add(session, loc)
                 if not loc.exists:
                     continue
 
-                if not convert:
+                convert_to = convert_to.lower()
+                if convert_to not in (".mp3",):
+                    # TODO add other file types
+                    convert_to = ".mp3"
+
+                session_add(session, loc)
+                basename = os.path.basename(loc.filename)
+                base, ext = os.path.splitext(basename)
+                ext = ext.lower()
+                if not convert_to or ext == convert_to:
+                    """
+                    cherrypy.request.headers[Accept]: audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5
+                    mimetype 2: ('audio/x-ms-wma', None)
+                    """
+                    session_add(session, loc)
+                    mimetype = mimetypes.guess_type(loc.filename)
+                    print("mimetype 2:", mimetype)
                     return serve_file(loc.filename,
-                                      "application/x-download",
+                                      mimetype[0],
+                                      "attachment")
+
+                _locations = []
+                for l in locations:
+                    session_add(session, l)
+                    _locations.append(l.json())
+                session_add(session, loc)
+                jobs.append(cmd=convert,
+                            id=loc.file_id,
+                            locations=_locations,
+                            to=convert_to,
+                            unique=True,
+                            priority="high")
+                cnt = 0
+                while cnt < 30:
+                    cnt += 1
+                    if os.path.exists(dst):
+                        break
+                    sleep(1)
+
+                if os.path.exists(dst):
+                    mimetype = mimetypes.guess_type(dst)
+                    print("mimetype 3:", mimetype)
+                    return serve_file(dst,
+                                      mimetype[0],
                                       "attachment")
                 # ## TODO extract audio, then convert.
                 # ## Extract audio

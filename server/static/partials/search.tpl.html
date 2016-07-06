@@ -18,18 +18,20 @@
             ></button>
           </span>
         </div>
-        <button class="btn-primary btn glyphicon glyphicon-triangle-left"
-                ng-click="SearchService.collection.start=SearchService.collection.start-SearchService.collection.limit; search();"></button>
-        <button class="btn-primary btn glyphicon glyphicon-triangle-right"
-                ng-click="SearchService.collection.start=SearchService.collection.start+SearchService.collection.limit; search();"></button><br>
-        <div ng-repeat="item in SearchService.collection.results[SearchService.collection.searchQuery] track by item.id"
-             ng-class="{'playing': PlayerService.collection.playingId == item.id}" class="item">
-             <span ng-include src="'/static/partials/item.tpl.html'"></span>
+
+        <dir-pagination-controls pagination-id="searchResults"
+                                 on-page-change="SearchService.pageChanged(newPageNumber)"></dir-pagination-controls>
+
+        <div dir-paginate="item in SearchService.collection.results[SearchService.collection.searchQuery] | itemsPerPage: SearchService.collection.limit"
+            total-items="SearchService.collection.totals[SearchService.collection.searchTerm]"
+            current-page="SearchService.collection.currentPage"
+            pagination-id="searchResults"
+            ng-class="{'playing': PlayerService.collection.playingId == item.id}"
+            class="item">
+            <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
-        <button class="btn-primary btn glyphicon glyphicon-triangle-left"
-                ng-click="SearchService.collection.start=SearchService.collection.start-SearchService.collection.limit; search();"></button>
-        <button class="btn-primary btn glyphicon glyphicon-triangle-right"
-                ng-click="SearchService.collection.start=SearchService.collection.start+SearchService.collection.limit; search();"></button>
+        <dir-pagination-controls pagination-id="searchResults"
+                                 on-page-change="SearchService.pageChanged(newPageNumber)"></dir-pagination-controls>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" ng-click="$hide()">Close</button>

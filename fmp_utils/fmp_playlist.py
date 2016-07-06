@@ -29,7 +29,6 @@ class WnckTracker:
         self.locked = False
 
     def check_window(self):
-        print ("+"*1000)
         Gtk.main_iteration()
         self.screen = Wnck.Screen.get_default()
         self.screen.force_update()
@@ -38,7 +37,6 @@ class WnckTracker:
 
         for w in self.windows:
             name = w.get_class_instance_name()
-            print ("name:",name)
             if "fmp.py" not in name:
                 continue
             self.window = w
