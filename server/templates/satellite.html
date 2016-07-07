@@ -33,7 +33,23 @@
       }
 
       .glyphicon-remove:hover {
-        color: green;
+        color: red;
+      }
+
+      .glyphicon-play {
+        color:black;
+      }
+
+      .glyphicon-play:hover {
+        color:black;
+      }
+
+      .glyphicon-pause {
+        color:black;
+      }
+
+      .glyphicon-pause:hover {
+        color:black;
       }
 
       .glyphicon-plus {
@@ -105,11 +121,11 @@
         <br clear="all">
         <div ng-repeat="item in PlaylistService.collection.history track by item.id"
              ng-class="{'playing': PlayerService.collection.playingId == item.id}" class="item">
-          <span ng-include src="'/static/partials/item.tpl.html?_='+Date.now()"></span>
+          <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
         <h1>Coming up</h1>
         <div ng-repeat="item in Preload.collection.preload track by item.id" class="item">
-          <span ng-include src="'/static/partials/item.tpl.html?_='+Date.now()"></span>
+          <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
         currentTime: {{PlayerService.collection.currentTime}}
         {{PlayerService.collection.sound.duration}}

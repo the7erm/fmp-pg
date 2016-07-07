@@ -322,8 +322,7 @@ def check_for_files_that_need_converting():
                 user_id = 0
                 session_add(session, f)
                 filename = f.filename
-
-                if filename.lower().endswith(".mp3"):
+                if not filename or filename.lower().endswith(".mp3"):
                     continue
                 # print("f.filename:",filename)
 
@@ -808,6 +807,9 @@ cherrypy.config.update({
 
 
 class FmpServer(object):
+
+    playlist_reset_expire = 0
+
     @cherrypy.expose
     def index(self):
 
@@ -944,13 +946,15 @@ class FmpServer(object):
             if "," in user_id:
                 user_ids = user_id.split(",")
 
-            user_ids = [str(int(x)) for x in user_ids]
+            user_ids_int = [int(x) for x in user_ids]
+            user_ids = [str(x) for x in user_ids_int]
             mark_as_played_kwargs = {
                 "user_ids": user_ids,
                 "percent_played": int(float(kwargs.get("percent_played", 0))),
                 "now": int(kwargs.get("now", time()))
             }
             f.mark_as_played(**mark_as_played_kwargs)
+
             cue_kwargs = {
                 "id": kwargs.get("file_id"),
                 "uid": kwargs.get("user_id"),
@@ -959,12 +963,31 @@ class FmpServer(object):
             self.cue(**cue_kwargs)
             session.add(f)
             response = f.json()
-            preload = []
-            for p in playlist.preload:
-                session.add(p)
-                if p.id != kwargs.get("file_id"):
-                    preload.append(p)
-            playlist.preload = preload
+
+            # Re-construct the preload without the current item
+            if playlist.preload:
+                preload = []
+                file_id = kwargs.get("file_id")
+                for p in playlist.preload:
+                    session_add(session, p)
+                    if p.id != file_id:
+                        preload.append(p)
+                playlist.preload = preload
+
+            set_playing = to_bool(kwargs.get("set_playing", False))
+            force_sync = to_bool(kwargs.get("force_sync", False))
+            if (set_playing and
+                playlist.player.state_string != "PLAYING" and
+                (self.playlist_reset_expire < time() or
+                 force_sync)):
+                    for user in get_listeners():
+                        if (user['id'] in user_ids_int or
+                            user['id'] in user_ids):
+                                print ("resetting playlist")
+                                self.playlist_reset_expire = time() + 60
+                                playlist.reset()
+                                break
+
             return json.dumps(response)
 
     @cherrypy.expose
@@ -1992,6 +2015,8 @@ class FmpServer(object):
 
             group_by_user = {}
             for f in files:
+                if not f:
+                    continue
                 session_add(session, f)
                 f_id = f.id
                 user_id = 0
@@ -2003,6 +2028,8 @@ class FmpServer(object):
                 filename = fnCache.get(f_id, f.filename)
                 session_add(session, f)
                 fnCache[f_id] = filename
+                if not filename:
+                    continue
                 # print("f.filename:", filename)
 
                 if not filename.lower().endswith(".mp3"):
@@ -2507,6 +2534,17 @@ def get_all_users():
             results.append(u.json())
     return results
 
+def get_listeners():
+    results = []
+    with session_scope() as session:
+        users = session.query(User)\
+                       .filter(User.listening==True)\
+                       .order_by(User.listening.desc().nullslast(),
+                                 User.admin.desc().nullslast(),
+                                 User.name.nullslast())\
+                       .all()
+        results = [u.json() for u in users]
+    return results
 
 def merge_admin_user_ids(session, user_ids=[]):
     user_ids = [int(x) for x in user_ids]

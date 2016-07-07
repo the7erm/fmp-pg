@@ -131,6 +131,34 @@ class File(Base):
             session_add(session, self)
             self.iterate_user_ids(self.mark_user_as_played, **kwargs)
 
+            if 'file_id' not in kwargs:
+                session_add(session, self)
+                kwargs['file_id'] = self.id
+            self.remove_from_preload(**kwargs)
+
+    def remove_from_preload(self, *args, **kwargs):
+        _user_ids = kwargs.get('user_ids', [])
+        user_ids = [str(int(user_id)) for user_id in _user_ids]
+        if not user_ids:
+            with session_scope() as session:
+                users = session.query(User)\
+                               .filter(User.listening==True)\
+                               .all()
+                for user in users:
+                    session_add(session, user)
+                    user_ids.append(str(user.id))
+
+        if not user_ids:
+            return
+
+        with session_scope() as session:
+            sql = """DELETE FROM
+                     preload
+                     WHERE user_id IN (%s) AND
+                           file_id = :file_id""" % ",".join(user_ids)
+            session.execute(text(sql), kwargs)
+            session.commit()
+
     def iterate_user_ids(self, cmd, **kwargs):
         with session_scope() as session:
             if 'user_ids' in kwargs:

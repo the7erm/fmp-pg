@@ -311,8 +311,8 @@ class FmpPlaylist(Playlist):
         print("PLAYLIST RESET")
         self.files = picker.get_recently_played(10)
         if not self.files:
-            self.files = picker.get_preload()
-        self.preload = picker.get_preload()
+            self.files = picker.get_preload(remove_item=False)
+        self.preload = picker.get_preload(remove_item=False)
         self.index = len(self.files) - 1
         self.set_player_uri()
         self.player.state = state_keeper.state

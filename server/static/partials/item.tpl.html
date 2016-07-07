@@ -1,10 +1,16 @@
 <a class="glyphicon glyphicon-plus"
          ng-if="!Utils.inList(PlaylistService.collection.history, item)&&!Utils.inList(Preload.collection.preload, item)"
-         ng-click="addToPlaylist(item)"></a>
+         ng-click="addToPlaylist(item)">&nbsp;</a>
 <a class="glyphicon glyphicon-remove"
         ng-if="(Utils.inList(PlaylistService.collection.history, item)||Utils.inList(Preload.collection.preload, item))&&
         PlayerService.collection.playingId != item.id"
-        ng-click="removeFromPlaylist(item)"></a>
+        ng-click="removeFromPlaylist(item)">&nbsp;</a>
+<a class="glyphicon glyphicon-play"
+   ng-if="PlayerService.collection.playingId == item.id&&!PlayerService.collection.paused"
+   ng-click="PlayerService.pause()">&nbsp;</a>
+<a class="glyphicon glyphicon-pause"
+  ng-if="PlayerService.collection.playingId == item.id&&PlayerService.collection.paused"
+  ng-click="PlayerService.play()">&nbsp;</a>
 <span ng-if="!item.artists.length || !item.titles.length">
   <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;"><code>{{item.locations[0].basename}}</code></a>
 </span>
@@ -15,7 +21,7 @@
 </span>
 <br clear="all">
 <div ng-repeat="ufi in item.user_file_info">
-  {{ufi.user.name}} {{ufi.rating}}
+  {{ufi.user.name}}
   <a ng-click="rate(item, ufi.user.id, 0)" class="star">
     <img src="/static/images/no.star.grey.png" ng-if="ufi.rating>0"
          class="star">
@@ -54,6 +60,7 @@
   <img src="/static/images/question.mark.svg" ng-if="ufi.rating==6"
        class="star">
   <a ng-click="thumb(item, ufi.user.id, -1)" class="glyphicon glyphicon-thumbs-down star"></a>
-  <a ng-click="thumb(item, ufi.user.id, 1)" class="glyphicon glyphicon-thumbs-up star"></a> {{ufi.true_score}}
+  <a ng-click="thumb(item, ufi.user.id, 1)" class="glyphicon glyphicon-thumbs-up star"></a> {{ufi.true_score}}<br>
+  {{ufi.reason}}
 </div>
 <hr>

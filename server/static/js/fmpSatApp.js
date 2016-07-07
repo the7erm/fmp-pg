@@ -285,13 +285,18 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
         }
     }
 
-    methods.markAsPlayed = function(id, percent_played){
+    methods.markAsPlayed = function(id, percent_played, force_sync){
+        if (typeof force_sync == "undefined") {
+            force_sync = false;
+        }
         // console.log("markAsPlayed", id, percent_played);
         if (isNaN(percent_played)) {
             return;
         }
         var int_percent_played = parseInt(percent_played);
-        if (collection.playingId == id && collection.int_percent_played == int_percent_played) {
+        if (collection.playingId == id &&
+            collection.int_percent_played == int_percent_played &&
+            !force_sync) {
             return;
         }
 
@@ -301,7 +306,9 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
         var params = {
             "user_ids": ListenersService.collection.listener_user_ids.join(","),
             "percent_played": percent_played,
-            "file_id": id
+            "file_id": id,
+            "set_playing": true,
+            "force_sync": force_sync
         };
         $http({
           "method": 'GET',
@@ -412,6 +419,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         }
     };
     methods.pause = function() {
+        methods.updateTime(0, true);
         collection.sound.pause();
     };
 
@@ -473,7 +481,11 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         var idx = methods.getPlayingIndex();
         methods.setIndex(idx-1);
     };
-    methods.updateTime = function() {
+    methods.updateTime = function(cnt, force_sync) {
+        // console.log("updateTime:", cnt, force_sync);
+        if (typeof force_sync == "undefined") {
+            force_sync = false;
+        }
         collection.currentTime = collection.sound.currentTime;
         collection.paused = collection.sound.paused;
         if (!collection.paused) {
@@ -483,7 +495,8 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             localStorage['percent_played'] = percent_played;
             localStorage['currentTime'] = collection.currentTime;
             localStorage['paused'] = 0;
-            PlaylistService.markAsPlayed(collection.playingId, percent_played);
+            PlaylistService.markAsPlayed(collection.playingId, percent_played,
+                                         force_sync);
         } else {
             localStorage['paused'] = 1;
         }
@@ -604,19 +617,31 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
         if(typeof collection.locks[query] == 'undefined') {
             return false;
         }
+        // console.log("locked:", query, collection.locks[query]);
         return collection.locks[query];
     };
 
     methods.lock = function(query) {
         collection.locks[query] = true;
+        // console.log("lock:", query);
     };
 
     methods.unlock = function(query) {
         collection.locks[query] = false;
+        // console.log("unlock:", query);
+        delete collection.locks[query];
     }
 
     methods.search = function() {
+        if (methods.isLocked("search")) {
+            methods.timeoutSearch();
+            return;
+        }
+        methods.lock("search");
         var query = methods.query();
+        if (collection.promise) {
+            $timeout.cancel(collection.promise);
+        }
         collection.promise = false;
         collection.searchQuery = query;
         if (typeof collection.results[query] == "undefined") {
@@ -625,10 +650,12 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
         if (typeof collection.expireTimes[query] != "undefined" &&
             collection.expireTimes[query] > Date.now()) {
             console.log("cached:", query);
+            methods.unlock("search");
             methods.prefetch();
             return;
         }
         if (methods.isLocked(query)) {
+            methods.unlock("search");
             methods.prefetch();
             return;
         }
@@ -643,8 +670,10 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             collection.expireTimes[query] = Date.now() + (1000 * 60 * 5);
             collection.currentPage = (collection.start / collection.limit) + 1;
             methods.unlock(query);
+            methods.unlock("search");
             methods.prefetch();
         }, function(){
+            methods.unlock("search");
             methods.unlock(query);
         });
     };
@@ -660,7 +689,10 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
         if (multiplier > 7) {
             return;
         }
-
+        if (methods.isLocked("prefetch")) {
+            return;
+        }
+        methods.lock("prefetch");
         var start = collection.start,
             limit = collection.limit,
             _multi = multiplier - 3,
@@ -681,6 +713,7 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
         console.log("prefetch collection.start:", collection.start,
                     "thisStart:", thisStart, "multiplier:", multiplier);
         if (thisStart < 0) {
+            methods.unlock("prefetch");
             methods.prefetch(multiplier+1);
             return;
         }
@@ -692,10 +725,12 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             collection.start = collectionStart;
             if (typeof collection.expireTimes[query] != "undefined" &&
                 collection.expireTimes[query] > Date.now()) {
+                methods.unlock("prefetch");
                 methods.prefetch(multiplier+1);
                 return;
             }
             if (methods.isLocked(query)) {
+                methods.unlock("prefetch");
                 methods.prefetch(multiplier+1);
                 return;
             }
@@ -705,6 +740,7 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
               "method": 'GET',
               "url": query
             }).then(function(response) {
+                methods.unlock("prefetch");
                 collection.results[query] = response.data.results;
                 collection.totals[collection.searchTerm] = response.data.total;
 
@@ -713,8 +749,11 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
                 methods.unlock(query);
                 methods.prefetch(multiplier+1);
             }, function(){
+                methods.unlock("prefetch");
                 methods.unlock(query);
             });
+        } else {
+            methods.unlock("prefetch");
         }
     }
     methods.updateLists = function(item) {
