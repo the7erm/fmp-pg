@@ -389,6 +389,10 @@ fmpApp.factory("PlayerService", function(PlaylistService,
 
     document.getElementById("audio-player").appendChild(collection.audio);
     document.getElementById("video-player").appendChild(collection.video);
+    $("#video-player").resizable({
+        handles: 'w, s, sw, n, nw, e, ne, se',
+        aspectRatio: 16 / 9
+    });
     methods.initPlayer = function() {
         if (collection.initialized) {
             return;

@@ -7,8 +7,11 @@
           href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
     <link rel="stylesheet"
           href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" href="/static/js/bower_components/jquery-ui/themes/base/jquery-ui.min.css">
 
     <script src="/static/js/jquery-2.0.3.min.js"></script>
+    <script src="/static/js/bower_components/jquery-ui/jquery-ui.min.js"></script>
+
 
 
     <script type="text/javascript"
@@ -110,12 +113,15 @@
         position: fixed;
         top:0px;
         right:0px;
+        background: white;
+        padding-left:5px;
       }
       #video-player-element {
-        max-height: 280px;
-        width:auto;
+        width:100%;
         border:5px solid #000;
         padding:0px;
+        height:100%;
+        background: black;
       }
       #audio-player {
         width: 100%;
@@ -125,7 +131,7 @@
   </head>
   <body>
     <div ng-controller="PlayerController">
-        <div id="video-player"></div>
+        <div id="video-player"  class="ui-widget-content"></div>
         <button type="button"
                 class="btn btn-lg btn-primary"
                 ng-click="showModal()">Search</button>
