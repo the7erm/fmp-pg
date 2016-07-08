@@ -105,10 +105,28 @@
         padding:0px;
       }
 
+      #video-player {
+        float:right;
+        height:10%;
+        width: auto;
+        max-height: 280px;
+        position: fixed;
+        top:0px;
+        right:0px;
+      }
+      #video-player-element {
+        max-height: 280px;
+        width:auto;
+      }
+      #audio-player {
+        width: 100%;
+      }
+
     </style>
   </head>
   <body>
     <div ng-controller="PlayerController">
+        <div id="video-player"></div>
         <button type="button"
                 class="btn btn-lg btn-primary"
                 ng-click="showModal()">Search</button>
@@ -128,18 +146,18 @@
           <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
         currentTime: {{PlayerService.collection.currentTime}}
-        {{PlayerService.collection.sound.duration}}
+        {{PlayerService.collection.media.duration}}
         <nav class="navbar navbar-default navbar-fixed-bottom">
           <div class="container" style="width:100%">
-            <div id="player" style="width:100%;"></div>
+            <div id="audio-player"></div>
             <button class="btn btn-default glyphicon glyphicon-fast-backward btn-bottom"
                 ng-click="prev()"></button>
             <button class="btn btn-default glyphicon glyphicon-pause btn-bottom"
                     ng-click="pause()"
-                    ng-if="!PlayerService.collection.sound.paused"></button>
+                    ng-if="!PlayerService.collection.media.paused"></button>
             <button class="btn btn-default glyphicon glyphicon-play btn-bottom"
                     ng-click="play()"
-                    ng-if="PlayerService.collection.sound.paused"></button>
+                    ng-if="PlayerService.collection.media.paused"></button>
             <button class="btn btn-default glyphicon glyphicon-fast-forward btn-bottom"
                     ng-click="next()"></button>
 

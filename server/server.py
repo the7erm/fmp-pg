@@ -116,6 +116,9 @@ class Converter(object):
             output = ""
             audio_tmp = ""
             if ext in (".mp4", ".wmv", ".flv", ".avi"):
+                """
+                avconv -i Owl_City__quot_Fireflies_quot__official_music_video.mp4 -c:v libx264 -c:a libmp3lame ~/tmp/test.mp4
+                """
 
                 # avprobe -v quiet -show_format -of json -pretty  -show_streams
                 # '/home/erm/disk2/acer-home/media/video/c
@@ -259,9 +262,10 @@ def convert(id=None, locations=[], to=".mp3", unique=True,  *args, **kwargs):
 
     converter.append(src, tmp_dst, dst)
 
-
-def convert_filename(file_id):
-    dst_basename = "%s%s" % (file_id, ".mp3")
+def convert_filename(file_id, ext=".mp3"):
+    if ext not in (".mp3", ".mp4"):
+        ext = ".mp3"
+    dst_basename = "%s%s" % (file_id, ext)
     dst = os.path.join(CONVERT_DIR, dst_basename)
     return dst
 
@@ -1806,6 +1810,38 @@ class FmpServer(object):
                 results.append(item)
 
         return results
+
+    @cherrypy.expose
+    def stream(self, file_id):
+        print ("STREAM cherrypy.request.headers[Accept]:",
+               cherrypy.request.headers.get("Accept"))
+
+        """
+        STREAM cherrypy.request.headers[Accept]:
+        video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5
+        mimetype 2: ('video/mp4', None)
+
+        """
+        with session_scope() as session:
+            locations = session.query(Location)\
+                               .filter(Location.file_id == file_id)\
+                               .all()
+            if not locations:
+                raise cherrypy.NotFound()
+
+            for loc in locations:
+                session_add(session, loc)
+                if not loc.exists:
+                    continue
+
+                session_add(session, loc)
+                mimetype = mimetypes.guess_type(loc.filename)
+                print("mimetype 2:", mimetype)
+                return serve_file(loc.filename,
+                                  mimetype[0],
+                                  "attachment")
+
+        raise cherrypy.NotFound()
 
     @cherrypy.expose
     def download(self, file_id, convert_to=".mp3", **kwargs):

@@ -73,7 +73,7 @@ fmpApp.factory("ListenersService", function($http, $rootScope, FmpIpScanner){
     try {
         listener_user_ids = JSON.parse(localStorage["listener_user_ids"]);
     } catch(e) {
-        console.error("ListenersService error:", e);
+        //console.log("ListenersService error:", e);
     }
     var collection = {
             users: [],
@@ -161,6 +161,10 @@ fmpApp.factory("Utils", function(){
                 }
             }
             return idx;
+        },
+        isVideo: function(basename) {
+            var rx = /\.(mp4|webm|ogv|3gpp|mkv)$/i;
+            return rx.test(basename);
         }
     };
     return methods;
@@ -324,6 +328,7 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
     return methods;
 });
 
+
 fmpApp.factory("PlayerService", function(PlaylistService,
                                          FmpIpScanner,
                                          $rootScope,
@@ -333,21 +338,19 @@ fmpApp.factory("PlayerService", function(PlaylistService,
                                          Utils,
                                          SearchService){
     var collection = {
-            "sound": document.createElement("audio"),
+            "audio": document.createElement("audio"),
+            "video": document.createElement("video"),
             "initialized": false,
             "playingId": null
         },
         methods = {
             "collection": collection
         };
-    Preload.PlayerService = methods;
-    collection.sound.setAttribute("preload", "auto");
-    collection.sound.controls = true;
-    collection.sound.style="width:100%";
-    collection.sound.onerror = function() {
-         alert("Error! Something went wrong");
-    };
-    collection.sound.onended = function(){
+
+    collection.media = collection.audio;
+    collection.media = collection.audio;
+
+    methods.onended = function(){
         console.log("onended");
         var idx = methods.getPlayingIndex();
         if (idx == -1) {
@@ -361,8 +364,29 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             methods.thumb(file, ufi.user.id, +1);
         }
         methods.setIndex(idx+1);
-    }
-    document.getElementById("player").appendChild(collection.sound);
+    };
+    Preload.PlayerService = methods;
+    collection.audio.setAttribute("preload", "auto");
+    collection.video.setAttribute("preload", "auto");
+    collection.audio.controls = true;
+    collection.video.controls = true;
+    collection.video.id = "video-player-element";
+    collection.audio.style="width:100%";
+
+    collection.audio.onerror = function() {
+         alert("Error! Something went wrong");
+    };
+    collection.video.onerror = function() {
+         alert("Error! PLAYING VIDEO Something went wrong");
+         methods.hideVideo();
+         collection.media = collection.audio;
+         collection.media.play();
+    };
+    collection.audio.onended = methods.onended;
+    collection.video.onended = methods.onended;
+
+    document.getElementById("audio-player").appendChild(collection.audio);
+    document.getElementById("video-player").appendChild(collection.video);
     methods.initPlayer = function() {
         if (collection.initialized) {
             return;
@@ -383,19 +407,49 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         methods.setPlayingData(history[idx].id);
         methods.play();
         if (collection.playingId == playingId && !isNaN(currentTime)) {
-            collection.sound.currentTime = currentTime;
+            collection.media.currentTime = currentTime;
         }
         if (paused && paused != "0") {
             methods.pause();
         }
     };
 
+    methods.showVideo = function() {
+        $("#video-player").show();
+        $("#audio-player").hide();
+    };
+    methods.hideAudio = methods.showVideo;
+
+    methods.showAudio = function() {
+        $("#video-player").hide();
+        $("#audio-player").show();
+    }
+    methods.hideVideo = methods.showAudio;
+
+    methods.setVideoSrc = function(id) {
+        methods.showVideo();
+        collection.video.src = (
+            FmpIpScanner.collection.url+"stream?file_id="+id);
+        collection.media = collection.video;
+    }
     methods.setPlayingData = function(id) {
         if (!id) {
             return;
         }
-        collection.sound.src = (
+        collection.audio.src = (
             FmpIpScanner.collection.url+"download?file_id="+id+"&convert_to=.mp3");
+        var idx = Utils.getIdIndex(PlaylistService.collection.history, id);
+        collection.media = collection.audio;
+        if (idx != -1) {
+            var item = PlaylistService.collection.history[idx];
+            if (Utils.isVideo(item.locations[0].basename)) {
+                methods.setVideoSrc(id);
+            } else {
+                methods.hideVideo();
+            }
+        } else {
+            methods.showAudio();
+        }
         collection.playingId = id;
     }
 
@@ -404,23 +458,23 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             Preload.getPreload();
             methods.playId(Preload.collection.preload[0].id);
         } else {
-            collection.sound.play();
+            collection.media.play();
         }
     };
     methods.playId = function(id) {
-        methods.setPlayingData(id);
         PlaylistService.moveToHistory(id);
-        collection.sound.play();
+        methods.setPlayingData(id);
+        collection.media.play();
     };
     methods.playItem = function(item) {
-        methods.playId(item.id);
         if (!Utils.inList(PlaylistService.collection.history, item)) {
             PlaylistService.collection.history.push(item);
         }
+        methods.playId(item.id);
     };
     methods.pause = function() {
         methods.updateTime(0, true);
-        collection.sound.pause();
+        collection.media.pause();
     };
 
     methods.getIdIndex = function(id) {
@@ -486,11 +540,11 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         if (typeof force_sync == "undefined") {
             force_sync = false;
         }
-        collection.currentTime = collection.sound.currentTime;
-        collection.paused = collection.sound.paused;
+        collection.currentTime = collection.media.currentTime;
+        collection.paused = collection.media.paused;
         if (!collection.paused) {
             var percent_played = (
-                collection.currentTime / collection.sound.duration) * 100;
+                collection.currentTime / collection.media.duration) * 100;
             localStorage['playingId'] = collection.playingId;
             localStorage['percent_played'] = percent_played;
             localStorage['currentTime'] = collection.currentTime;
