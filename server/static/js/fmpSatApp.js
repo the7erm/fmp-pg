@@ -532,6 +532,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         if (!file) {
             return;
         }
+        collection.media.pause();
         methods.playId(file.id);
     }
     methods.prev = function() {
