@@ -220,8 +220,7 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
                 var item = preload[i],
                     found = false;
                 if (methods.PlaylistService) {
-                    found = Utils.inList(
-                        methods.PlaylistService.collection.history, item);
+                    found = Utils.inList(collection.preload.history, item);
                 }
                 if (!found) {
                     found = Utils.inList(
@@ -279,10 +278,13 @@ fmpApp.factory("PlaylistService", function($http, $rootScope, ListenersService,
     };
 
     methods.moveToHistory = function(id) {
+        var idInList = Utils.idInList(collection.history, id);
         for(var i=0;i<Preload.collection.preload.length;i++) {
             var item = Preload.collection.preload[i];
             if (item.id == id) {
-                collection.history.push(item);
+                if (!idInList) {
+                    collection.history.push(item);
+                }
                 Preload.collection.preload.splice(i, 1);
                 Preload.getPreload();
             }
@@ -468,6 +470,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
     };
     methods.playItem = function(item) {
         if (!Utils.inList(PlaylistService.collection.history, item)) {
+            console.log("ADDED TO PLAYLIST");
             PlaylistService.collection.history.push(item);
         }
         methods.playId(item.id);

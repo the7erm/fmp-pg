@@ -12,7 +12,7 @@
   ng-if="PlayerService.collection.playingId == item.id&&PlayerService.collection.paused"
   ng-click="PlayerService.play()">&nbsp;</a>
 <span ng-if="!item.artists.length || !item.titles.length">
-  <a ng-click="PlayerService.playId(item.id)" style="cursor:pointer;"><code>{{item.locations[0].basename}}</code></a>
+  <a ng-click="PlayerService.playItem(item)" style="cursor:pointer;"><code>{{item.locations[0].basename}}</code></a>
 </span>
 <span ng-if="item.artists.length && item.titles.length">
   <a ng-click="PlayerService.playItem(item)" style="cursor:pointer;">
