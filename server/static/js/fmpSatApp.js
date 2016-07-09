@@ -220,11 +220,11 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
                 var item = preload[i],
                     found = false;
                 if (methods.PlaylistService) {
-                    found = Utils.inList(collection.preload.history, item);
-                }
-                if (!found) {
                     found = Utils.inList(
                         methods.PlaylistService.collection.history, item);
+                }
+                if (!found) {
+                    found = Utils.inList(collection.preload.history, item);
                 }
                 if (found) {
                     continue;
