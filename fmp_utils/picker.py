@@ -74,6 +74,8 @@ def get_preload(uids=[], remove_item=True, user_ids=[], minimum=0,
         if not users:
             users = session.query(User).all()
 
+        needs_populated = []
+
         for user in users:
             session_add(session, user)
             if primary_user_id is not None:
@@ -87,16 +89,22 @@ def get_preload(uids=[], remove_item=True, user_ids=[], minimum=0,
                            .count()
 
             if total <= minimum:
-                session_add(session, user)
-                populate_preload([user], primary_user_id=primary_user_id,
-                                 prefetch_num=prefetch_num,
-                                 secondary_prefetch_num=secondary_prefetch_num)
+                needs_populated.append(user)
+
+        if needs_populated:
+            populate_preload(users,
+                             primary_user_id=primary_user_id,
+                             prefetch_num=prefetch_num,
+                             secondary_prefetch_num=secondary_prefetch_num)
+
+        for user in users:
             session_add(session, user)
-            total = session.query(Preload)\
-                           .filter(Preload.user_id==user.id)\
-                           .count()
-            if total <= minimum:
-                continue
+            # This code isn't needed because it's ok if we get an item.
+            # total = session.query(Preload)\
+            #                .filter(Preload.user_id==user.id)\
+            #                .count()
+            # if total <= minimum:
+            #    continue
 
             pick, preload = session.query(File, Preload)\
                                    .join(Preload, Preload.file_id == File.id)\

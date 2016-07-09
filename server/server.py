@@ -1997,7 +1997,7 @@ class FmpServer(object):
                 file_id = int(file_id)
                 already_added.append(file_id)
 
-            if file_id and file_id not in group_by_user_file_ids[user_id]:
+            if file_id not in group_by_user_file_ids[user_id]:
                 group_by_user_file_ids[user_id].append(file_id)
 
         if already_added:
@@ -2008,17 +2008,14 @@ class FmpServer(object):
         print("PRIMARY USER ID:", primary_user_id)
         # print("FILES:", files)
 
-        sql = """SELECT f.*, l.basename
+        sql = """SELECT f.*
                  FROM files f,
-                      preload p,
-                      locations l
+                      preload p
                  WHERE user_id IN (%s) AND
-                       f.id = p.file_id AND
-                       l.file_id = f.id %s
+                       f.id = p.file_id %s
                  ORDER BY p.from_search DESC, p.id ASC""" % (
                     ",".join(str(x) for x in user_ids),
                     already_added_sql
-
                  )
         print("sql:", sql)
 
@@ -2030,7 +2027,7 @@ class FmpServer(object):
             # Check the preload and make sure all the users have files
             # up to their minimums ready.
             preloaded = picker.get_preload(
-                user_ids=user_ids,
+                user_ids=ufi_user_ids,
                 remove_item=False,
                 primary_user_id=primary_user_id,
                 prefetch_num=prefetchNum,
@@ -2039,6 +2036,7 @@ class FmpServer(object):
 
             for p in preloaded:
                 session_add(session, p)
+                print("preloaded:",p)
 
             # TODO wait
 
@@ -2054,6 +2052,8 @@ class FmpServer(object):
                 if not f:
                     continue
                 session_add(session, f)
+                # print ("f:", f)
+                # session_add(session, f)
                 f_id = f.id
                 user_id = 0
                 session_add(session, f)
@@ -2087,8 +2087,11 @@ class FmpServer(object):
                                     unique=True)
 
                         continue  # for f in files:
+
+                session_add(session, f)
                 if f.cued:
                     user_id = f.cued['user_id']
+                # print("user_id:", user_id)
                 if not group_by_user.get(user_id):
                     group_by_user[user_id] = []
                 if not group_by_user_file_ids.get(user_id):

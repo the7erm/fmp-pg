@@ -179,6 +179,10 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
             "collection": collection
         };
     methods.getPreload = function() {
+        if (collection.locked) {
+            return;
+        }
+        collection.locked = true;
         var files = [],
             history = methods.PlaylistService.collection.history,
             preload = collection.preload;
@@ -188,15 +192,11 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
                     collection.preload.splice(idx, 1);
                 }
             });
-            if (collection.preload && collection.preload.length > 10) {
+            if (collection.preload && collection.preload.length > 5) {
+                console.log("collection.preload.length > 5");
+                collection.locked = false;
                 return;
             }
-        }
-        if(history && history.length > 0) {
-            files = files.concat(history);
-        }
-        if (preload && preload.length > 0) {
-            files = files.concat(preload);
         }
         var postData = {
             user_ids: ListenersService.collection.listener_user_ids,
@@ -205,7 +205,7 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
             prefetchNum: 10,
             secondaryPrefetchNum: 10,
             include_admins: false,
-            files: files
+            files: collection.preload
         };
         $http({
           "method": 'POST',
@@ -233,6 +233,9 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
             }
             // collection.preload = collection.preload.concat(response.data.preload);
             console.log("collection.preload:", collection.preload);
+            collection.locked = false;
+        }, function(){
+            collection.locked = false;
         });
     };
     $rootScope.$on("server-found", methods.getPreload);
@@ -508,7 +511,7 @@ fmpApp.factory("PlayerService", function(PlaylistService,
     };
     methods.getFileFromPreload = function() {
         if (!Preload.collection.preload ||
-            Preload.collection.preload.length == 0) {
+            Preload.collection.preload.length < 10) {
             Preload.getPreload();
             if (!Preload.collection.preload ||
                 Preload.collection.preload.length == 0) {
