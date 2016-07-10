@@ -3,25 +3,32 @@
   <head>
     <meta charset="UTF-8">
     <title>FMP - Satellite</title>
+    <link rel="stylesheet" href="/static/js/bower_components/jquery-ui/themes/base/jquery-ui.min.css">
     <link rel="stylesheet"
           href="/static/js/bootstrap-3.3.5-dist/css/bootstrap.min.css">
     <link rel="stylesheet"
           href="/static/js/bootstrap-3.3.5-dist/css/bootstrap-theme.min.css">
-    <link rel="stylesheet" href="/static/js/bower_components/jquery-ui/themes/base/jquery-ui.min.css">
+    <link rel="stylesheet"
+          href="/static/js/bower_components/angular-growl-v2/build/angular-growl.css">
 
-    <script src="/static/js/jquery-2.0.3.min.js"></script>
-    <script src="/static/js/bower_components/jquery-ui/jquery-ui.min.js"></script>
-
-
+    <script type="text/javascript"
+            src="/static/js/jquery-2.0.3.min.js"></script>
+    <script type="text/javascript"
+            src="/static/js/bower_components/jquery-ui/jquery-ui.min.js"></script>
+    <script type="text/javascript"
+            src="/static/js/bootstrap-3.3.5-dist/js/bootstrap.min.js"></script>
 
     <script type="text/javascript"
             src="/static/js/angular.js"></script>
     <!-- Latest compiled and minified JavaScript -->
-    <script src="/static/js/bower_components/angular-strap/dist/angular-strap.min.js"></script>
-    <script src="/static/js/bower_components/angular-strap/dist/angular-strap.tpl.min.js"></script>
-    <script src="/static/js/bower_components/angularUtils-pagination/dirPagination.js"></script>
-
-
+    <script type="text/javascript"
+            src="/static/js/bower_components/angular-strap/dist/angular-strap.min.js"></script>
+    <script type="text/javascript"
+            src="/static/js/bower_components/angular-strap/dist/angular-strap.tpl.min.js"></script>
+    <script type="text/javascript"
+            src="/static/js/bower_components/angularUtils-pagination/dirPagination.js"></script>
+    <script type="text/javascript"
+            src="/static/js/bower_components/angular-growl-v2/build/angular-growl.js"></script>
     <script type="text/javascript"
             src="/static/js/fmpSatApp.js"></script>
 
@@ -115,6 +122,8 @@
         right:0px;
         background: white;
         padding-left:5px;
+        width: 25%;
+        height: auto;
       }
       #video-player-element {
         width:100%;
@@ -126,15 +135,43 @@
       #audio-player {
         width: 100%;
       }
+      .modal-dialog {
+        width: 80%;
+      }
 
     </style>
   </head>
   <body>
     <div ng-controller="PlayerController">
+        <nav class="navbar navbar-default">
+          <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">FMP</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+              <form class="navbar-form navbar-left" role="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" placeholder="Search"
+                   ng-model="SearchService.collection.searchTerm"
+                   ng-keyup="SearchService.timeoutSearch($event)">
+                </div>
+                <button type="submit" class="btn btn-default"
+                        ng-click="showModal();">Submit</button>
+              </form>
+            </div><!-- /.navbar-collapse -->
+          </div><!-- /.container-fluid -->
+        </nav>
+        <div growl></div>
         <div id="video-player"  class="ui-widget-content"></div>
-        <button type="button"
-                class="btn btn-lg btn-primary"
-                ng-click="showModal()">Search</button>
         Server:<a href="{{FmpIpScanner.collection.url}}" target="_BLANK">{{FmpIpScanner.collection.url}}</a><br>
         <h1>Who listening?</h1>
         <button ng-repeat="user in ListenersService.collection.users"
@@ -147,28 +184,28 @@
           <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
 
-        <a ng-click="Preload.getPreload()">Preload.getPreload()</a>
         <h1>Coming up</h1>
         <div ng-repeat="item in Preload.collection.preload track by item.id" class="item">
           <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
         currentTime: {{PlayerService.collection.currentTime}}
         {{PlayerService.collection.media.duration}}
-        <nav class="navbar navbar-default navbar-fixed-bottom">
-          <div class="container" style="width:100%">
+        <nav class="navbar navbar-default navbar-fixed-bottom" style="width:100%;">
             <div id="audio-player"></div>
-            <button class="btn btn-default glyphicon glyphicon-fast-backward btn-bottom"
+            <div class="btn-group" role="group" aria-label="Basic example" style="width:100%; text-align:center;">
+              <button class="btn btn-default glyphicon glyphicon-fast-backward btn-bottom"
                 ng-click="prev()"></button>
-            <button class="btn btn-default glyphicon glyphicon-pause btn-bottom"
-                    ng-click="pause()"
-                    ng-if="!PlayerService.collection.media.paused"></button>
-            <button class="btn btn-default glyphicon glyphicon-play btn-bottom"
-                    ng-click="play()"
-                    ng-if="PlayerService.collection.media.paused"></button>
-            <button class="btn btn-default glyphicon glyphicon-fast-forward btn-bottom"
+              <button class="btn btn-default glyphicon glyphicon-pause btn-bottom"
+                      style="width:34%;"
+                      ng-click="pause()"
+                      ng-if="!PlayerService.collection.media.paused"></button>
+              <button class="btn btn-default glyphicon glyphicon-play btn-bottom"
+                      ng-click="play()"
+                      ng-if="PlayerService.collection.media.paused"
+                      style="width:34%;"></button>
+              <button class="btn btn-default glyphicon glyphicon-fast-forward btn-bottom"
                     ng-click="next()"></button>
-
-          </div>
+            </div>
         </nav>
     </div>
   </body>

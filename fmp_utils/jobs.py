@@ -55,7 +55,8 @@ class Jobs():
             return
 
         one_has_jobs = False
-        for user_id, user_jobs in self.picker.items():
+        items = self.picker.items()
+        for user_id, user_jobs in items:
             if user_jobs:
                 one_has_jobs = True
             if user_id not in self.user_ids:
@@ -72,7 +73,8 @@ class Jobs():
             self.user_ids.append(user_turn)
             print(self.user_ids)
 
-            for user_id, user_jobs in self.picker.items():
+            items = self.picker.items()
+            for user_id, user_jobs in items:
 
                 if user_id != user_turn:
                     continue

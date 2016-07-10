@@ -61,6 +61,7 @@
        class="star">
   <a ng-click="thumb(item, ufi.user.id, -1)" class="glyphicon glyphicon-thumbs-down star"></a>
   <a ng-click="thumb(item, ufi.user.id, 1)" class="glyphicon glyphicon-thumbs-up star"></a> {{ufi.true_score}}<br>
-  {{ufi.reason}}
+  <div ng-if="!item.cued">{{ufi.reason}}</div>
 </div>
+<div ng-if="item.cued">{{item.cued.reason}}</div>
 <hr>

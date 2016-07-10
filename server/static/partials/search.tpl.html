@@ -6,11 +6,13 @@
         <button type="button" class="close" aria-label="Close" ng-click="$hide()"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title">Search<span ng-if="SearchService.collection.searchTerm"> - {{SearchService.collection.searchTerm}}</span></h4>
       </div>
-      <div class="modal-body" style="overflow:auto;">
+      <div class="modal-body" style="overflow:auto;"">
         <div class="input-group">
-          <input type="text" class="form-control" placeholder="Search for..."
+          <input type="text" class="form-control" placeholder="Search"
+                 title="Enter a search term, hotkeys Page Up/Down work."
                  ng-model="SearchService.collection.searchTerm"
-                 ng-keyup="SearchService.timeoutSearch()">
+                 ng-keyup="SearchService.timeoutSearch($event)"
+                 id="searchModalInput">
           <span class="input-group-btn">
             <button class="btn btn-default glyphicon glyphicon-search"
                     type="button"
@@ -30,6 +32,7 @@
             class="item">
             <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
+        <br>
         <dir-pagination-controls pagination-id="searchResults"
                                  on-page-change="SearchService.pageChanged(newPageNumber)"></dir-pagination-controls>
       </div>
