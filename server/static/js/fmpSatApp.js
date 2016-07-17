@@ -419,6 +419,38 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         handles: 'w, s, sw, n, nw, e, ne, se',
         aspectRatio: 16 / 9
     });
+
+    methods.clearSrc = function() {
+        collection.audio.src = "";
+        collection.video.src = "";
+    };
+
+    window.onunload = function() {
+        var keys = ['abort', 'canplay', 'canplaythrough', 'durationchange',
+                    'emptied', 'ended', 'error', 'loadeddata',
+                    'loadedmetadata', 'loadstart', 'pause',
+                    'play', 'playing', 'progress', 'ratechange', 'seeked',
+                    'seeking', 'stalled', 'suspend', 'timeupdate',
+                    'volumechange', 'waiting'],
+            noop = function(){},
+            loopEls = function(els) {
+                if (!els) {
+                    return;
+                }
+                for (var i=0;i<els.length;i++) {
+                    var el = els[i];
+                    for (var j=0;j<keys.length;j++) {
+                        var k = keys[j];
+                        el["on"+k] = noop;
+                    }
+                    els[i].src = "";
+                }
+            };
+
+        loopEls(document.getElementsByTagName("audio"));
+        loopEls(document.getElementsByTagName("video"));
+    };
+
     methods.initPlayer = function() {
         if (collection.initialized) {
             return;
@@ -574,6 +606,9 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         if (typeof force_sync == "undefined") {
             force_sync = false;
         }
+        if (!collection.media.src) {
+            return;
+        }
         collection.currentTime = collection.media.currentTime;
         collection.paused = collection.media.paused;
         if (!collection.paused) {
@@ -627,12 +662,8 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         }
     };
     methods.thumb = function(item, userId, direction) {
-        var fileId = item.id;
-        console.log("thumb:", fileId, userId, direction);
-        for (var j=0;j<item.user_file_info.length;j++){
-            var ufi = item.user_file_info[j];
-            if (ufi['user'].id == userId) {
-                ufi['skip_score'] = parseInt(ufi['skip_score']) + parseInt(direction);
+        var fileId = item.id,
+            update = function(fileId, item, ufi, userId) {
                 var params = {
                     "user_id": userId,
                     "file_id": fileId,
@@ -649,6 +680,14 @@ fmpApp.factory("PlayerService", function(PlaylistService,
                         methods.updateLists(item);
                     }
                 });
+            };
+        console.log("thumb:", fileId, userId, direction);
+        for (var j=0;j<item.user_file_info.length;j++){
+            var ufi = item.user_file_info[j];
+            if (ufi['user'].id == userId) {
+                ufi['skip_score'] = parseInt(ufi['skip_score']) + parseInt(direction);
+                var x = update.bind({}, fileId, item, ufi, userId);
+                x();
             }
         }
     }

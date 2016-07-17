@@ -5,7 +5,8 @@ sys.path.append('../')
 from fmp_utils.db_session import Session, session_scope
 from models.file import File
 from models.user import User
-from models.user_file_info import UserFileInfo
+from models.user_file_info import UserFileInfo, DEFAULT_RATING,\
+                                  DEFAULT_SKIP_SCORE, DEFAULT_TRUE_SCORE
 from models.pick_from import PickFrom
 from models.preload import Preload
 from sqlalchemy.sql import not_, and_, text
@@ -17,6 +18,29 @@ from fmp_utils.misc import session_add
 import math
 
 true_score_pool = defaultdict(list)
+
+def insert_missing_user_file_info_for_user_id(user_id):
+    with session_scope() as session:
+        sql = """INSERT INTO user_file_info (file_id, user_id, rating,
+                                             skip_score, true_score)
+                     SELECT f.id, :user_id, :rating, :skip_score, :true_score
+                     FROM files f
+                     WHERE id NOT IN (
+                        SELECT file_id
+                        FROM user_file_info ufi
+                        WHERE user_id = :user_id
+                     )"""
+
+        print ("SQL:", sql)
+        spec = {
+            "user_id": user_id,
+            "rating": DEFAULT_RATING,
+            "skip_score": DEFAULT_SKIP_SCORE,
+            "true_score": DEFAULT_TRUE_SCORE
+        }
+        print ("spec:", spec)
+        session.execute(text(sql), spec)
+        session.commit()
 
 def build_truescore_list(user_id):
     scores = []
@@ -227,6 +251,7 @@ def populate_pick_from(user_id=None, truncate=False):
         spec = {
             "user_id": user_id
         }
+        insert_missing_user_file_info_for_user_id(user_id)
         remove_duplicate_entries(user_id)
         if truncate:
             session.execute(text("""DELETE FROM pick_from
@@ -349,11 +374,16 @@ def insert_random_unplayed_for_user_from_pick_from(user):
         result = session.query(File).from_statement(
             text("""SELECT f.*
                     FROM pick_from pf, files f
-                    LEFT JOIN user_file_info usi ON user_id = :user_id AND
-                                                    usi.file_id = f.id
-                    WHERE usi.file_id IS NULL AND
-                          pf.file_id = f.id AND
-                          pf.user_id = :user_id
+                    LEFT JOIN user_file_info ufi ON user_id = :user_id AND
+                                                    ufi.file_id = f.id
+                    WHERE (ufi.user_id = :user_id AND
+                           pf.file_id = f.id AND
+                           pf.user_id = :user_id AND
+                           ufi.time_played IS NULL)
+                          OR
+                          (ufi.file_id IS NULL AND
+                           pf.file_id = f.id AND
+                           pf.user_id = :user_id)
                     ORDER BY random()
                     LIMIT 1"""))\
             .params(user_id=user_id)\

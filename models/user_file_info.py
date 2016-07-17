@@ -21,14 +21,19 @@ from datetime import date
 from pprint import pprint
 from time import time
 
+DEFAULT_RATING = 6
+DEFAULT_SKIP_SCORE = 5
+DEFAULT_TRUE_SCORE = ((DEFAULT_RATING * 2 * 10) +
+                      (DEFAULT_SKIP_SCORE * 10)) / 2
+
 class UserFileInfo(Base):
     __tablename__ = "user_file_info"
 
     id = Column(Integer, primary_key=True)
 
-    rating = Column(Integer, default=6)
-    skip_score = Column(Integer, default=5)
-    true_score = Column(Float, default=((6 * 2 * 10) + (5 * 10)) / 2)
+    rating = Column(Integer, default=DEFAULT_RATING)
+    skip_score = Column(Integer, default=DEFAULT_SKIP_SCORE)
+    true_score = Column(Float, default=DEFAULT_TRUE_SCORE)
     time_played = Column(BigInteger)
     date_played = Column(Date)
     percent_played = Column(Float)
