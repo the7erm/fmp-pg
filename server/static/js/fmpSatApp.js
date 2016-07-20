@@ -1061,11 +1061,22 @@ fmpApp.controller("PlayerController", function($scope,
         }
     });
 
+    var aboutModal = $modal({
+        scope: $scope,
+        template: '/static/partials/about.tpl.html?_='+Date.now()+".tpl.html",
+        show: false,
+        title:"About",
+        backdrop: false
+    });
+
     // Show when some event occurs (use $promise property to ensure the template has been loaded)
     $scope.showModal = function() {
         myOtherModal.$promise.then(myOtherModal.show);
         SearchService.search();
     };
+    $scope.showAboutModal = function() {
+        aboutModal.$promise.then(aboutModal.show);
+    }
     $scope.doSearch = function(searchTerm) {
         SearchService.collection.searchTerm = searchTerm;
         $scope.showModal();

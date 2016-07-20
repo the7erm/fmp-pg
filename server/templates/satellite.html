@@ -164,9 +164,6 @@
 
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-              <ul class="nav navbar-nav">
-                <li><a href="/#/home">Remote</a></li>
-              </ul>
               <form class="navbar-form navbar-left" role="search">
                 <div class="form-group">
                   <input type="text" class="form-control" placeholder="Search"
@@ -176,6 +173,10 @@
                 <button type="submit" class="btn btn-default"
                         ng-click="showModal();">Submit</button>
               </form>
+              <ul class="nav navbar-nav">
+                <li><a href="/#/home">Remote</a></li>
+                <li><a ng-click="showAboutModal();">About</a></li>
+              </ul>
             </div><!-- /.navbar-collapse -->
           </div><!-- /.container-fluid -->
         </nav>
