@@ -439,7 +439,21 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                 listener_user_ids = collection.FmpListeners.collection.listener_user_ids,
                 secondary_user_ids = collection.FmpListeners.collection.secondary_user_ids,
                 primary_user_id = collection.FmpListeners.collection.primary_user_id,
-                grouped_by_user = {};
+                grouped_by_user = {},
+                file_ids_in_preload = response.data.file_ids_in_preload;
+
+
+            for(var i=0;i<collection.FmpPlaylist.collection.files.length;i++) {
+                var fileData = collection.FmpPlaylist.collection.files[i];
+                if (!fileData.spec.playing &&
+                    file_ids_in_preload.indexOf(fileData.spec.id) == -1) {
+                        logger.log("Removing file that's not cued:",
+                                   fileData);
+                            collection.FmpPlaylist.deleteFile(
+                                fileData);
+                }
+            }
+
             for(var i=0;i<preload.length;i++) {
                 var fileData = preload[i];
                 var idx = FmpUtils.indexOfFile(collection.FmpPlaylist.collection.files,
@@ -450,11 +464,12 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                 logger.log("listener_user_ids:", listener_user_ids);
                 logger.log("secondary_user_ids:", secondary_user_ids);
                 if (fileData.cued) {
+                    var playlistFileData = collection.FmpPlaylist.collection.files[idx];
                     if (idx != -1 &&
-                        !angular.equals(collection.FmpPlaylist.collection.files[idx].spec.cued,
+                        !angular.equals(playlistFileData.spec.cued,
                                         fileData.cued)) {
-                        collection.FmpPlaylist.collection.files[idx].spec.cued = fileData.cued;
-                        collection.FmpPlaylist.collection.files[idx].save();
+                        playlistFileData.spec.cued = fileData.cued;
+                        playlistFileData.save();
                     }
                     var user_id = fileData.cued.user_id;
                     if(typeof grouped_by_user[user_id] == "undefined") {
@@ -474,11 +489,11 @@ fmpApp.factory('FmpSync', function($rootScope, $http, FmpLocalStorage, FmpUtils,
                         secondary_user_ids.indexOf(fileData.cued.user_id) == -1 &&
                         primary_user_id != fileData.cued.user_id) {
                         logger.log("user_id:", user_id, "is not a listener.");
-                        if (idx != -1 && !collection.FmpPlaylist.collection.files[idx].playing) {
+                        if (idx != -1 && !playlistFileData.playing) {
                             logger.log("Removing file for non listener:",
-                                       collection.FmpPlaylist.collection.files[idx]);
-                            collection.FmpPlaylist.collection.deleteFile(
-                                collection.FmpPlaylist.collection.files[idx]);
+                                       playlistFileData);
+                            collection.FmpPlaylist.deleteFile(
+                                playlistFileData);
                         }
                         continue;
                     }

@@ -2008,6 +2008,8 @@ class FmpServer(object):
         print("PRIMARY USER ID:", primary_user_id)
         # print("FILES:", files)
 
+
+
         sql = """SELECT f.*
                  FROM files f,
                       preload p
@@ -2020,6 +2022,12 @@ class FmpServer(object):
         print("sql:", sql)
 
         with session_scope() as session:
+            res = session.query(Preload.file_id)\
+                         .filter(Preload.user_id.in_(user_ids))
+            file_ids_in_preload = []
+            for file_id in res:
+                file_ids_in_preload.append(file_id[0])
+
             ufi_user_ids = user_ids
             if include_admins:
                 ufi_user_ids = merge_admin_user_ids(session, user_ids)
@@ -2127,7 +2135,8 @@ class FmpServer(object):
                     result.append(item)
 
         return {"STATUS": "OK",
-                "preload": result}
+                "preload": result,
+                "file_ids_in_preload": file_ids_in_preload}
 
     @cherrypy.expose
     @cherrypy.tools.json_in()

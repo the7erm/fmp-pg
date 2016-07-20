@@ -29,6 +29,9 @@ def to_int(value):
 
 
 def session_add(session, obj, commit=False, close=False):
+    if obj is None:
+        print("session_add obj is None")
+        return
     added = False
     try_cnt = 0
     while not added:

@@ -589,6 +589,12 @@ var FmpFile = function (spec) {
             (parseInt(ufi.rating) * 2 * 10) +
             (parseInt(ufi.skip_score) * 10)
         ) / 2;
+        if (true_score > 125) {
+            true_score = 125;
+        }
+        if (true_score < -25) {
+            true_score = -25;
+        }
         ufi.true_score = true_score;
     };
 
