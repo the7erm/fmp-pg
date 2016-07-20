@@ -12,11 +12,17 @@
   ng-if="PlayerService.collection.playingId == item.id&&PlayerService.collection.paused"
   ng-click="PlayerService.play()">&nbsp;</a>
 <span ng-if="!item.artists.length || !item.titles.length">
-  <a ng-click="PlayerService.playItem(item)" style="cursor:pointer;"><code>{{item.locations[0].basename}}</code></a>
+  <a class="glyphicon glyphicon-search" ng-click="doSearch(item.locations[0].basename)" title="Search for {{item.locations[0].basename}}"></a>
+  <a ng-click="PlayerService.playItem(item)"><code>{{item.locations[0].basename}}</code></a>
 </span>
 <span ng-if="item.artists.length && item.titles.length">
-  <a ng-click="PlayerService.playItem(item)" style="cursor:pointer;">
-    {{item.artists[0].name}} - {{item.titles[0].name}}
+  <a class="glyphicon glyphicon-search" ng-click="doSearch(item.artists[0].name)" title="Search for {{item.artists[0].name}}"></a>
+  <a ng-click="PlayerService.playItem(item)">
+    {{item.artists[0].name}}
+  </a> -
+  <a class="glyphicon glyphicon-search" ng-click="doSearch(item.titles[0].name)" title="Search for {{item.titles[0].name}}"></a>
+  <a ng-click="PlayerService.playItem(item)">
+    {{item.titles[0].name}}
   </a>
 </span>
 <br clear="all">

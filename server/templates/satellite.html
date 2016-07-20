@@ -70,6 +70,10 @@
         color:green;
       }
 
+      a:hover {
+        cursor: pointer;
+      }
+
       a.glyphicon {
         cursor: pointer;
       }
@@ -98,6 +102,7 @@
 
       body {
         font-size:1.8em;
+        padding-bottom: 100px;
       }
 
       .item {
@@ -139,6 +144,7 @@
         width: 80%;
       }
 
+
     </style>
   </head>
   <body>
@@ -158,6 +164,9 @@
 
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="/#/home">Remote</a></li>
+              </ul>
               <form class="navbar-form navbar-left" role="search">
                 <div class="form-group">
                   <input type="text" class="form-control" placeholder="Search"
@@ -185,11 +194,10 @@
         </div>
 
         <h1>Coming up</h1>
+        <div ng-if="!Preload.collection.preload || Preload.collection.preload == 0">Loading ... </div>
         <div ng-repeat="item in Preload.collection.preload track by item.id" class="item">
           <span ng-include src="'/static/partials/item.tpl.html'"></span>
         </div>
-        currentTime: {{PlayerService.collection.currentTime}}
-        {{PlayerService.collection.media.duration}}
         <nav class="navbar navbar-default navbar-fixed-bottom" style="width:100%;">
             <div id="audio-player"></div>
             <div class="btn-group" role="group" aria-label="Basic example" style="width:100%; text-align:center;">

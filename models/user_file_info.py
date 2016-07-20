@@ -117,13 +117,11 @@ class UserFileInfo(Base):
 
             true_score = (((self.rating * 2 * 10) + (self.skip_score * 10)) / 2)
 
-            """
             if true_score < -20:
                 true_score = -20
 
             if true_score > 125:
                 true_score = 125
-            """
 
             self.true_score = true_score
 

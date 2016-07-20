@@ -989,7 +989,7 @@ class FmpServer(object):
                             user['id'] in user_ids):
                                 print ("resetting playlist")
                                 self.playlist_reset_expire = time() + 60
-                                playlist.reset()
+                                # playlist.reset()
                                 break
 
             return json.dumps(response)

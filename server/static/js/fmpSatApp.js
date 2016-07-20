@@ -172,18 +172,32 @@ fmpApp.factory("Utils", function(){
 });
 
 fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
-                                   FmpIpScanner, Utils){
+                                   FmpIpScanner, Utils, $timeout){
     var collection = {
-            "preload": []
+            "preload": [],
+            "minimum": 5,
+            "promise": false
         },
         methods = {
             "collection": collection
         };
+
+    methods.getNewPreload = function() {
+        if (collection.promise) {
+            $timeout.cancel(collection.promise);
+        }
+        collection.promise = $timeout(methods.clearPreload, 1000, true);
+    };
+    methods.clearPreload = function() {
+        collection.preload = [];
+        methods.getPreload();
+    };
     methods.getPreload = function() {
         if (collection.locked) {
             return;
         }
         collection.locked = true;
+        collection.promise = false;
         var files = [],
             history = methods.PlaylistService.collection.history,
             preload = collection.preload;
@@ -198,17 +212,17 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
         if(!numberOfListeners) {
             numberOfListeners = 1;
         }
-        if (collection.preload && collection.preload.length > numberOfListeners) {
-            console.log("collection.preload.length > "+numberOfListeners);
+        if (collection.preload && collection.preload.length > collection.minimum) {
+            console.log("collection.preload.length > "+collection.minimum);
             collection.locked = false;
             return;
         }
         var prefetchNum = numberOfListeners * 3,
             secondaryPrefetchNum = prefetchNum;
 
-        if (prefetchNum < 5) {
-            prefetchNum = 5;
-            secondaryPrefetchNum = 5;
+        if (prefetchNum < collection.minimum) {
+            prefetchNum = collection.minimum * 2;
+            secondaryPrefetchNum = prefetchNum;
         }
 
         var postData = {
@@ -252,7 +266,7 @@ fmpApp.factory("Preload", function($http, $rootScope, ListenersService,
         });
     };
     $rootScope.$on("server-found", methods.getPreload);
-    $rootScope.$on("listeners-changed", methods.getPreload);
+    $rootScope.$on("listeners-changed", methods.getNewPreload);
     return methods;
 });
 
@@ -635,6 +649,25 @@ fmpApp.factory("PlayerService", function(PlaylistService,
         }
         SearchService.updateLists(item);
     }
+    methods.updateUserFileInfo = function(fileId, item, ufi, userId,
+                                          ufiKey, route) {
+        var params = {
+            "user_id": userId,
+            "file_id": fileId
+        };
+        params[ufiKey] = ufi[ufiKey];
+        $http({
+          "method": 'GET',
+          "url": FmpIpScanner.collection.url+route,
+          "params": params
+        }).then(function(response) {
+            console.log("response.data:", response.data);
+            if (response.data) {
+                ufi['true_score'] = response.data.true_score;
+                methods.updateLists(item);
+            }
+        });
+    };
     methods.rate = function(item, userId, rating) {
         var fileId = item.id;
         console.log("rate:", fileId, userId, rating);
@@ -642,51 +675,21 @@ fmpApp.factory("PlayerService", function(PlaylistService,
             var ufi = item.user_file_info[j];
             if (ufi['user'].id == userId) {
                 ufi['rating'] = rating;
-                var params = {
-                    "user_id": userId,
-                    "file_id": fileId,
-                    "rating": rating
-                }
-                $http({
-                  "method": 'GET',
-                  "url": FmpIpScanner.collection.url+"rate",
-                  "params": params
-                }).then(function(response) {
-                    console.log("response.data:", response.data);
-                    if (response.data) {
-                        ufi['true_score'] = response.data.true_score;
-                        methods.updateLists(item);
-                    }
-                });
+                var x = methods.updateUserFileInfo.bind(
+                    {}, fileId, item, ufi, userId, "rating", "rate");
+                x();
             }
         }
     };
     methods.thumb = function(item, userId, direction) {
-        var fileId = item.id,
-            update = function(fileId, item, ufi, userId) {
-                var params = {
-                    "user_id": userId,
-                    "file_id": fileId,
-                    "skip_score": ufi['skip_score']
-                }
-                $http({
-                  "method": 'GET',
-                  "url": FmpIpScanner.collection.url+"set_score",
-                  "params": params
-                }).then(function(response) {
-                    console.log("response.data:", response.data);
-                    if (response.data) {
-                        ufi['true_score'] = response.data.true_score;
-                        methods.updateLists(item);
-                    }
-                });
-            };
+        var fileId = item.id;
         console.log("thumb:", fileId, userId, direction);
         for (var j=0;j<item.user_file_info.length;j++){
             var ufi = item.user_file_info[j];
             if (ufi['user'].id == userId) {
                 ufi['skip_score'] = parseInt(ufi['skip_score']) + parseInt(direction);
-                var x = update.bind({}, fileId, item, ufi, userId);
+                var x = methods.updateUserFileInfo.bind(
+                    {}, fileId, item, ufi, userId, "skip_score", "set_score");
                 x();
             }
         }
@@ -850,52 +853,69 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             });
     };
     methods.prefetch = function(multiplier) {
-        if (typeof multiplier == "undefined") {
+        var maxPages = 10;
+        if (isNaN(multiplier)) {
             multiplier = 1;
         }
         if (multiplier < 0) {
             return;
         }
-
         if (methods.isLocked("prefetch")) {
             return;
         }
+        var numberOfPages = 7,
+            halfWay = Math.floor(numberOfPages * 0.5),
+            start = collection.start || 0,
+            limit = collection.limit,
+            _multi = multiplier - halfWay,
+            subtract = _multi * limit,
+            thisStart = start + subtract,
+            total = collection.totals[collection.searchTerm],
+            halfWayThroughFirstGroup = (limit * halfWay),
+            lastGroupStartPage = (total - (limit * (numberOfPages)));
+
+        console.log("871 thisStart:", thisStart,
+                    "start:", start,
+                    "collection.start:", collection.start,
+                    "multiplier:", multiplier,
+                    "subtract:", subtract);
+
+        if (lastGroupStartPage < 0) {
+            lastGroupStartPage = total;
+        }
+
+        console.log("total:", total, "lastGroupStartPage:", lastGroupStartPage);
+
         methods.lock("prefetch");
-        if (multiplier > 7) {
+        if (multiplier > numberOfPages) {
             // doPrefetch = function(thisStart, multiplier);
-            if (multiplier >= 10) {
+            if (multiplier >= maxPages) {
                 methods.unlock("prefetch");
                 return;
             }
-            var start = collection.start,
-                limit = collection.limit;
-                thisStart = start - (10 * limit);
+            thisStart = start - (maxPages * limit);
             if (thisStart > 0) {
                 methods.doPrefetch(thisStart, -99);
             }
-            thisStart = start + (10 * limit);
-            if (thisStart < collection.totals[collection.searchTerm]) {
+            thisStart = start + (maxPages * limit);
+            if (thisStart <= total) {
                 methods.doPrefetch(thisStart, -99);
             }
             methods.unlock("prefetch");
             return;
         }
-        var start = collection.start,
-            limit = collection.limit,
-            _multi = multiplier - 3,
-            subtract = _multi * limit,
-            thisStart = start + subtract;
 
-        if (collection.start <= (limit * 3)) {
-            thisStart = collection.start + (collection.limit * multiplier);
+        if (start >= lastGroupStartPage) {
+            // The start is in the last group of pages, or it's halfway
+            // through the first group.
+            subtract = multiplier * limit;
+            thisStart = start - subtract;
+            console.log("LAST GROUP");
         }
-        if (collection.start >= (collection.totals[collection.searchTerm] - (
-            collection.limit * 7))) {
-            start = collection.start,
-            limit = collection.limit,
-            _multi = multiplier - 7,
-            subtract = _multi * limit,
-            thisStart = start + subtract;
+        if (start <= halfWayThroughFirstGroup) {
+            var numToAdd = multiplier * limit;
+            thisStart = start + numToAdd;
+            console.log("FIRST GROUP");
         }
 
         if (thisStart < 0) {
@@ -904,9 +924,10 @@ fmpApp.factory("SearchService", function(ListenersService, $http,
             return;
         }
 
-        if (thisStart < collection.totals[collection.searchTerm]) {
+        if (thisStart <= total) {
             methods.doPrefetch(thisStart, multiplier);
         } else {
+            console.log("thisStart > total", thisStart, ">", total);
             methods.unlock("prefetch");
         }
     }
@@ -1018,6 +1039,9 @@ fmpApp.controller("PlayerController", function($scope,
             "uid": ListenersService.collection.listener_user_ids[0],
             "cued": 0
           }
+        }, function(){
+            // console.log("MADE IT")
+            // console.log(PlaylistService.getFileFromPreload());
         });
     };
 
@@ -1041,6 +1065,11 @@ fmpApp.controller("PlayerController", function($scope,
     $scope.showModal = function() {
         myOtherModal.$promise.then(myOtherModal.show);
         SearchService.search();
+    };
+    $scope.doSearch = function(searchTerm) {
+        SearchService.collection.searchTerm = searchTerm;
+        $scope.showModal();
+        SearchService.timeoutSearch();
     };
 
 });

@@ -18,8 +18,10 @@ from fmp_utils.misc import session_add
 import math
 
 true_score_pool = defaultdict(list)
+MAX_ALLOWED = 115
 
 def insert_missing_user_file_info_for_user_id(user_id):
+    return
     with session_scope() as session:
         sql = """INSERT INTO user_file_info (file_id, user_id, rating,
                                              skip_score, true_score)
@@ -245,6 +247,8 @@ def remove_duplicate_entries(user_id):
             print (sql)
 
 def populate_pick_from(user_id=None, truncate=False):
+    if max_preload_reached(user_id):
+        return
     with session_scope() as session:
         if user_id is None:
             truncate = True
@@ -264,7 +268,7 @@ def populate_pick_from(user_id=None, truncate=False):
                             spec)
             session.commit()
 
-            # Remove the last 100 songs that have been played
+            # Remove the last 200 songs that have been played by that user
             # note, some files don't have an artist.
             session.execute(text("""DELETE FROM pick_from
                                     WHERE file_id IN (
@@ -313,14 +317,16 @@ def populate_pick_from(user_id=None, truncate=False):
 
         if user_id is not None:
             # Remove files rated 0
-            #session.execute(text("""DELETE FROM pick_from
-            #                        WHERE file_id IN (
-            #                             SELECT file_id
-            #                             FROM user_file_info
-            #                             WHERE rating = 0 AND
-            #                                   user_id = :user_id
-            #                        )"""),
-            #                {"user_id": user_id})
+            session.execute(text("""DELETE FROM pick_from
+                                    WHERE file_id IN (
+                                         SELECT file_id
+                                         FROM user_file_info
+                                         WHERE (rating = 0 OR
+                                                true_score < 0)
+                                               AND
+                                               user_id = :user_id
+                                    ) AND user_id = :user_id"""),
+                            {"user_id": user_id})
 
             # Remove files that are already in the preload for that user.
             session.execute(text("""DELETE FROM pick_from
@@ -366,11 +372,26 @@ def populate_pick_from(user_id=None, truncate=False):
 
         session.commit()
 
+def max_preload_reached(user_id):
+    if not user_id:
+        return False
+    with session_scope() as session:
+        total = session.query(Preload)\
+                   .filter(Preload.user_id==user_id)\
+                   .count()
+        return total >= MAX_ALLOWED
+    return False
+
 def insert_random_unplayed_for_user_from_pick_from(user):
     result = None
     with session_scope() as session:
         session_add(session, user)
         user_id = user.id
+
+        if max_preload_reached(user_id):
+            return
+        session_add(session, user)
+
         result = session.query(File).from_statement(
             text("""SELECT f.*
                     FROM pick_from pf, files f
@@ -400,6 +421,9 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
     with session_scope() as session:
         session_add(session, user)
         user_id = user.id
+        if max_preload_reached(user_id):
+            return
+        session_add(session, user)
         user_name = user.name
         sql = """SELECT f.*, ufi.time_played
                  FROM files f,
@@ -412,7 +436,6 @@ def insert_random_for_user_true_score_from_pick_from(user, true_score):
                        ufi.rating > 0 AND
                        pf.user_id = ufi.user_id
                  ORDER BY ufi.time_played NULLS FIRST,
-                          f.time_played NULLS FIRST,
                           random()
                  LIMIT 1"""
 
@@ -501,6 +524,8 @@ def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
             session_add(session, user)
             # Prepare a list that is safe for all our users.
             user_id = user.id
+            if max_preload_reached(user_id):
+                continue
             populate_pick_from(user_id=user_id, truncate=True)
 
         threashold = math.floor(len(users) / 5)
@@ -509,8 +534,13 @@ def populate_preload(users=[], primary_user_id=None, prefetch_num=None,
 
         for user in users:
             session_add(session, user)
+            user_id = user.id
+
+            if max_preload_reached(user_id):
+                continue
+            session_add(session, user)
             if primary_user_id is not None:
-                if user.id == primary_user_id:
+                if user_id == primary_user_id:
                     if prefetch_num is not None:
                         try:
                             threashold = int(prefetch_num)
@@ -533,6 +563,9 @@ def populate_preload_for_user(user, threashold=1):
     with session_scope() as session:
         session_add(session, user)
         user_id = user.id
+        if max_preload_reached(user_id):
+            return
+
         true_score_pool[user_id] = build_truescore_list(user_id)
         session_add(session, user)
         cnt = 0
@@ -540,7 +573,7 @@ def populate_preload_for_user(user, threashold=1):
             threashold = 1
 
         session_add(session, user)
-        for true_score in true_score_pool[user.id]:
+        for true_score in true_score_pool[user_id]:
             if cnt <= threashold:
                 # Run queries up to the threashold.
                 session_add(session, user)
