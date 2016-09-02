@@ -26,6 +26,8 @@ DEFAULT_SKIP_SCORE = 5
 DEFAULT_TRUE_SCORE = ((DEFAULT_RATING * 2 * 10) +
                       (DEFAULT_SKIP_SCORE * 10)) / 2
 
+MAX_TRUE_SCORE = 125
+
 class UserFileInfo(Base):
     __tablename__ = "user_file_info"
 
@@ -120,8 +122,8 @@ class UserFileInfo(Base):
             if true_score < -20:
                 true_score = -20
 
-            if true_score > 125:
-                true_score = 125
+            if true_score > MAX_TRUE_SCORE:
+                true_score = MAX_TRUE_SCORE
 
             self.true_score = true_score
 

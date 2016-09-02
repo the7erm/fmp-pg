@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # player.py -- gstreamer 1.0 player
 #    Copyright (C) 2015 Eugene Miller <theerm@gmail.com>
@@ -18,27 +18,40 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 import gi
 gi.require_version('Gst', '1.0')
+gi.require_version('Gtk', '3.0')
+gi.require_version('GstVideo', '1.0')
+gi.require_version('Wnck', '3.0')
 from gi.repository import GObject, Gst, Gtk, GdkX11, GstVideo, Gdk, Pango,\
                           GLib, Gio, GdkPixbuf, Wnck
 GObject.threads_init()
 Gst.init(None)
 import sys
-import signal
-signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 import mutagen
 import os
 import urllib
+import urllib.parse
 import math
 from random import shuffle
 from pprint import pprint
 from datetime import datetime
 from copy import deepcopy
 from time import sleep, time
-from .constants import SUPPORTED_EXTENSIONS
+try:
+    from .constants import SUPPORTED_EXTENSIONS
+except:
+    from constants import SUPPORTED_EXTENSIONS
 # from utils import utcnow
-from .media_tags import MediaTags
+
+try:
+    from .media_tags import MediaTags
+except:
+    from media_tags import MediaTags
 
 PLAYING = Gst.State.PLAYING
 PAUSED = Gst.State.PAUSED
@@ -55,6 +68,7 @@ logger = None
 debug_threads = False
 
 def wait(*args):
+    print ("WAIT:", args)
     now = "%s " % datetime.now()
     msg = now + " ".join(map(str, args))
 
@@ -66,10 +80,25 @@ def wait(*args):
     threads_leave("\t" + msg)
 
 def threads_enter(*args):
+    """
+    if Gtk.events_pending():
+        while Gtk.events_pending():
+            # print("iterate")
+            Gtk.main_iteration()
+    """
+    # print("THREAD ENTER", args)
     Gdk.threads_enter()
+    # print("ENTERED", args)
+
 
 def threads_leave(*args):
+    # print("THREAD LEAVE", args)
     Gdk.threads_leave()
+    # print("LEFT", args)
+    if Gtk.events_pending():
+        while Gtk.events_pending():
+            # print("iterate")
+            Gtk.main_iteration()
 
 TOP_SPAN = '<span foreground="black" size="large"><b>%s</b></span>'
 PACK_PADDING = 0
@@ -104,6 +133,22 @@ class ActionTracker(Log):
 
 action_tracker = ActionTracker()
 
+class FakeStateKeeper:
+    def __init__(self, *args, **kwargs):
+        self.state = "PAUSED"
+        self.valid_states = ("PAUSED", "PLAYING")
+
+    def load(self):
+        return
+
+    def set_state(self, state):
+        state = state.upper()
+        if state in self.valid_states:
+            self.state = state
+
+    def save(self):
+        return
+
 class Player(GObject.GObject, Log):
     __name__ = 'Player'
     __gsignals__ = {
@@ -125,6 +170,8 @@ class Player(GObject.GObject, Log):
     def __init__(self, uri=None, resume_percent=0, state='PLAYING'):
         # Player.__init__()
         GObject.GObject.__init__(self)
+        self.window_connections_init = False
+        self.state_keeper = FakeStateKeeper()
         self.action_tracker = action_tracker
         self.fullscreen = False
         self.is_video = False
@@ -150,6 +197,7 @@ class Player(GObject.GObject, Log):
         self.init_player(uri=uri)
 
         self.state = state
+        print ("PLAYER INITIALISED", self.uri)
         GObject.timeout_add_seconds(1, self.time_status)
 
     def init_window(self):
@@ -166,7 +214,6 @@ class Player(GObject.GObject, Log):
         self.window.set_title("Video-Player")
 
         self.window.add_events(Gdk.EventMask.KEY_PRESS_MASK |
-                               Gdk.EventMask.BUTTON_PRESS_MASK |
                                Gdk.EventMask.SCROLL_MASK |
                                Gdk.EventMask.SMOOTH_SCROLL_MASK |
                                Gdk.EventMask.POINTER_MOTION_MASK |
@@ -300,9 +347,13 @@ class Player(GObject.GObject, Log):
         self.connect('state-changed', self.on_state_changed)
 
     def init_window_connections(self):
+        if self.window_connections_init:
+            return
+        self.pause_lock = False
+        self.window_connections_init = True
         self.window.connect('key-press-event', self.on_key_press)
         self.window.connect('motion-notify-event', self.show_controls)
-        self.window.connect('button-press-event', self.pause)
+        self.window.connect('button-press-event', self.window_pause)
         self.window.connect("scroll-event", self.on_scroll)
         self.window.connect('destroy', self.quit)
         self.window.connect("check_resize", self.on_check_resize)
@@ -323,10 +374,12 @@ class Player(GObject.GObject, Log):
     def on_state_change(self, player, state):
         # Player.on_state_change()
         # print("on_state_change")
+        threads_leave("show_video_window")
         self.show_video_window()
 
     def show_video_window(self):
         # print("show_video_window")
+        threads_enter("show_video_window")
         if self.playbin.get_property('n-video'):
             self.drawingarea.show()
             self.alt_drawingarea_vbox.hide()
@@ -335,7 +388,7 @@ class Player(GObject.GObject, Log):
             self.drawingarea.hide()
             self.alt_drawingarea_vbox.show()
             self.is_video = False
-
+        threads_leave("show_video_window")
         self.hide_controls()
         return False
 
@@ -382,7 +435,7 @@ class Player(GObject.GObject, Log):
     def time_status(self):
         # print("time_status()")
         # Player.time_status()
-        Gdk.threads_leave()
+        # threads_leave()
         obj = self.get_time_status()
 
         if obj['state'] != self.last_state:
@@ -395,9 +448,9 @@ class Player(GObject.GObject, Log):
 
         self.last_time_status = deepcopy(obj)
 
-        Gdk.threads_enter()
+        threads_enter("set markup")
         self.time_label.set_markup(TOP_SPAN % self.escape(obj['str']))
-        Gdk.threads_leave()
+        threads_leave("set_markup")
         # print "time status obj:", obj
         obj['now'] = time()
         # obj['now_iso'] = obj['now'].isoformat()
@@ -436,10 +489,13 @@ class Player(GObject.GObject, Log):
         if not hasattr(self, 'pixbuf'):
             return
         boxAllocation = self.playing_image_sbox.get_allocation()
+        threads_enter("set_allocation")
         self.playing_image.set_allocation(boxAllocation)
+        threads_leave("set_allocation")
         self.resizeImage(boxAllocation.width, boxAllocation.height)
 
     def resizeImage(self, allocation_width, allocation_height, force=False):
+
         # print("resizeImage()")
         # Player.resizeImage()
         # allocation_height = allocation_height - 40
@@ -461,9 +517,11 @@ class Player(GObject.GObject, Log):
             pixbuf = self.pixbuf.scale_simple(
                 width, height, GdkPixbuf.InterpType.BILINEAR)
 
+            threads_enter("set_playing_image")
             self.playing_image.set_from_pixbuf(pixbuf)
             self.playing_image.set_allocation(
                 self.playing_image_sbox.get_allocation())
+            threads_leave("set_playing_image")
 
         # self.image.connect('expose-event', self.on_image_resize, self.window)
 
@@ -484,7 +542,7 @@ class Player(GObject.GObject, Log):
 
     def on_key_press(self, widget, event):
         # Player.on_key_press()
-        Gdk.threads_leave()
+        threads_leave("on_key_press")
         keyname = Gdk.keyval_name(event.keyval)
         self.show_controls()
         self.log_debug(".on_key_press:%s", keyname)
@@ -532,38 +590,63 @@ class Player(GObject.GObject, Log):
 
     def show_controls(self, *args, **kwargs):
         if self.is_video and self.fullscreen:
+            threads_enter("show_controls")
             self.show_controls_time = time()
             self.bottom_hbox.show()
             self.stack_switcher.show()
             self.top_hbox.show()
+            threads_leave("threads_leave")
             self.emit('show-controls', {})
 
     def hide_controls(self, *args, **kwargs):
         self.log_debug(".hide_controls()")
+        threads_leave("hide_controls")
+        threads_enter("hide_controls")
         if self.is_video and self.fullscreen and self.show_controls_time < (time() - 5):
             self.showing_controls = False
             self.bottom_hbox.hide()
             self.stack_switcher.hide()
             self.top_hbox.hide()
+            threads_leave("hide_controls")
             self.emit('hide-controls', {})
         else:
             self.showing_controls = True
             self.bottom_hbox.show()
             self.stack_switcher.show()
             self.top_hbox.show()
+            threads_leave("hide_controls")
             self.emit('show_controls', {})
+
+    def unlock_pause(self, *args, **kwargs):
+        self.pause_lock = False
+        print("UNLOCK")
+
+    def window_pause(self, window, event):
+        if self.pause_lock:
+            return
+        self.pause_lock = True
+        self.pause()
+        GObject.timeout_add(100, self.unlock_pause)
+
 
     def pause(self, *args, **kwargs):
         # Player.pause()
-        Gdk.threads_leave()
+        # print("**"*100)
+        # print("PAUSE", args)
+        # threads_leave("pause")
         self.state = 'TOGGLE'
+        print ("pause - show_controls()")
         self.show_controls()
+        print ("pause - /show_controls()")
         self.action_tracker.mark()
+        print ("pause - /marked")
         self.state_keeper.set_state(self.state_string)
+        print("set self.state_string")
+
 
     def on_scroll(self, widget, event):
         # Player.on_scroll()
-        Gdk.threads_leave()
+        threads_leave("on_scroll")
         if event.direction == Gdk.ScrollDirection.UP:
             self.position = "+5"
         if event.direction == Gdk.ScrollDirection.DOWN:
@@ -574,23 +657,27 @@ class Player(GObject.GObject, Log):
     @property
     def position(self):
         # Player.position()
-        Gdk.threads_leave()
+        threads_leave("position")
         try:
            res, position = self.pipeline.query_position(time_format)
         except Exception as e:
-            self.log_error(".position ERROR GETTING POSITION:%s", e)
+            self.log_error(".position ERROR GETTING POSITION:%s" % e)
             return self.last_good_position
+
+        position_values = self.pipeline.query_position(time_format)
+        # print("position_values:", position_values)
 
         if res and position:
             self.last_good_position = position
         else:
-            self.log_error(".position FAIL GETTING RES:%s %s", res, position)
+            self.log_error(".position FAIL GETTING RES:%s POSITION:%s" % (
+                res, position))
         return self.last_good_position
 
     @position.setter
     def position(self, position):
         # Player.position()
-        Gdk.threads_leave()
+        threads_leave("position")
         if self.seek_lock:
             return
         self.seek_lock = True
@@ -605,15 +692,15 @@ class Player(GObject.GObject, Log):
             self.seek_lock = False
             return
 
-        Gdk.threads_enter()
+        threads_enter("seek")
         self.playbin.seek_simple(
             Gst.Format.TIME,
             Gst.SeekFlags.FLUSH,
             position
         )
+        threads_leave("seek")
         self.push_status("SEEK:%s" % (self.format_ns(position)))
-        Gdk.threads_leave()
-        print("self.state:", self.state_string)
+        # print("self.state:", self.state_string)
         self.use_state_cache_until = 0
         self.last_good_position = position
         self.seek_lock = False
@@ -693,33 +780,65 @@ class Player(GObject.GObject, Log):
     @property
     def duration(self):
         # Player.duration()
-        Gdk.threads_leave()
+        threads_leave("top duration")
         cnt = 0
         res = False
         duration = 0
         if self.uri in self.duration_cache:
             return self.duration_cache[self.uri]
+
+        print("self.uri", self.uri)
+        print("self.playbin.props.uri:", self.playbin.props.uri)
         try:
-            Gdk.threads_enter()
-            while cnt < 100 and not (res and duration):
+            while cnt < 10 and not (res and duration):
+                threads_enter("duration")
                 res, duration = self.pipeline.query_duration(time_format)
                 sleep(0.1)
                 cnt += 1
-            Gdk.threads_leave()
+                playbin_uri = self.playbin.get_property("uri")
+                print ("URI:", playbin_uri)
+                print ("state:", self.playbin.get_state(0))
+                print ("cnt:", cnt)
+                threads_leave("duration")
         except:
-            Gdk.threads_leave()
             return self.last_good_duration
 
         if res and duration:
             self.duration_cache[self.uri] = duration
             self.last_good_duration = duration
 
+        playbin_uri = self.playbin.get_property("uri")
+        print ("AFTER URI:", playbin_uri)
+        pprint(dir(self.playbin))
+        # properties = self.playbin.get_properties()
+        print("PROPERTIES")
+        pprint(self.playbin.props)
+        pprint(dir(self.playbin.props))
+        print("self.playbin.props.uri:", self.playbin.props.uri)
         return self.last_good_duration
 
     def init_player(self, uri=None):
         # Player.init_player()
         # Create GStreamer pipeline
         self.pipeline = Gst.Pipeline()
+
+        # Create GStreamer elements
+        self.playbin = Gst.ElementFactory.make('playbin', None)
+
+        # Add playbin to the pipeline
+        self.pipeline.add(self.playbin)
+
+        if (not self.pipeline or not self.playbin):
+            print('Not all elements could be created.')
+            sys.exit(-1)
+
+        # Set properties
+        if uri is not None:
+            print ("************* SET URI ")
+            self.uri = uri
+            self.playbin.set_property('uri', self.uri)
+            self.state = PLAYING
+            print("self.uri:", self.uri)
 
         # Create bus to get events from GStreamer pipeline
         self.bus = self.pipeline.get_bus()
@@ -732,28 +851,17 @@ class Player(GObject.GObject, Log):
         self.bus.enable_sync_message_emission()
         self.bus.connect('sync-message::element', self.on_sync_message)
 
-        # Create GStreamer elements
-        self.playbin = Gst.ElementFactory.make('playbin', None)
-
-        # Add playbin to the pipeline
-        self.pipeline.add(self.playbin)
-
-        # Set properties
-        if uri is not None:
-            self.uri = uri
-            self.playbin.set_property('uri', self.uri)
-            self.state = PLAYING
-
         self.connect('artist-title-changed', self.on_artist_title_changed)
         self.connect("state-changed", self.on_state_change)
+        print("/init_player")
 
     def quit(self, *args, **kwargs):
         # Player.quit()
-        Gdk.threads_leave()
-        Gdk.threads_enter()
+        threads_leave("top quit")
+        threads_enter("quit")
         self.pipeline.set_state(STOPPED)
         Gtk.main_quit()
-        Gdk.threads_leave()
+        threads_leave("bottom")
 
     @property
     def uri(self):
@@ -781,6 +889,7 @@ class Player(GObject.GObject, Log):
 
     @uri.setter
     def uri(self, value):
+        threads_leave("uri.setter top")
         # Player.uri()
         if not value:
             return
@@ -789,8 +898,8 @@ class Player(GObject.GObject, Log):
         self.temp_width = 0
         self.temp_height = 0
         self.on_check_resize()
-        Gdk.threads_leave()
         if value is None:
+            print ("uri was None")
             return
         uri = value
         if os.path.exists(value):
@@ -800,16 +909,20 @@ class Player(GObject.GObject, Log):
         else:
             self.filename = ""
 
+        print("self.filename:", self.filename)
         changed = uri != self.uri
         self.uri_path = uri
         if not uri:
+            print ("NO URI")
             return
 
         if changed:
-            Gdk.threads_enter()
-            self.playbin.set_property('uri', self.uri)
-            Gdk.threads_leave()
-            self.push_status("uri:%s" % urllib.parse.unquote(self.uri))
+            threads_enter("set playing uri")
+            self.playbin.props.uri = self.uri
+            print ("set playbin uri:", self.uri)
+            print ("self.playbin.props.uri", self.playbin.props.uri)
+            threads_leave("set playing uri")
+            # self.push_status("uri:%s" % urllib.parse.unquote(self.uri))
             self.artist = ""
             self.title = ""
             self.artist_title = urllib.parse.unquote(os.path.basename(self.uri))
@@ -820,12 +933,12 @@ class Player(GObject.GObject, Log):
     @property
     def state(self):
         # Player.state()
-        Gdk.threads_leave()
+        threads_leave("state getter top")
         self.pipeline_ready()
         if self.use_state_cache_until < time() or not self.state_cache:
-            Gdk.threads_enter()
+            threads_enter("state middle")
             self.state_cache = self.playbin.get_state(0)
-            Gdk.threads_leave()
+            threads_leave("state getter middle")
         else:
             log_debug(" USING STATE CACHE self.state_cache %s",
                       self.state_cache[1])
@@ -834,40 +947,46 @@ class Player(GObject.GObject, Log):
     @state.setter
     def state(self, value=None):
         # Player.state()
-        Gdk.threads_leave()
+        threads_leave("state setter top")
         self.pipeline_ready()
-        self.log_info(' SET STATE:%s', value)
+        self.log_info('SET STATE:%s', value)
         if value not in (PLAYING, PAUSED, STOPPED):
             self.state_string = value
             return
 
         old_state = self.state
-        Gdk.threads_enter()
+        print("old_state:", old_state)
+        # threads_enter("state setter middle")
         self.pipeline.set_state(value)
-        Gdk.threads_leave()
+        self.playbin.set_state(value)
+        print ("set pipeline state", value)
+        # threads_leave("state setter middle")
         self_state = self.state
+        print ("AFTER self.state:", self_state)
         if old_state != self_state or value != self_state:
+            print("changing self.last_state")
             self.last_state = value
+            print("emitting state-changed")
             self.emit('state-changed', value)
         self.log_info(' /SET STATE:%s', value)
 
     def on_state_changed(self, player, value):
         # Player.on_state_changed()
-        Gdk.threads_leave()
+        # threads_leave("on_state_changed top")
         state = self.state
-        Gdk.threads_enter()
+        # threads_enter("on_state_changed middle")
         if state in(PAUSED, STOPPED, READY):
             # logger.debug("SET IMAGE: PLAY")
             self.pause_btn.set_image(self.play_img)
         elif state == PLAYING:
             self.pause_btn.set_image(self.pause_img)
 
-        Gdk.threads_leave()
-        self.push_status("state-changed:%s" % self.state_to_string(value))
+        # threads_leave("on_state_changed middle")
+        # self.push_status("state-changed:%s" % self.state_to_string(value))
 
     def pipeline_ready(self):
         # Player.pipeline_ready()
-        Gdk.threads_leave()
+        threads_leave("pipeline ready top")
         if not self.pipeline:
             raise PlayerError('Player.player is %r\nInfo:%s' % (
                 self.pipeline, sys.exc_info()[0]))
@@ -892,7 +1011,7 @@ class Player(GObject.GObject, Log):
     @state_string.setter
     def state_string(self, value=''):
         # Player.state_string()
-        Gdk.threads_leave()
+        threads_leave("state string top")
         if not value:
             raise ValueError('Invalid state_string %r' % value)
         value_upper = str(value).upper()
@@ -905,12 +1024,15 @@ class Player(GObject.GObject, Log):
 
         if value_upper in ('TOGGLE',):
             state = self.state
+            print("STATE:", state)
             if state == PLAYING:
                 self.state = PAUSED
                 return
             if state in (STOPPED, PAUSED, READY):
                 self.state = PLAYING
                 return
+            print ("TOGGLE FALIED", state)
+
             return
 
         if value_upper in ('PLAYING', 'PLAY', 'START'):
@@ -930,16 +1052,16 @@ class Player(GObject.GObject, Log):
 
     def on_sync_message(self, bus, msg):
         # Player.on_sync_message()
-        Gdk.threads_leave()
+        threads_leave("on_sync_message top")
         if msg.get_structure().get_name() == 'prepare-window-handle':
 
-            Gdk.threads_enter()
+            threads_enter("on_sync_message_middle")
             msg.src.set_window_handle(self.xid)
-            Gdk.threads_leave()
+            threads_leave("on_sync_message_middle")
 
     def on_eos(self, bus, msg):
         # Player.on_eos()
-        Gdk.threads_leave()
+        threads_leave("on_eos")
 
     def print_tag(self, tag_list, tag_name):
         # Player.print_tag()
@@ -998,9 +1120,9 @@ class Player(GObject.GObject, Log):
 
     def on_error(self, bus, msg):
         # Player.on_error()
-        Gdk.threads_leave()
+        threads_leave("on error")
         error = msg.parse_error()
-        # print 'Player.on_error():', error[0]
+        print ('Player.on_error():', error[0])
 
 
 class Playlist(Log):
@@ -1031,7 +1153,7 @@ class Playlist(Log):
         return
 
     def on_key_press(self, widget, event):
-        Gdk.threads_leave()
+        threads_leave("on_keypress")
         keyname = Gdk.keyval_name(event.keyval)
         self.log_debug(".on_key_press keyname:%s", keyname)
 
@@ -1106,6 +1228,7 @@ class Playlist(Log):
                 self.player.show_video_window()
                 msg = "No Uri"
                 self.player.push_status(msg)
+                print ("NO URI")
             else:
                 self.set_error_message(error)
             return
@@ -1182,19 +1305,25 @@ class TrayIcon(Log):
         self.ind.set_tooltip_text(artist_title)
 
     def on_state_change(self, player, state):
+        print("tray on_state_change")
         self.log_debug('.on_state_change: player:%s  state:%s', player, state)
         if state != PLAYING:
             play_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PLAY,
-                                                 Gtk.IconSize.BUTTON)
+                                                Gtk.IconSize.BUTTON)
+            threads_enter()
             self.play_pause_item.set_label('Play')
             self.play_pause_item.set_image(play_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+            threads_leave()
         else:
-            self.play_pause_item.set_label('Pause')
             pause_img = Gtk.Image.new_from_stock(Gtk.STOCK_MEDIA_PAUSE,
                                                  Gtk.IconSize.BUTTON)
+            threads_enter()
+            self.play_pause_item.set_label('Pause')
             self.play_pause_item.set_image(pause_img)
             self.ind.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
+            threads_leave()
+
         self.log_debug('/.on_state_change')
 
     def on_button_press(self, icon, event, **kwargs):

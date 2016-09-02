@@ -16,7 +16,7 @@ import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject
 
-GObject.threads_init()
+# GObject.threads_init()
 
 
 class WnckTracker:
@@ -45,14 +45,14 @@ class WnckTracker:
             self.window.connect("workspace-changed", self.on_state_change)
 
     def on_geometry_changed(self, *args, **kwargs):
-        # print("on_geometry_changed:", args, kwargs)
+        print("on_geometry_changed:", args, kwargs)
         if self.timeout:
             GObject.source_remove(self.timeout)
             self.timeout = False
         self.timeout = GObject.timeout_add_seconds(1, self.write_once)
 
     def on_state_change(self, *args, **kwargs):
-        # print ("on_state_change")
+        print ("on_state_change")
         if self.timeout:
             GObject.source_remove(self.timeout)
             self.timeout = False
@@ -119,7 +119,7 @@ class WnckTracker:
                 data = json.loads(fp.read())
                 self.check_window()
                 print ("RESTORE:", data)
-                pprint(dir(Wnck.WindowMoveResizeMask))
+                # pprint(dir(Wnck.WindowMoveResizeMask))
 
                 self.window.set_geometry(Wnck.WindowGravity.STATIC,
                                          Wnck.WindowMoveResizeMask.X |
@@ -435,10 +435,17 @@ class FmpPlaylist(Playlist):
             self.files[self.index].deinc_score()
         except IndexError:
             return
-        super(FmpPlaylist, self).next(*args, **kwargs)
+        # Segment faults occur if we don't call it like this
+        GObject.idle_add( super(FmpPlaylist, self).next)
+
+    def prev(self, *args, **kwargs):
+        GObject.idle_add( super(FmpPlaylist, self).prev)
 
     def pause(self, *args, **kwargs):
-        self.player.pause()
+        # self.player.pause()
+        # Segment faults occur if we call self.player.pause
+        # Directly.
+        GObject.idle_add(self.player.pause)
         self.server.broadcast({"time-status": self.player.get_time_status()})
 
     @property

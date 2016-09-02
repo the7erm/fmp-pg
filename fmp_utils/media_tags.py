@@ -1,6 +1,9 @@
 
+try:
+    from .constants import AUDIO_EXT, AUDIO_EXT_WITH_TAGS, VIDEO_EXT, VALID_EXT
+except:
+    from constants import AUDIO_EXT, AUDIO_EXT_WITH_TAGS, VIDEO_EXT, VALID_EXT
 
-from .constants import AUDIO_EXT, AUDIO_EXT_WITH_TAGS, VIDEO_EXT, VALID_EXT
 import os
 import re
 import mutagen

@@ -80,6 +80,8 @@ class File(Base):
     user_file_info = relationship("UserFileInfo", backref="file",
                                   order_by="UserFileInfo.user_id")
 
+    last_mark_as_played_time = time()
+
     locations = relationship(
         "Location",
          order_by="Location.dirname,Location.basename", backref="file")
@@ -121,10 +123,15 @@ class File(Base):
             session_add(session, self)
             print("File.mark_as_played()")
             percent_played = kwargs.get('percent_played', 0)
+            if self.last_mark_as_played_time < time() - 5:
+                kwargs['force'] = True
+                self.last_mark_as_played_time = time()
+
             if self.percent_played and not kwargs.get("force", False) and\
                int(self.percent_played) == int(percent_played):
                 print("not marking as played", int(self.percent_played) == int(percent_played))
                 return
+            self.last_mark_as_played_time = time()
             self.time_played = int(kwargs.get('now', time()))
             self.percent_played = percent_played
             do_commit(self)

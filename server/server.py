@@ -219,7 +219,7 @@ class ConverterPlugin(cherrypy.process.plugins.SimplePlugin):
         self.bus.log('Stop Called')
         converter.die = True
         self.bus.log("CONVERTER THREAD:%s" % converter.thread)
-        pprint(dir(converter.thread))
+        # pprint(dir(converter.thread))
 
 
 ConverterPlugin(cherrypy.engine).subscribe()

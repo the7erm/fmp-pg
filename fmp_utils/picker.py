@@ -18,7 +18,7 @@ from fmp_utils.misc import session_add
 import math
 
 true_score_pool = defaultdict(list)
-MAX_ALLOWED = 115
+MAX_ALLOWED = 125
 
 def insert_missing_user_file_info_for_user_id(user_id):
     return
@@ -51,7 +51,8 @@ def build_truescore_list(user_id):
         true_scores = session.query(UserFileInfo.true_score)\
                              .filter(and_(
                                     UserFileInfo.user_id==user_id,
-                                    UserFileInfo.true_score >= 0
+                                    UserFileInfo.true_score >= 0,
+                                    UserFileInfo.rating > 0
                                   ))\
                              .distinct()\
                              .all()
@@ -249,6 +250,12 @@ def remove_duplicate_entries(user_id):
 def populate_pick_from(user_id=None, truncate=False):
     if max_preload_reached(user_id):
         return
+    blacklist = [
+        '%.minecraft/%',
+        '%/assets/%',
+        '%/resources/%'
+    ]
+
     with session_scope() as session:
         if user_id is None:
             truncate = True
@@ -267,6 +274,15 @@ def populate_pick_from(user_id=None, truncate=False):
                                     FROM files"""),
                             spec)
             session.commit()
+
+            for bl in blacklist:
+                session.execute(text("""DELETE FROM pick_from
+                                        WHERE file_id IN (
+                                            SELECT DISTINCT file_id
+                                            FROM locations
+                                            WHERE dirname LIKE '%s'
+                                        )""" % bl))
+                session.commit()
 
             # Remove the last 200 songs that have been played by that user
             # note, some files don't have an artist.
@@ -321,12 +337,12 @@ def populate_pick_from(user_id=None, truncate=False):
                                     WHERE file_id IN (
                                          SELECT file_id
                                          FROM user_file_info
-                                         WHERE (rating = 0 OR
+                                         WHERE (rating <= 0 OR
                                                 true_score < 0)
                                                AND
                                                user_id = :user_id
                                     ) AND user_id = :user_id"""),
-                            {"user_id": user_id})
+                            spec)
 
             # Remove files that are already in the preload for that user.
             session.execute(text("""DELETE FROM pick_from
