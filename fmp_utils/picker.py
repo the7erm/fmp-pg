@@ -5,8 +5,10 @@ sys.path.append('../')
 from fmp_utils.db_session import Session, session_scope
 from models.file import File
 from models.user import User
+from models.genre import Genre
 from models.user_file_info import UserFileInfo, DEFAULT_RATING,\
                                   DEFAULT_SKIP_SCORE, DEFAULT_TRUE_SCORE
+from models.user_file_history import UserFileHistory
 from models.pick_from import PickFrom
 from models.preload import Preload
 from sqlalchemy.sql import not_, and_, text
@@ -16,6 +18,7 @@ from pprint import pprint
 from fmp_utils.jobs import jobs
 from fmp_utils.misc import session_add
 import math
+import os
 
 true_score_pool = defaultdict(list)
 MAX_ALLOWED = 125
@@ -43,6 +46,34 @@ def insert_missing_user_file_info_for_user_id(user_id):
         print ("spec:", spec)
         session.execute(text(sql), spec)
         session.commit()
+
+def insert_no_genre():
+    """This forces every file to have a genre."""
+    print("INSERT NO GENRE")
+    with session_scope() as session:
+        no_genre = session.query(Genre)\
+                          .filter(Genre.name=='No Genre')\
+                          .first()
+        if not no_genre:
+            no_genre = Genre()
+            no_genre.name = "No Genre"
+            no_genre.enabled = True
+
+        session.add(no_genre)
+        session.commit()
+        sql = """INSERT INTO genre_association (file_id, genre_id)
+                 SELECT f.id, :no_genre_id
+                 FROM files f
+                 LEFT JOIN genre_association ga ON ga.file_id = f.id
+                 WHERE ga.file_id IS NULL"""
+
+        spec = {
+            "no_genre_id": no_genre.id,
+        }
+        session.execute(text(sql), spec)
+        session.commit()
+    print("DONE INSERT NO GENRE")
+
 
 def build_truescore_list(user_id):
     scores = []
@@ -255,6 +286,8 @@ def populate_pick_from(user_id=None, truncate=False):
         '%/assets/%',
         '%/resources/%'
     ]
+
+    insert_no_genre()
 
     with session_scope() as session:
         if user_id is None:
@@ -608,3 +641,33 @@ def populate_preload_for_user(user, threashold=1):
                     true_score)
 
             cnt += 1
+
+
+if True == False:
+    with session_scope() as session:
+        sql = """SELECT ufi.*
+                 FROM user_file_info ufi
+                 WHERE ufi.user_id = 1 AND
+                       ufi.true_score >= 100
+                 ORDER BY random()"""
+
+        results = session.query(UserFileInfo)\
+                         .from_statement(text(sql))\
+                         .all()
+
+        already_added = []
+        size = 0
+        for r in results:
+            session_add(session, r)
+            if r.id in already_added:
+                continue
+            file_id = r.file_id
+            filename = r.file.filename
+            if os.path.exists(filename):
+                session_add(session, r)
+                already_added.append(r.id)
+                size += os.path.getsize(filename)
+                print ("r.file:", filename)
+                insert_into_preload(1, file_id, reason="Favorite", from_search=True)
+
+        print ("size:", size)

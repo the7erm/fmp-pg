@@ -309,6 +309,23 @@ class File(Base):
                 for obj in getattr(self, k):
                     json[k].append(obj.json())
 
+            session_add(session, self)
+            genre_cnt = 0
+            has_no_genre = False
+            genres_without_no_genre = []
+            for genre in self.genres:
+                genre_cnt += 1
+                session_add(session, genre)
+                if genre.name == "No Genre":
+                    has_no_genre = True
+                else:
+                    genres_without_no_genre.append(genre)
+
+            if has_no_genre and genre_cnt > 1:
+                self.genres = genres_without_no_genre
+                session_add(session, self)
+                session.commit()
+
             json['user_file_info'] = []
             for user in users:
                 session_add(session, self)

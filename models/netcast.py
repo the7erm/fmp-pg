@@ -12,8 +12,9 @@ except SystemError:
 import feedparser
 import re
 from fmp_utils.constants import CACHE_DIR
-from fmp_utils.db_session import  create_all, Session
+from fmp_utils.db_session import  create_all, Session, session_scope
 from fmp_utils.jobs import jobs
+from fmp_utils.misc import session_add
 from sqlalchemy import Table, Column, Integer, String, Boolean, BigInteger,\
                        Float, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
@@ -21,6 +22,9 @@ from sqlalchemy.sql import not_, and_, text
 from pprint import pprint
 from time import mktime, time
 from .user import User
+
+TTL = 60 * 60 * 3 # Wait at least 3 hours before updating.
+ERROR_TTL = 30 * 60 # Wait 30 minutes before trying to update on an error
 
 class Rss(Base):
     __tablename__ = "rss"
@@ -46,10 +50,15 @@ class Rss(Base):
     timestamp = Column(BigInteger, onupdate=time)
 
     def update(self):
+        if self.expires and time() < self.expires:
+            print ("Not updating because feed has not expired")
+            return
+        print("self.expires:", self.expires)
         feed = feedparser.parse(self.url)
+
         if feed.bozo:
             # Expire in 30 minutes
-            self.expires = time() + (30 * 60)
+            self.expires = time() + ERROR_TTL
             return
         self.author = feed.feed.author
         self.generator = feed.feed.generator
@@ -67,27 +76,28 @@ class Rss(Base):
         self.title = feed.feed.title
         self.updated = mktime(feed.feed.updated_parsed)
 
+        with session_scope() as session:
+            session_add(session, self)
+            session.commit()
+            for item in feed.entries:
+                session_add(session, self)
+                found_entry = None
+                for entry in self.entries:
+                    if entry.link_id == item.id:
+                        found_entry = entry
+                        break
 
-        session.add(self)
-        session.commit()
+                if not found_entry:
+                    entry = Entry()
+                    self.entries.append(entry)
+                else:
+                    entry = found_entry
 
-        for item in feed.entries:
-            found_entry = None
-            for entry in self.entries:
-                if entry.link_id == item.id:
-                    found_entry = entry
-                    break
+                entry.sync(item)
 
-            if not found_entry:
-                entry = Entry()
-                self.entries.append(entry)
-            else:
-                entry = found_entry
-
-            entry.sync(item)
-
-        session.add(self)
-        session.commit()
+            self.expires = time() + TTL
+            session_add(session, self)
+            session.commit()
 
 class Entry(Base):
     __tablename__ = "entries"
@@ -110,50 +120,54 @@ class Entry(Base):
     timestamp = Column(BigInteger, onupdate=time)
 
     def sync(self, item):
-        self.author = item.author
-        self.comments = item.comments
-        self.guidislink = item.guidislink
-        self.link = item.link
-        self.link_id = item.id
-        self.published = mktime(item.published_parsed)
-        self.slash_comments = item.slash_comments
-        # self.subtitle = item.subtitle
-        self.summary = item.summary
-        self.title = item.title
-        self.wfw_commentrss = item.wfw_commentrss
+        with session_scope() as session:
+            session_add(session, self)
+            self.author = item.author
+            self.comments = item.comments
+            self.guidislink = item.guidislink
+            self.link = item.link
+            self.link_id = item.id
+            self.published = mktime(item.published_parsed)
+            self.slash_comments = item.slash_comments
+            # self.subtitle = item.subtitle
+            self.summary = item.summary
+            self.title = item.title
+            self.wfw_commentrss = item.wfw_commentrss
 
-        for content_item in item.content:
-            found_content = None
-            for content in self.contents:
-                if content.value == content_item.value:
-                    found_content = content
-                    break
 
-            if not found_content:
-                content = Content()
-                self.contents.append(content)
-            else:
-                content = found_content
+            for content_item in item.content:
+                session_add(session, self)
+                found_content = None
+                for content in self.contents:
+                    if content.value == content_item.value:
+                        found_content = content
+                        break
 
-            content.sync(content_item)
+                if not found_content:
+                    content = Content()
+                    self.contents.append(content)
+                else:
+                    content = found_content
 
-        for enclosure_item in item.enclosures:
-            found = None
-            for enclosure in self.enclosures:
-                if enclosure.href == enclosure_item.href:
-                    found = enclosure
-                    break
+                content.sync(content_item)
 
-            if not found:
-                enclosure = Enclosure()
-                self.enclosures.append(enclosure)
-            else:
-                enclosure = found
+            for enclosure_item in item.enclosures:
+                session_add(session, self)
+                found = None
+                for enclosure in self.enclosures:
+                    if enclosure.href == enclosure_item.href:
+                        found = enclosure
+                        break
 
-            enclosure.sync(enclosure_item)
+                if not found:
+                    enclosure = Enclosure()
+                    self.enclosures.append(enclosure)
+                else:
+                    enclosure = found
 
-        session.add(self)
-        session.commit()
+                enclosure.sync(enclosure_item)
+
+            session.commit()
 
 
 class Content(Base):
@@ -170,8 +184,9 @@ class Content(Base):
         self.base = item.base
         self.typ = item.type
         self.value = item.value
-        session.add(self)
-        session.commit()
+        with session_scope() as session:
+            session_add(session, self)
+            session.commit()
 
 
 class Enclosure(Base):
@@ -185,33 +200,32 @@ class Enclosure(Base):
     timestamp = Column(BigInteger, onupdate=time)
 
     def sync(self, item):
+        print("item.href:", item.href)
         self.href = item.href
         self.typ = item.type
         self.length = item.length
-        session.add(self)
-        session.commit()
+        with session_scope() as session:
+            session_add(session, self)
+            session.commit()
 
     @property
     def cache_filename(self):
         return os.path.join(CACHE_DIR,
-                            re.sub("\W+", "-",
-                                   os.path.basename(href)))
+                            re.sub("\W+", "-", os.path.basename(self.href)))
 
     @property
     def filename(self):
         cache_filename = self.cache_filename
-        if os.path.exist(cache_filename):
+        if os.path.exists(cache_filename):
             return cache_filename
         return self.href
 
 if __name__ == "__main__":
     create_all(Base)
     url = "http://music.the-erm.com/feed/"
-    rss = (
-            session.query(Rss)\
-                   .filter(Rss.url==url)
-                   .first()
-          )
+    rss = session.query(Rss)\
+                 .filter(Rss.url==url)\
+                 .first()
 
     if not rss:
         rss = Rss()

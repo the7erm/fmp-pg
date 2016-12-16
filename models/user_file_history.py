@@ -32,6 +32,7 @@ class UserFileHistory(Base):
     voted_to_skip = Column(Boolean)
     user_id = Column(Integer, ForeignKey('users.id'))
     file_id = Column(Integer, ForeignKey('files.id'))
+    enclosure_id = Column(Integer, ForeignKey('enclosures.id'))
     user_file_id = Column(Integer, ForeignKey('user_file_info.id'))
     timestamp = Column(BigInteger, onupdate=time)
 
