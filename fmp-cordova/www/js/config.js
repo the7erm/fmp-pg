@@ -1,4 +1,6 @@
-fmpApp.config(['$routeProvider', '$locationProvider', function($routeProvider, $locationProvider){
+fmpApp.config(['$routeProvider', '$locationProvider', 'growlProvider', function($routeProvider, $locationProvider, growlProvider){
+    growlProvider.globalTimeToLive(5000);
+    growlProvider.globalPosition('bottom-left');
     $routeProvider
     .when('/playlist', {
         templateUrl: 'partials/playlist.html',

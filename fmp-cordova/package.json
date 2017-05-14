@@ -1,0 +1,17 @@
+{
+  "name": "fmp-cordova",
+  "version": "1.0.0",
+  "description": "fmp cordova app",
+  "main": "index.js",
+  "dependencies": {
+    "angular": "^1.4.8",
+    "harmony-proxy": "^1.0.1",
+    "harmony-reflect": "^1.4.6"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Erm <theerm@gmail.com>",
+  "license": "GPL-2.0"
+}

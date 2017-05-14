@@ -9,8 +9,11 @@ try:
 except SystemError:
     from base import Base, to_json
 
+import requests
 import feedparser
 import re
+import os
+import shutil
 from fmp_utils.constants import CACHE_DIR
 from fmp_utils.db_session import  create_all, Session, session_scope
 from fmp_utils.jobs import jobs
@@ -60,11 +63,49 @@ class Rss(Base):
             # Expire in 30 minutes
             self.expires = time() + ERROR_TTL
             return
+        attrs = [
+            ('author', 'author'),
+            ('generator', 'generator'),
+            ('itunes_block', 'itunes_block'),
+            ('itunes_explicit', 'itunes_explicit'),
+            ('image', 'image.href'),
+            ('language', 'language'),
+            ('link', 'link'),
+            ('publisher', 'publisher'),
+            ('rights', 'rights'),
+            ('subtitle', 'subtitle'),
+            ('sy_updatefrequency', 'sy_updatefrequency'),
+            ('sy_updateperiod', 'sy_updateperiod'),
+            ('title', 'title')
+        ]
+
+        for local_attr, feed_attr in attrs:
+            obj = feed.feed
+            feed_attr_parts = feed_attr.split('.')
+            attrs_length = len(feed_attr_parts)
+            for i, attr in enumerate(feed_attr_parts):
+                if hasattr(obj, attr):
+                    obj = getattr(obj, attr)
+                    if (i+1) == attrs_length:
+                        print("set:", local_attr,":", obj)
+                        setattr(self, local_attr, obj)
+                    break
+                else:
+                    print ('obj has no attr:', attr)
+                    break
+
+
+        """
         self.author = feed.feed.author
         self.generator = feed.feed.generator
+
         self.image = feed.feed.image.href
-        self.itunes_block = feed.feed.itunes_block
-        self.itunes_explicit = feed.feed.itunes_explicit
+        if hasattr(feed.feed, 'itunes_block'):
+            self.itunes_block = feed.feed.itunes_block
+
+        if hasattr(feed.feed, 'itunes_explicit'):
+            self.itunes_explicit = feed.feed.itunes_explicit
+
         self.language = feed.feed.language
         self.link = feed.feed.link
         self.publisher = feed.feed.publisher
@@ -74,6 +115,7 @@ class Rss(Base):
         self.sy_updatefrequency = feed.feed.sy_updatefrequency
         self.sy_updateperiod = feed.feed.sy_updateperiod
         self.title = feed.feed.title
+        """
         self.updated = mktime(feed.feed.updated_parsed)
 
         with session_scope() as session:
@@ -211,7 +253,7 @@ class Enclosure(Base):
     @property
     def cache_filename(self):
         return os.path.join(CACHE_DIR,
-                            re.sub("\W+", "-", os.path.basename(self.href)))
+                            re.sub("\W+", "-", self.href))
 
     @property
     def filename(self):
@@ -219,6 +261,35 @@ class Enclosure(Base):
         if os.path.exists(cache_filename):
             return cache_filename
         return self.href
+
+    def download(self):
+        if os.path.exists(self.cache_filename):
+            print("exists:", self.cache_filename)
+            return
+        tmp_filename = "%s.tmp" % self.cache_filename
+        r = requests.get(self.href, stream=True)
+        total_length = r.headers.get('content-length')
+
+        with open(tmp_filename, 'wb') as f:
+            if total_length is None: # no content length header
+                print("Downloading:", self.filename)
+                print("Progress unknown no content-length header")
+                f.write(r.content)
+            else:
+                dl = 0
+                total_length = int(total_length)
+                print("Downloading:", self.filename)
+                for chunk in r.iter_content(chunk_size=10240):
+                    if chunk: # filter out keep-alive new chunks
+                        dl += len(chunk)
+                        f.write(chunk)
+                        done = int(50 * dl / total_length)
+                        sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )
+                        sys.stdout.flush()
+            shutil.move(tmp_filename, self.cache_filename)
+
+
+
 
 if __name__ == "__main__":
     create_all(Base)

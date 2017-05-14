@@ -107,6 +107,11 @@ fmpApp.controller("MainController", function($scope, $location, FmpListeners,
         $scope.scrollToElement("#file-"+window.player.file.id);
     }
 
+    $scope.page = 'player';
+    $scope.setPage = function(page) {
+        $scope.page = page;
+    }
+
     FmpIpScanner.startScan();
     logger.log("initialized");
 });

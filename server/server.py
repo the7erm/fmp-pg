@@ -830,6 +830,22 @@ class FmpServer(object):
             data = fp.read()
         return data % template_data
 
+    @cherrypy.expose
+    def react_index(self):
+
+        template_data = {
+            'host': cherrypy.request.headers['Host'],
+            'scheme': 'ws',
+            'playlist_data': []
+        }
+        static_path = sys.path[0]
+        index_path = os.path.join(static_path, "server", "templates",
+                                  "react-index.html")
+        data = "Error"
+        with open(index_path, 'r') as fp:
+            data = fp.read()
+        return data % template_data
+
 
     @cherrypy.expose
     def satellite(self):

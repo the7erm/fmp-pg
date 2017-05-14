@@ -84,7 +84,8 @@ class File(Base):
 
     locations = relationship(
         "Location",
-         order_by="Location.dirname,Location.basename", backref="file")
+         order_by="Location.dirname,Location.basename",
+         backref="file")
 
     @property
     def filename(self):

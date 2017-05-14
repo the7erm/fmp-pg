@@ -112,3 +112,20 @@ input[type=radio] {
   width:75%;
   padding-left:5px;
 }
+
+#main-content {
+  padding-top:30px;
+}
+
+
+.scroll{
+  width:100%;
+  height:21px;
+  overflow:hidden;
+  position:relative;
+}
+
+.scrollingtext{
+  white-space:nowrap;
+  position:absolute;
+}

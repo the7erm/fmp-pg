@@ -1,4 +1,4 @@
-fmpApp.factory("FmpIpScanner", function($http, $rootScope){
+fmpApp.factory("FmpIpScanner", function($http, $rootScope, growl){
   var logger = new Logger("FmpIpScanner", true);
   logger.log("Connection:", navigator.connection);
   var collection = {
@@ -32,6 +32,8 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         logger.log("adding known host:", host);
       }
     }
+    collection.scanHosts.push("http://192.168.1.116:5050/");
+    collection.scanHosts.push("http://192.168.1.117:5050/");
     for(var i=1;i<255;i++) {
       var host = 'http://192.168.1.'+i+':5050/';
       if (collection.scanHosts.indexOf(host) == -1) {
@@ -45,6 +47,11 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
         return;
     }
     if (collection.found || collection.scanHosts.length == 0) {
+      if (!collection.found && collection.scanHosts.length == 0) {
+        growl.warning("Couldn't connect to fmp server", {
+            ttl: 5000
+        });
+      }
       return;
     }
     if (navigator.connection.type != Connection.WIFI) {
@@ -61,7 +68,7 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
       $http({
           method: 'GET',
           url: host+"fmp_version",
-          timeout: 100
+          timeout: 200
       }).then(function(response) {
         if (response.data.fmp) {
           collection.found = true;
@@ -76,8 +83,12 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
           logger.log("found fmp server at host:", host);
           logger.log("Running time:", scanEnd.valueOf() -
                                        collection.scanStart.valueOf());
+
           $rootScope.$broadcast("server-found");
           collection.scanLock = false;
+          growl.info("Connected to server "+host, {
+            ttl: 5000
+          });
         }
       }, function errorCallback(response) {
         try {
@@ -96,10 +107,13 @@ fmpApp.factory("FmpIpScanner", function($http, $rootScope){
 
   methods.startScan = function(FmpConfig) {
     logger.log("startScan()");
+    growl.info("Searching for server", {
+      ttl: 2000
+    });
     collection.found = false;
     methods.generateHosts();
     collection.scanStart = new Date();
-    for (var i=1;i<=5;i++) {
+    for (var i=1;i<=2;i++) {
       try {
         logger.log("started thread:",i);
         methods.scan(i, FmpConfig);
