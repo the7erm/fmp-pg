@@ -129,6 +129,10 @@
                         ng-if="downloader.downloading&&downloader.downloading.progress<100"></div>
                     <div style="height:3px !important; background:green; width:100%"
                         ng-if="!downloader.downloading||downloader.downloading.progress>=100"></div>
+                    <div style="height:3px !important; background:red; width:{{downloader.totalPercent}}%"
+                        ng-if="downloader.downloading&&downloader.totalPercent<100"></div>
+                    <div style="height:3px !important; background:green; width:100%"
+                        ng-if="downloader.totalPercent>=100"></div>
                 </div>
             </form>
         </nav>

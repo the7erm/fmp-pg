@@ -598,6 +598,14 @@ var fmpApp = angular.module('fmpApp', [
         methods.setPlayingData = function(obj) {
             console.log("setPlayingData:", obj);
             collection.playingData = obj;
+            var title = "FMP"
+            if (typeof obj.artists[0] != "undefined") {
+              title = "FMP - "+obj.artists[0].name+" - "+obj.titles[0].name;
+            } else {
+              title = "FMP - "+obj.locations[0].basename;
+            }
+            console.log("document.title:", title);
+            document.title = title;
         }
 
         methods.onAddGenre = function(file_id, genre){

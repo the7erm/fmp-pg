@@ -122,12 +122,12 @@ def test_conn(config):
     total_users = 0
 
     try:
-        total_folders = cur.execute("SELECT count(*) AS 'total' FROM folders").fetchone()[0]
+        total_folders = cur.execute("SELECT count(*) AS total FROM folders").fetchone()[0]
     except:
         result['errors'].append("Can't count totals for table `folders`")
 
     try:
-        sql = """SELECT count(*) AS 'total'
+        sql = """SELECT count(*) AS total
                  FROM files f, locations l
                  WHERE f.id = l.file_id"""
         total_files = cur.execute(sql).fetchone()[0]
@@ -135,7 +135,7 @@ def test_conn(config):
         result['errors'].append("Can't count totals for table `files`")
 
     try:
-        sql = """SELECT count(*) AS 'total'
+        sql = """SELECT count(*) AS total
                  FROM users u"""
         total_users = cur.execute(sql).fetchone()[0]
     except:

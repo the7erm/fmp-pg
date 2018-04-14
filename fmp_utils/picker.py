@@ -21,7 +21,7 @@ import math
 import os
 
 true_score_pool = defaultdict(list)
-MAX_ALLOWED = 125
+MAX_ALLOWED = 510
 
 def insert_missing_user_file_info_for_user_id(user_id):
     return

@@ -2,6 +2,7 @@
 import sys
 from collections import defaultdict
 from time import time
+from copy import deepcopy
 import traceback
 
 class Jobs():
@@ -56,6 +57,18 @@ class Jobs():
 
         one_has_jobs = False
         items = self.picker.items()
+        items = deepcopy(items)
+        """
+        items = deepcopy(items) was added to stop this from happening.
+        Traceback (most recent call last):
+          File "/home/erm/git/fmp-pg/fmp_utils/fmp_playlist.py", line 346, in on_time_status
+            jobs.run_next_job()
+          File "/home/erm/git/fmp-pg/fmp_utils/jobs.py", line 26, in run_next_job
+            self.run_picker_jobs(end_time)
+          File "/home/erm/git/fmp-pg/fmp_utils/jobs.py", line 77, in run_picker_jobs
+            for user_id, user_jobs in items:
+        RuntimeError: dictionary changed size during iteration
+        """
         for user_id, user_jobs in items:
             if user_jobs:
                 one_has_jobs = True
@@ -74,6 +87,18 @@ class Jobs():
             print(self.user_ids)
 
             items = self.picker.items()
+            items = deepcopy(items)
+            """
+            items = deepcopy(items) was added to stop this from happening.
+            Traceback (most recent call last):
+              File "/home/erm/git/fmp-pg/fmp_utils/fmp_playlist.py", line 346, in on_time_status
+                jobs.run_next_job()
+              File "/home/erm/git/fmp-pg/fmp_utils/jobs.py", line 26, in run_next_job
+                self.run_picker_jobs(end_time)
+              File "/home/erm/git/fmp-pg/fmp_utils/jobs.py", line 77, in run_picker_jobs
+                for user_id, user_jobs in items:
+            RuntimeError: dictionary changed size during iteration
+            """
             for user_id, user_jobs in items:
 
                 if user_id != user_turn:

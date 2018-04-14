@@ -2525,8 +2525,21 @@ def cherry_py_worker():
     print ("IMAGE PATH:", static_img_path)
     favicon = os.path.join(static_img_path, "favicon.ico")
     print ("IMAGE:", favicon)
-
+    """
+    conf = {
+        '/': {
+            'tools.response_headers.on': True,
+            'tools.response_headers.headers': [('Content-Type', 'image/jpeg'), ('Access-Control-Allow-Origin', 'http://my_ip')],
+            'server.socket_host': 'my_ip',
+            'server.socket_port': 8888
+        }
+    }
+    """
     cherrypy.quickstart(FmpServer(), '/', config={
+        '/': {
+            'tools.response_headers.on': True,
+            'tools.response_headers.headers': [('Access-Control-Allow-Origin', '*')]
+        },
         '/ws': {
             'tools.websocket.on': True,
             'tools.websocket.handler_cls': ChatWebSocketHandler

@@ -922,6 +922,10 @@ var FmpFile = function (spec) {
 var Downloader = function(){
     var thisDownloader = this;
 
+    thisDownloader.totalQued = 0;
+    thisDownloader.totalComplete = 0;
+    thisDownloader.totalPercent = 100;
+
     thisDownloader.queue = [];
     thisDownloader.downloading = null;
     var logger = new Logger("Downloader", false);
@@ -943,25 +947,29 @@ var Downloader = function(){
             file.dlCompleteCallback = thisDownloader.onComplete;
             file.dlFailCallback = thisDownloader.onFail;
             thisDownloader.queue.push(file);
+            thisDownloader.totalQued++;
         }
         if (!thisDownloader.downloading || thisDownloader.downloading.progress == 100 ||
             thisDownloader.downloading.exists) {
-            thisDownloader.downloading = null;
+                thisDownloader.downloading = null;
         }
         thisDownloader.run();
     };
     thisDownloader.onComplete = function() {
         thisDownloader.downloading = null;
+        thisDownloader.totalComplete++;
         thisDownloader.run();
     };
     thisDownloader.onFail = function() {
         thisDownloader.downloading = null;
+        thisDownloader.totalComplete++;
         thisDownloader.run();
     };
     thisDownloader.run = function() {
         if (thisDownloader.downloading || thisDownloader.queue.length == 0) {
             return;
         }
+        thisDownloader.totalPercent = ((thisDownloader.totalComplete / thisDownloader.totalQued) * 100).toFixed(0);
         var file = thisDownloader.queue.shift();
         logger.log("thisDownloader file:", file.basename);
         thisDownloader.downloading = file;
@@ -1052,6 +1060,7 @@ var Player = function() {
         thisPlayer.file.skipped = false;
         thisPlayer.file.err = "";
 
+
         thisPlayer.media = new Media(thisPlayer.file.filename,
             function(){
                 // mediaSuccess
@@ -1104,9 +1113,31 @@ var Player = function() {
             }
         );
 
-
+        this.getFileTags();
         thisPlayer.waitForRelease();
     };
+
+    this.getFileTags = function() {
+        var jsmediatags = window.jsmediatags;
+        console.log("jsmediatags read:", thisPlayer.file.filename);
+        window.resolveLocalFileSystemURL(thisPlayer.file.filename, function (oFile)
+        {
+            console.log("jsmediatags oFile found");
+            oFile.file(function (file)
+            {
+                window.jsmediatags.read(file, {
+                    onSuccess: function(tag) {
+                        console.log("jsmediatags onSuccess:", tag);
+                    },
+                    onError: function(error) {
+                        console.log("jsmediatags onError:", error);
+                    }
+                });
+            });
+        }, function() {
+            console.log("getFileTags() NOTHING");
+        });
+    }
 
     thisPlayer.setMusicControls = function() {
         MusicControls.destroy(function(){}, function(){});
